@@ -1,0 +1,28 @@
+{
+    "rules": [
+        [
+            ["folder", "startsWithAny", ["app", "database/migrations", "database/factories", "routes", "tests"]],
+            ["extension", "oneOf", ["php", "blade.php"]]
+        ],
+        [
+            ["folder", "startsWith", "resources/sql"],
+            ["extension", "=", "sql"]
+        ]
+    ],
+    "globalExcludeRules": [
+        ["folder", "startsWithAny", ["vendor", "node_modules", "storage"]],
+        ["extension", "oneOf", ["log", "lock"]],
+        ["basename", "startsWith", ".env"]
+    ],
+    "always": {
+        "include": [
+            "composer.json",
+            "README.md",
+            ".env.example"
+        ],
+        "exclude": [
+            "composer.lock",
+            "package-lock.json"
+        ]
+    }
+}

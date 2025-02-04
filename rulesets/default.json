@@ -1,0 +1,61 @@
+{
+    "globalExcludeRules": [
+        ["path", "startsWithAny", [
+            "vendor/",
+            "node_modules/",
+            "build/",
+            "dist/",
+            "out/",
+            "target/",
+            "bin/",
+            "obj/",
+            "logs/",
+            "temp/",
+            "tmp/",
+            "cache/",
+            "coverage/"
+        ]],
+        ["basename", "startsWith", "."],
+        ["extension", "oneOf", [
+            "log",
+            "lock",
+            "tmp",
+            "temp",
+            "swp",
+            "swo",
+            "bak",
+            "cache",
+            "pyc",
+            "pyo",
+            "rbc",
+            "class",
+            "o",
+            "obj"
+        ]],
+        ["basename", "oneOf", [
+            "Thumbs.db",
+            ".DS_Store",
+            "package-lock.json",
+            "yarn.lock",
+            "composer.lock",
+            ".gitkeep",
+            ".phpunit.result.cache",
+            ".env",
+            ".env.local",
+            ".env.*.local"
+        ]],
+        ["extension", "oneOf", [
+            "exe",
+            "dll",
+            "so",
+            "dylib",
+            "jar",
+            "war",
+            "ear"
+        ]],
+        ["path", "contains", "__pycache__"],
+        ["path", "contains", "__snapshots__"],
+        ["basename", "regex", "/^~.*/"],
+        ["size", "<", "5MB"]
+    ]
+}
