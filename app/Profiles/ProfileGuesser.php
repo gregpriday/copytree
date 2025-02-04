@@ -1,8 +1,6 @@
 <?php
 
-namespace App\Services\Profiles;
-
-use RuntimeException;
+namespace App\Profiles;
 
 /**
  * Guesses the appropriate profile based on the project structure.

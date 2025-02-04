@@ -2,10 +2,9 @@
 
 namespace App\Commands;
 
-use App\Services\Profiles\ProfileGuesser;
-use App\Services\Profiles\ProfileLoader;
+use App\Profiles\ProfileGuesser;
+use App\Profiles\ProfileLoader;
 use LaravelZero\Framework\Commands\Command;
-use RuntimeException;
 
 class CopyTreeCommand extends Command
 {

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Profiles;
+namespace App\Profiles;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
