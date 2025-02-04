@@ -1,0 +1,71 @@
+{
+    "name": "gregpriday/copy-tree",
+    "description": "Copy a directory and its files to your clipboard.",
+    "keywords": ["gregpriday", "copy-tree"],
+    "homepage": "https://github.com/gregpriday/copy-tree",
+    "type": "project",
+    "license": "MIT",
+    "support": {
+        "issues": "https://github.com/gregpriday/copy-tree/issues",
+        "source": "https://github.com/gregpriday/copy-tree"
+    },
+    "authors": [
+        {
+            "name": "Greg Priday",
+            "email": "greg@siteorigin.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2.0",
+        "ext-fileinfo": "*",
+        "caseyamcl/guzzle_retry_middleware": "^2.12",
+        "civicrm/gitignore": "^1.2",
+        "czproject/git-php": "^4.3",
+        "illuminate/support": "^11.15",
+        "laravel-zero/framework": "^11",
+        "openai-php/client": "^0.10.3",
+        "openai-php/laravel": "^0.10.2",
+        "symfony/console": "^6.0|^7.0",
+        "symfony/finder": "^7.1",
+        "symfony/process": "^6.0|^7.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.18.3",
+        "mockery/mockery": "^1.6.12",
+        "phpunit/phpunit": "^10.5",
+        "spatie/ray": "^1.28",
+        "symfony/phpunit-bridge": "^6.0|^7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/"
+        },
+        "files": [
+            "bootstrap/constants.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit --no-coverage",
+        "test-coverage": "vendor/bin/phpunit --coverage",
+        "format": "vendor/bin/pint"
+    },
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "phpstan/extension-installer": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "bin": ["copytree"]
+}
