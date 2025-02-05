@@ -13,7 +13,6 @@ class CopyDocsCommand extends Command
     protected $signature = 'copy:docs
         {--f|filter=* : Filter files using glob patterns.}
         {--a|ai-filter=? : Filter files using a natural language description.}
-        {--s|search=? : Search for files using a query string.}
         {--o|output? : Output to a file (the filename is always "profile-docs.txt").}
         {--i|display : Display output in the console.}
         {--S|stream : Stream output directly.}

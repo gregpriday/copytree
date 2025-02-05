@@ -5,7 +5,6 @@ namespace App\Commands;
 use App\Pipeline\FileLoader;
 use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\GitFilterStage;
-use App\Pipeline\Stages\JinaSearchStage;
 use App\Pipeline\Stages\OpenAIFilterStage;
 use App\Pipeline\Stages\RulesetFilterStage;
 use App\Pipeline\Stages\SortFilesStage;
@@ -14,7 +13,6 @@ use App\Profiles\ProfileLoader;
 use App\Renderer\FileOutputRenderer;
 use App\Renderer\TreeRenderer;
 use App\Services\AIFilenameGenerator;
-use App\Services\JinaCodeSearch;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
 use Illuminate\Pipeline\Pipeline;
@@ -36,7 +34,6 @@ class CopyTreeCommand extends Command
         {--p|profile=auto : Profile to apply. Available options: auto, none, etc.}
         {--f|filter=* : Filter files using glob patterns. Can be specified multiple times.}
         {--a|ai-filter=false : Filter files using AI based on a natural language description.}
-        {--s|search=false : Search for files using a search query string.}
         {--m|modified : Only include files that have been modified since the last commit.}
         {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
         {--o|output? : Outputs to a file. If no filename is provided, creates file in ~/.copytree/files/.}
@@ -97,12 +94,6 @@ class CopyTreeCommand extends Command
         if ($this->option('ai-filter') !== false) {
             $pipeline->through([
                 new OpenAIFilterStage($this->option('ai-filter')),
-            ]);
-        } elseif ($this->option('search') !== false) {
-            // Use Jina search for search queries.
-            $jinaService = app(JinaCodeSearch::class);
-            $pipeline->through([
-                new JinaSearchStage($jinaService, $this->option('search')),
             ]);
         }
 
