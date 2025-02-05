@@ -39,38 +39,33 @@ class DefaultFileLoader implements FileTransformerInterface
         $mime = File::mimeType($filePath);
 
         // If the file is an image, delegate to ImageDescription transformer.
-        if (strpos($mime, 'image/') === 0) {
-            $transformer = new ImageDescription;
-
-            return $transformer->transform($input);
+        if (str_starts_with($mime, 'image/')) {
+            return app(ImageDescription::class)->transform($input);
         }
 
         // If the file is a PDF, delegate to PDFToText transformer.
         if ($mime === 'application/pdf') {
-            $transformer = new PDFToText;
-
-            return $transformer->transform($input);
+            return app(PDFToText::class)->transform($input);
         }
 
-        // If the file is convertible (based on PandocConverter's criteria), delegate to DocumentToTextTransformer.
+        // If the file is convertible (based on PandocConverter's criteria), delegate to DocumentToText transformer.
         if (DocumentToText::canConvert($input)) {
-            $transformer = new DocumentToText;
-
-            return $transformer->transform($input);
+            return app(DocumentToText::class)->transform($input);
         }
 
         // Fallback: load the file content directly.
-        $content = File::get($filePath);
+        $maxBytes = 5 * 1024 * 1024; // 5 MB in bytes
+        $fileSize = $input->getSize();
+        if ($fileSize > $maxBytes) {
+            // Load only the first 5MB if the file is larger than 5MB.
+            $content = file_get_contents($filePath, false, null, 0, $maxBytes)
+                ."\n\n=== Only showing the first 5MB ===";
+        } else {
+            $content = file_get_contents($filePath);
+        }
 
         if ($this->isBinaryContent($content)) {
             return '[Binary file - not displayed]';
-        }
-
-        if (mb_strlen($content) > $this->maxLength) {
-            $snipped = mb_substr($content, 0, $this->maxLength);
-            $snipped .= "\n\n... [truncated after {$this->maxLength} characters] ...";
-
-            return $snipped;
         }
 
         return $content;
