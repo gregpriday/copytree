@@ -64,48 +64,25 @@ class JinaCodeSearch
     /**
      * Create a new JinaCodeSearch instance.
      *
-     * @param int   $previewLength   Maximum number of characters for a file preview (default: 1000).
-     * @param int   $chunkSize       Number of files per API call (default: 20).
-     * @param float $relevancyCutoff Minimum relevance score to pass (default: 0.8).
+     * @param string $apiKey         The API key for Jina.
+     * @param int    $previewLength  Maximum number of characters for a file preview (default: 1000).
+     * @param int    $chunkSize      Number of files per API call (default: 20).
+     * @param float  $relevancyCutoff Minimum relevance score to pass (default: 0.8).
      *
-     * @throws RuntimeException If configuration file or API key is missing.
+     * @throws RuntimeException
      */
     public function __construct(
+        string $apiKey,
         int $previewLength = 1000,
         int $chunkSize = 20,
         float $relevancyCutoff = 0.8
     ) {
+        $this->apiKey = $apiKey;
         $this->previewLength   = $previewLength;
         $this->chunkSize       = $chunkSize;
         $this->relevancyCutoff = $relevancyCutoff;
 
-        $this->loadConfiguration();
         $this->initializeClientWithRetry();
-    }
-
-    /**
-     * Load configuration from a custom .env file.
-     *
-     * Expects the Jina API key to be defined as "JINA_API_KEY" in ~/.copytree/.env.
-     *
-     * @throws RuntimeException If the configuration file or API key is missing.
-     */
-    protected function loadConfiguration(): void
-    {
-        $homeDir = PHP_OS_FAMILY === 'Windows' ? getenv('USERPROFILE') : getenv('HOME');
-        $envPath = $homeDir . DIRECTORY_SEPARATOR . '.copytree' . DIRECTORY_SEPARATOR . '.env';
-
-        if (!file_exists($envPath)) {
-            throw new RuntimeException("Jina.ai configuration file not found at {$envPath}");
-        }
-
-        $env = parse_ini_file($envPath);
-
-        if (!isset($env['JINA_API_KEY'])) {
-            throw new RuntimeException('Jina.ai API key not found in configuration');
-        }
-
-        $this->apiKey = $env['JINA_API_KEY'];
     }
 
     /**
@@ -115,9 +92,9 @@ class JinaCodeSearch
     {
         $stack = HandlerStack::create();
         $stack->push(GuzzleRetryMiddleware::factory([
-            'max_retry_attempts' => 3,
-            'retry_on_status'      => [429, 503, 500],
-            'default_retry_multiplier' => 2.0,
+            'max_retry_attempts'      => 3,
+            'retry_on_status'         => [429, 503, 500],
+            'default_retry_multiplier'=> 2.0,
         ]));
 
         $this->client = new Client([
@@ -156,8 +133,8 @@ class JinaCodeSearch
      *
      * @param array  $files Array of files to search through. Each element should be an
      *                      associative array with keys:
-     *                      - 'path': The relative file path.
-     *                      - 'file': An instance of SplFileInfo.
+     *                        - 'path': The relative file path.
+     *                        - 'file': An instance of SplFileInfo.
      * @param string $query Natural language search query.
      *
      * @return array{files: array, total_tokens: int} Ranked files and token usage info.
@@ -178,7 +155,7 @@ class JinaCodeSearch
             ];
         }, $files);
 
-        // Split documents into chunks to avoid exceeding token limits.
+        // Split documents into chunks.
         $chunks = array_chunk($documents, $this->chunkSize);
         $results = [];
         $totalTokens = 0;
@@ -206,8 +183,6 @@ class JinaCodeSearch
             'fulfilled'   => function ($response, $index) use (&$results, &$totalTokens, $chunks) {
                 $data = json_decode($response->getBody()->getContents(), true);
                 $totalTokens += $data['usage']['total_tokens'] ?? 0;
-
-                // Map the results back to original files.
                 foreach ($data['results'] as $result) {
                     $chunkIndex = $result['index'];
                     $originalFile = $chunks[$index][$chunkIndex]['original'];
@@ -224,10 +199,9 @@ class JinaCodeSearch
 
         $pool->promise()->wait();
 
-        // Sort results by relevance score (highest first).
+        // Sort results by relevance score.
         usort($results, fn($a, $b) => $b['relevance_score'] <=> $a['relevance_score']);
 
-        // Prepare final output by mapping results.
         $formattedResults = array_map(function ($result) {
             return [
                 'file'            => $result['file']['path'],
@@ -245,13 +219,12 @@ class JinaCodeSearch
     /**
      * Get file content with the file path as context.
      *
-     * Reads the file content, truncates it to the preview length, and
-     * prefixes it with the file’s relative path.
+     * Reads the file, truncates it to the preview length, and prefixes it with the file’s relative path.
      *
      * @param SplFileInfo $file The file to read.
      * @param string      $path The relative file path.
      *
-     * @return string The formatted file content.
+     * @return string
      *
      * @throws RuntimeException If the file cannot be read.
      */

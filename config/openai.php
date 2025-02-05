@@ -25,4 +25,6 @@ return [
     */
 
     'request_timeout' => env('OPENAI_REQUEST_TIMEOUT', 60),
+
+    'model' => env('OPENAI_MODEL', 'gpt-4o'),
 ];

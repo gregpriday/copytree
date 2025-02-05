@@ -62,7 +62,7 @@ class OpenAIFilterStage implements FilePipelineStageInterface
 
         try {
             $response = OpenAI::chat()->create([
-                'model'       => config('openai.model', 'gpt-4'),
+                'model'       => config('openai.model', 'gpt-4o'),
                 'messages'    => [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user',   'content' => $promptText],
