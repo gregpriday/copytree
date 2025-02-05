@@ -2,9 +2,9 @@
 
 namespace App\Commands;
 
-use LaravelZero\Framework\Commands\Command;
-use Illuminate\Support\Facades\Cache;
 use App\Services\GitHubUrlHandler;
+use Illuminate\Support\Facades\Cache;
+use LaravelZero\Framework\Commands\Command;
 
 class ClearCacheCommand extends Command
 {
@@ -27,8 +27,6 @@ class ClearCacheCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return int
      */
     public function handle(): int
     {
@@ -45,7 +43,8 @@ class ClearCacheCommand extends Command
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Error clearing caches: ' . $e->getMessage());
+            $this->error('Error clearing caches: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

@@ -7,12 +7,12 @@ use Symfony\Component\Finder\SplFileInfo;
 class RulesetFilter
 {
     /**
-     * @var array[]  Each element is a rule set (an array of rule triples) for inclusion.
+     * @var array[] Each element is a rule set (an array of rule triples) for inclusion.
      */
     protected array $rules = [];
 
     /**
-     * @var array[]  Each element is a rule set (an array of rule triples) that if matched will force exclusion.
+     * @var array[] Each element is a rule set (an array of rule triples) that if matched will force exclusion.
      */
     protected array $globalExcludeRules = [];
 
@@ -29,9 +29,9 @@ class RulesetFilter
     /**
      * Create a new RulesetFilter instance.
      *
-     * @param array $rules              The include rule sets (from the "rules" property).
-     * @param array $globalExcludeRules The global exclude rule sets.
-     * @param array $always             An array with keys "include" and "exclude" (each an array of glob patterns).
+     * @param  array  $rules  The include rule sets (from the "rules" property).
+     * @param  array  $globalExcludeRules  The global exclude rule sets.
+     * @param  array  $always  An array with keys "include" and "exclude" (each an array of glob patterns).
      */
     public function __construct(array $rules = [], array $globalExcludeRules = [], array $always = [])
     {
@@ -54,9 +54,6 @@ class RulesetFilter
      * 3. Then, if any global exclude rule set evaluates true for the file, reject.
      * 4. Finally, if include rules exist, the file must match at least one include rule set; if not, reject.
      *    (If no include rules exist, the file is accepted.)
-     *
-     * @param SplFileInfo $file
-     * @return bool
      */
     public function accept(SplFileInfo $file): bool
     {
@@ -102,17 +99,16 @@ class RulesetFilter
      * Evaluate a rule set (an array of rule triples) against the file.
      * Every rule in the rule set must evaluate true for the set to match.
      *
-     * @param SplFileInfo $file
-     * @param array       $ruleSet An array of rule triples, e.g. [ [field, operator, value], ... ]
-     * @return bool
+     * @param  array  $ruleSet  An array of rule triples, e.g. [ [field, operator, value], ... ]
      */
     protected function evaluateRuleSet(SplFileInfo $file, array $ruleSet): bool
     {
         foreach ($ruleSet as $rule) {
-            if (!$this->evaluateRule($file, $rule)) {
+            if (! $this->evaluateRule($file, $rule)) {
                 return false;
             }
         }
+
         return true;
     }
 
@@ -122,14 +118,10 @@ class RulesetFilter
      * A rule is defined as a triple: [field, operator, value].
      * Supported fields: folder, path, dirname, basename, extension, filename, contents, contents_slice, size, mtime, mimeType.
      * Supported operators include: "=", "!=", ">", ">=", "<", "<=", "oneOf", "regex", "glob", "fnmatch", "contains", "startsWith", "endsWith".
-     *
-     * @param SplFileInfo $file
-     * @param array       $rule
-     * @return bool
      */
     protected function evaluateRule(SplFileInfo $file, array $rule): bool
     {
-        list($field, $operator, $value) = $rule;
+        [$field, $operator, $value] = $rule;
         $fieldValue = $this->getFieldValue($file, $field);
 
         switch ($operator) {
@@ -169,8 +161,6 @@ class RulesetFilter
      *
      * Uses the Finder SplFileInfo methods where possible.
      *
-     * @param SplFileInfo $file
-     * @param string      $field
      * @return mixed
      */
     protected function getFieldValue(SplFileInfo $file, string $field)
@@ -206,9 +196,8 @@ class RulesetFilter
     /**
      * Check if a given file path matches a glob pattern.
      *
-     * @param string $path    The relative file path.
-     * @param string $pattern The glob pattern.
-     * @return bool
+     * @param  string  $path  The relative file path.
+     * @param  string  $pattern  The glob pattern.
      */
     protected function matchesPattern(string $path, string $pattern): bool
     {

@@ -20,7 +20,7 @@ class RulesetFilterStage implements FilePipelineStageInterface
     /**
      * Create a new RulesetFilterStage.
      *
-     * @param RulesetFilter $rulesetFilter The ruleset filter instance to use.
+     * @param  RulesetFilter  $rulesetFilter  The ruleset filter instance to use.
      */
     public function __construct(RulesetFilter $rulesetFilter)
     {
@@ -35,9 +35,8 @@ class RulesetFilterStage implements FilePipelineStageInterface
      * 2. Only include files that are accepted.
      * 3. Pass the filtered array to the next stage in the pipeline.
      *
-     * @param array    $files An array of Symfony Finder SplFileInfo objects.
-     * @param \Closure $next  The next stage in the pipeline.
-     *
+     * @param  array  $files  An array of Symfony Finder SplFileInfo objects.
+     * @param  \Closure  $next  The next stage in the pipeline.
      * @return array The filtered array of files.
      */
     public function handle(array $files, \Closure $next): array

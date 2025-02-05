@@ -3,8 +3,8 @@
 namespace App\Renderer;
 
 use App\Transforms\FileTransformer;
-use Symfony\Component\Finder\SplFileInfo;
 use DateTime;
+use Symfony\Component\Finder\SplFileInfo;
 
 class FileOutputRenderer
 {
@@ -13,7 +13,7 @@ class FileOutputRenderer
     /**
      * Constructor.
      *
-     * @param FileTransformer $transformer The file transformer instance
+     * @param  FileTransformer  $transformer  The file transformer instance
      */
     public function __construct(FileTransformer $transformer)
     {
@@ -26,9 +26,8 @@ class FileOutputRenderer
      * This method takes an array of SplFileInfo objects, applies the transformer
      * to get each file’s content, and outputs a formatted string including metadata.
      *
-     * @param SplFileInfo[] $files    Array of files to render.
-     * @param int           $maxLines Maximum number of lines to show per file (0 for unlimited).
-     *
+     * @param  SplFileInfo[]  $files  Array of files to render.
+     * @param  int  $maxLines  Maximum number of lines to show per file (0 for unlimited).
      * @return string The rendered output.
      */
     public function render(array $files, int $maxLines = 0): string
@@ -40,7 +39,7 @@ class FileOutputRenderer
             $mimeType = mime_content_type($file->getRealPath());
             $size = $this->formatFileSize($file->getSize());
             $lines = count(file($file->getRealPath()));
-            $modifiedTime = (new DateTime())->setTimestamp($file->getMTime())->format('Y-m-d H:i:s');
+            $modifiedTime = (new DateTime)->setTimestamp($file->getMTime())->format('Y-m-d H:i:s');
 
             // Start file block
             $output[] = sprintf(
@@ -60,7 +59,7 @@ class FileOutputRenderer
                 $linesArr = explode("\n", $content);
                 if (count($linesArr) > $maxLines) {
                     $content = implode("\n", array_slice($linesArr, 0, $maxLines))
-                        . "\n\n... [truncated after {$maxLines} lines] ...";
+                        ."\n\n... [truncated after {$maxLines} lines] ...";
                 }
             }
 
@@ -75,7 +74,7 @@ class FileOutputRenderer
     /**
      * Format a file size in bytes into a human-readable string.
      *
-     * @param int $bytes The size in bytes.
+     * @param  int  $bytes  The size in bytes.
      * @return string The formatted file size.
      */
     protected function formatFileSize(int $bytes): string
@@ -85,6 +84,7 @@ class FileOutputRenderer
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
         $pow = min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
-        return round($bytes, 1) . ' ' . $units[$pow];
+
+        return round($bytes, 1).' '.$units[$pow];
     }
 }

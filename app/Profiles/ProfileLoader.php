@@ -34,7 +34,7 @@ class ProfileLoader
         $data = json_decode($json, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException("Invalid JSON in profile configuration: " . json_last_error_msg());
+            throw new RuntimeException('Invalid JSON in profile configuration: '.json_last_error_msg());
         }
 
         // Merge any command options with the profile data.

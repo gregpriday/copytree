@@ -7,6 +7,7 @@ use DirectoryIterator;
 class TempFileManager
 {
     private const MAX_AGE_MINUTES = 15;
+
     private const PREFIX = 'ctree_output_';
 
     /**
@@ -17,7 +18,7 @@ class TempFileManager
     public static function getTempDir(): string
     {
         $baseDir = sys_get_temp_dir();
-        $ctreeDir = $baseDir . DIRECTORY_SEPARATOR . 'ctree';
+        $ctreeDir = $baseDir.DIRECTORY_SEPARATOR.'ctree';
 
         if (! is_dir($ctreeDir)) {
             mkdir($ctreeDir, 0777, true);
@@ -38,9 +39,9 @@ class TempFileManager
     {
         $tempDir = self::getTempDir();
         $timestamp = date('Y-m-d_H-i-s');
-        $hash = substr(hash('sha256', $content . uniqid()), 0, 16);
-        $filename = self::PREFIX . $timestamp . '_' . $hash . '.txt';
-        $filepath = $tempDir . DIRECTORY_SEPARATOR . $filename;
+        $hash = substr(hash('sha256', $content.uniqid()), 0, 16);
+        $filename = self::PREFIX.$timestamp.'_'.$hash.'.txt';
+        $filepath = $tempDir.DIRECTORY_SEPARATOR.$filename;
 
         file_put_contents($filepath, $content);
 

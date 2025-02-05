@@ -2,19 +2,19 @@
 
 namespace App\Commands;
 
-use App\Profiles\ProfileGuesser;
-use App\Profiles\ProfileLoader;
 use App\Pipeline\FileLoader;
+use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\GitFilterStage;
 use App\Pipeline\Stages\JinaSearchStage;
 use App\Pipeline\Stages\OpenAIFilterStage;
-use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\RulesetFilterStage;
 use App\Pipeline\Stages\SortFilesStage;
-use App\Services\JinaCodeSearch;
-use App\Services\AIFilenameGenerator;
-use App\Renderer\TreeRenderer;
+use App\Profiles\ProfileGuesser;
+use App\Profiles\ProfileLoader;
 use App\Renderer\FileOutputRenderer;
+use App\Renderer\TreeRenderer;
+use App\Services\AIFilenameGenerator;
+use App\Services\JinaCodeSearch;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
 use Illuminate\Pipeline\Pipeline;
@@ -64,22 +64,22 @@ class CopyTreeCommand extends Command
         $profileGuesser = new ProfileGuesser($projectPath);
         $guessedProfile = $profileGuesser->guess();
         $profilePath = $profileGuesser->getProfilePath($guessedProfile);
-        $profileLoader = new ProfileLoader();
+        $profileLoader = new ProfileLoader;
         $profileLoader->load($profilePath, [
-            'profile'    => $this->option('profile'),
-            'filter'     => (array)$this->option('filter'),
-            'ai_filter'  => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
-            'search'     => $this->option('search'),
-            'modified'   => $this->option('modified'),
-            'changes'    => $this->option('changes'),
-            'depth'      => (int)$this->option('depth'),
-            'max_lines'  => (int)$this->option('max-lines'),
+            'profile' => $this->option('profile'),
+            'filter' => (array) $this->option('filter'),
+            'ai_filter' => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
+            'search' => $this->option('search'),
+            'modified' => $this->option('modified'),
+            'changes' => $this->option('changes'),
+            'depth' => (int) $this->option('depth'),
+            'max_lines' => (int) $this->option('max-lines'),
         ]);
 
         $this->info('Profile loaded successfully.');
 
         // Load the initial file set.
-        $depth = (int)$this->option('depth');
+        $depth = (int) $this->option('depth');
         $fileLoader = new FileLoader($projectPath);
         $files = $fileLoader->loadFiles($depth);
 
@@ -89,27 +89,27 @@ class CopyTreeCommand extends Command
         // Add Git filtering if requested.
         if ($this->option('modified') || $this->option('changes')) {
             $pipeline->through([
-                new GitFilterStage($projectPath, (bool)$this->option('modified'), $this->option('changes'))
+                new GitFilterStage($projectPath, (bool) $this->option('modified'), $this->option('changes')),
             ]);
         }
 
         // Add AI filtering if requested.
         if ($this->option('ai-filter') !== false) {
             $pipeline->through([
-                new OpenAIFilterStage($this->option('ai-filter'))
+                new OpenAIFilterStage($this->option('ai-filter')),
             ]);
         } elseif ($this->option('search') !== false) {
             // Use Jina search for search queries.
             $jinaService = app(JinaCodeSearch::class);
             $pipeline->through([
-                new JinaSearchStage($jinaService, $this->option('search'))
+                new JinaSearchStage($jinaService, $this->option('search')),
             ]);
         }
 
         // Add external sources if configured in the profile.
         if (config('profile.external')) {
             $pipeline->through([
-                new ExternalSourceStage(config('profile.external'))
+                new ExternalSourceStage(config('profile.external')),
             ]);
         }
 
@@ -122,13 +122,13 @@ class CopyTreeCommand extends Command
                         config('profile.global_exclude_rules', []),
                         config('profile.always', [])
                     )
-                )
+                ),
             ]);
         }
 
         // Always add a sorting stage.
         $pipeline->through([
-            new SortFilesStage()
+            new SortFilesStage,
         ]);
 
         // Execute the pipeline.
@@ -137,7 +137,7 @@ class CopyTreeCommand extends Command
         });
 
         // Render the tree view.
-        $treeRenderer = new TreeRenderer();
+        $treeRenderer = new TreeRenderer;
         $treeOutput = $treeRenderer->render($finalFiles);
 
         // Render file contents output if not in only-tree mode.
@@ -145,7 +145,7 @@ class CopyTreeCommand extends Command
         if (! $this->option('only-tree')) {
             // Resolve the FileOutputRenderer via the container so that its dependency (FileTransformer) is injected.
             $fileRenderer = app(FileOutputRenderer::class);
-            $maxLines = (int)$this->option('max-lines');
+            $maxLines = (int) $this->option('max-lines');
             $fileOutput = $fileRenderer->render($finalFiles, $maxLines);
         }
 
@@ -165,12 +165,12 @@ class CopyTreeCommand extends Command
             if (empty($filename)) {
                 // Generate a filename using the AI Filename Generation service.
                 $filename = app(AIFilenameGenerator::class)->generateFilename(
-                    array_map(fn(SplFileInfo $file) => ['path' => $file->getRelativePathname()], $finalFiles),
+                    array_map(fn (SplFileInfo $file) => ['path' => $file->getRelativePathname()], $finalFiles),
                     storage_path('app/files')
                 );
             }
             // Write output to the file.
-            $fullPath = storage_path('app/files') . DIRECTORY_SEPARATOR . $filename;
+            $fullPath = storage_path('app/files').DIRECTORY_SEPARATOR.$filename;
             file_put_contents($fullPath, $combinedOutput);
             $this->info("Saved output to file: {$fullPath}");
         } elseif ($this->option('display')) {
@@ -179,12 +179,12 @@ class CopyTreeCommand extends Command
         } elseif ($this->option('as-reference')) {
             // Create a temporary file and copy its reference to the clipboard.
             $tempFile = TempFileManager::createTempFile($combinedOutput);
-            (new Clipboard())->copy($tempFile, true);
+            (new Clipboard)->copy($tempFile, true);
             $this->info("Copied reference to temporary file: {$tempFile}");
         } else {
             // Copy the output directly to the clipboard.
-            (new Clipboard())->copy($combinedOutput);
-            $this->info("Copied " . count($finalFiles) . " files to clipboard.");
+            (new Clipboard)->copy($combinedOutput);
+            $this->info('Copied '.count($finalFiles).' files to clipboard.');
         }
 
         return self::SUCCESS;

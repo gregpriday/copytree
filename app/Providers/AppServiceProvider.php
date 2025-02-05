@@ -26,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
             if (empty($jinaConfig['api_key'])) {
                 throw new \RuntimeException('JINA_API_KEY not configured in config/services.php');
             }
+
             return new JinaCodeSearch($jinaConfig['api_key'], 1000, 20, 0.8);
         });
 

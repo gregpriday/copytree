@@ -29,8 +29,8 @@ return [
 
     'stores' => [
         'file' => [
-            'driver'    => 'file',
-            'path'      => copytree_path('cache'),
+            'driver' => 'file',
+            'path' => copytree_path('cache'),
             'lock_path' => copytree_path('cache'),
         ],
     ],
@@ -45,6 +45,6 @@ return [
     |
     */
 
-    'prefix' => Str::slug(env('APP_NAME', 'laravel'), '_') . '_cache_',
+    'prefix' => Str::slug(env('APP_NAME', 'laravel'), '_').'_cache_',
 
 ];

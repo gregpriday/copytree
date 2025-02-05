@@ -14,60 +14,46 @@ class JinaCodeSearch
 {
     /**
      * The HTTP client.
-     *
-     * @var Client|null
      */
     protected ?Client $client = null;
 
     /**
      * Jina API key.
-     *
-     * @var string
      */
     protected string $apiKey;
 
     /**
      * Model to use for reranking.
-     *
-     * @var string
      */
     protected string $model = 'jina-reranker-v2-base-multilingual';
 
     /**
      * Jina API endpoint.
-     *
-     * @var string
      */
     protected string $apiEndpoint = 'https://api.jina.ai/v1/rerank';
 
     /**
      * Maximum length for a file preview.
-     *
-     * @var int
      */
     protected int $previewLength;
 
     /**
      * Number of files to process per API call.
-     *
-     * @var int
      */
     protected int $chunkSize;
 
     /**
      * Minimum relevance score to consider a file acceptable.
-     *
-     * @var float
      */
     protected float $relevancyCutoff;
 
     /**
      * Create a new JinaCodeSearch instance.
      *
-     * @param string $apiKey         The API key for Jina.
-     * @param int    $previewLength  Maximum number of characters for a file preview (default: 1000).
-     * @param int    $chunkSize      Number of files per API call (default: 20).
-     * @param float  $relevancyCutoff Minimum relevance score to pass (default: 0.8).
+     * @param  string  $apiKey  The API key for Jina.
+     * @param  int  $previewLength  Maximum number of characters for a file preview (default: 1000).
+     * @param  int  $chunkSize  Number of files per API call (default: 20).
+     * @param  float  $relevancyCutoff  Minimum relevance score to pass (default: 0.8).
      *
      * @throws RuntimeException
      */
@@ -78,8 +64,8 @@ class JinaCodeSearch
         float $relevancyCutoff = 0.8
     ) {
         $this->apiKey = $apiKey;
-        $this->previewLength   = $previewLength;
-        $this->chunkSize       = $chunkSize;
+        $this->previewLength = $previewLength;
+        $this->chunkSize = $chunkSize;
         $this->relevancyCutoff = $relevancyCutoff;
 
         $this->initializeClientWithRetry();
@@ -92,17 +78,17 @@ class JinaCodeSearch
     {
         $stack = HandlerStack::create();
         $stack->push(GuzzleRetryMiddleware::factory([
-            'max_retry_attempts'      => 3,
-            'retry_on_status'         => [429, 503, 500],
-            'default_retry_multiplier'=> 2.0,
+            'max_retry_attempts' => 3,
+            'retry_on_status' => [429, 503, 500],
+            'default_retry_multiplier' => 2.0,
         ]));
 
         $this->client = new Client([
             'base_uri' => $this->apiEndpoint,
-            'handler'  => $stack,
-            'headers'  => [
-                'Authorization' => 'Bearer ' . $this->apiKey,
-                'Content-Type'  => 'application/json',
+            'handler' => $stack,
+            'headers' => [
+                'Authorization' => 'Bearer '.$this->apiKey,
+                'Content-Type' => 'application/json',
             ],
         ]);
     }
@@ -110,7 +96,7 @@ class JinaCodeSearch
     /**
      * Set the model used for reranking.
      *
-     * @param string $model The model identifier.
+     * @param  string  $model  The model identifier.
      */
     public function setModel(string $model): void
     {
@@ -120,7 +106,7 @@ class JinaCodeSearch
     /**
      * Set a custom API endpoint.
      *
-     * @param string $endpoint The API endpoint URL.
+     * @param  string  $endpoint  The API endpoint URL.
      */
     public function setApiEndpoint(string $endpoint): void
     {
@@ -131,12 +117,11 @@ class JinaCodeSearch
     /**
      * Search through files based on a natural language query.
      *
-     * @param array  $files Array of files to search through. Each element should be an
-     *                      associative array with keys:
+     * @param  array  $files  Array of files to search through. Each element should be an
+     *                        associative array with keys:
      *                        - 'path': The relative file path.
      *                        - 'file': An instance of SplFileInfo.
-     * @param string $query Natural language search query.
-     *
+     * @param  string  $query  Natural language search query.
      * @return array{files: array, total_tokens: int} Ranked files and token usage info.
      *
      * @throws RuntimeException If no files are provided.
@@ -151,7 +136,7 @@ class JinaCodeSearch
         $documents = array_map(function ($file) {
             return [
                 'original' => $file,
-                'content'  => $this->getFileContent($file['file'], $file['path']),
+                'content' => $this->getFileContent($file['file'], $file['path']),
             ];
         }, $files);
 
@@ -168,10 +153,10 @@ class JinaCodeSearch
                     '',
                     ['Content-Type' => 'application/json'],
                     json_encode([
-                        'model'     => $this->model,
-                        'query'     => $query,
+                        'model' => $this->model,
+                        'query' => $query,
                         'documents' => array_column($chunk, 'content'),
-                        'top_n'     => count($chunk),
+                        'top_n' => count($chunk),
                     ])
                 );
             }
@@ -180,38 +165,38 @@ class JinaCodeSearch
         // Process the requests in parallel.
         $pool = new Pool($this->client, $requests(), [
             'concurrency' => 5,
-            'fulfilled'   => function ($response, $index) use (&$results, &$totalTokens, $chunks) {
+            'fulfilled' => function ($response, $index) use (&$results, &$totalTokens, $chunks) {
                 $data = json_decode($response->getBody()->getContents(), true);
                 $totalTokens += $data['usage']['total_tokens'] ?? 0;
                 foreach ($data['results'] as $result) {
                     $chunkIndex = $result['index'];
                     $originalFile = $chunks[$index][$chunkIndex]['original'];
                     $results[] = [
-                        'file'            => $originalFile,
+                        'file' => $originalFile,
                         'relevance_score' => $result['relevance_score'],
                     ];
                 }
             },
-            'rejected'    => function ($reason) {
-                throw new RuntimeException('Jina.ai API request failed: ' . $reason->getMessage());
+            'rejected' => function ($reason) {
+                throw new RuntimeException('Jina.ai API request failed: '.$reason->getMessage());
             },
         ]);
 
         $pool->promise()->wait();
 
         // Sort results by relevance score.
-        usort($results, fn($a, $b) => $b['relevance_score'] <=> $a['relevance_score']);
+        usort($results, fn ($a, $b) => $b['relevance_score'] <=> $a['relevance_score']);
 
         $formattedResults = array_map(function ($result) {
             return [
-                'file'            => $result['file']['path'],
+                'file' => $result['file']['path'],
                 'relevance_score' => $result['relevance_score'],
                 'above_threshold' => $result['relevance_score'] >= $this->relevancyCutoff,
             ];
         }, $results);
 
         return [
-            'files'        => $formattedResults,
+            'files' => $formattedResults,
             'total_tokens' => $totalTokens,
         ];
     }
@@ -221,10 +206,8 @@ class JinaCodeSearch
      *
      * Reads the file, truncates it to the preview length, and prefixes it with the file’s relative path.
      *
-     * @param SplFileInfo $file The file to read.
-     * @param string      $path The relative file path.
-     *
-     * @return string
+     * @param  SplFileInfo  $file  The file to read.
+     * @param  string  $path  The relative file path.
      *
      * @throws RuntimeException If the file cannot be read.
      */
@@ -233,9 +216,10 @@ class JinaCodeSearch
         try {
             $content = file_get_contents($file->getPathname());
             $preview = mb_substr($content, 0, $this->previewLength);
+
             return "File Path: {$path}\n\nContent:\n{$preview}";
         } catch (\Exception $e) {
-            throw new RuntimeException("Failed to read file {$path}: " . $e->getMessage());
+            throw new RuntimeException("Failed to read file {$path}: ".$e->getMessage());
         }
     }
 }

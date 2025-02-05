@@ -36,9 +36,8 @@ class AIFilenameGenerator
      *
      * Each file in the array is expected to be an associative array with at least a 'path' key.
      *
-     * @param array       $files           The files to analyze.
-     * @param string|null $outputDirectory (Optional) Directory to check for filename uniqueness.
-     *
+     * @param  array  $files  The files to analyze.
+     * @param  string|null  $outputDirectory  (Optional) Directory to check for filename uniqueness.
      * @return string The sanitized filename ending with .txt.
      *
      * @throws RuntimeException When no files are provided or the API call fails.
@@ -53,41 +52,42 @@ class AIFilenameGenerator
         $files = array_slice($files, 0, $this->maxFiles);
 
         // Prepare a list of file paths.
-        $filesList = "";
+        $filesList = '';
         foreach ($files as $file) {
             // Expect each file to have a 'path' key.
-            $filesList .= "- " . $file['path'] . "\n";
+            $filesList .= '- '.$file['path']."\n";
         }
 
         // Build the prompt for filename generation.
-        $prompt = "Generate a descriptive filename for the following set of files:\n\n" . $filesList;
+        $prompt = "Generate a descriptive filename for the following set of files:\n\n".$filesList;
 
         // Load the system prompt from the filename generator prompt file.
         $systemPrompt = file_get_contents(base_path('prompts/filename-generator/system.txt'));
 
         try {
             $response = OpenAI::chat()->create([
-                'model'       => $this->model,
-                'messages'    => [
+                'model' => $this->model,
+                'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $prompt],
                 ],
                 'temperature' => 0.1,
-                'max_tokens'  => 120,
+                'max_tokens' => 120,
             ]);
         } catch (\Exception $e) {
-            throw new RuntimeException('Failed to generate filename: ' . $e->getMessage());
+            throw new RuntimeException('Failed to generate filename: '.$e->getMessage());
         }
 
         // Decode the response expecting a JSON with a "filename" key.
         $content = $response->choices[0]->message->content ?? '';
         $data = json_decode($content, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE || !isset($data['filename'])) {
-            throw new RuntimeException('Invalid response from OpenAI: ' . json_last_error_msg());
+        if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['filename'])) {
+            throw new RuntimeException('Invalid response from OpenAI: '.json_last_error_msg());
         }
 
         $rawFilename = $data['filename'];
+
         return $this->sanitizeFilename($rawFilename, $outputDirectory);
     }
 
@@ -97,9 +97,8 @@ class AIFilenameGenerator
      * Ensures the filename is in hyphen-case, only contains lowercase letters, numbers, and hyphens,
      * and appends a .txt extension. If an output directory is provided, it ensures uniqueness.
      *
-     * @param string      $filename  The raw filename to sanitize.
-     * @param string|null $directory (Optional) The output directory to check for existing files.
-     *
+     * @param  string  $filename  The raw filename to sanitize.
+     * @param  string|null  $directory  (Optional) The output directory to check for existing files.
      * @return string The sanitized filename.
      */
     protected function sanitizeFilename(string $filename, ?string $directory = null): string
@@ -116,13 +115,13 @@ class AIFilenameGenerator
         $filename = substr($filename, 0, $this->maxFilenameLength);
 
         $baseFilename = $filename;
-        $filename = $filename . '.txt';
+        $filename = $filename.'.txt';
 
         // If an output directory is provided, ensure the filename is unique.
         if ($directory) {
             $counter = 2;
-            while (file_exists($directory . DIRECTORY_SEPARATOR . $filename)) {
-                $filename = $baseFilename . '-' . $counter . '.txt';
+            while (file_exists($directory.DIRECTORY_SEPARATOR.$filename)) {
+                $filename = $baseFilename.'-'.$counter.'.txt';
                 $counter++;
             }
         }

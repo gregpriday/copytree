@@ -9,6 +9,7 @@ use Symfony\Component\Process\Process;
 class Clipboard
 {
     private string $contents;
+
     private bool $isFilePath = false;
 
     public function __construct()

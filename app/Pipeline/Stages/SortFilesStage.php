@@ -15,8 +15,6 @@ class SortFilesStage implements FilePipelineStageInterface
      * If the common parts are equal, the file with fewer components (i.e. a parent directory)
      * is considered "less" (and will come first).
      *
-     * @param SplFileInfo $a
-     * @param SplFileInfo $b
      * @return int Returns negative if $a should appear before $b, positive if after, or zero if equal.
      */
     protected function compareFiles(SplFileInfo $a, SplFileInfo $b): int
@@ -45,14 +43,14 @@ class SortFilesStage implements FilePipelineStageInterface
     /**
      * Process the array of files by sorting them in nested alphabetical order.
      *
-     * @param array    $files An array of Symfony Finder SplFileInfo objects.
-     * @param \Closure $next  The next stage in the pipeline.
-     *
+     * @param  array  $files  An array of Symfony Finder SplFileInfo objects.
+     * @param  \Closure  $next  The next stage in the pipeline.
      * @return array The sorted array of files.
      */
     public function handle(array $files, \Closure $next): array
     {
         usort($files, [$this, 'compareFiles']);
+
         return $next($files);
     }
 }

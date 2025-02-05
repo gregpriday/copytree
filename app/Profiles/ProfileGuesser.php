@@ -8,13 +8,14 @@ namespace App\Profiles;
 class ProfileGuesser
 {
     private string $projectPath;
+
     private array $availableProfiles;
 
     /**
      * Constructor.
      *
-     * @param string $projectPath      The base path of the project.
-     * @param array  $availableProfiles (Optional) An array of available profile names.
+     * @param  string  $projectPath  The base path of the project.
+     * @param  array  $availableProfiles  (Optional) An array of available profile names.
      */
     public function __construct(string $projectPath, array $availableProfiles = [])
     {
@@ -36,15 +37,15 @@ class ProfileGuesser
      */
     public function guess(): string
     {
-        $ctreeDir = $this->projectPath . DIRECTORY_SEPARATOR . '.ctree';
+        $ctreeDir = $this->projectPath.DIRECTORY_SEPARATOR.'.ctree';
 
         // Check for the new profile file.
-        if (file_exists($ctreeDir . DIRECTORY_SEPARATOR . 'profile.json')) {
+        if (file_exists($ctreeDir.DIRECTORY_SEPARATOR.'profile.json')) {
             return 'profile';
         }
 
         // Fallback to legacy ruleset file.
-        if (file_exists($ctreeDir . DIRECTORY_SEPARATOR . 'ruleset.json')) {
+        if (file_exists($ctreeDir.DIRECTORY_SEPARATOR.'ruleset.json')) {
             return 'ruleset';
         }
 
@@ -68,11 +69,11 @@ class ProfileGuesser
      */
     private function isLaravelProject(): bool
     {
-        return file_exists($this->projectPath . DIRECTORY_SEPARATOR . 'artisan')
-            && is_dir($this->projectPath . DIRECTORY_SEPARATOR . 'app')
-            && is_dir($this->projectPath . DIRECTORY_SEPARATOR . 'bootstrap')
-            && is_dir($this->projectPath . DIRECTORY_SEPARATOR . 'config')
-            && is_dir($this->projectPath . DIRECTORY_SEPARATOR . 'database');
+        return file_exists($this->projectPath.DIRECTORY_SEPARATOR.'artisan')
+            && is_dir($this->projectPath.DIRECTORY_SEPARATOR.'app')
+            && is_dir($this->projectPath.DIRECTORY_SEPARATOR.'bootstrap')
+            && is_dir($this->projectPath.DIRECTORY_SEPARATOR.'config')
+            && is_dir($this->projectPath.DIRECTORY_SEPARATOR.'database');
     }
 
     /**
@@ -80,12 +81,13 @@ class ProfileGuesser
      */
     private function isSvelteKitProject(): bool
     {
-        $packageJsonPath = $this->projectPath . DIRECTORY_SEPARATOR . 'package.json';
+        $packageJsonPath = $this->projectPath.DIRECTORY_SEPARATOR.'package.json';
         if (! file_exists($packageJsonPath)) {
             return false;
         }
 
         $packageJson = json_decode(file_get_contents($packageJsonPath), true);
+
         return isset($packageJson['dependencies']['@sveltejs/kit'])
             || isset($packageJson['devDependencies']['@sveltejs/kit']);
     }
@@ -95,20 +97,19 @@ class ProfileGuesser
      *
      * This method supports both the legacy file naming (.ctree/ruleset.json) and the new one (.ctree/profile.json).
      *
-     * @param string $profileName The profile name to retrieve.
-     *
+     * @param  string  $profileName  The profile name to retrieve.
      * @return string|null The absolute path to the profile file, or null if not found.
      */
     public function getProfilePath(string $profileName): ?string
     {
         // First, check for a file (e.g., "laravel.json" in .ctree/).
-        $profilePath = $this->projectPath . DIRECTORY_SEPARATOR . '.ctree' . DIRECTORY_SEPARATOR . $profileName . '.json';
+        $profilePath = $this->projectPath.DIRECTORY_SEPARATOR.'.ctree'.DIRECTORY_SEPARATOR.$profileName.'.json';
         if (file_exists($profilePath)) {
             return realpath($profilePath);
         }
 
         // Next check the rulesets folder
-        $profilePath = base_path('rulesets') . DIRECTORY_SEPARATOR . $profileName . '.json';
+        $profilePath = base_path('rulesets').DIRECTORY_SEPARATOR.$profileName.'.json';
         if (file_exists($profilePath)) {
             return realpath($profilePath);
         }

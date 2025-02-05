@@ -2,9 +2,9 @@
 
 namespace App\Pipeline;
 
+use InvalidArgumentException;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
-use InvalidArgumentException;
 
 class FileLoader
 {
@@ -33,14 +33,14 @@ class FileLoader
     /**
      * Create a new FileLoader instance.
      *
-     * @param string $basePath The directory path to scan.
-     * @param array  $excludedDirectories Optional list of directories to exclude (will be merged with defaults).
+     * @param  string  $basePath  The directory path to scan.
+     * @param  array  $excludedDirectories  Optional list of directories to exclude (will be merged with defaults).
      *
      * @throws InvalidArgumentException If the provided path is not a valid directory.
      */
     public function __construct(string $basePath, array $excludedDirectories = [])
     {
-        if (!is_dir($basePath)) {
+        if (! is_dir($basePath)) {
             throw new InvalidArgumentException("The path {$basePath} is not a valid directory.");
         }
 
@@ -59,23 +59,22 @@ class FileLoader
      * This method uses Symfony Finder to locate all files (recursively) in the base directory,
      * while excluding directories that are known to contain huge amounts of files.
      *
-     * @param int|null $maxDepth Optional maximum depth (if null, no depth limit is applied).
-     *
+     * @param  int|null  $maxDepth  Optional maximum depth (if null, no depth limit is applied).
      * @return SplFileInfo[] An array of SplFileInfo objects.
      */
     public function loadFiles(?int $maxDepth = null): array
     {
-        $finder = new Finder();
+        $finder = new Finder;
         $finder->files()->in($this->basePath);
 
         // Exclude the directories.
-        if (!empty($this->excludedDirectories)) {
+        if (! empty($this->excludedDirectories)) {
             $finder->exclude($this->excludedDirectories);
         }
 
         // If a max depth is provided, apply it.
         if ($maxDepth !== null) {
-            $finder->depth('<=' . $maxDepth);
+            $finder->depth('<='.$maxDepth);
         }
 
         $files = [];

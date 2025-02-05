@@ -31,7 +31,6 @@ class CopyDocsCommand extends Command
      * and passes along only the relevant options (filter, ai-filter, search, output, display, stream, as-reference)
      * to the main CopyTreeCommand.
      *
-     * @return int
      * @throws \Symfony\Component\Console\Exception\ExceptionInterface
      */
     public function handle(): int
@@ -42,7 +41,7 @@ class CopyDocsCommand extends Command
         // Build the basic argument list for the main command.
         $args = [
             'command' => 'copy',
-            'path'    => $fixedPath,
+            'path' => $fixedPath,
         ];
 
         // Get all options and remove those that don't apply.
@@ -58,6 +57,7 @@ class CopyDocsCommand extends Command
 
         // Retrieve and run the main CopyTreeCommand.
         $command = $this->getApplication()->find('copy');
+
         return $command->run(new ArrayInput($args), $this->output);
     }
 }

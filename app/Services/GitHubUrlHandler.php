@@ -10,17 +10,22 @@ use Symfony\Component\Process\Process;
 class GitHubUrlHandler
 {
     protected string $repoUrl;
+
     protected string $branch;
+
     protected string $subPath;
+
     protected string $repoDir;
+
     protected string $cacheKey;
+
     protected string $url;
 
     /**
      * Create a new GitHubUrlHandler instance.
      *
-     * @param string $url The GitHub URL in the format:
-     *                    https://github.com/username/repo[/tree/branch[/sub/path]]
+     * @param  string  $url  The GitHub URL in the format:
+     *                       https://github.com/username/repo[/tree/branch[/sub/path]]
      *
      * @throws RuntimeException if the OS is not MacOS or if the URL format is invalid.
      */
@@ -40,21 +45,20 @@ class GitHubUrlHandler
      *
      * Sets the repository URL, branch, subpath, and a cache key.
      *
-     * @param string $url
      * @throws InvalidArgumentException if the URL format is invalid.
      */
     protected function parseUrl(string $url): void
     {
         $pattern = '#^https://github\.com/([^/]+/[^/]+)(?:/tree/([^/]+))?(?:/(.+))?$#';
-        if (!preg_match($pattern, $url, $matches)) {
+        if (! preg_match($pattern, $url, $matches)) {
             throw new InvalidArgumentException('Invalid GitHub URL format');
         }
 
         // e.g. "username/repo" becomes a Git URL.
-        $this->repoUrl = 'https://github.com/' . $matches[1] . '.git';
-        $this->branch  = $matches[2] ?? 'main';
+        $this->repoUrl = 'https://github.com/'.$matches[1].'.git';
+        $this->branch = $matches[2] ?? 'main';
         $this->subPath = $matches[3] ?? '';
-        $this->cacheKey = md5($matches[1] . '/' . $this->branch);
+        $this->cacheKey = md5($matches[1].'/'.$this->branch);
     }
 
     /**
@@ -68,11 +72,11 @@ class GitHubUrlHandler
     {
         $reposDir = copytree_path('repos');
 
-        if (!is_dir($reposDir) && !mkdir($reposDir, 0777, true) && !is_dir($reposDir)) {
+        if (! is_dir($reposDir) && ! mkdir($reposDir, 0777, true) && ! is_dir($reposDir)) {
             throw new RuntimeException("Failed to create cache directory: {$reposDir}");
         }
 
-        $this->repoDir = $reposDir . DIRECTORY_SEPARATOR . $this->cacheKey;
+        $this->repoDir = $reposDir.DIRECTORY_SEPARATOR.$this->cacheKey;
     }
 
     /**
@@ -82,13 +86,14 @@ class GitHubUrlHandler
      * If a subpath was specified in the URL, that subdirectory is returned.
      *
      * @return string The local file path to the repository (or subdirectory).
+     *
      * @throws InvalidArgumentException if the specified subPath is not found.
      */
     public function getFiles(): string
     {
         $this->ensureGitIsInstalled();
 
-        if (!is_dir($this->repoDir)) {
+        if (! is_dir($this->repoDir)) {
             $this->cloneRepository();
         } else {
             $this->updateRepository();
@@ -96,8 +101,8 @@ class GitHubUrlHandler
 
         $targetPath = $this->repoDir;
         if ($this->subPath) {
-            $targetPath .= DIRECTORY_SEPARATOR . $this->subPath;
-            if (!is_dir($targetPath)) {
+            $targetPath .= DIRECTORY_SEPARATOR.$this->subPath;
+            if (! is_dir($targetPath)) {
                 throw new InvalidArgumentException("Specified path '{$this->subPath}' not found in repository");
             }
         }
@@ -107,9 +112,6 @@ class GitHubUrlHandler
 
     /**
      * Check if a URL is a valid GitHub URL.
-     *
-     * @param string $url
-     * @return bool
      */
     public static function isGitHubUrl(string $url): bool
     {
@@ -151,7 +153,7 @@ class GitHubUrlHandler
             if (is_dir($this->repoDir)) {
                 $this->executeCommand(['rm', '-rf', $this->repoDir]);
             }
-            throw new RuntimeException('Failed to clone repository: ' . $e->getMessage());
+            throw new RuntimeException('Failed to clone repository: '.$e->getMessage());
         }
     }
 
@@ -166,7 +168,7 @@ class GitHubUrlHandler
             $this->executeCommand(['git', 'fetch'], $this->repoDir);
 
             $behindCountProcess = $this->executeCommand(
-                ['git', 'rev-list', 'HEAD..origin/' . $this->branch, '--count'],
+                ['git', 'rev-list', 'HEAD..origin/'.$this->branch, '--count'],
                 $this->repoDir
             );
             $behindCount = (int) trim($behindCountProcess->getOutput());
@@ -185,9 +187,10 @@ class GitHubUrlHandler
     /**
      * Execute a system command using Symfony Process.
      *
-     * @param array       $command The command to execute.
-     * @param string|null $cwd     The working directory (if any).
+     * @param  array  $command  The command to execute.
+     * @param  string|null  $cwd  The working directory (if any).
      * @return Process The executed process.
+     *
      * @throws ProcessFailedException if the process fails.
      */
     protected function executeCommand(array $command, ?string $cwd = null): Process
@@ -195,7 +198,7 @@ class GitHubUrlHandler
         $process = new Process($command, $cwd);
         $process->run();
 
-        if (!$process->isSuccessful()) {
+        if (! $process->isSuccessful()) {
             throw new ProcessFailedException($process);
         }
 
@@ -212,13 +215,13 @@ class GitHubUrlHandler
     public static function cleanCache(): void
     {
         $homeDir = getenv('HOME');
-        $cacheDir = $homeDir . DIRECTORY_SEPARATOR . '.copytree' . DIRECTORY_SEPARATOR . 'cache';
+        $cacheDir = $homeDir.DIRECTORY_SEPARATOR.'.copytree'.DIRECTORY_SEPARATOR.'cache';
 
         if (is_dir($cacheDir)) {
             $process = new Process(['rm', '-rf', $cacheDir]);
             $process->run();
 
-            if (!$process->isSuccessful()) {
+            if (! $process->isSuccessful()) {
                 throw new ProcessFailedException($process);
             }
         }
@@ -237,7 +240,7 @@ class GitHubUrlHandler
             $process = new Process(['rm', '-rf', $this->repoDir]);
             $process->run();
 
-            if (!$process->isSuccessful()) {
+            if (! $process->isSuccessful()) {
                 throw new ProcessFailedException($process);
             }
         }

@@ -2,12 +2,11 @@
 
 namespace App\Pipeline\Stages;
 
-use App\Pipeline\FilePipelineStageInterface;
 use App\Pipeline\FileLoader;
+use App\Pipeline\FilePipelineStageInterface;
 use App\Pipeline\RulesetFilter;
 use App\Services\GitHubUrlHandler;
 use Symfony\Component\Finder\SplFileInfo;
-use RuntimeException;
 
 class ExternalSourceStage implements FilePipelineStageInterface
 {
@@ -18,15 +17,13 @@ class ExternalSourceStage implements FilePipelineStageInterface
      * - 'source': string (a GitHub URL or a local directory path)
      * - 'destination': string (a prefix to remap file paths from the external source)
      * - 'rules' (optional): array of include rule sets for filtering the external files
-     *
-     * @var array
      */
     protected array $externalItems;
 
     /**
      * Create a new ExternalSourceStage instance.
      *
-     * @param array $externalItems External configuration items.
+     * @param  array  $externalItems  External configuration items.
      */
     public function __construct(array $externalItems)
     {
@@ -50,10 +47,9 @@ class ExternalSourceStage implements FilePipelineStageInterface
      * The pipeline expects each file to be represented as an associative array:
      *   [ 'file' => (SplFileInfo instance), 'path' => (relative path) ]
      *
-     * @param array    $files An array of local files (either raw SplFileInfo objects or
+     * @param  array  $files  An array of local files (either raw SplFileInfo objects or
      *                        associative arrays with 'file' and 'path' keys).
-     * @param \Closure $next  The next stage in the pipeline.
-     *
+     * @param  \Closure  $next  The next stage in the pipeline.
      * @return array The merged file set.
      */
     public function handle(array $files, \Closure $next): array
@@ -62,20 +58,20 @@ class ExternalSourceStage implements FilePipelineStageInterface
 
         foreach ($this->externalItems as $item) {
             // Validate required keys.
-            if (!isset($item['source'], $item['destination'])) {
+            if (! isset($item['source'], $item['destination'])) {
                 continue; // Skip invalid configuration items.
             }
 
-            $source      = $item['source'];
-            $destination = rtrim($item['destination'], '/') . '/';
-            $rules       = $item['rules'] ?? [];
+            $source = $item['source'];
+            $destination = rtrim($item['destination'], '/').'/';
+            $rules = $item['rules'] ?? [];
 
             // Resolve external source.
             if (str_starts_with($source, 'https://github.com/')) {
                 $handler = new GitHubUrlHandler($source);
                 $externalPath = $handler->getFiles();
             } else {
-                if (!is_dir($source)) {
+                if (! is_dir($source)) {
                     continue; // Skip if the local external directory does not exist.
                 }
                 $externalPath = realpath($source);
@@ -86,7 +82,7 @@ class ExternalSourceStage implements FilePipelineStageInterface
             $filesFromSource = $loader->loadFiles();
 
             // If filtering rules are provided for the external source, apply them.
-            if (!empty($rules)) {
+            if (! empty($rules)) {
                 $filter = new RulesetFilter($rules, [], []); // globalExcludeRules and always are empty here.
                 $filesFromSource = array_filter($filesFromSource, function (SplFileInfo $file) use ($filter) {
                     return $filter->accept($file);
@@ -97,7 +93,7 @@ class ExternalSourceStage implements FilePipelineStageInterface
             $filesFromSource = array_map(function (SplFileInfo $file) use ($destination) {
                 return [
                     'file' => $file,
-                    'path' => $destination . $file->getRelativePathname(),
+                    'path' => $destination.$file->getRelativePathname(),
                 ];
             }, $filesFromSource);
 
@@ -114,6 +110,7 @@ class ExternalSourceStage implements FilePipelineStageInterface
                     'path' => $item->getRelativePathname(),
                 ];
             }
+
             return $item;
         }, $files);
 
