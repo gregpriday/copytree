@@ -12,7 +12,7 @@ use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\RulesetFilterStage;
 use App\Pipeline\Stages\SortFilesStage;
 use App\Services\JinaCodeSearch;
-use App\Services\AIFilenameGeneratorService;
+use App\Services\AIFilenameGenerator;
 use App\Renderer\TreeRenderer;
 use App\Renderer\FileOutputRenderer;
 use App\Utilities\Clipboard;
@@ -43,8 +43,7 @@ class CopyTreeCommand extends Command
         {--i|display : Display the output in the console.}
         {--S|stream : Stream output directly (useful for piping).}
         {--r|as-reference : Copy a reference to a temporary file instead of copying the content directly.}
-        {--no-cache : Do not use or keep cached GitHub repositories.}
-        {--x|profile-docs : Copy the profile documentation from the docs/profiles directory.}';
+        {--no-cache : Do not use or keep cached GitHub repositories.}';
 
     /**
      * The description of the command.
@@ -165,7 +164,7 @@ class CopyTreeCommand extends Command
             $filename = is_array($outputOption) ? reset($outputOption) : $outputOption;
             if (empty($filename)) {
                 // Generate a filename using the AI Filename Generation service.
-                $filename = app(AIFilenameGeneratorService::class)->generateFilename(
+                $filename = app(AIFilenameGenerator::class)->generateFilename(
                     array_map(fn(SplFileInfo $file) => ['path' => $file->getRelativePathname()], $finalFiles),
                     storage_path('app/files')
                 );

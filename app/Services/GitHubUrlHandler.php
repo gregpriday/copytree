@@ -66,8 +66,7 @@ class GitHubUrlHandler
      */
     protected function setupCacheDirectory(): void
     {
-        $homeDir = getenv('HOME');
-        $reposDir = $homeDir . DIRECTORY_SEPARATOR . '.copytree' . DIRECTORY_SEPARATOR . 'repos';
+        $reposDir = copytree_path('repos');
 
         if (!is_dir($reposDir) && !mkdir($reposDir, 0777, true) && !is_dir($reposDir)) {
             throw new RuntimeException("Failed to create cache directory: {$reposDir}");

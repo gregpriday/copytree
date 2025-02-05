@@ -30,8 +30,8 @@ return [
     'stores' => [
         'file' => [
             'driver'    => 'file',
-            'path'      => getenv('HOME') . '/.copytree/cache',
-            'lock_path' => getenv('HOME') . '/.copytree/cache',
+            'path'      => copytree_path('cache'),
+            'lock_path' => copytree_path('cache'),
         ],
     ],
 

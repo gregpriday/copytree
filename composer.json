@@ -42,7 +42,8 @@
             "App\\": "app/"
         },
         "files": [
-            "bootstrap/constants.php"
+            "bootstrap/constants.php",
+            "bootstrap/helpers.php"
         ]
     },
     "autoload-dev": {
