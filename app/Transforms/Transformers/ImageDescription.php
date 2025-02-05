@@ -50,7 +50,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'user', 'content' => [
-                ['type' => 'text', 'text' => 'Please describe the image.'],
+                ['type' => 'text', 'text' => 'Please describe the image with the filename: '.$input->getPath()],
                 ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
             ]],
         ];

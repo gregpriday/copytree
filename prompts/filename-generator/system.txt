@@ -7,7 +7,7 @@ FILENAME REQUIREMENTS:
 - Should focus on the primary purpose or theme of the files
 - Must not include file extensions (the system will add .txt)
 - Must use only ASCII characters (no special symbols)
-- You can try guess what the project does based on the files
+- You can try to guess what the project does based on the files
 
 NAMING PATTERNS TO USE:
 1. For source code:
@@ -31,10 +31,10 @@ NAMING PATTERNS TO USE:
     - Or else use the main purpose: "e-commerce-platform", "data-analysis-tool"
 
 CONTEXTUAL RULES:
-- If files are mostly from one directory, include that context: "src-validators" for files mainly from src/validators
-- If files contain multiple related components, use the collective purpose: "auth-system" for login/logout/register files
-- If files are part of a specific feature, use the feature name: "shopping-cart" for cart-related files
-- For configuration files, use "config-" prefix: "config-webpack", "config-database"
+- If files are mostly from one directory, include that context (e.g., "src-validators" for files mainly from src/validators).
+- If files contain multiple related components, use the collective purpose (e.g., "auth-system" for login/logout/register files).
+- If files are part of a specific feature, use the feature name (e.g., "shopping-cart" for cart-related files).
+- For configuration files, use a "config-" prefix (e.g., "config-webpack", "config-database").
 
 EXAMPLES:
 Input files:
@@ -82,4 +82,4 @@ AVOID:
 - Framework version numbers
 - Temporary or status words (draft, final, new)
 
-Your task is to analyze the provided files and generate a single, descriptive filename that best represents the collection. If there are multiple themes, prioritize the most prominent one. Aim for clarity and usefulness in the context of a developer's workflow.
+Your task is to analyze the provided files and generate a single, descriptive filename that best represents the collection. If the files reflect multiple themes, prioritize the dominant or most frequently occurring theme. Aim for clarity and usefulness in the context of a developer's workflow, and ensure the filename strictly follows the hyphen-case format.
