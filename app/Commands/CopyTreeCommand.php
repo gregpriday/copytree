@@ -18,6 +18,7 @@ use App\Utilities\TempFileManager;
 use Illuminate\Pipeline\Pipeline;
 use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Finder\SplFileInfo;
+use Symfony\Component\Process\Process;
 
 class CopyTreeCommand extends Command
 {
@@ -36,7 +37,7 @@ class CopyTreeCommand extends Command
         {--a|ai-filter=false : Filter files using AI based on a natural language description.}
         {--m|modified : Only include files that have been modified since the last commit.}
         {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
-        {--o|output= : Outputs to a file. If no filename is provided, creates file in ~/.copytree/files/.}
+        {--o|output= : Outputs to a file. If no filename is provided, creates file in ~/.copytree/outputs/.}
         {--i|display : Display the output in the console.}
         {--S|stream : Stream output directly (useful for piping).}
         {--r|as-reference : Copy a reference to a temporary file instead of copying the content directly.}
@@ -54,6 +55,11 @@ class CopyTreeCommand extends Command
      */
     public function handle(): int
     {
+        // Display warning if this is not MacOS
+        if (PHP_OS_FAMILY !== 'Darwin') {
+            $this->warn('This command is designed for macOS and may not work as expected on other operating systems.');
+        }
+
         // Use the current working directory as the project path.
         $projectPath = $this->argument('path') ?: getcwd();
 
@@ -71,8 +77,6 @@ class CopyTreeCommand extends Command
             'depth' => (int) $this->option('depth'),
             'max_lines' => (int) $this->option('max-lines'),
         ]);
-
-        $this->info('Profile loaded successfully.');
 
         // Load the initial file set.
         $depth = (int) $this->option('depth');
@@ -156,13 +160,21 @@ class CopyTreeCommand extends Command
                 // Generate a filename using the AI Filename Generation service.
                 $filename = app(AIFilenameGenerator::class)->generateFilename(
                     array_map(fn (SplFileInfo $file) => ['path' => $file->getRelativePathname()], $finalFiles),
-                    storage_path('app/files')
+                    // Use the default output folder (~/.copytree/outputs)
+                    copytree_path('outputs')
                 );
             }
+            // Create the outputs folder if it does not exist.
+            $outputDir = copytree_path('outputs');
+            if (! is_dir($outputDir)) {
+                mkdir($outputDir, 0755, true);
+            }
             // Write output to the file.
-            $fullPath = storage_path('app/files').DIRECTORY_SEPARATOR.$filename;
+            $fullPath = $outputDir.DIRECTORY_SEPARATOR.$filename;
             file_put_contents($fullPath, $combinedOutput);
             $this->info("Saved output to file: {$fullPath}");
+
+            $this->revealInFinder($fullPath);
         } elseif ($this->option('display')) {
             // Display the output in the console.
             $this->line($combinedOutput);
@@ -178,5 +190,18 @@ class CopyTreeCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    private function revealInFinder(string $filePath): void
+    {
+        // Attempt to reveal the file in Finder using AppleScript
+        $script = sprintf(
+            'tell application "Finder" to reveal POSIX file "%s"
+        tell application "Finder" to activate',
+            str_replace('"', '\"', $filePath)
+        );
+
+        $process = new Process(['osascript', '-e', $script]);
+        $process->run();
     }
 }
