@@ -1,6 +1,6 @@
 # Copytree
 
-**Copytree** is a command‑line utility that copies a directory’s structure and file contents to your clipboard (or to a file) in a structured XML format. Built on the Laravel Zero framework, it offers advanced file filtering and transformation features—including AI‑assisted file selection, Git integration, and customizable rulesets—making it ideal for sharing full project context with AI assistants (such as Claude, ChatGPT, or Gemini).
+**Copytree** is a command‑line utility that copies a directory’s structure and file contents to your clipboard (or to a file) in a structured XML format. Built on the Laravel Zero framework, it offers advanced file filtering and transformation features—including AI‑assisted file selection, Git integration, and customizable profiles—making it ideal for sharing full project context with AI assistants (such as Claude, ChatGPT, or Gemini).
 
 > **Note:** This tool is designed exclusively for macOS. It uses native tools like `pbcopy` and `osascript` for clipboard operations.
 
@@ -8,27 +8,31 @@
 
 ## Features
 
-- **MacOS Integration:** Uses macOS‑specific commands for clipboard management.
-- **AI‑Powered Filtering:** Supports natural language file filtering (via OpenAI API) and smart filename generation.
-- **Git & External Source Support:** Includes Git integration (modified/changed files filtering, changes between commits) and GitHub URL handling.
-- **Ruleset-Based File Selection:** Configure inclusion and exclusion of files using JSON rulesets.
-- **File Transformation Pipeline:** Built-in transformers convert images, PDFs, Markdown, and other file types into text.
+- **macOS Integration:** Uses macOS‑specific commands for clipboard management.
+- **AI‑Powered Filtering:** Supports natural language file filtering (via the OpenAI API) and smart filename generation.
+- **Git & External Source Support:** Includes Git integration (filtering modified or changed files and changes between commits) and GitHub URL handling.
+- **Profile‑Based File Selection:** Configure inclusion and exclusion of files using JSON profiles.
+- **File Transformation Pipeline:** Built‑in transformers convert images, PDFs, Markdown, and other file types into text.
 - **Versatile Output Options:** Output to the clipboard, display in the console, stream output, or save to a file with an auto‑generated descriptive filename.
 
 ---
 
 ## Requirements
 
-- **MacOS only:** The Clipboard utility checks for Darwin (macOS) and will throw an exception on other operating systems.
+- **macOS only:** Copytree is built for macOS. (It checks for Darwin and will throw an exception on other operating systems.)
 - **PHP 8.2 or higher**
 - **Git:** Required for GitHub URL handling and repository operations.
 - **Composer:** To install PHP dependencies.
 - **Pandoc:** For document conversion (e.g. for transforming files via Pandoc filters)  
-  *Installation example:* `brew install pandoc`  
-  citeturn0search11
+  *Installation example:*  
+  ```bash
+  brew install pandoc
+  ```
 - **Poppler:** For PDF-to-text conversion (used by the PDF transformer)  
-  *Installation example:* `brew install poppler`  
-  citeturn0search5
+  *Installation example:*
+  ```bash
+  brew install poppler
+  ```
 
 ---
 
@@ -54,17 +58,13 @@
       ```bash
       brew install pandoc
       ```
-      citeturn0search11
-
     - **Poppler:**  
       Install using Homebrew:
       ```bash
       brew install poppler
       ```
-      citeturn0search5
-
     - **Additional Requirements:**  
-      Make sure Git is installed and available in your PATH.
+      Ensure Git is installed and available in your PATH.
 
 4. **Environment Configuration:**
 
@@ -127,7 +127,7 @@ The primary command is `copy` (invoked via the CLI script `copytree`) with a var
       ```bash
       php copytree --display
       ```
-    - **Save to a File (with AI‑generated filename):**
+    - **Save to a File (with an AI‑generated filename):**
       ```bash
       php copytree --output
       ```
@@ -145,15 +145,9 @@ The primary command is `copy` (invoked via the CLI script `copytree`) with a var
   php copytree --changes=commit1:commit2
   ```
 
-### Ruleset and Profile Configuration
+### Profile Configuration
 
-Copytree uses JSON‑formatted rulesets (located in the `rulesets/` folder or in a `.ctree` directory in your project) to control which files are included. Use the `--ruleset` option to specify a particular ruleset:
-
-```bash
-php copytree --ruleset=laravel
-```
-
-Profiles can be automatically detected by the tool based on your project structure (e.g., detecting a Laravel or SvelteKit project).
+Copytree uses JSON‑formatted profiles (located in the `rulesets/` folder or in a `.ctree` directory in your project) to control which files are included. Profiles are automatically detected based on your project structure (for example, detecting a Laravel or SvelteKit project). To use a specific profile, include it in your project’s `.ctree` folder or place a corresponding JSON file in the `rulesets/` directory.
 
 ---
 
@@ -171,14 +165,14 @@ Profiles can be automatically detected by the tool based on your project structu
   The system uses a pipeline of transformers (for images, PDFs, Markdown, etc.) to convert file contents as needed. Custom transformers can be added by modifying the configuration (see `config/profile.php`).
 
 - **Smart Filename Generation:**  
-  When saving output, if no filename is provided, the AI filename generator produces a descriptive hyphen‑separated filename (e.g., `user-authentication-system.txt`).
+  When saving output, if no filename is provided, the AI filename generator produces a descriptive hyphen‑separated filename (for example, `user-authentication-system.txt`).
 
 ---
 
 ## Troubleshooting
 
-- **MacOS Only:**  
-  Copytree is explicitly built for macOS. If you attempt to run it on another OS, the Clipboard utility will raise an exception.
+- **macOS Only:**  
+  Copytree is explicitly built for macOS. Running it on another OS will raise an exception.
 - **Clipboard Issues:**  
   Ensure that `pbcopy` and `osascript` are available in your PATH.
 - **Pandoc or Poppler Errors:**  
@@ -207,11 +201,10 @@ This project is licensed under the MIT License. See [LICENSE.md](LICENSE.md) for
 
 ## References
 
-- Project details and documentation from [gregpriday/copy-tree on GitHub](https://github.com/gregpriday/copy-tree) citeturn0search0
-- Installation instructions for Pandoc using Homebrew citeturn0search11
-- Installation instructions for Poppler on macOS using Homebrew citeturn0search5
+- Project details and documentation from [gregpriday/copy-tree on GitHub](https://github.com/gregpriday/copy-tree)
+- Installation instructions for Pandoc using Homebrew
+- Installation instructions for Poppler on macOS using Homebrew
 
 ---
 
 This README should give you a comprehensive guide to installing, setting up, and using Copytree on macOS. Enjoy capturing your project context and empowering your AI‑assisted workflows!
-

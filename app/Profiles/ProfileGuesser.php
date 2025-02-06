@@ -95,21 +95,22 @@ class ProfileGuesser
     /**
      * Retrieve the absolute path to a profile file based on a given profile name.
      *
-     * This method supports both the legacy file naming (.ctree/ruleset.json) and the new one (.ctree/profile.json).
+     * This method supports both the legacy file naming (.ctree/ruleset.json or .ctree/profile.json)
+     * and also checks the "profiles" folder at the project root.
      *
      * @param  string  $profileName  The profile name to retrieve.
      * @return string|null The absolute path to the profile file, or null if not found.
      */
     public function getProfilePath(string $profileName): ?string
     {
-        // First, check for a file (e.g., "laravel.json" in .ctree/).
+        // First, check for a file in the .ctree directory (e.g., ".ctree/laravel.json").
         $profilePath = $this->projectPath.DIRECTORY_SEPARATOR.'.ctree'.DIRECTORY_SEPARATOR.$profileName.'.json';
         if (file_exists($profilePath)) {
             return realpath($profilePath);
         }
 
-        // Next check the rulesets folder
-        $profilePath = base_path('rulesets').DIRECTORY_SEPARATOR.$profileName.'.json';
+        // Next, check the profiles folder at the project root.
+        $profilePath = base_path('profiles').DIRECTORY_SEPARATOR.$profileName.'.json';
         if (file_exists($profilePath)) {
             return realpath($profilePath);
         }
