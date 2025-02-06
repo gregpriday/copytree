@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use InvalidArgumentException;
-use RuntimeException;
+use App\Exceptions\GitOperationException;
+use App\Exceptions\InvalidGitHubUrlException;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
 
@@ -27,12 +27,12 @@ class GitHubUrlHandler
      * @param  string  $url  The GitHub URL in the format:
      *                       https://github.com/username/repo[/tree/branch[/sub/path]]
      *
-     * @throws RuntimeException if the OS is not MacOS or if the URL format is invalid.
+     * @throws GitOperationException if the OS is not MacOS.
      */
     public function __construct(string $url)
     {
         if (PHP_OS_FAMILY !== 'Darwin') {
-            throw new RuntimeException('This package only supports MacOS.');
+            throw new GitOperationException('This package only supports MacOS.');
         }
 
         $this->url = $url;
@@ -45,13 +45,13 @@ class GitHubUrlHandler
      *
      * Sets the repository URL, branch, subpath, and a cache key.
      *
-     * @throws InvalidArgumentException if the URL format is invalid.
+     * @throws InvalidGitHubUrlException if the URL format is invalid.
      */
     protected function parseUrl(string $url): void
     {
         $pattern = '#^https://github\.com/([^/]+/[^/]+)(?:/tree/([^/]+))?(?:/(.+))?$#';
         if (! preg_match($pattern, $url, $matches)) {
-            throw new InvalidArgumentException('Invalid GitHub URL format');
+            throw new InvalidGitHubUrlException('Invalid GitHub URL format');
         }
 
         // e.g. "username/repo" becomes a Git URL.
@@ -66,14 +66,14 @@ class GitHubUrlHandler
      *
      * Uses ~/.copytree/cache/repos for a consistent cache location.
      *
-     * @throws RuntimeException if the repos directory cannot be created.
+     * @throws GitOperationException if the repos directory cannot be created.
      */
     protected function setupCacheDirectory(): void
     {
         $reposDir = copytree_path('repos');
 
         if (! is_dir($reposDir) && ! mkdir($reposDir, 0777, true) && ! is_dir($reposDir)) {
-            throw new RuntimeException("Failed to create cache directory: {$reposDir}");
+            throw new GitOperationException("Failed to create cache directory: {$reposDir}");
         }
 
         $this->repoDir = $reposDir.DIRECTORY_SEPARATOR.$this->cacheKey;
@@ -87,7 +87,7 @@ class GitHubUrlHandler
      *
      * @return string The local file path to the repository (or subdirectory).
      *
-     * @throws InvalidArgumentException if the specified subPath is not found.
+     * @throws InvalidGitHubUrlException if the specified subPath is not found.
      */
     public function getFiles(): string
     {
@@ -103,7 +103,7 @@ class GitHubUrlHandler
         if ($this->subPath) {
             $targetPath .= DIRECTORY_SEPARATOR.$this->subPath;
             if (! is_dir($targetPath)) {
-                throw new InvalidArgumentException("Specified path '{$this->subPath}' not found in repository");
+                throw new InvalidGitHubUrlException("Specified path '{$this->subPath}' not found in repository");
             }
         }
 
@@ -121,21 +121,21 @@ class GitHubUrlHandler
     /**
      * Ensure Git is installed on the system.
      *
-     * @throws RuntimeException if Git is not installed.
+     * @throws GitOperationException if Git is not installed.
      */
     protected function ensureGitIsInstalled(): void
     {
         try {
             $this->executeCommand(['git', '--version']);
         } catch (ProcessFailedException $e) {
-            throw new RuntimeException('Git is not installed on this system');
+            throw new GitOperationException('Git is not installed on this system');
         }
     }
 
     /**
      * Clone the repository into the cache directory.
      *
-     * @throws RuntimeException if cloning fails.
+     * @throws GitOperationException if cloning fails.
      */
     protected function cloneRepository(): void
     {
@@ -153,7 +153,7 @@ class GitHubUrlHandler
             if (is_dir($this->repoDir)) {
                 $this->executeCommand(['rm', '-rf', $this->repoDir]);
             }
-            throw new RuntimeException('Failed to clone repository: '.$e->getMessage());
+            throw new GitOperationException('Failed to clone repository: '.$e->getMessage());
         }
     }
 

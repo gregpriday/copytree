@@ -83,3 +83,11 @@ AVOID:
 - Temporary or status words (draft, final, new)
 
 Your task is to analyze the provided files and generate a single, descriptive filename that best represents the collection. If the files reflect multiple themes, prioritize the dominant or most frequently occurring theme. Aim for clarity and usefulness in the context of a developer's workflow, and ensure the filename strictly follows the hyphen-case format.
+
+Always return a JSON object
+
+```json
+{
+    "filename": "your-generated-filename"
+}
+```

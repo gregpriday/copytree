@@ -64,19 +64,18 @@ class AIFilenameGenerator
         // Load the system prompt from the filename generator prompt file.
         $systemPrompt = file_get_contents(base_path('prompts/filename-generator/system.txt'));
 
-        try {
-            $response = OpenAI::chat()->create([
-                'model' => $this->model,
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $prompt],
-                ],
-                'temperature' => 0.1,
-                'max_tokens' => 120,
-            ]);
-        } catch (\Exception $e) {
-            throw new RuntimeException('Failed to generate filename: '.$e->getMessage());
-        }
+        $response = OpenAI::chat()->create([
+            'model' => $this->model,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $prompt],
+            ],
+            'temperature' => 0.1,
+            'response_format' => [
+                'type' => 'json_object',
+            ],
+            'max_tokens' => 120,
+        ]);
 
         // Decode the response expecting a JSON with a "filename" key.
         $content = $response->choices[0]->message->content ?? '';
