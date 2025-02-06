@@ -1,0 +1,147 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Ctree Profile Schema",
+    "description": "A JSON schema for Ctree profiles. Profiles define file filtering rules, external source configurations, and file transformation settings used by Copytree. This schema replaces the old ruleset schema to support additional functionality.",
+    "type": "object",
+    "properties": {
+        "rules": {
+            "description": "An array of rule sets. Each rule set is an array of rules (triples) that must all match (AND logic). Different rule sets are OR’d together.",
+            "$ref": "#/definitions/rulesArray"
+        },
+        "globalExcludeRules": {
+            "description": "An array of rule sets that, if matched, will always exclude a file regardless of the normal rules.",
+            "$ref": "#/definitions/rulesArray"
+        },
+        "always": {
+            "description": "An object specifying files to always include or always exclude regardless of matching rules.",
+            "type": "object",
+            "properties": {
+                "include": {
+                    "description": "An array of relative file paths to always include.",
+                    "type": "array",
+                    "items": { "type": "string" }
+                },
+                "exclude": {
+                    "description": "An array of relative file paths to always exclude.",
+                    "type": "array",
+                    "items": { "type": "string" }
+                }
+            },
+            "additionalProperties": false
+        },
+        "external": {
+            "description": "An array of external source definitions. Each item specifies a source (GitHub URL or local directory), a destination prefix for remapping, and (optionally) its own include rules.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "description": "A GitHub URL or a local directory path.",
+                        "type": "string"
+                    },
+                    "destination": {
+                        "description": "A prefix to remap file paths from the external source.",
+                        "type": "string"
+                    },
+                    "rules": {
+                        "description": "An array of rule sets to filter files from this external source.",
+                        "$ref": "#/definitions/rulesArray"
+                    }
+                },
+                "required": ["source", "destination"],
+                "additionalProperties": false
+            }
+        },
+        "transforms": {
+            "description": "An array of transformation configurations. Each configuration specifies a set of rules to match files and a list of transformer class names to apply.",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "rules": {
+                        "description": "An array of rule sets that determine which files to transform.",
+                        "$ref": "#/definitions/rulesArray"
+                    },
+                    "transforms": {
+                        "description": "An array of transformer identifiers (class names) to apply to matching files.",
+                        "type": "array",
+                        "items": { "type": "string" }
+                    }
+                },
+                "required": ["rules", "transforms"],
+                "additionalProperties": false
+            }
+        }
+    },
+    "definitions": {
+        "ruleTriple": {
+            "description": "A rule is an array of three elements: [field, operator, value]. The field is one of the file attributes, the operator is a comparison or pattern operator, and the value is a string, number, or an array of strings.",
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": [
+                {
+                    "type": "string",
+                    "enum": [
+                        "folder",
+                        "path",
+                        "dirname",
+                        "basename",
+                        "extension",
+                        "filename",
+                        "contents",
+                        "contents_slice",
+                        "size",
+                        "mtime",
+                        "mimeType"
+                    ]
+                },
+                {
+                    "type": "string",
+                    "enum": [
+                        "=",
+                        "!=",
+                        ">",
+                        ">=",
+                        "<",
+                        "<=",
+                        "oneOf",
+                        "notOneOf",
+                        "regex",
+                        "notRegex",
+                        "glob",
+                        "fnmatch",
+                        "contains",
+                        "notContains",
+                        "startsWith",
+                        "notStartsWith",
+                        "endsWith",
+                        "notEndsWith",
+                        "length",
+                        "isAscii",
+                        "isJson",
+                        "isUlid",
+                        "isUrl",
+                        "isUuid"
+                    ]
+                },
+                {
+                    "anyOf": [
+                        { "type": "string" },
+                        { "type": "number" },
+                        { "type": "array", "items": { "type": "string" } }
+                    ]
+                }
+            ]
+        },
+        "rulesArray": {
+            "description": "An array of rule sets. Each rule set is an array of rule triples.",
+            "type": "array",
+            "items": {
+                "type": "array",
+                "items": { "$ref": "#/definitions/ruleTriple" }
+            }
+        }
+    },
+    "additionalProperties": false
+}

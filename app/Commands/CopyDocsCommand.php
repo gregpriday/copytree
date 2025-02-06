@@ -35,7 +35,7 @@ class CopyDocsCommand extends Command
     public function handle(): int
     {
         // Set the fixed source path for profile docs.
-        $fixedPath = base_path('docs/rulesets');
+        $fixedPath = base_path('docs/profiles');
 
         // Build the basic argument list for the main command.
         $args = [
