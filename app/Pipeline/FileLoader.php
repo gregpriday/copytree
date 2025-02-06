@@ -80,7 +80,7 @@ class FileLoader
 
         // Apply max depth if provided.
         if ($maxDepth !== null) {
-            $finder->depth('<= ' . $maxDepth);
+            $finder->depth('<= '.$maxDepth);
         }
 
         $files = [];

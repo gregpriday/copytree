@@ -4,7 +4,6 @@ namespace App\Services;
 
 use OpenAI\Laravel\Facades\OpenAI;
 use RuntimeException;
-use Symfony\Component\Finder\SplFileInfo;
 
 class AIFilenameGenerator
 {
@@ -55,7 +54,7 @@ class AIFilenameGenerator
         // Prepare a list of file paths.
         $filesList = '';
 
-        if(count($files)) {
+        if (count($files)) {
             $file = $files[0];
             $folder = str_replace($file->getRelativePathname(), '', $file->getPathname());
             $filesList .= 'Parent Folder: '.$folder."\n";
