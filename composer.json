@@ -1,5 +1,5 @@
 {
-    "name": "gregpriday/copy-tree",
+    "name": "gregpriday/copytree",
     "description": "Copy a directory and its files to your clipboard.",
     "keywords": ["gregpriday", "copy-tree"],
     "homepage": "https://github.com/gregpriday/copy-tree",

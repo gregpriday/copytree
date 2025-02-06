@@ -17,7 +17,6 @@ use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
 use Illuminate\Pipeline\Pipeline;
 use LaravelZero\Framework\Commands\Command;
-use Symfony\Component\Finder\SplFileInfo;
 use Symfony\Component\Process\Process;
 
 class CopyTreeCommand extends Command
@@ -149,31 +148,28 @@ class CopyTreeCommand extends Command
         if (! $this->option('only-tree')) {
             $combinedOutput .= "<ct:project_files>\n{$fileOutput}\n</ct:project_files>\n";
         }
-        $combinedOutput .= "</ct:project><!-- END OF PROJECT -->\n";
+        $combinedOutput .= "</ct:project><!-- END OF PROJECT -->\n\n\n";
 
         // Handle output options.
-        $outputOption = $this->option('output');
-        if ($outputOption !== null) {
-            // Determine the desired filename.
-            $filename = is_array($outputOption) ? reset($outputOption) : $outputOption;
-            if (empty($filename)) {
-                // Generate a filename using the AI Filename Generation service.
-                $filename = app(AIFilenameGenerator::class)->generateFilename(
-                    array_map(fn (SplFileInfo $file) => ['path' => $file->getRelativePathname()], $finalFiles),
-                    // Use the default output folder (~/.copytree/outputs)
+        if ($this->input->hasParameterOption(['--output', '-o'])) {
+            $outputOption = $this->option('output') ?? '';
+            $filename = ($outputOption === '')
+                ? app(AIFilenameGenerator::class)->generateFilename(
+                    // Pass the array of files (or file paths) to the AI filename generator.
+                    $finalFiles,
                     copytree_path('outputs')
-                );
-            }
+                )
+                : $outputOption;
+
             // Create the outputs folder if it does not exist.
             $outputDir = copytree_path('outputs');
             if (! is_dir($outputDir)) {
                 mkdir($outputDir, 0755, true);
             }
-            // Write output to the file.
+
             $fullPath = $outputDir.DIRECTORY_SEPARATOR.$filename;
             file_put_contents($fullPath, $combinedOutput);
             $this->info("Saved output to file: {$fullPath}");
-
             $this->revealInFinder($fullPath);
         } elseif ($this->option('display')) {
             // Display the output in the console.
@@ -197,7 +193,7 @@ class CopyTreeCommand extends Command
         // Attempt to reveal the file in Finder using AppleScript
         $script = sprintf(
             'tell application "Finder" to reveal POSIX file "%s"
-        tell application "Finder" to activate',
+            tell application "Finder" to activate',
             str_replace('"', '\"', $filePath)
         );
 

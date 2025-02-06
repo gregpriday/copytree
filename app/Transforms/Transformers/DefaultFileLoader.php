@@ -84,6 +84,11 @@ class DefaultFileLoader implements FileTransformerInterface
         $printable = 0;
         $total = $sampleLength;
 
+        // if the content is empty, it's not binary
+        if ($total === 0) {
+            return false;
+        }
+
         for ($i = 0; $i < $sampleLength; $i++) {
             $char = $sample[$i];
             $ord = ord($char);
