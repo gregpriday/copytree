@@ -68,6 +68,9 @@ class OpenAIFilterStage implements FilePipelineStageInterface
                     ['role' => 'user',   'content' => $promptText],
                 ],
                 'temperature' => 0.3,
+                'response_format' => [
+                    'type' => 'json_object',
+                ],
                 'max_tokens' => 500,
             ]);
         } catch (\Exception $e) {

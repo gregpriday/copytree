@@ -9,14 +9,16 @@ class CopyDocsCommand extends Command
 {
     /**
      * The signature of the command.
+     *
+     * All parameters are defined as options so that nothing is required.
      */
     protected $signature = 'copy:docs
-        {--f|filter=* : Filter files using glob patterns.}
-        {--a|ai-filter=? : Filter files using a natural language description.}
-        {--o|output? : Output to a file (the filename is always "profile-docs.txt").}
-        {--i|display : Display output in the console.}
-        {--S|stream : Stream output directly.}
-        {--r|as-reference : Copy a reference to a temporary file.}';
+        {--f|filter=* : (Optional) Filter files using glob patterns.}
+        {--a|ai-filter=? : (Optional) Filter files using a natural language description.}
+        {--o|output? : (Optional) Output to a file (the filename is always "profile-docs.txt").}
+        {--i|display : (Optional) Display output in the console.}
+        {--S|stream : (Optional) Stream output directly.}
+        {--r|as-reference : (Optional) Copy a reference to a temporary file.}';
 
     /**
      * The description of the command.
@@ -26,9 +28,8 @@ class CopyDocsCommand extends Command
     /**
      * Execute the command.
      *
-     * This command simply sets a fixed source (here, the "rulesets" directory is used as a stand‐in for profile docs)
-     * and passes along only the relevant options (filter, ai-filter, search, output, display, stream, as-reference)
-     * to the main CopyTreeCommand.
+     * This command sets a fixed source (the "docs/profiles" directory) and passes along the
+     * relevant options (filter, ai-filter, output, display, stream, as-reference) to the main CopyTreeCommand.
      *
      * @throws \Symfony\Component\Console\Exception\ExceptionInterface
      */
@@ -43,7 +44,7 @@ class CopyDocsCommand extends Command
             'path' => $fixedPath,
         ];
 
-        // Get all options and remove those that don't apply.
+        // Get all options; they are all optional.
         $options = $this->options();
 
         // If an output file is specified, force it to "profile-docs.txt".
@@ -51,7 +52,7 @@ class CopyDocsCommand extends Command
             $options['output'] = 'profile-docs.txt';
         }
 
-        // Merge the remaining options with the arguments.
+        // Merge the options with the arguments.
         $args = array_merge($args, $options);
 
         // Retrieve and run the main CopyTreeCommand.

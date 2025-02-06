@@ -24,19 +24,19 @@ class CopyTreeCommand extends Command
     /**
      * The signature of the command.
      *
-     * @var string
+     * Note that the "output" option now uses "=" so that it is always registered.
      */
     protected $signature = 'copy
         {path? : The directory path or GitHub URL (default: current working directory)}
         {--d|depth=10 : Maximum depth of the tree.}
         {--l|max-lines=0 : Maximum number of lines to show per file. Use 0 for unlimited.}
         {--t|only-tree : Include only the directory tree in the output, not the file contents.}
-        {--p|profile=auto : Profile to apply. Available options: auto, none, etc.}
-        {--f|filter=* : Filter files using glob patterns. Can be specified multiple times.}
+        {--p|profile=auto : Profile to apply.}
+        {--f|filter=* : Filter files using glob patterns.}
         {--a|ai-filter=false : Filter files using AI based on a natural language description.}
         {--m|modified : Only include files that have been modified since the last commit.}
         {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
-        {--o|output? : Outputs to a file. If no filename is provided, creates file in ~/.copytree/files/.}
+        {--o|output= : Outputs to a file. If no filename is provided, creates file in ~/.copytree/files/.}
         {--i|display : Display the output in the console.}
         {--S|stream : Stream output directly (useful for piping).}
         {--r|as-reference : Copy a reference to a temporary file instead of copying the content directly.}
@@ -66,7 +66,6 @@ class CopyTreeCommand extends Command
             'profile' => $this->option('profile'),
             'filter' => (array) $this->option('filter'),
             'ai_filter' => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
-            'search' => $this->option('search'),
             'modified' => $this->option('modified'),
             'changes' => $this->option('changes'),
             'depth' => (int) $this->option('depth'),

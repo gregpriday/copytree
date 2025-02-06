@@ -44,35 +44,38 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
             $content = substr($content, 0, $maxLength);
         }
 
-        // Load the system prompt for file summarization.
-        $systemPromptPath = base_path('prompts/file-summary/system.txt');
-        if (! File::exists($systemPromptPath)) {
-            throw new RuntimeException('System prompt for file summary not found.');
-        }
-        $systemPrompt = File::get($systemPromptPath);
+        // Use caching so that if the file hasn't changed, we don't call OpenAI again.
+        return $this->cacheTransformResult($input, function () use ($content) {
+            // Load the system prompt for file summarization.
+            $systemPromptPath = base_path('prompts/file-summary/system.txt');
+            if (! File::exists($systemPromptPath)) {
+                throw new RuntimeException('System prompt for file summary not found.');
+            }
+            $systemPrompt = File::get($systemPromptPath);
 
-        // Prepare the messages for the OpenAI chat API.
-        $messages = [
-            ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user', 'content' => "Please provide a concise summary for the following file content:\n\n".$content],
-        ];
+            // Prepare the messages for the OpenAI chat API.
+            $messages = [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => "Please provide a concise summary for the following file content:\n\n".$content],
+            ];
 
-        try {
-            $response = OpenAI::chat()->create([
-                'model' => config('openai.model', 'gpt-4o'),
-                'messages' => $messages,
-                'temperature' => 0.3,
-                'max_tokens' => 300,
-            ]);
-        } catch (\Exception $e) {
-            throw new RuntimeException('OpenAI API call failed: '.$e->getMessage());
-        }
+            try {
+                $response = OpenAI::chat()->create([
+                    'model' => config('openai.model', 'gpt-4o'),
+                    'messages' => $messages,
+                    'temperature' => 0.3,
+                    'max_tokens' => 300,
+                ]);
+            } catch (\Exception $e) {
+                throw new RuntimeException('OpenAI API call failed: '.$e->getMessage());
+            }
 
-        $summary = $response->choices[0]->message->content ?? '';
-        if (empty($summary)) {
-            throw new RuntimeException('No summary returned from OpenAI.');
-        }
+            $summary = $response->choices[0]->message->content ?? '';
+            if (empty($summary)) {
+                throw new RuntimeException('No summary returned from OpenAI.');
+            }
 
-        return $summary;
+            return $summary;
+        });
     }
 }

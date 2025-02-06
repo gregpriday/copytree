@@ -2,12 +2,13 @@
 
 namespace App\Transforms\Transformers;
 
+use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use RuntimeException;
 use Spatie\PdfToText\Pdf;
 use Symfony\Component\Finder\SplFileInfo;
 
-class PDFToText implements FileTransformerInterface
+class PDFToText extends BaseTransformer implements FileTransformerInterface
 {
     /**
      * Transform a PDF file into plain text.
@@ -39,11 +40,13 @@ class PDFToText implements FileTransformerInterface
             throw new RuntimeException("File '{$realPath}' is not a PDF file.");
         }
 
-        try {
-            // Use the spatie/pdf-to-text package to extract text.
-            return Pdf::getText($realPath);
-        } catch (\Exception $e) {
-            throw new RuntimeException('Failed to convert PDF to text: '.$e->getMessage());
-        }
+        // Use caching to avoid redundant PDF-to-text conversions.
+        return $this->cacheTransformResult($input, function () use ($realPath) {
+            try {
+                return Pdf::getText($realPath);
+            } catch (\Exception $e) {
+                throw new RuntimeException('Failed to convert PDF to text: '.$e->getMessage());
+            }
+        });
     }
 }

@@ -3,11 +3,12 @@
 namespace App\Transforms\Transformers;
 
 use App\Services\PandocConverter;
+use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 
-class DocumentToText implements FileTransformerInterface
+class DocumentToText extends BaseTransformer implements FileTransformerInterface
 {
     /**
      * The document conversion service instance.
@@ -40,9 +41,15 @@ class DocumentToText implements FileTransformerInterface
             throw new RuntimeException('DocumentToTextTransformer expects a SplFileInfo instance.');
         }
 
-        return $this->converter->convertToText($input);
+        // Use caching to avoid redundant conversions.
+        return $this->cacheTransformResult($input, function () use ($input) {
+            return $this->converter->convertToText($input);
+        });
     }
 
+    /**
+     * Determine whether the given file can be converted using Pandoc.
+     */
     public static function canConvert(SplFileInfo $inputFile): bool
     {
         // This method uses the PandocConverter's list of convertible MIME types.
