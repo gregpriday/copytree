@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Unit\Utilities;
+namespace Tests\Unit\Utilities\Git;
 
 use App\Utilities\Git\GitIgnoreManager;
 use PHPUnit\Framework\TestCase;
@@ -158,7 +158,7 @@ EOD;
      * Test that a directory-only rule (a rule ending with a slash) is applied to directories.
      *
      * Note: According to this implementation, a rule such as "build/" will mark the directory "build"
-     * as ignored but will not affect files inside it.
+     * as ignored AND WILL ALSO IGNORE FILES INSIDE.
      */
     public function test_directory_only_rule(): void
     {
@@ -178,9 +178,44 @@ EOD;
         $dirInfo = new SplFileInfo($buildDir, '', 'build');
         $this->assertFalse($manager->accept($dirInfo), 'Directory "build" should be ignored due to the directory-only rule.');
 
-        // Check a file inside "build". (According to the implementation, the rule is skipped for files.)
+        // Check a file inside "build".  It SHOULD be ignored.
         $fileInfo = new SplFileInfo($fileInside, 'build', 'build/output.txt');
-        $this->assertTrue($manager->accept($fileInfo), 'A file inside "build" is accepted because the rule applies only to directories.');
+        $this->assertFalse($manager->accept($fileInfo), 'A file inside "build" is ignored because the directory is ignored.'); // Corrected assertion
+    }
+
+    /**
+     * Test that ignoring a directory also ignores all files and subdirectories within it.
+     */
+    public function test_directory_only_rule_ignores_contents(): void
+    {
+        // Create a .gitignore with a directory-only rule
+        $gitignoreContent = <<<'EOD'
+build/
+EOD;
+        $this->createTestItem('.gitignore', $gitignoreContent);
+
+        // Create a directory "build" and files/subdirectories inside it.
+        $this->createTestItem('build', '', true);
+        $fileInside1 = $this->createTestItem('build/output1.txt', 'output content 1');
+        $this->createTestItem('build/subdir', '', true);
+        $fileInside2 = $this->createTestItem('build/subdir/output2.txt', 'output content 2');
+
+        // Also create a file *outside* the ignored directory.
+        $fileOutside = $this->createTestItem('src/safe.txt', 'safe file');
+
+        $manager = new GitIgnoreManager($this->tempDir);
+
+        // Check files inside "build".
+        $fileInfo1 = new SplFileInfo($fileInside1, 'build', 'build/output1.txt');
+        $fileInfo2 = new SplFileInfo($fileInside2, 'build/subdir', 'build/subdir/output2.txt');
+
+        $this->assertFalse($manager->accept($fileInfo1), 'File "build/output1.txt" should be ignored.');
+        $this->assertFalse($manager->accept($fileInfo2), 'File "build/subdir/output2.txt" should be ignored.');
+
+        // Check the file outside.
+        $outsideInfo = new SplFileInfo($fileOutside, 'src', 'src/safe.txt');
+        $this->assertTrue($manager->accept($outsideInfo), 'File "src/safe.txt" should be accepted.');
+
     }
 
     /**

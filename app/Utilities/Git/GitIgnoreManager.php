@@ -150,7 +150,7 @@ class GitIgnoreManager
     {
         // Normalize the file's relative path to use forward slashes.
         $relativePath = str_replace('\\', '/', $file->getRelativePathname());
-        $ignored = false; // Initialize: by default, files are not ignored.
+        $ignored = false; // By default, files are not ignored.
 
         foreach ($this->ignoreRules as $ignoreEntry) {
             $ignoreDir = $ignoreEntry['dir'];
@@ -169,7 +169,7 @@ class GitIgnoreManager
 
             // Process each rule in this .gitignore.
             foreach ($ignoreEntry['rules'] as $rule) {
-                // If the rule is marked as directory-only but this file is not a directory, skip.
+                // If the rule is directory-only but this file is not a directory, skip.
                 if ($rule['directoryOnly'] && ! $file->isDir()) {
                     continue;
                 }
@@ -188,7 +188,7 @@ class GitIgnoreManager
 
                 if ($this->matchPattern($rule['pattern'], $subject)) {
                     // In this implementation, the last matching rule wins.
-                    // A non-negated rule means "ignore" (i.e. set $ignored to true),
+                    // A non-negated rule means "ignore" (set $ignored to true),
                     // while a negation flips it to false.
                     $ignored = ! $rule['isNegation'];
 
@@ -199,14 +199,18 @@ class GitIgnoreManager
                 }
             }
 
-            // Optimization: For directories, if a parent's rule already causes ignoring,
-            // we may skip further processing.
+            // For directories, check if a parent's rule already causes ignoring.
             if ($ignored && $file->isDir()) {
                 $dirPrefix = str_replace('\\', '/', $relativePath).'/';
                 if ($this->isParentIgnored($dirPrefix)) {
-                    return false;  // Reject - since parent is ignored
+                    return false;
                 }
             }
+        }
+
+        // NEW: For all files (directories or not), if any parent directory is ignored, reject the file.
+        if ($this->isParentIgnored($relativePath)) {
+            return false;
         }
 
         // If no matching rule was found or the last match did not indicate ignore, accept the file.
