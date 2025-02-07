@@ -2,6 +2,7 @@
 
 namespace App\Pipeline;
 
+use App\Utilities\Git\GitIgnoreManager;
 use InvalidArgumentException;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
@@ -59,6 +60,7 @@ class FileLoader
      * This method uses Symfony Finder to locate all files (recursively) in the base directory,
      * applying global directory and file exclusions directly via Finder. Then, it filters out files
      * whose relative path indicates they are located in a base path directory that should be excluded.
+     * Finally, it applies Git ignore rules by using the GitIgnoreManager.
      *
      * @param  int|null  $maxDepth  Optional maximum depth (if null, no depth limit is applied).
      * @return SplFileInfo[] An array of SplFileInfo objects.
@@ -90,7 +92,7 @@ class FileLoader
         }
 
         // Filter out files that reside in a base path directory that should be excluded.
-        $filteredFiles = array_filter($files, function (SplFileInfo $file) {
+        $files = array_filter($files, function (SplFileInfo $file) {
             $relativePath = $file->getRelativePathname();
             // Extract the first directory (if any) from the relative path.
             $parts = explode(DIRECTORY_SEPARATOR, $relativePath);
@@ -101,6 +103,10 @@ class FileLoader
             return true;
         });
 
-        return array_values($filteredFiles);
+        // Filter out files that are ignored by Git ignore rules.
+        $gitIgnoreManager = new GitIgnoreManager($this->basePath);
+        $files = array_filter($files, fn (SplFileInfo $file) => $gitIgnoreManager->accept($file));
+
+        return array_values($files);
     }
 }

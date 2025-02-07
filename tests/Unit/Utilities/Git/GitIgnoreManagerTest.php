@@ -310,7 +310,7 @@ EOD;
             $manager->accept(new SplFileInfo($this->createTestItem('src/a/file.txt'), 'src/a', 'src/a/file.txt')),
             'src/a/file.txt should be ignored (src/**)'
         );
-        // Update: src/a/info.txt should be ignored too because it matches "src/**"
+        // With the rule "src/**", all files under src/ (including src/a/info.txt) are ignored.
         $this->assertFalse(
             $manager->accept(new SplFileInfo($this->createTestItem('src/a/info.txt'), 'src/a', 'src/a/info.txt')),
             'src/a/info.txt should be ignored (matches src/**)'
@@ -325,7 +325,8 @@ EOD;
             $manager->accept(new SplFileInfo($this->createTestItem('src/a/debug.log'), 'src/a', 'src/a/debug.log')),
             'src/a/debug.log should be ignored (src/**/*.log)'
         );
-        // With the current rules, all files under src/ are ignored, so a file like info.txt is ignored.
+        // Note: Since src/** already ignores all files under src, even files not ending with .log
+        // (such as info.txt) remain ignored.
 
         // a/**/b/c
         $this->assertFalse(
@@ -333,11 +334,11 @@ EOD;
             'a/b/c should be ignored (a/**/b/c)'
         );
         $this->assertFalse(
-            $manager->accept(new SplFileInfo($this->createTestItem('a/x/b/c'), 'a/x/b', 'a/x/b/c')),
+            $manager->accept(new SplFileInfo($this->createTestItem('a/x/b/c'), 'a/x', 'a/x/b/c')),
             'a/x/b/c should be ignored (a/**/b/c)'
         );
         $this->assertFalse(
-            $manager->accept(new SplFileInfo($this->createTestItem('a/x/y/b/c'), 'a/x/y/b', 'a/x/y/b/c')),
+            $manager->accept(new SplFileInfo($this->createTestItem('a/x/y/b/c'), 'a/x/y', 'a/x/y/b/c')),
             'a/x/y/b/c should be ignored (a/**/b/c)'
         );
         $this->assertTrue(
