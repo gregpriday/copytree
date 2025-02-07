@@ -150,8 +150,8 @@ class GitIgnoreManager
      */
     public function accept(SplFileInfo $file): bool
     {
-        // Normalize the file's relative path to use forward slashes.
-        $relativePath = str_replace('\\', '/', $file->getRelativePathname());
+        // Normalize the file's relative path to use forward slashes and remove any leading slash.
+        $relativePath = ltrim(str_replace('\\', '/', $file->getRelativePathname()), '/');
         $ignored = false; // By default, files are not ignored.
 
         foreach ($this->ignoreRules as $ignoreEntry) {
@@ -189,7 +189,7 @@ class GitIgnoreManager
                 }
 
                 if ($this->matchPattern($rule['pattern'], $subject)) {
-                    // In this implementation, the last matching rule wins.
+                    // In Git, the last matching rule wins.
                     // A non-negated rule means "ignore" (set $ignored to true),
                     // while a negation flips it to false.
                     $ignored = ! $rule['isNegation'];
@@ -203,19 +203,18 @@ class GitIgnoreManager
 
             // For directories, check if a parent's rule already causes ignoring.
             if ($ignored && $file->isDir()) {
-                $dirPrefix = str_replace('\\', '/', $relativePath).'/';
+                $dirPrefix = ltrim(str_replace('\\', '/', $relativePath), '/').'/';
                 if ($this->isParentIgnored($dirPrefix)) {
                     return false;
                 }
             }
         }
 
-        // NEW: For all files (directories or not), if any parent directory is ignored, reject the file.
+        // For all files (directories or not), if any parent directory is ignored, reject the file.
         if ($this->isParentIgnored($relativePath)) {
             return false;
         }
 
-        // If no matching rule was found or the last match did not indicate ignore, accept the file.
         return ! $ignored;
     }
 
@@ -231,9 +230,9 @@ class GitIgnoreManager
 
         foreach ($this->ignoreRules as $entry) {
             foreach ($entry['rules'] as $rule) {
-                if ($rule['directoryOnly'] && !$rule['isNegation']) {
+                if ($rule['directoryOnly'] && ! $rule['isNegation']) {
                     // Build the ignore path by combining the .gitignore location with the rule's pattern.
-                    $ignorePath = rtrim(($entry['dir'] ? $entry['dir'] . '/' : '') . $rule['pattern'], '/');
+                    $ignorePath = rtrim(($entry['dir'] ? $entry['dir'].'/' : '').$rule['pattern'], '/');
                     $ignorePath = str_replace('\\', '/', $ignorePath);
                     if ($ignorePath === '') {
                         continue;
@@ -250,7 +249,6 @@ class GitIgnoreManager
 
         return false;
     }
-
 
     /**
      * Check if a given pattern matches the subject.
@@ -273,39 +271,34 @@ class GitIgnoreManager
         // If the pattern contains '**', convert it to a regex.
         if (strpos($pattern, '**') !== false) {
             $regex = $this->convertPatternToRegex($pattern);
-            $flags = $this->caseSensitive ? '' : 'i'; // Case‑insensitive flag
+            $flags = $this->caseSensitive ? '' : 'i'; // Case-insensitive flag.
+
             return preg_match($regex, $subject) === 1;
         }
 
         // Otherwise, use fnmatch (with FNM_PATHNAME for correct '/' handling).
         $flags = FNM_PATHNAME;
-        if (!$this->caseSensitive) {
+        if (! $this->caseSensitive) {
             $flags |= FNM_CASEFOLD;
         }
+
         return fnmatch($pattern, $subject, $flags);
     }
 
     /**
      * Convert a gitignore pattern (which may include '**') into a regular expression.
      *
-     * Conversion rules:
-     *  - '**' is converted to '.*' (matching any characters including directory separators).
-     *  - '*' is converted to '[^/]*' (matching any characters except '/').
-     *  - '?' is converted to '.' (matching any single character).
-     *  - Other regex special characters are escaped.
-     *
      * The resulting regex is anchored at the beginning and end.
      */
     protected function convertPatternToRegex(string $pattern): string
     {
-        // If the pattern starts with "**/", allow zero or more directories by prepending an optional prefix.
         $prefix = '';
         if (substr($pattern, 0, 3) === '**/') {
             $prefix = '(?:.*\/)?';
             $pattern = substr($pattern, 3);
         }
 
-        // First, replace '/**/' with a temporary token.
+        // Replace '/**/' with a temporary token.
         $pattern = str_replace('/**/', '___DOUBLEAST___', $pattern);
 
         // Escape the pattern so that all regex special characters are treated literally.
@@ -314,7 +307,7 @@ class GitIgnoreManager
         // Restore our token with a regex fragment that allows an optional directory segment.
         $escaped = str_replace('___DOUBLEAST___', '(?:\/.*)?', $escaped);
 
-        // Now replace any remaining '**' with '.*'
+        // Replace any remaining '**' with '.*'
         $escaped = str_replace('\*\*', '.*', $escaped);
 
         // Replace remaining '*' with a pattern that matches any number of characters except a slash.
@@ -323,14 +316,9 @@ class GitIgnoreManager
         // Replace '?' with '.' (any single character).
         $escaped = str_replace('\?', '.', $escaped);
 
-        // Only if the escaped pattern contains a slash, adjust the ending so that patterns
-        // like "src/**/temp.txt" also match "src/temp.txt".
-        if (strpos($escaped, '/') !== false && preg_match('/^(.*[^\/])((?:[^\/]+\/)*[^\/]+)$/', $escaped, $matches)) {
-            if (!preg_match('/\/$/', $matches[1])) {
-                $escaped = $matches[1] . '\/?' . $matches[2];
-            }
-        }
+        // Unescape bracket expressions so that they work as character classes.
+        $escaped = preg_replace(['/\\\\\[/', '/\\\\\]/'], ['[', ']'], $escaped);
 
-        return '/^' . $prefix . $escaped . '$/';
+        return '/^'.$prefix.$escaped.'$/';
     }
 }
