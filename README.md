@@ -160,5 +160,5 @@ This project is licensed under the MIT License. See LICENSE.md for further detai
 
 ## References
 
-- Project details and documentation are available on the GitHub repository: https://github.com/gregpriday/copy-tree
+- Project details and documentation are available on the GitHub repository: https://github.com/gregpriday/copytree
 - Installation instructions for Pandoc and Poppler using Homebrew.
