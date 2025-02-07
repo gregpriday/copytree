@@ -20,7 +20,7 @@ class GitIgnoreManagerTest extends TestCase
     protected function setUp(): void
     {
         $this->tempDir = sys_get_temp_dir().'/gitignore_test_'.uniqid();
-        if (! mkdir($this->tempDir, 0777, true) && ! is_dir($this->tempDir)) {
+        if (!mkdir($this->tempDir, 0777, true) && !is_dir($this->tempDir)) {
             throw new RuntimeException(sprintf('Directory "%s" was not created', $this->tempDir));
         }
     }
@@ -38,7 +38,7 @@ class GitIgnoreManagerTest extends TestCase
      */
     private function removeDirectory(string $dir): void
     {
-        if (! is_dir($dir)) {
+        if (!is_dir($dir)) {
             return;
         }
         $iterator = new \RecursiveIteratorIterator(
@@ -58,19 +58,20 @@ class GitIgnoreManagerTest extends TestCase
     /**
      * Create a test file (or directory if needed) relative to the temporary directory.
      *
-     * @param  string  $relativePath  The path relative to the temporary directory.
-     * @param  string  $content  The content to write (ignored if creating a directory).
-     * @param  bool  $isDir  Whether to create a directory instead of a file.
+     * @param string $relativePath The path relative to the temporary directory.
+     * @param string $content      The content to write (ignored if creating a directory).
+     * @param bool   $isDir      Whether to create a directory instead of a file.
+     *
      * @return string The full path of the created file or directory.
      */
     private function createTestItem(string $relativePath, string $content = '', bool $isDir = false): string
     {
-        $fullPath = $this->tempDir.'/'.$relativePath;
+        $fullPath = $this->tempDir . '/' . $relativePath;
         $dir = $isDir ? $fullPath : dirname($fullPath);
-        if (! is_dir($dir)) {
+        if (!is_dir($dir)) {
             mkdir($dir, 0777, true);
         }
-        if (! $isDir) {
+        if (!$isDir) {
             file_put_contents($fullPath, $content);
         }
 
@@ -83,7 +84,7 @@ class GitIgnoreManagerTest extends TestCase
     public function test_constructor_throws_exception_for_invalid_base_path(): void
     {
         $this->expectException(RuntimeException::class);
-        new GitIgnoreManager($this->tempDir.'/nonexistent');
+        new GitIgnoreManager($this->tempDir . '/nonexistent');
     }
 
     /**
@@ -215,7 +216,6 @@ EOD;
         // Check the file outside.
         $outsideInfo = new SplFileInfo($fileOutside, 'src', 'src/safe.txt');
         $this->assertTrue($manager->accept($outsideInfo), 'File "src/safe.txt" should be accepted.');
-
     }
 
     /**
@@ -271,4 +271,184 @@ EOD;
         $this->assertFalse($manager->accept($infoMatch2), '"src/dir/temp.txt" should be ignored.');
         $this->assertTrue($manager->accept($infoNoMatch), '"src/dir/other.txt" should be accepted.');
     }
+
+    /**
+     * Test more complex scenarios involving the double asterisk pattern.
+     */
+    public function test_double_asterisk_advanced(): void
+    {
+        $gitignoreContent = <<<'EOD'
+**/temp.txt
+src/**
+src/**/*.log
+a/**/b/c
+**/d/e/**
+EOD;
+        $this->createTestItem('.gitignore', $gitignoreContent);
+
+        $manager = new GitIgnoreManager($this->tempDir);
+
+        // **/temp.txt
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('temp.txt'), '', 'temp.txt')), 'temp.txt should be ignored (**/temp.txt at root)');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('a/temp.txt'), 'a', 'a/temp.txt')), 'a/temp.txt should be ignored (**/temp.txt in subdir)');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('a/b/temp.txt'), 'a/b', 'a/b/temp.txt')), 'a/b/temp.txt should be ignored (**/temp.txt deeper)');
+
+        // src/**
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('src/file.txt'), 'src', 'src/file.txt')), 'src/file.txt should be ignored (src/**)');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('src/a/file.txt'), 'src/a', 'src/a/file.txt')), 'src/a/file.txt should be ignored (src/**)');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('other/src/file.txt'), 'other/src', 'other/src/file.txt')), 'other/src/file.txt should be accepted (src/**)');
+
+        // src/**/*.log
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('src/error.log'), 'src', 'src/error.log')), 'src/error.log should be ignored (src/**/*.log)');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('src/a/debug.log'), 'src/a', 'src/a/debug.log')), 'src/a/debug.log should be ignored (src/**/*.log)');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('src/a/info.txt'), 'src/a', 'src/a/info.txt')), 'src/a/info.txt should be accepted (src/**/*.log)');
+
+        // a/**/b/c
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('a/b/c'), 'a/b', 'a/b/c')), 'a/b/c should be ignored (a/**/b/c)');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('a/x/b/c'), 'a/x/b', 'a/x/b/c')), 'a/x/b/c should be ignored (a/**/b/c)');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('a/x/y/b/c'), 'a/x/y/b', 'a/x/y/b/c')), 'a/x/y/b/c should be ignored (a/**/b/c)');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('a/b/d'), 'a/b', 'a/b/d')), 'a/b/d should be accepted (a/**/b/c)');
+
+        // **/d/e/**
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('d/e/file.txt'), 'd/e', 'd/e/file.txt')), 'd/e/file.txt should be ignored (**/d/e/**)');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('x/d/e/file.txt'), 'x/d/e', 'x/d/e/file.txt')), 'x/d/e/file.txt should be ignored (**/d/e/**)');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('x/y/d/e/z/file.txt'), 'x/y/d/e/z', 'x/y/d/e/z/file.txt')), 'x/y/d/e/z/file.txt should be ignored (**/d/e/**)');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('d/f/file.txt'), 'd/f', 'd/f/file.txt')), 'd/f/file.txt should be accepted (**/d/e/**)');
+    }
+
+    /**
+     * Test interactions between multiple .gitignore files at different levels.
+     */
+    public function test_nested_gitignore_files(): void
+    {
+        // Top-level .gitignore: Ignore all .log files
+        $this->createTestItem('.gitignore', '*.log');
+        // Subdirectory .gitignore: Re-include important.log
+        $this->createTestItem('logs/.gitignore', '!important.log');
+        // Deeper subdirectory .gitignore: Ignore specific.log
+        $this->createTestItem('logs/deep/.gitignore', 'specific.log');
+
+        $manager = new GitIgnoreManager($this->tempDir);
+
+        // Files in the root
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('error.log'), '', 'error.log')), 'Root error.log should be ignored');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('main.txt'), '', 'main.txt')), 'Root main.txt should be accepted');
+
+        // Files in the 'logs' subdirectory
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('logs/important.log'), 'logs', 'logs/important.log')), 'logs/important.log should be re-included');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('logs/debug.log'), 'logs', 'logs/debug.log')), 'logs/debug.log should be ignored');
+
+        // Files in the 'logs/deep' subdirectory
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('logs/deep/important.log'), 'logs/deep', 'logs/deep/important.log')), 'logs/deep/important.log should still be included');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('logs/deep/specific.log'), 'logs/deep', 'logs/deep/specific.log')), 'logs/deep/specific.log should be ignored');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('logs/deep/other.log'), 'logs/deep', 'logs/deep/other.log')), 'logs/deep/other.log should be ignored (inherited)');
+    }
+
+    /**
+     * Test edge cases with slashes, wildcards, and directory/file distinctions.
+     */
+    public function test_edge_cases_slashes_wildcards(): void
+    {
+        $gitignoreContent = <<<'EOD'
+/foo/bar
+baz/*.txt
+qux?/
+EOD;
+        $this->createTestItem('.gitignore', $gitignoreContent);
+
+        $manager = new GitIgnoreManager($this->tempDir);
+
+        // /foo/bar
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('foo/bar', ''), 'foo', 'foo/bar')), 'foo/bar should be ignored');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('a/foo/bar', ''), 'a/foo', 'a/foo/bar')), 'a/foo/bar should be accepted (leading slash)');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('foo/baz', ''), 'foo', 'foo/baz')), 'foo/baz should be accepted');
+
+        // baz/*.txt
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('baz/file.txt', ''), 'baz', 'baz/file.txt')), 'baz/file.txt should be ignored');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('baz/file.log', ''), 'baz', 'baz/file.log')), 'baz/file.log should be accepted');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('a/baz/file.txt', ''), 'a/baz', 'a/baz/file.txt')), 'a/baz/file.txt should be accepted');
+
+        // qux?/  (directory-only with ?)
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('qux1', '', true), '', 'qux1')), 'qux1/ should be ignored');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('quxa', '', true), '', 'quxa')), 'quxa/ should be ignored');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('qux1/file.txt', ''), 'qux1', 'qux1/file.txt')), 'qux1/file.txt should be ignored because qux1/ is ignored.');  // Corrected: Should be assertFalse
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('qux', ''), '', 'qux')), 'qux should be accepted');
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('qux12', ''), '', 'qux12')), 'qux12 should be accepted');
+    }
+
+    /**
+     * Test case sensitivity (and insensitivity) of matching.
+     */
+    public function test_case_sensitivity(): void
+    {
+        $this->createTestItem('.gitignore', 'testfile.txt');
+
+        // Case-sensitive manager
+        $managerSensitive = new GitIgnoreManager($this->tempDir, true);
+        $this->assertFalse($managerSensitive->accept(new SplFileInfo($this->createTestItem('testfile.txt'), '', 'testfile.txt')), 'Case-sensitive match');
+        $this->assertTrue($managerSensitive->accept(new SplFileInfo($this->createTestItem('TestFile.txt'), '', 'TestFile.txt')), 'Case-sensitive mismatch');
+
+        // Case-insensitive manager
+        $managerInsensitive = new GitIgnoreManager($this->tempDir, false);
+        $this->assertFalse($managerInsensitive->accept(new SplFileInfo($this->createTestItem('testfile.txt'), '', 'testfile.txt')), 'Case-insensitive match');
+        $this->assertFalse($managerInsensitive->accept(new SplFileInfo($this->createTestItem('TestFile.txt'), '', 'TestFile.txt')), 'Case-insensitive match (uppercase)');
+    }
+
+    /**
+     * Test behavior with empty or comment-only .gitignore files.
+     */
+    public function test_empty_and_comment_only_gitignore(): void
+    {
+        // Empty .gitignore
+        $this->createTestItem('.gitignore', '');
+        $managerEmpty = new GitIgnoreManager($this->tempDir);
+        $this->assertTrue($managerEmpty->accept(new SplFileInfo($this->createTestItem('file.txt'), '', 'file.txt')), 'Empty .gitignore should accept all');
+
+        // Comment-only .gitignore
+        $this->createTestItem('comments/.gitignore', "# This is a comment\n  # Another comment");
+        $managerComments = new GitIgnoreManager($this->tempDir);
+        $this->assertTrue($managerComments->accept(new SplFileInfo($this->createTestItem('comments/file.txt'), 'comments', 'comments/file.txt')), 'Comment-only .gitignore should accept all');
+    }
+
+    /**
+     * Test files with spaces and other special characters in their names.
+     */
+    public function test_files_with_special_characters(): void
+    {
+        $gitignoreContent = <<<'EOD'
+# Ignore files with spaces
+file\ with\ spaces.txt
+# Ignore files starting with a dot
+.hiddenfile
+# Ignore files with brackets
+[special]file.txt
+EOD;
+        $this->createTestItem('.gitignore', $gitignoreContent);
+        $manager = new GitIgnoreManager($this->tempDir);
+
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('file with spaces.txt'), '', 'file with spaces.txt')), 'File with spaces should be ignored.');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('.hiddenfile'), '', '.hiddenfile')), 'File starting with a dot should be ignored');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('[special]file.txt'), '', '[special]file.txt')), 'File with brackets should be ignored.');
+
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('other_file.txt'), '', 'other_file.txt')), 'Normal file should be accepted.');
+    }
+
+    /**
+     * Test with Leading and Trailing Spaces
+     */
+    public function test_leading_trailing_spaces(): void
+    {
+        $gitignoreContent = <<<'EOD'
+  ignore_me.txt
+	  also_ignore.log
+EOD;
+        $this->createTestItem('.gitignore', $gitignoreContent);
+        $manager = new GitIgnoreManager($this->tempDir);
+
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('ignore_me.txt'), '', 'ignore_me.txt')), 'Should ignore with leading/trailing spaces.');
+        $this->assertFalse($manager->accept(new SplFileInfo($this->createTestItem('also_ignore.log'), '', 'also_ignore.log')), 'Should also ignore with tabs.');
+
+        $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('  ignore_me.txt  '), '', '  ignore_me.txt  ')), 'Should not ignore files that are just spaces and the filename.');
+    }
 }
+
