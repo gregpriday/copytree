@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Transforms\Transformers;
+namespace App\Transforms\Transformers\Summarizers;
 
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
+use App\Transforms\Transformers\Loaders\FileLoader;
 use Illuminate\Support\Facades\File;
 use OpenAI\Laravel\Facades\OpenAI;
 use RuntimeException;
@@ -32,7 +33,7 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
 
         // Only summarize text files. For non-text files, fall back to the default loader.
         if (strpos($mimeType, 'text/') !== 0) {
-            return (new DefaultFileLoader)->transform($input);
+            return (new FileLoader)->transform($input);
         }
 
         // Read the file content.

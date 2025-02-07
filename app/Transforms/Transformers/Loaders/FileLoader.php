@@ -1,12 +1,15 @@
 <?php
 
-namespace App\Transforms\Transformers;
+namespace App\Transforms\Transformers\Loaders;
 
 use App\Transforms\FileTransformerInterface;
+use App\Transforms\Transformers\Converters\DocumentToText;
+use App\Transforms\Transformers\Converters\PDFToText;
+use App\Transforms\Transformers\Images\ImageDescription;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Finder\SplFileInfo;
 
-class DefaultFileLoader implements FileTransformerInterface
+class FileLoader implements FileTransformerInterface
 {
     /**
      * Maximum allowed characters before snipping occurs.

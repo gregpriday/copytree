@@ -2,7 +2,7 @@
 
 namespace Tests\Integration;
 
-use App\Transforms\Transformers\ImageDescription;
+use App\Transforms\Transformers\Images\ImageDescription;
 use Symfony\Component\Finder\SplFileInfo;
 use Tests\TestCase;
 

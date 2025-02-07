@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Transforms\Transformers;
+namespace App\Transforms\Transformers\Markdown;
 
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;

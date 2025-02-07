@@ -1,9 +1,10 @@
 <?php
 
-namespace App\Transforms\Transformers;
+namespace App\Transforms\Transformers\Images;
 
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
+use App\Transforms\Transformers\Loaders\FileLoader;
 use Illuminate\Support\Facades\File;
 use OpenAI\Laravel\Facades\OpenAI;
 use RuntimeException;
@@ -35,7 +36,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
         $mimeType = File::mimeType($input->getRealPath());
         if (strpos($mimeType, 'image/') !== 0) {
             // If not an image, fall back to the default file loader transformer.
-            return (new DefaultFileLoader)->transform($input);
+            return (new FileLoader)->transform($input);
         }
 
         // Use the caching helper to cache the expensive transformation.

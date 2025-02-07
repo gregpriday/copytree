@@ -6,9 +6,10 @@ Profiles in Copytree let you define exactly which files to copy from your projec
 - **globalExcludeRules** – An array of rule sets that, if matched, will always exclude a file.
 - **always** – An object to explicitly include or exclude files by name.
 - **external** – An array of external source definitions whose files are merged into the output.
-- **transforms** – An array of transformation configurations that process file contents.
+- **transforms** – An array of transformation configurations that process file contents.  
+  **Note:** Images are automatically processed via the ImageDescription transformer; you do not need to include a transforms section for images.
 
-For a complete guide on writing profiles, see [Writing Profiles for Copytree](./profiles.md) (formerly “Writing Rulesets”).
+For a complete guide on writing profiles, see [Writing Profiles for Copytree](./profiles.md).
 
 ---
 
@@ -24,7 +25,8 @@ For a complete guide on writing profiles, see [Writing Profiles for Copytree](./
 8. [Unity Game Project](#8-unity-game-project)
 9. [Ruby on Rails Application](#9-ruby-on-rails-application)
 10. [Flutter Mobile App](#10-flutter-mobile-app)
-11. [Common Patterns](#11-common-patterns)
+11. [Transforming Markdown Files](#11-transforming-markdown-files)
+12. [Common Patterns](#12-common-patterns)
 
 ---
 
@@ -55,7 +57,7 @@ A simple profile for a typical web project that includes HTML, CSS, and JavaScri
 ## 2. Python Data Science Project
 
 **Description:**  
-A profile for a Python data science project. It includes Python files, Jupyter notebooks, and data files while excluding sensitive files. In addition, it merges in external documentation from a remote GitHub repository and applies a transformation to Jupyter notebooks (e.g. converting them to plain text).
+A profile for a Python data science project. It includes Python files, Jupyter notebooks, and data files while excluding sensitive files. In addition, it merges in external documentation from a remote GitHub repository. (Since there isn’t a built‑in transformer for notebooks, no transforms are configured here.)
 
 ```json
 {
@@ -87,18 +89,6 @@ A profile for a Python data science project. It includes Python files, Jupyter n
         ]
       ]
     }
-  ],
-  "transforms": [
-    {
-      "rules": [
-        [
-          ["extension", "=", "ipynb"]
-        ]
-      ],
-      "transforms": [
-        "NotebookToText"
-      ]
-    }
   ]
 }
 ```
@@ -108,7 +98,7 @@ A profile for a Python data science project. It includes Python files, Jupyter n
 ## 3. Java Maven Project
 
 **Description:**  
-A profile for a Java Maven project. It focuses on Java source files and key Maven configuration files. This example also includes a transformation step to summarize XML configuration files.
+A profile for a Java Maven project that focuses on Java source files and key Maven configuration files. This example does not include any file transforms.
 
 ```json
 {
@@ -125,19 +115,7 @@ A profile for a Java Maven project. It focuses on Java source files and key Mave
   ],
   "always": {
     "include": ["pom.xml", "README.md", "src/main/resources/application.properties"]
-  },
-  "transforms": [
-    {
-      "rules": [
-        [
-          ["extension", "=", "xml"]
-        ]
-      ],
-      "transforms": [
-        "XmlSummary"
-      ]
-    }
-  ]
+  }
 }
 ```
 
@@ -146,7 +124,7 @@ A profile for a Java Maven project. It focuses on Java source files and key Mave
 ## 4. Node.js Express API
 
 **Description:**  
-A profile for a Node.js Express API project. It focuses on JavaScript and JSON files from API routes and middleware directories, while excluding common debug or sensitive files. A transformation is applied to JSON configuration files for improved readability.
+A profile for a Node.js Express API project. It focuses on JavaScript and JSON files from API routes and middleware directories while excluding common debug or sensitive files. No additional transforms are specified.
 
 ```json
 {
@@ -167,22 +145,7 @@ A profile for a Node.js Express API project. It focuses on JavaScript and JSON f
   ],
   "always": {
     "include": ["package.json", "app.js", "config/database.js", "README.md"]
-  },
-  "transforms": [
-    {
-      "rules": [
-        [
-          ["extension", "=", "json"]
-        ],
-        [
-          ["folder", "startsWith", "config"]
-        ]
-      ],
-      "transforms": [
-        "JsonFormatter"
-      ]
-    }
-  ]
+  }
 }
 ```
 
@@ -191,7 +154,7 @@ A profile for a Node.js Express API project. It focuses on JavaScript and JSON f
 ## 5. React Native Mobile App
 
 **Description:**  
-A profile for a React Native mobile app project. It includes JavaScript/TypeScript source files as well as native configuration files. This example shows how to merge in external configuration files from a local directory.
+A profile for a React Native mobile app project. It includes JavaScript/TypeScript source files as well as native configuration files. This example also merges in external configuration files from a local directory.
 
 ```json
 {
@@ -233,7 +196,7 @@ A profile for a React Native mobile app project. It includes JavaScript/TypeScri
 ## 6. Django Web Application
 
 **Description:**  
-A profile for a Django web application. It filters for Python files, HTML templates, and static assets while excluding common temporary or development files. In addition, it applies a transformation to HTML template files (for example, to minify them).
+A profile for a Django web application. It filters for Python files, HTML templates, and static assets while excluding common temporary or development files. No transforms are configured here.
 
 ```json
 {
@@ -254,22 +217,7 @@ A profile for a Django web application. It filters for Python files, HTML templa
   ],
   "always": {
     "include": ["manage.py", "requirements.txt", "README.md"]
-  },
-  "transforms": [
-    {
-      "rules": [
-        [
-          ["extension", "=", "html"]
-        ],
-        [
-          ["folder", "startsWith", "templates"]
-        ]
-      ],
-      "transforms": [
-        "HtmlMinifier"
-      ]
-    }
-  ]
+  }
 }
 ```
 
@@ -278,7 +226,7 @@ A profile for a Django web application. It filters for Python files, HTML templa
 ## 7. Golang Microservice
 
 **Description:**  
-A profile for a Golang microservice project that focuses on Go source files and configuration files. It also applies a transformation to YAML or TOML configuration files for better readability.
+A profile for a Golang microservice project that focuses on Go source files and configuration files. No additional transforms are specified.
 
 ```json
 {
@@ -300,19 +248,7 @@ A profile for a Golang microservice project that focuses on Go source files and 
   ],
   "always": {
     "include": ["go.mod", "go.sum", "Dockerfile", "Makefile", "README.md"]
-  },
-  "transforms": [
-    {
-      "rules": [
-        [
-          ["extension", "oneOf", ["yaml", "toml"]]
-        ]
-      ],
-      "transforms": [
-        "YamlFormatter"
-      ]
-    }
-  ]
+  }
 }
 ```
 
@@ -321,7 +257,7 @@ A profile for a Golang microservice project that focuses on Go source files and 
 ## 8. Unity Game Project
 
 **Description:**  
-A profile for a Unity game project that includes C# scripts, Unity asset files, and scene files. This example also shows how to merge in shared assets from an external GitHub repository and apply a transformation to summarize C# code.
+A profile for a Unity game project that includes C# scripts, Unity asset files, and scene files. This example also shows how to merge in shared assets from an external GitHub repository. No transforms are configured here.
 
 ```json
 {
@@ -350,18 +286,6 @@ A profile for a Unity game project that includes C# scripts, Unity asset files, 
         ]
       ]
     }
-  ],
-  "transforms": [
-    {
-      "rules": [
-        [
-          ["extension", "=", "cs"]
-        ]
-      ],
-      "transforms": [
-        "CsCodeSummarizer"
-      ]
-    }
   ]
 }
 ```
@@ -371,7 +295,7 @@ A profile for a Unity game project that includes C# scripts, Unity asset files, 
 ## 9. Ruby on Rails Application
 
 **Description:**  
-A profile for a Ruby on Rails application. It focuses on Ruby source files, view templates, and important configuration files, while excluding logs and temporary files. Additionally, it applies a transformation to ERB template files to generate summaries.
+A profile for a Ruby on Rails application. It focuses on Ruby source files, view templates, and important configuration files while excluding logs and temporary files. No transforms are configured here.
 
 ```json
 {
@@ -389,19 +313,7 @@ A profile for a Ruby on Rails application. It focuses on Ruby source files, view
   ],
   "always": {
     "include": ["Gemfile", "config/database.yml", "README.md"]
-  },
-  "transforms": [
-    {
-      "rules": [
-        [
-          ["extension", "=", "erb"]
-        ]
-      ],
-      "transforms": [
-        "ErbTemplateSummarizer"
-      ]
-    }
-  ]
+  }
 }
 ```
 
@@ -410,7 +322,7 @@ A profile for a Ruby on Rails application. It focuses on Ruby source files, view
 ## 10. Flutter Mobile App
 
 **Description:**  
-A profile for a Flutter mobile app project that focuses on Dart files and Flutter-specific configuration. In this example, external assets (such as images) from a local directory are merged into the output.
+A profile for a Flutter mobile app project that focuses on Dart files and Flutter‑specific configuration. In this example, external assets (such as images) from a local directory are merged into the output.
 
 ```json
 {
@@ -450,7 +362,40 @@ A profile for a Flutter mobile app project that focuses on Dart files and Flutte
 
 ---
 
-## 11. Common Patterns
+## 11. Transforming Markdown Files
+
+**Description:**  
+If you wish to apply a transformation to Markdown files (for example, to generate a concise summary), you can use the built‑in transformer `"Markdown.FileSummary"`. In this example, any file with the `md` extension will be processed by the transformer. (Remember, images are handled by default so you only need to specify transforms for other file types as necessary.)
+
+```json
+{
+  "rules": [
+    [
+      ["extension", "=", "md"]
+    ]
+  ],
+  "transforms": [
+    {
+      "rules": [
+        [
+          ["extension", "=", "md"]
+        ]
+      ],
+      "transforms": [
+        "Markdown.FileSummary"
+      ]
+    }
+  ]
+}
+```
+
+In this configuration, the transformer identifier `"Markdown.FileSummary"` is always prefixed with  
+`App\Transforms\Transformers\` and the dot is converted to a namespace separator, so it is resolved as  
+`App\Transforms\Transformers\Markdown\FileSummary`.
+
+---
+
+## 12. Common Patterns
 
 Here are some frequently used patterns you can incorporate into any profile:
 
@@ -509,7 +454,3 @@ Here are some frequently used patterns you can incorporate into any profile:
   ]
 }
 ```
-
----
-
-These updated examples cover a wide range of project types and demonstrate how Copytree profiles can be used not only to filter files by type and location but also to merge in external resources and apply content transformations. Adapt these examples to your specific needs or use them as a starting point for creating your own custom profiles. Remember that each rule is applied on a file-by-file basis—ensure your rules are designed to match individual files rather than entire directories.

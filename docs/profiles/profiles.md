@@ -93,7 +93,7 @@ A Copytree profile is defined in JSON format and typically contains the followin
         ]
       ],
       "transforms": [
-        "FileSummary"
+        "Markdown.FileSummary"
       ]
     }
   ]
@@ -106,7 +106,8 @@ In this example:
 - Files in directories containing `"node_modules"` or whose basenames start with a dot are globally excluded.
 - Specific files (e.g. `README.md` and `package.json`) are always included, whereas `.env` and `temp.log` are always excluded.
 - An external source is defined to merge files from a remote GitHub repository (mapped under the `external/` directory) and only include Markdown or text files.
-- Markdown files will be processed by a transformer (e.g. a file summarization transformer named `"FileSummary"`).
+- Markdown files will be processed by a transformer—here, the transformer is referenced using the new dot‑notation. In this case, `"Markdown.FileSummary"` points to the class  
+  `App\Transforms\Transformers\Markdown\FileSummary`.
 
 ---
 
@@ -199,7 +200,12 @@ The **transforms** property enables you to apply content transformations to file
 
 Each transform configuration object includes:
 - **rules:** The conditions under which the transformation should be applied.
-- **transforms:** An array of transformer identifiers (typically class names) that will process the file content.
+- **transforms:** An array of transformer identifiers that will process the file content.
+
+> **Note:** In the new system, transformer identifiers must be specified using dot‑notation. Copytree will always prefix the identifier with  
+> `App\Transforms\Transformers\` and convert any dots into namespace separators.  
+> For example, if you have a transformer located at  
+> `App\Transforms\Transformers\Markdown\MarkdownLinkStripper`, you would specify it as `"Markdown.MarkdownLinkStripper"`.
 
 _Example:_
 ```json
@@ -212,14 +218,14 @@ _Example:_
         ]
       ],
       "transforms": [
-        "FileSummary"
+        "Markdown.FileSummary"
       ]
     }
   ]
 }
 ```
 
-This configuration will run the `"FileSummary"` transformer on all Markdown files.
+This configuration will run the `App\Transforms\Transformers\Markdown\FileSummary` transformer on all Markdown files.
 
 ---
 
@@ -322,7 +328,7 @@ Profiles support a wide range of operators and file fields. For details, refer t
 
 ## Numeric and Directory Filtering
 
-For numeric fields such as `size` or `mtime`, you may use either raw numbers or human-readable strings with units:
+For numeric fields such as `size` or `mtime`, you may use either raw numbers or human‑readable strings with units:
 
 ```json
 ["size", "<", "5 MB"]
@@ -409,12 +415,15 @@ For filtering based on directory paths, use the `folder` field:
         ]
       ],
       "transforms": [
-        "FileSummary"
+        "Markdown.FileSummary"
       ]
     }
   ]
 }
 ```
+
+In this example, the transformer identifier `"Markdown.FileSummary"` will be converted into the fully qualified class name  
+`App\Transforms\Transformers\Markdown\FileSummary`.
 
 ---
 

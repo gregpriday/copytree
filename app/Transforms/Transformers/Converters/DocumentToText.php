@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Transforms\Transformers;
+namespace App\Transforms\Transformers\Converters;
 
 use App\Services\PandocConverter;
 use App\Transforms\BaseTransformer;

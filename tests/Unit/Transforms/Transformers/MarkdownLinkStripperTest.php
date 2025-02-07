@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Transforms\Transformers;
 
-use App\Transforms\Transformers\MarkdownLinkStripper;
+use App\Transforms\Transformers\Markdown\MarkdownLinkStripper;
 use PHPUnit\Framework\TestCase;
 
 class MarkdownLinkStripperTest extends TestCase
