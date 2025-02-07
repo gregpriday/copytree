@@ -22,6 +22,7 @@ class HTMLStripper extends BaseTransformer implements FileTransformerInterface
         // Optionally decode HTML entities, normalize whitespace, etc.
         $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5);
         $content = preg_replace('/\s+/', ' ', $content);
+
         return trim($content);
     }
 }
