@@ -94,6 +94,8 @@ class GitIgnoreManager
         $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
             $line = trim($line);
+            // Unescape backslashes so that "file\ with\ spaces.txt" becomes "file with spaces.txt"
+            $line = stripcslashes($line);
             // Skip blank lines or comments.
             if ($line === '' || strpos($line, '#') === 0) {
                 continue;
@@ -219,16 +221,28 @@ class GitIgnoreManager
 
     protected function isParentIgnored(string $path): bool
     {
+        // Split the relative path into its components.
+        $parts = explode('/', $path);
+        $parentPaths = [];
+        // Build all parent directory paths from the file's relative path.
+        for ($i = 1; $i < count($parts); $i++) {
+            $parentPaths[] = implode('/', array_slice($parts, 0, $i));
+        }
+
         foreach ($this->ignoreRules as $entry) {
             foreach ($entry['rules'] as $rule) {
-                if ($rule['directoryOnly'] && ! $rule['isNegation']) {
-                    $ignorePath = rtrim(($entry['dir'] ? $entry['dir'].'/' : '').$rule['pattern'], '/');
+                if ($rule['directoryOnly'] && !$rule['isNegation']) {
+                    // Build the ignore path by combining the .gitignore location with the rule's pattern.
+                    $ignorePath = rtrim(($entry['dir'] ? $entry['dir'] . '/' : '') . $rule['pattern'], '/');
                     $ignorePath = str_replace('\\', '/', $ignorePath);
                     if ($ignorePath === '') {
                         continue;
                     }
-                    if (str_starts_with($path, $ignorePath.'/') || $path === $ignorePath) {
-                        return true; // Current path or a parent path is ignored.
+                    // Check each parent directory of the file.
+                    foreach ($parentPaths as $parent) {
+                        if ($this->matchPattern($ignorePath, $parent)) {
+                            return true; // A parent directory matches an ignore rule.
+                        }
                     }
                 }
             }
@@ -236,6 +250,7 @@ class GitIgnoreManager
 
         return false;
     }
+
 
     /**
      * Check if a given pattern matches the subject.
@@ -247,25 +262,26 @@ class GitIgnoreManager
      */
     protected function matchPattern(string $pattern, string $subject): bool
     {
-        // If the pattern contains no wildcard characters, do a simple (optionally case-insensitive) string comparison.
-        if (strpos($pattern, '*') === false && strpos($pattern, '?') === false && strpos($pattern, '[') === false) {
-            return $this->caseSensitive ? ($pattern === $subject) : (strcasecmp($pattern, $subject) === 0);
+        // If the pattern contains no '*' or '?' then use a simple string comparison.
+        // (Ignore the presence of '[' so that literal patterns like "[special]file.txt" are not interpreted as globs.)
+        if (strpos($pattern, '*') === false && strpos($pattern, '?') === false) {
+            return $this->caseSensitive
+                ? ($pattern === $subject)
+                : (strcasecmp($pattern, $subject) === 0);
         }
 
         // If the pattern contains '**', convert it to a regex.
         if (strpos($pattern, '**') !== false) {
             $regex = $this->convertPatternToRegex($pattern);
-            $flags = $this->caseSensitive ? '' : 'i'; // Case-insensitive flag
-
+            $flags = $this->caseSensitive ? '' : 'i'; // Case‑insensitive flag
             return preg_match($regex, $subject) === 1;
         }
 
         // Otherwise, use fnmatch (with FNM_PATHNAME for correct '/' handling).
         $flags = FNM_PATHNAME;
-        if (! $this->caseSensitive) {
+        if (!$this->caseSensitive) {
             $flags |= FNM_CASEFOLD;
         }
-
         return fnmatch($pattern, $subject, $flags);
     }
 
@@ -282,6 +298,13 @@ class GitIgnoreManager
      */
     protected function convertPatternToRegex(string $pattern): string
     {
+        // If the pattern starts with "**/", allow zero or more directories by prepending an optional prefix.
+        $prefix = '';
+        if (substr($pattern, 0, 3) === '**/') {
+            $prefix = '(?:.*\/)?';
+            $pattern = substr($pattern, 3);
+        }
+
         // First, replace '/**/' with a temporary token.
         $pattern = str_replace('/**/', '___DOUBLEAST___', $pattern);
 
@@ -289,10 +312,9 @@ class GitIgnoreManager
         $escaped = preg_quote($pattern, '/');
 
         // Restore our token with a regex fragment that allows an optional directory segment.
-        // This fragment will match either a slash followed by one or more characters or nothing at all.
         $escaped = str_replace('___DOUBLEAST___', '(?:\/.*)?', $escaped);
 
-        // Now replace any remaining '**' (if any) with '.*'
+        // Now replace any remaining '**' with '.*'
         $escaped = str_replace('\*\*', '.*', $escaped);
 
         // Replace remaining '*' with a pattern that matches any number of characters except a slash.
@@ -301,14 +323,14 @@ class GitIgnoreManager
         // Replace '?' with '.' (any single character).
         $escaped = str_replace('\?', '.', $escaped);
 
-        // Finally, if there isn’t already a slash immediately before the final literal text,
-        // insert an optional slash so that patterns like "src/**/temp.txt" match "src/temp.txt"
-        if (preg_match('/^(.*[^\/])((?:[^\/]+\/)*[^\/]+)$/', $escaped, $matches)) {
-            if (! preg_match('/\/$/', $matches[1])) {
-                $escaped = $matches[1].'\/?'.$matches[2];
+        // Only if the escaped pattern contains a slash, adjust the ending so that patterns
+        // like "src/**/temp.txt" also match "src/temp.txt".
+        if (strpos($escaped, '/') !== false && preg_match('/^(.*[^\/])((?:[^\/]+\/)*[^\/]+)$/', $escaped, $matches)) {
+            if (!preg_match('/\/$/', $matches[1])) {
+                $escaped = $matches[1] . '\/?' . $matches[2];
             }
         }
 
-        return '/^'.$escaped.'$/';
+        return '/^' . $prefix . $escaped . '$/';
     }
 }
