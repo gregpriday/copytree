@@ -50,8 +50,12 @@ class GitIgnoreManager
     protected function loadAllGitIgnoreFiles(): void
     {
         $finder = new Finder;
-        // Do not follow symbolic links.
-        $finder->files()->in($this->basePath)->name('.gitignore')->followLinks(false);
+        // Tell Finder not to ignore dot files so that ".gitignore" is found.
+        $finder->files()
+            ->in($this->basePath)
+            ->ignoreDotFiles(false)
+            ->name('.gitignore')
+            ->followLinks(false);
 
         foreach ($finder as $file) {
             /** @var SplFileInfo $file */
@@ -199,33 +203,34 @@ class GitIgnoreManager
             // we may skip further processing.
             if ($ignored && $file->isDir()) {
                 $dirPrefix = str_replace('\\', '/', $relativePath).'/';
-                $isParentIgnored = function ($path) {
-                    foreach ($this->ignoreRules as $entry) {
-                        foreach ($entry['rules'] as $rule) {
-                            if ($rule['directoryOnly'] && ! $rule['isNegation']) {
-                                $ignorePath = rtrim(($entry['dir'] ? $entry['dir'].'/' : '').$rule['pattern'], '/');
-                                $ignorePath = str_replace('\\', '/', $ignorePath);
-                                if ($ignorePath === '') {
-                                    continue;
-                                }
-                                if (strpos($path, $ignorePath.'/') === 0 || $path === $ignorePath) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-
-                    return false;
-                };
-
-                if ($isParentIgnored($dirPrefix)) {
-                    return false;
+                if ($this->isParentIgnored($dirPrefix)) {
+                    return false;  // Reject - since parent is ignored
                 }
             }
         }
 
         // If no matching rule was found or the last match did not indicate ignore, accept the file.
         return ! $ignored;
+    }
+
+    protected function isParentIgnored(string $path): bool
+    {
+        foreach ($this->ignoreRules as $entry) {
+            foreach ($entry['rules'] as $rule) {
+                if ($rule['directoryOnly'] && ! $rule['isNegation']) {
+                    $ignorePath = rtrim(($entry['dir'] ? $entry['dir'].'/' : '').$rule['pattern'], '/');
+                    $ignorePath = str_replace('\\', '/', $ignorePath);
+                    if ($ignorePath === '') {
+                        continue;
+                    }
+                    if (str_starts_with($path, $ignorePath.'/') || $path === $ignorePath) {
+                        return true; // Current path or a parent path is ignored.
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -238,15 +243,26 @@ class GitIgnoreManager
      */
     protected function matchPattern(string $pattern, string $subject): bool
     {
+        // If the pattern contains no wildcard characters, do a simple (optionally case-insensitive) string comparison.
+        if (strpos($pattern, '*') === false && strpos($pattern, '?') === false && strpos($pattern, '[') === false) {
+            return $this->caseSensitive ? ($pattern === $subject) : (strcasecmp($pattern, $subject) === 0);
+        }
+
+        // If the pattern contains '**', convert it to a regex.
         if (strpos($pattern, '**') !== false) {
             $regex = $this->convertPatternToRegex($pattern);
-            $flags = $this->caseSensitive ? '' : 'i';
+            $flags = $this->caseSensitive ? '' : 'i'; // Case-insensitive flag
 
-            return preg_match($regex.$flags, $subject) === 1;
+            return preg_match($regex, $subject) === 1;
         }
-        $flags = $this->caseSensitive ? 0 : FNM_CASEFOLD;
 
-        return fnmatch($pattern, $subject, FNM_PATHNAME | $flags);
+        // Otherwise, use fnmatch (with FNM_PATHNAME for correct '/' handling).
+        $flags = FNM_PATHNAME;
+        if (! $this->caseSensitive) {
+            $flags |= FNM_CASEFOLD;
+        }
+
+        return fnmatch($pattern, $subject, $flags);
     }
 
     /**
@@ -259,27 +275,22 @@ class GitIgnoreManager
      *  - Other regex special characters are escaped.
      *
      * The resulting regex is anchored at the beginning and end.
-     *
-     * @return string The regex pattern, including delimiters.
      */
     protected function convertPatternToRegex(string $pattern): string
     {
-        // Escape regex special characters (using '/' as delimiter).
+        // Escape regex special characters
         $escaped = preg_quote($pattern, '/');
 
-        // Replace escaped '**' with a temporary marker.
-        $escaped = str_replace('\*\*', '##DOUBLEAST##', $escaped);
+        // Replace escaped '**' first.
+        $escaped = str_replace('\*\*', '.*', $escaped);
 
-        // Replace remaining '*' (escaped) with a pattern that does not match '/'.
+        // Replace remaining escaped '*' with [^/]* (any character except a slash).
         $escaped = str_replace('\*', '[^/]*', $escaped);
-
-        // Replace the temporary marker with '.*'
-        $escaped = str_replace('##DOUBLEAST##', '.*', $escaped);
 
         // Replace escaped '?' with '.' (any single character).
         $escaped = str_replace('\?', '.', $escaped);
 
-        // Return the regex anchored with ^ and $.
+        // Anchor the regex and return.
         return '/^'.$escaped.'$/';
     }
 }

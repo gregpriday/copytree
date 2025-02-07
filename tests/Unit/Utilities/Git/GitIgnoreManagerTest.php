@@ -11,8 +11,6 @@ class GitIgnoreManagerTest extends TestCase
 {
     /**
      * The temporary directory used for testing.
-     *
-     * @var string
      */
     private string $tempDir;
 
@@ -21,8 +19,8 @@ class GitIgnoreManagerTest extends TestCase
      */
     protected function setUp(): void
     {
-        $this->tempDir = sys_get_temp_dir() . '/gitignore_test_' . uniqid();
-        if (!mkdir($this->tempDir, 0777, true) && !is_dir($this->tempDir)) {
+        $this->tempDir = sys_get_temp_dir().'/gitignore_test_'.uniqid();
+        if (! mkdir($this->tempDir, 0777, true) && ! is_dir($this->tempDir)) {
             throw new RuntimeException(sprintf('Directory "%s" was not created', $this->tempDir));
         }
     }
@@ -37,12 +35,10 @@ class GitIgnoreManagerTest extends TestCase
 
     /**
      * Recursively remove a directory and its contents.
-     *
-     * @param string $dir
      */
     private function removeDirectory(string $dir): void
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return;
         }
         $iterator = new \RecursiveIteratorIterator(
@@ -62,41 +58,41 @@ class GitIgnoreManagerTest extends TestCase
     /**
      * Create a test file (or directory if needed) relative to the temporary directory.
      *
-     * @param string $relativePath The path relative to the temporary directory.
-     * @param string $content      The content to write (ignored if creating a directory).
-     * @param bool   $isDir        Whether to create a directory instead of a file.
-     *
+     * @param  string  $relativePath  The path relative to the temporary directory.
+     * @param  string  $content  The content to write (ignored if creating a directory).
+     * @param  bool  $isDir  Whether to create a directory instead of a file.
      * @return string The full path of the created file or directory.
      */
     private function createTestItem(string $relativePath, string $content = '', bool $isDir = false): string
     {
-        $fullPath = $this->tempDir . '/' . $relativePath;
+        $fullPath = $this->tempDir.'/'.$relativePath;
         $dir = $isDir ? $fullPath : dirname($fullPath);
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             mkdir($dir, 0777, true);
         }
-        if (!$isDir) {
+        if (! $isDir) {
             file_put_contents($fullPath, $content);
         }
+
         return $fullPath;
     }
 
     /**
      * Test that the constructor throws an exception when the base path does not exist.
      */
-    public function testConstructorThrowsExceptionForInvalidBasePath(): void
+    public function test_constructor_throws_exception_for_invalid_base_path(): void
     {
         $this->expectException(RuntimeException::class);
-        new GitIgnoreManager($this->tempDir . '/nonexistent');
+        new GitIgnoreManager($this->tempDir.'/nonexistent');
     }
 
     /**
      * Test that a top‐level .gitignore correctly excludes files.
      */
-    public function testAcceptTopLevelGitignore(): void
+    public function test_accept_top_level_gitignore(): void
     {
         // Create a top-level .gitignore with a rule to ignore "exclude.txt"
-        $gitignoreContent = <<<EOD
+        $gitignoreContent = <<<'EOD'
 # Ignore exclude.txt file
 exclude.txt
 EOD;
@@ -118,10 +114,10 @@ EOD;
     /**
      * Test that a .gitignore file placed in a subdirectory only affects files in that subdirectory.
      */
-    public function testAcceptSubdirectoryGitignore(): void
+    public function test_accept_subdirectory_gitignore(): void
     {
         // Create a subdirectory "sub" and a .gitignore inside it that ignores "temp.txt"
-        $this->createTestItem('sub/.gitignore', "temp.txt");
+        $this->createTestItem('sub/.gitignore', 'temp.txt');
         $fileTemp = $this->createTestItem('sub/temp.txt', 'should be ignored');
         $fileKeep = $this->createTestItem('sub/keep.txt', 'should be included');
 
@@ -137,10 +133,10 @@ EOD;
     /**
      * Test that negation rules work correctly.
      */
-    public function testNegationRule(): void
+    public function test_negation_rule(): void
     {
         // Create a .gitignore with a rule to ignore all .log files except "keep.log"
-        $gitignoreContent = <<<EOD
+        $gitignoreContent = <<<'EOD'
 *.log
 !keep.log
 EOD;
@@ -164,10 +160,10 @@ EOD;
      * Note: According to this implementation, a rule such as "build/" will mark the directory "build"
      * as ignored but will not affect files inside it.
      */
-    public function testDirectoryOnlyRule(): void
+    public function test_directory_only_rule(): void
     {
         // Create a .gitignore with a directory-only rule
-        $gitignoreContent = <<<EOD
+        $gitignoreContent = <<<'EOD'
 build/
 EOD;
         $this->createTestItem('.gitignore', $gitignoreContent);
@@ -190,10 +186,10 @@ EOD;
     /**
      * Test that a rule with a leading slash only matches files relative to the location of the .gitignore.
      */
-    public function testHasLeadingSlashRule(): void
+    public function test_has_leading_slash_rule(): void
     {
         // Create a .gitignore with a rule that has a leading slash
-        $gitignoreContent = <<<EOD
+        $gitignoreContent = <<<'EOD'
 /config
 EOD;
         $this->createTestItem('.gitignore', $gitignoreContent);
@@ -214,10 +210,10 @@ EOD;
     /**
      * Test that a pattern containing a double asterisk (“**”) is correctly converted and applied.
      */
-    public function testDoubleAsteriskPattern(): void
+    public function test_double_asterisk_pattern(): void
     {
         // Create a .gitignore with a rule using the "**" pattern.
-        $gitignoreContent = <<<EOD
+        $gitignoreContent = <<<'EOD'
 src/**/temp.txt
 EOD;
         $this->createTestItem('.gitignore', $gitignoreContent);
