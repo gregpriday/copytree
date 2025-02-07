@@ -278,19 +278,33 @@ class GitIgnoreManager
      */
     protected function convertPatternToRegex(string $pattern): string
     {
-        // Escape regex special characters
+        // First, replace '/**/' with a temporary token.
+        $pattern = str_replace('/**/', '___DOUBLEAST___', $pattern);
+
+        // Escape the pattern so that all regex special characters are treated literally.
         $escaped = preg_quote($pattern, '/');
 
-        // Replace escaped '**' first.
+        // Restore our token with a regex fragment that allows an optional directory segment.
+        // This fragment will match either a slash followed by one or more characters or nothing at all.
+        $escaped = str_replace('___DOUBLEAST___', '(?:\/.*)?', $escaped);
+
+        // Now replace any remaining '**' (if any) with '.*'
         $escaped = str_replace('\*\*', '.*', $escaped);
 
-        // Replace remaining escaped '*' with [^/]* (any character except a slash).
+        // Replace remaining '*' with a pattern that matches any number of characters except a slash.
         $escaped = str_replace('\*', '[^/]*', $escaped);
 
-        // Replace escaped '?' with '.' (any single character).
+        // Replace '?' with '.' (any single character).
         $escaped = str_replace('\?', '.', $escaped);
 
-        // Anchor the regex and return.
+        // Finally, if there isn’t already a slash immediately before the final literal text,
+        // insert an optional slash so that patterns like "src/**/temp.txt" match "src/temp.txt"
+        if (preg_match('/^(.*[^\/])((?:[^\/]+\/)*[^\/]+)$/', $escaped, $matches)) {
+            if (! preg_match('/\/$/', $matches[1])) {
+                $escaped = $matches[1].'\/?'.$matches[2];
+            }
+        }
+
         return '/^'.$escaped.'$/';
     }
 }
