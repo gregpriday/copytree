@@ -3,7 +3,6 @@
 namespace App\Renderer;
 
 use App\Transforms\FileTransformer;
-use DateTime;
 use Symfony\Component\Finder\SplFileInfo;
 
 class FileOutputRenderer
@@ -39,16 +38,14 @@ class FileOutputRenderer
             $mimeType = mime_content_type($file->getRealPath());
             $size = $this->formatFileSize($file->getSize());
             $lines = count(file($file->getRealPath()));
-            $modifiedTime = (new DateTime)->setTimestamp($file->getMTime())->format('Y-m-d H:i:s');
 
             // Start file block
             $output[] = sprintf(
-                '<ct:file_contents path="%s" mime-type="%s" size="%s" lines="%d" modified="%s">',
+                '<ct:file_contents path="%s" mime-type="%s" size="%s" lines="%d">',
                 $relativePath,
                 $mimeType,
                 $size,
-                $lines,
-                $modifiedTime
+                $lines
             );
 
             // Get the transformed file content.

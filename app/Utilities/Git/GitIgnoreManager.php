@@ -2,6 +2,7 @@
 
 namespace App\Utilities\Git;
 
+use ErrorException;
 use RuntimeException;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
@@ -273,7 +274,11 @@ class GitIgnoreManager
             $regex = $this->convertPatternToRegex($pattern);
             $flags = $this->caseSensitive ? '' : 'i'; // Case-insensitive flag.
 
-            return preg_match($regex, $subject) === 1;
+            try {
+                return preg_match($regex, $subject) === 1;
+            } catch (ErrorException $e) {
+                return false;
+            }
         }
 
         // Otherwise, use fnmatch (with FNM_PATHNAME for correct '/' handling).
@@ -316,8 +321,11 @@ class GitIgnoreManager
         // Replace '?' with '.' (any single character).
         $escaped = str_replace('\?', '.', $escaped);
 
-        // Unescape bracket expressions so that they work as character classes.
-        $escaped = preg_replace(['/\\\\\[/', '/\\\\\]/'], ['[', ']'], $escaped);
+        // Instead of unconditionally unescaping "[" and "]",
+        // use a callback to only unescape balanced bracket expressions.
+        $escaped = preg_replace_callback('/\\\\\[([^\\\\\]]*)\\\\\]/', function ($matches) {
+            return '['.$matches[1].']';
+        }, $escaped);
 
         return '/^'.$prefix.$escaped.'$/';
     }

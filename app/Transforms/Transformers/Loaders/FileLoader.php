@@ -6,6 +6,7 @@ use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Converters\DocumentToText;
 use App\Transforms\Transformers\Converters\PDFToText;
 use App\Transforms\Transformers\Images\ImageDescription;
+use App\Transforms\Transformers\Images\SvgDescription;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -40,6 +41,11 @@ class FileLoader implements FileTransformerInterface
         }
 
         $mime = File::mimeType($filePath);
+
+        // If this is an SVG
+        if ($mime === 'image/svg+xml') {
+            return app(SvgDescription::class)->transform($input);
+        }
 
         // If the file is an image, delegate to ImageDescription transformer.
         if (str_starts_with($mime, 'image/')) {

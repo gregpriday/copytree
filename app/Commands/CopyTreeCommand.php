@@ -13,6 +13,7 @@ use App\Profiles\ProfileLoader;
 use App\Renderer\FileOutputRenderer;
 use App\Renderer\TreeRenderer;
 use App\Services\AIFilenameGenerator;
+use App\Services\GitHubUrlHandler;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
 use Illuminate\Pipeline\Pipeline;
@@ -59,8 +60,14 @@ class CopyTreeCommand extends Command
             $this->warn('This command is designed for macOS and may not work as expected on other operating systems.');
         }
 
-        // Use the current working directory as the project path.
+        // Use the provided path argument or fallback to current working directory.
         $projectPath = $this->argument('path') ?: getcwd();
+
+        // If the provided project path is a GitHub URL, clone the repository and use the local path.
+        if (str_starts_with($projectPath, 'https://github.com/')) {
+            $handler = new GitHubUrlHandler($projectPath);
+            $projectPath = $handler->getFiles();
+        }
 
         // Load the profile configuration.
         $profileGuesser = new ProfileGuesser($projectPath);
