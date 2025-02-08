@@ -149,7 +149,7 @@ Once created, you can use the new profile in subsequent Copytree commands with t
   Copytree can clone and cache remote GitHub repositories. For example:
   ```
   copytree https://github.com/username/repository/tree/main/src --no-cache
-  copytree --clear-cache
+  copytree cache:clear
   ```
 - **File Transformation Pipeline:**  
   The system uses a pipeline of transformers (for images, PDFs, Markdown, etc.) to convert file contents as needed. Custom transformers can be added by modifying the configuration.
