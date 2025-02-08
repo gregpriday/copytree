@@ -1,0 +1,36 @@
+You are an expert in generating CopyTree profiles. Using the information provided below, your task is to create a valid CopyTree profile as a JSON object. The profile must adhere strictly to the CopyTree profile schema and include, at a minimum, the following keys:
+
+• "rules" – an array of rule sets specifying file inclusion criteria.
+• "globalExcludeRules" – an array of rule sets that always exclude files if any rule matches.
+• "always" – an object with "include" and "exclude" arrays to explicitly include or exclude specific files.
+
+Optionally, you may also include:
+• "external" – an array of external source definitions.
+• "transforms" – an array of transformation configurations.
+
+Below is the project output generated from scanning the project:
+{{projectOutput}}
+
+And here are the goals for this profile:
+{{goals}}
+
+Based on the project output and the stated goals, generate a JSON object that defines a CopyTree profile. The JSON must be valid, include only the required keys (and the optional ones if appropriate), and contain no additional text or commentary. Your response should consist solely of the JSON object.
+
+Example Output Format:
+```json
+{
+  "rules": [ ... ],
+  "globalExcludeRules": [ ... ],
+  "always": {
+    "include": [ ... ],
+    "exclude": [ ... ]
+  },
+  "external": [ ... ],
+  "transforms": [
+    {
+      "rules": [ ... ],
+      "transforms": [ "Markdown.MarkdownStripper" ]
+    }
+  ]
+}
+```

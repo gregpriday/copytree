@@ -12,7 +12,7 @@ class FileOutputRenderer
     /**
      * Constructor.
      *
-     * @param  FileTransformer  $transformer  The file transformer instance
+     * @param  FileTransformer  $transformer  The file transformer instance.
      */
     public function __construct(FileTransformer $transformer)
     {
@@ -24,12 +24,14 @@ class FileOutputRenderer
      *
      * This method takes an array of SplFileInfo objects, applies the transformer
      * to get each file’s content, and outputs a formatted string including metadata.
+     * Optionally, it limits the output by a maximum number of lines and/or characters.
      *
      * @param  SplFileInfo[]  $files  Array of files to render.
      * @param  int  $maxLines  Maximum number of lines to show per file (0 for unlimited).
+     * @param  int  $maxCharacters  Maximum number of characters to show per file (0 for unlimited).
      * @return string The rendered output.
      */
-    public function render(array $files, int $maxLines = 0): string
+    public function render(array $files, int $maxLines = 0, int $maxCharacters = 0): string
     {
         $output = [];
 
@@ -51,13 +53,19 @@ class FileOutputRenderer
             // Get the transformed file content.
             $content = $this->transformer->transform($file);
 
-            // If maxLines is set, limit the content preview.
+            // If maxLines is set, limit the content preview by lines.
             if ($maxLines > 0) {
                 $linesArr = explode("\n", $content);
                 if (count($linesArr) > $maxLines) {
                     $content = implode("\n", array_slice($linesArr, 0, $maxLines))
                         ."\n\n... [truncated after {$maxLines} lines] ...";
                 }
+            }
+
+            // If maxCharacters is set, further limit the content preview by characters.
+            if ($maxCharacters > 0 && mb_strlen($content) > $maxCharacters) {
+                $content = mb_substr($content, 0, $maxCharacters)
+                    ."\n\n... [truncated after {$maxCharacters} characters] ...";
             }
 
             $output[] = $content;

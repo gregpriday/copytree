@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use App\Pipeline\FileLoader;
+use App\Pipeline\RulesetFilter;
 use App\Pipeline\Stages\AIFilterStage;
 use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\GitFilterStage;
@@ -31,6 +32,7 @@ class CopyTreeCommand extends Command
         {path? : The directory path or GitHub URL (default: current working directory)}
         {--d|depth=10 : Maximum depth of the tree.}
         {--l|max-lines=0 : Maximum number of lines to show per file. Use 0 for unlimited.}
+        {--C|max-characters=0 : Maximum number of characters to show per file. Use 0 for unlimited.}
         {--t|only-tree : Include only the directory tree in the output, not the file contents.}
         {--p|profile=auto : Profile to apply.}
         {--f|filter=* : Filter files using glob patterns.}
@@ -60,7 +62,7 @@ class CopyTreeCommand extends Command
             $this->warn('This command is designed for macOS and may not work as expected on other operating systems.');
         }
 
-        // Use the provided path argument or fallback to current working directory.
+        // Use the provided path argument or fallback to the current working directory.
         $projectPath = $this->argument('path') ?: getcwd();
 
         // If the provided project path is a GitHub URL, clone the repository and use the local path.
@@ -100,7 +102,6 @@ class CopyTreeCommand extends Command
         }
 
         // Add AI filtering if requested.
-        // For each filter, add an AIFilterStage to the pipeline.
         $aiFilters = (array) $this->option('ai-filter');
         foreach ($aiFilters as $filterDescription) {
             $pipeline->through([
@@ -119,7 +120,7 @@ class CopyTreeCommand extends Command
         if (config('profile.rules')) {
             $pipeline->through([
                 new RulesetFilterStage(
-                    new \App\Pipeline\RulesetFilter(
+                    new RulesetFilter(
                         config('profile.rules'),
                         config('profile.global_exclude_rules', []),
                         config('profile.always', [])
@@ -145,10 +146,11 @@ class CopyTreeCommand extends Command
         // Render file contents output if not in only-tree mode.
         $fileOutput = '';
         if (! $this->option('only-tree')) {
-            // Resolve the FileOutputRenderer via the container so that its dependency (FileTransformer) is injected.
+            // Resolve the FileOutputRenderer so that its dependency (FileTransformer) is injected.
             $fileRenderer = app(FileOutputRenderer::class);
             $maxLines = (int) $this->option('max-lines');
-            $fileOutput = $fileRenderer->render($finalFiles, $maxLines);
+            $maxCharacters = (int) $this->option('max-characters');
+            $fileOutput = $fileRenderer->render($finalFiles, $maxLines, $maxCharacters);
         }
 
         // Combine the outputs into the final XML.
@@ -199,7 +201,7 @@ class CopyTreeCommand extends Command
 
     private function revealInFinder(string $filePath): void
     {
-        // Attempt to reveal the file in Finder using AppleScript
+        // Attempt to reveal the file in Finder using AppleScript.
         $script = sprintf(
             'tell application "Finder" to reveal POSIX file "%s"
             tell application "Finder" to activate',
