@@ -19,7 +19,11 @@ Based on the project output and the stated goals, generate a JSON object that de
 Example Output Format:
 ```json
 {
-  "rules": [ ... ],
+  "rules": [
+    [ ... ],
+    [ ... ],
+    [ ... ]
+   ],
   "globalExcludeRules": [ ... ],
   "always": {
     "include": [ ... ],
@@ -34,3 +38,5 @@ Example Output Format:
   ]
 }
 ```
+
+Take note of the schema, and what's actually required. Try to create a rule that will match the user's goals, while allowing for future expension of the project.

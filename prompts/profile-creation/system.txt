@@ -35,5 +35,11 @@ Transforms Output:
 (This is a list of available file transformers and conversion options.)
 
 --------------------------------------------------
+Output Schema
+{{schema}}
+
+(Use this schema to generate a valid JSON object.)
+
+--------------------------------------------------
 
 Based on the above information, generate a valid JSON object that includes at least the keys "rules", "globalExcludeRules", and "always". You may also include "external" and "transforms" if appropriate. The JSON must strictly adhere to the schema outlined above. Do not include any additional text or commentary.

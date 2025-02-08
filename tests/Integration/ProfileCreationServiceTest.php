@@ -1,4 +1,5 @@
 <?php
+
 // tests/Integration/ProfileCreationServiceTest.php
 
 namespace Tests\Integration;
@@ -24,7 +25,7 @@ class ProfileCreationServiceTest extends TestCase
 
         // Define the goals for the profile.
         $goals = [
-            "Filter for only files that make AI API calls.",
+            'Filter for only files that make Gemini AI API calls.',
         ];
 
         // Call createProfile to generate the profile data.
@@ -43,6 +44,6 @@ class ProfileCreationServiceTest extends TestCase
         $this->assertIsArray($profileData['globalExcludeRules'], 'The "globalExcludeRules" key should be an array.');
 
         // Output the generated profile data to STDOUT for manual inspection.
-        fwrite(STDOUT, "Generated Profile Data:\n" . json_encode($profileData, JSON_PRETTY_PRINT) . "\n");
+        fwrite(STDOUT, "Generated Profile Data:\n".json_encode($profileData, JSON_PRETTY_PRINT)."\n");
     }
 }

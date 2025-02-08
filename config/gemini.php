@@ -35,7 +35,8 @@ return [
     | for a response. By default, the client will time out after 30 seconds.
     */
 
-    'request_timeout' => env('GEMINI_REQUEST_TIMEOUT', 30),
+    'request_timeout' => env('GEMINI_REQUEST_TIMEOUT', 120),
 
     'model' => env('GEMINI_MODEL', 'models/gemini-2.0-flash'),
+    'model_pro' => env('GEMINI_MODEL', 'gemini-2.0-pro-exp-02-05'),
 ];

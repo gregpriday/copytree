@@ -106,23 +106,12 @@
                         "<",
                         "<=",
                         "oneOf",
-                        "notOneOf",
                         "regex",
-                        "notRegex",
                         "glob",
                         "fnmatch",
                         "contains",
-                        "notContains",
                         "startsWith",
-                        "notStartsWith",
-                        "endsWith",
-                        "notEndsWith",
-                        "length",
-                        "isAscii",
-                        "isJson",
-                        "isUlid",
-                        "isUrl",
-                        "isUuid"
+                        "endsWith"
                     ]
                 },
                 {

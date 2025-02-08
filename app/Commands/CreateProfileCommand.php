@@ -12,11 +12,11 @@ class CreateProfileCommand extends Command
      * The signature of the command.
      *
      * Accepts an optional project directory (defaults to the current working directory)
-     * and an optional character limit (default: 1000) for file content extraction.
+     * and an optional character limit (default: 1500) for file content extraction.
      */
     protected $signature = 'profile:create
         {path? : The project directory (defaults to current working directory)}
-        {--c|char-limit=1000 : Maximum number of characters per file for profile creation}';
+        {--c|char-limit=1500 : Maximum number of characters per file for profile creation}';
 
     /**
      * The description of the command.
@@ -32,6 +32,7 @@ class CreateProfileCommand extends Command
         $projectPath = $this->argument('path') ?: getcwd();
         if (! is_dir($projectPath)) {
             $this->error("The provided path is not a valid directory: {$projectPath}");
+
             return self::FAILURE;
         }
         $this->info("Using project directory: {$projectPath}");
@@ -40,24 +41,26 @@ class CreateProfileCommand extends Command
         $charLimit = (int) $this->option('char-limit');
 
         // Ask the user for a list of goals (one by one).
-        $this->info("Enter the primary goals for this profile. Press Enter without input to finish.");
+        $this->info('Enter the primary goals for this profile. Press Enter without input to finish.');
         $goals = [];
         while (true) {
-            $goal = $this->ask("Enter a goal");
+            $goal = $this->ask('Enter a goal');
             if (empty($goal)) {
                 break;
             }
             $goals[] = $goal;
         }
         if (empty($goals)) {
-            $this->warn("No goals entered. Aborting profile creation.");
+            $this->warn('No goals entered. Aborting profile creation.');
+
             return self::FAILURE;
         }
 
         // Ask the user to provide a name for the new profile.
-        $profileName = $this->ask("Enter a name for the new profile (without extension)", "default");
+        $profileName = $this->ask('Enter a name for the new profile (without extension)', 'default');
         if (empty($profileName)) {
-            $this->error("Profile name is required.");
+            $this->error('Profile name is required.');
+
             return self::FAILURE;
         }
 
@@ -67,22 +70,22 @@ class CreateProfileCommand extends Command
             $profileData = $service->createProfile($goals);
 
             // Display the generated profile data.
-            $this->info("Generated Profile Data:\n" . json_encode($profileData, JSON_PRETTY_PRINT));
+            $this->info("Generated Profile Data:\n".json_encode($profileData, JSON_PRETTY_PRINT));
 
             $profilePath = $service->saveProfile($profileName, $profileData);
             $this->info("Profile created and saved to: {$profilePath}");
             $this->revealInFinder($profilePath);
+
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error("Error creating profile: " . $e->getMessage());
+            $this->error('Error creating profile: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }
 
     /**
      * Reveal the generated profile in Finder using AppleScript.
-     *
-     * @param string $filePath
      */
     private function revealInFinder(string $filePath): void
     {

@@ -11,6 +11,8 @@ Profiles in Copytree let you define exactly which files to copy from your projec
 
 For a complete guide on writing profiles, see [Writing Profiles for Copytree](./profiles.md).
 
+> **Tip:** The `FileLoader` automatically excludes common folders (e.g. `.git`, `node_modules`, `vendor`, etc.) and files (e.g. lock files, hidden files) before applying your profile rules. You can therefore focus your profile on selecting the files that matter to your project without re‑specifying these defaults.
+
 ---
 
 ## Table of Contents
