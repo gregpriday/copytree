@@ -34,7 +34,7 @@ class CopyTreeCommand extends Command
         {--t|only-tree : Include only the directory tree in the output, not the file contents.}
         {--p|profile=auto : Profile to apply.}
         {--f|filter=* : Filter files using glob patterns.}
-        {--a|ai-filter=false : Filter files using AI based on a natural language description.}
+        {--a|ai-filter=* : Filter files using AI based on a natural language description.}
         {--m|modified : Only include files that have been modified since the last commit.}
         {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
         {--o|output= : Outputs to a file. If no filename is provided, creates file in ~/.copytree/outputs/.}
@@ -100,9 +100,11 @@ class CopyTreeCommand extends Command
         }
 
         // Add AI filtering if requested.
-        if ($this->option('ai-filter') !== false) {
+        // For each filter, add an AIFilterStage to the pipeline.
+        $aiFilters = (array) $this->option('ai-filter');
+        foreach ($aiFilters as $filterDescription) {
             $pipeline->through([
-                new AIFilterStage($this->option('ai-filter')),
+                new AIFilterStage($filterDescription),
             ]);
         }
 
