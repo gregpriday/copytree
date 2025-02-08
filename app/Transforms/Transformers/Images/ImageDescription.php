@@ -6,7 +6,12 @@ use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Loaders\FileLoader;
 use Gemini\Data\Blob;
+use Gemini\Data\Content;
+use Gemini\Data\GenerationConfig;
+use Gemini\Data\Schema;
+use Gemini\Enums\DataType;
 use Gemini\Enums\MimeType;
+use Gemini\Enums\ResponseMimeType;
 use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
@@ -58,13 +63,25 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
 
             // Create a combined prompt by appending the user instruction.
             $userInstruction = 'Please describe the image with the filename: '.$input->getPath();
-            $prompt = $systemPrompt."\n\n===\n\n".$userInstruction;
 
-            // Call the Gemini API using the Gemini-Pro-Vision model.
+            // Configure Gemini to return structured JSON output with a "description" field.
+            $generationConfig = new GenerationConfig(
+                responseMimeType: ResponseMimeType::APPLICATION_JSON,
+                responseSchema: new Schema(
+                    type: DataType::OBJECT,
+                    properties: [
+                        'description' => new Schema(type: DataType::STRING),
+                    ]
+                )
+            );
+
+            // Call the Gemini API using the Gemini-Pro-Vision model with structured output.
             try {
                 $response = Gemini::generativeModel(model: config('gemini.model'))
+                    ->withGenerationConfig($generationConfig)
+                    ->withSystemInstruction(Content::parse($systemPrompt))
                     ->generateContent([
-                        $prompt,
+                        $userInstruction,
                         new Blob(
                             mimeType: MimeType::IMAGE_JPEG,
                             data: $base64
@@ -74,8 +91,16 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
                 throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
             }
 
-            // Extract and return the text description.
-            $description = $response->text() ?? '';
+            // Extract and decode the JSON response.
+            $content = $response->text() ?? '';
+            $data = json_decode($content, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['description'])) {
+                throw new RuntimeException('Invalid response from Gemini: '.json_last_error_msg());
+            }
+
+            $description = $data['description'];
+
             if (empty($description)) {
                 throw new RuntimeException('No description returned from Gemini.');
             }

@@ -34,8 +34,5 @@ class ImageDescriptionTest extends TestCase
         $this->assertIsString($description, 'The returned description is not a string.');
         $this->assertNotEmpty($description, 'The returned description is empty.');
         $this->assertStringContainsString('cat', $description, 'The description does not contain the expected word "cat".');
-
-        // Optionally, output the description for debugging.
-        fwrite(STDOUT, 'Image description: '.$description."\n");
     }
 }

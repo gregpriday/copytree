@@ -9,7 +9,7 @@ Copytree is a command‑line utility that copies a directory’s structure and f
 ## Features
 
 - **macOS Integration:** Uses macOS‑specific commands for clipboard management.
-- **AI‑Powered Filtering:** Supports natural language file filtering (via the OpenAI API) and smart filename generation.
+- **AI‑Powered Filtering:** Supports natural language file filtering (via the Gemini API) and smart filename generation.
 - **Git & External Source Support:** Includes Git integration (filtering modified or changed files and changes between commits) and GitHub URL handling.
 - **Profile‑Based File Selection:** Configure inclusion and exclusion of files using JSON profiles.
 - **File Transformation Pipeline:** Built‑in transformers convert images, PDFs, Markdown, and other file types into text.
@@ -28,14 +28,14 @@ Copytree is a command‑line utility that copies a directory’s structure and f
 - **Pandoc:** For document conversion (used in transforming certain file types).  
   Install via Homebrew:
   ```
-  brew install pandoc
+brew install pandoc
   ```
 - **Poppler:** For PDF-to-text conversion (used by the PDF transformer).  
   Install via Homebrew:
   ```
-  brew install poppler
+brew install poppler
   ```
-- **OpenAI API (optional):** Set your `OPENAI_API_KEY` and `OPENAI_API_ORG` in your environment if you plan to use AI‑based features.
+- **Gemini API (optional):** Set your `GEMINI_API_KEY` (and optionally `GEMINI_BASE_URL`) in your environment if you plan to use AI‑based features.
 
 ---
 
@@ -66,7 +66,7 @@ mkdir -p ~/.copytree
 cp ~/.composer/vendor/gregpriday/copytree/.env.example ~/.copytree/.env
 ```
 
-Then update the `.env` file with your OpenAI API credentials (if you plan to use AI‑based features).
+Then update the `.env` file with your Gemini API credentials (if you plan to use AI‑based features).
 
 ---
 
@@ -74,20 +74,20 @@ Then update the `.env` file with your OpenAI API credentials (if you plan to use
 
 With Copytree installed globally, simply run the command from your terminal.
 
-Basic Commands:
+**Basic Commands:**
 - **Copy the Current Directory Structure to the Clipboard:**
   ```
-  copytree
+copytree
   ```
 - **Copy a Specific Directory or GitHub Repository:**
   ```
-  copytree /path/to/project
-  copytree https://github.com/username/repository/tree/main/src
+copytree /path/to/project
+copytree https://github.com/username/repository/tree/main/src
   ```
 - **AI‑Based File Filtering:**
   Use the `--ai-filter` option to pass a natural language description. For example:
   ```
-  copytree --ai-filter="Find all authentication related files"
+copytree --ai-filter="Find all authentication related files"
   ```
 - **Output Options:**
     - **Display in Console:**
@@ -105,11 +105,11 @@ Basic Commands:
 - **Git Filtering:**
   To include only files modified since the last commit or between two commits:
   ```
-  copytree --modified
-  copytree --changes=commit1:commit2
+copytree --modified
+copytree --changes=commit1:commit2
   ```
 
-Profiles:
+**Profiles:**
 Copytree uses JSON‑formatted profiles to control file selection, filtering, external merging, and transformation. Place your profile files in a `.ctree` directory within your project or in a designated profiles folder. Profiles are automatically detected based on your project structure, or you can specify a profile using the `--profile` option.
 
 ---
@@ -119,8 +119,8 @@ Copytree uses JSON‑formatted profiles to control file selection, filtering, ex
 - **GitHub URL Handling:**  
   Copytree can clone and cache remote GitHub repositories. For example:
   ```
-  copytree https://github.com/username/repository/tree/main/src --no-cache
-  copytree --clear-cache
+copytree https://github.com/username/repository/tree/main/src --no-cache
+copytree --clear-cache
   ```
 - **File Transformation Pipeline:**  
   The system uses a pipeline of transformers (for images, PDFs, Markdown, etc.) to convert file contents as needed. Custom transformers can be added by modifying the configuration.
@@ -137,8 +137,8 @@ Copytree uses JSON‑formatted profiles to control file selection, filtering, ex
   Ensure that `pbcopy` and `osascript` are available in your PATH.
 - **Pandoc or Poppler Errors:**  
   Verify that Pandoc and Poppler are correctly installed and available.
-- **OpenAI API Errors:**  
-  Check that your API key and organization ID are correctly set in your `.env` file.
+- **Gemini API Errors:**  
+  Check that your API key is correctly set in your `.env` file.
 
 ---
 
@@ -160,5 +160,5 @@ This project is licensed under the MIT License. See LICENSE.md for further detai
 
 ## References
 
-- Project details and documentation are available on the GitHub repository: https://github.com/gregpriday/copytree
+- Project details and documentation are available on the GitHub repository: [https://github.com/gregpriday/copytree](https://github.com/gregpriday/copytree)
 - Installation instructions for Pandoc and Poppler using Homebrew.

@@ -2,6 +2,11 @@
 
 namespace App\Services;
 
+use Gemini\Data\Content;
+use Gemini\Data\GenerationConfig;
+use Gemini\Data\Schema;
+use Gemini\Enums\DataType;
+use Gemini\Enums\ResponseMimeType;
 use Gemini\Laravel\Facades\Gemini;
 use RuntimeException;
 
@@ -64,7 +69,7 @@ class AIFilenameGenerator
         }
 
         // Build the prompt for filename generation.
-        $prompt = "Generate a descriptive filename for the following set of files and return the requested JSON:\n\n".$filesList;
+        $prompt = "Generate a descriptive filename for the following set of files and return a structured JSON output:\n\n".$filesList;
 
         // Load the system prompt from the filename generator prompt file.
         $systemPromptPath = base_path('prompts/filename-generator/system.txt');
@@ -73,20 +78,29 @@ class AIFilenameGenerator
         }
         $systemPrompt = file_get_contents($systemPromptPath);
 
-        $prompt = $systemPrompt."\n\n===\n\n".$prompt;
+        // Configure Gemini to return structured JSON output.
+        $generationConfig = new GenerationConfig(
+            responseMimeType: ResponseMimeType::APPLICATION_JSON,
+            responseSchema: new Schema(
+                type: DataType::OBJECT,
+                properties: [
+                    'filename' => new Schema(type: DataType::STRING),
+                ]
+            )
+        );
 
-        // Call the Gemini API using the generative model with our custom configuration.
         try {
+            // Generate content using Gemini with structured output.
             $response = Gemini::generativeModel(model: $this->model)
+                ->withSystemInstruction(Content::parse($systemPrompt))
+                ->withGenerationConfig($generationConfig)
                 ->generateContent($prompt);
         } catch (\Exception $e) {
             throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
         }
 
-        // Extract and decode the JSON response.
+        // Retrieve the structured JSON response.
         $content = $response->text() ?? '';
-        // Extract the JSON from inside code fences (```json ... ```)
-        $content = preg_replace('/^```json(.*)```$/s', '$1', $content);
         $data = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['filename'])) {

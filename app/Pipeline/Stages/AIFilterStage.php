@@ -3,6 +3,7 @@
 namespace App\Pipeline\Stages;
 
 use App\Pipeline\FilePipelineStageInterface;
+use Gemini\Data\Content;
 use Gemini\Laravel\Facades\Gemini;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -63,14 +64,11 @@ class AIFilterStage implements FilePipelineStageInterface
             throw new RuntimeException('Failed to load system prompt from prompts/file-filter/system.txt');
         }
 
-        // Combine the system prompt and our payload.
-        $combinedPrompt = $systemPrompt."\n\n===\n\n".$promptText;
-
         try {
             // Generate content using Gemini.
-            $response = Gemini::generativeModel(
-                model: config('gemini.model')
-            )->generateContent($combinedPrompt);
+            $response = Gemini::generativeModel(model: config('gemini.model'))
+                ->withSystemInstruction(Content::parse($systemPrompt))
+                ->generateContent($promptText);
         } catch (\Exception $e) {
             throw new RuntimeException('Gemini filtering failed: '.$e->getMessage());
         }
