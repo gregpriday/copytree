@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Pipeline\Stages;
 
-use App\Pipeline\Stages\OpenAIFilterStage;
+use App\Pipeline\Stages\AIFilterStage;
 use OpenAI\Laravel\Facades\OpenAI;
 use OpenAI\Responses\Chat\CreateResponse as ChatCreateResponse;
 use Symfony\Component\Finder\SplFileInfo;
@@ -44,7 +44,7 @@ class OpenAIFilterStageTest extends TestCase
 
         // Instantiate the OpenAIFilterStage with a description.
         $description = 'Filter out non-relevant files';
-        $stage = new OpenAIFilterStage($description, 450);
+        $stage = new AIFilterStage($description, 450);
 
         // The "next" closure is defined as the identity function.
         $next = function ($files) {

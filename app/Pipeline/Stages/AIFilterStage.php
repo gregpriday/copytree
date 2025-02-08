@@ -3,18 +3,18 @@
 namespace App\Pipeline\Stages;
 
 use App\Pipeline\FilePipelineStageInterface;
-use OpenAI\Laravel\Facades\OpenAI;
+use Gemini\Laravel\Facades\Gemini;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 
-class OpenAIFilterStage implements FilePipelineStageInterface
+class AIFilterStage implements FilePipelineStageInterface
 {
     protected string $description;
 
     protected int $previewLength;
 
     /**
-     * Create a new OpenAIFilterStage.
+     * Create a new GeminiFilterStage.
      *
      * @param  string  $description  The natural language description to filter files.
      * @param  int  $previewLength  Optional maximum preview length (default 450).
@@ -26,10 +26,10 @@ class OpenAIFilterStage implements FilePipelineStageInterface
     }
 
     /**
-     * Filter files using OpenAI.
+     * Filter files using Gemini.
      *
      * @param  array  $files  An array of Symfony Finder SplFileInfo objects.
-     * @param  \Closure  $next  The next pipeline stage.
+     * @param  \Closure  $next  The next stage in the pipeline.
      * @return array The filtered array of files.
      *
      * @throws RuntimeException If the API call or response is invalid.
@@ -40,7 +40,7 @@ class OpenAIFilterStage implements FilePipelineStageInterface
             return $next($files);
         }
 
-        // Prepare file data for AI: for each file, include relative path and a preview of the content.
+        // Prepare file data for Gemini: each file's relative path and a content preview.
         $fileData = [];
         foreach ($files as $file) {
             /** @var SplFileInfo $file */
@@ -50,45 +50,48 @@ class OpenAIFilterStage implements FilePipelineStageInterface
             ];
         }
 
-        // Create a JSON payload with the filtering description and the file list.
+        // Build a JSON payload containing the description and file data.
         $payload = [
             'description' => $this->description,
             'files' => $fileData,
         ];
         $promptText = json_encode($payload, JSON_PRETTY_PRINT);
 
-        // Use a system prompt from your prompt file.
+        // Load the system prompt for file filtering.
         $systemPrompt = file_get_contents(base_path('prompts/file-filter/system.txt'));
-
-        try {
-            $response = OpenAI::chat()->create([
-                'model' => config('openai.model', 'gpt-4o'),
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user',   'content' => $promptText],
-                ],
-                'temperature' => 0.3,
-                'response_format' => [
-                    'type' => 'json_object',
-                ],
-                'max_tokens' => 500,
-            ]);
-        } catch (\Exception $e) {
-            throw new RuntimeException('OpenAI filtering failed: '.$e->getMessage());
+        if ($systemPrompt === false) {
+            throw new RuntimeException('Failed to load system prompt from prompts/file-filter/system.txt');
         }
 
-        $content = $response->choices[0]->message->content ?? '';
+        // Combine the system prompt and our payload.
+        $combinedPrompt = $systemPrompt."\n\n===\n\n".$promptText;
+
+        try {
+            // Generate content using Gemini.
+            $response = Gemini::generativeModel(
+                model: config('gemini.model')
+            )->generateContent($combinedPrompt);
+        } catch (\Exception $e) {
+            throw new RuntimeException('Gemini filtering failed: '.$e->getMessage());
+        }
+
+        // Retrieve the response text.
+        $content = $response->text() ?? '';
+        // Remove code fences if present.
+        $content = preg_replace('/^```json(.*)```$/s', '$1', $content);
+
         $result = json_decode($content, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Invalid JSON response from OpenAI: '.json_last_error_msg());
+            throw new RuntimeException('Invalid JSON response from Gemini: '.json_last_error_msg());
         }
 
         if (! isset($result['files']) || ! is_array($result['files'])) {
-            throw new RuntimeException('OpenAI response did not include a valid "files" array.');
+            throw new RuntimeException('Gemini response did not include a valid "files" array.');
         }
 
         $acceptedPaths = $result['files'];
 
+        // Filter the files to only those whose relative path is in the accepted list.
         $filteredFiles = array_filter($files, function (SplFileInfo $file) use ($acceptedPaths) {
             return in_array($file->getRelativePathname(), $acceptedPaths);
         });
@@ -98,6 +101,9 @@ class OpenAIFilterStage implements FilePipelineStageInterface
 
     /**
      * Get a preview of the file content.
+     *
+     * @param  SplFileInfo  $file  The file to preview.
+     * @return string The first N characters of the file content.
      */
     protected function getFilePreview(SplFileInfo $file): string
     {

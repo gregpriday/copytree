@@ -3,9 +3,9 @@
 namespace App\Commands;
 
 use App\Pipeline\FileLoader;
+use App\Pipeline\Stages\AIFilterStage;
 use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\GitFilterStage;
-use App\Pipeline\Stages\OpenAIFilterStage;
 use App\Pipeline\Stages\RulesetFilterStage;
 use App\Pipeline\Stages\SortFilesStage;
 use App\Profiles\ProfileGuesser;
@@ -102,7 +102,7 @@ class CopyTreeCommand extends Command
         // Add AI filtering if requested.
         if ($this->option('ai-filter') !== false) {
             $pipeline->through([
-                new OpenAIFilterStage($this->option('ai-filter')),
+                new AIFilterStage($this->option('ai-filter')),
             ]);
         }
 

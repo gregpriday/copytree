@@ -2,16 +2,16 @@
 
 namespace Tests\Integration;
 
-use App\Pipeline\Stages\OpenAIFilterStage;
+use App\Pipeline\Stages\AIFilterStage;
 use Symfony\Component\Finder\SplFileInfo;
 use Tests\TestCase;
 
-class OpenAIFilterStageRealTest extends TestCase
+class AIFilterStageRealTest extends TestCase
 {
     public function test_integration_real_open_ai_filter_stage()
     {
         // Skip the test if no OpenAI API key is set.
-        if (empty(env('OPENAI_API_KEY'))) {
+        if (empty(env('GEMINI_API_KEY'))) {
             $this->markTestSkipped('OPENAI_API_KEY is not set. Skipping OpenAI integration test.');
         }
 
@@ -34,7 +34,7 @@ class OpenAIFilterStageRealTest extends TestCase
         $description = "Select only files that contain the keyword 'IntegrationTest' in their content.";
 
         // Create an instance of OpenAIFilterStage.
-        $stage = new OpenAIFilterStage($description, 450);
+        $stage = new AIFilterStage($description, 450);
 
         // The next stage is an identity function.
         $next = function ($files) {
