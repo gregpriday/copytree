@@ -73,8 +73,11 @@ class CopyTreeCommand extends Command
 
         // Load the profile configuration.
         $profileGuesser = new ProfileGuesser($projectPath);
-        $guessedProfile = $profileGuesser->guess();
-        $profilePath = $profileGuesser->getProfilePath($guessedProfile);
+        $profileName = $this->option('profile') === 'auto'
+            ? $profileGuesser->guess()
+            : $this->option('profile');
+        $profilePath = $profileGuesser->getProfilePath($profileName);
+
         $profileLoader = new ProfileLoader;
         $profileLoader->load($profilePath, [
             'profile' => $this->option('profile'),
@@ -96,7 +99,7 @@ class CopyTreeCommand extends Command
 
         // Add Git filtering if requested.
         if ($this->option('modified') || $this->option('changes')) {
-            $pipeline->through([
+            $pipeline->pipe([
                 new GitFilterStage($projectPath, (bool) $this->option('modified'), $this->option('changes')),
             ]);
         }
@@ -104,21 +107,21 @@ class CopyTreeCommand extends Command
         // Add AI filtering if requested.
         $aiFilters = (array) $this->option('ai-filter');
         foreach ($aiFilters as $filterDescription) {
-            $pipeline->through([
+            $pipeline->pipe([
                 new AIFilterStage($filterDescription),
             ]);
         }
 
         // Add external sources if configured in the profile.
         if (config('profile.external')) {
-            $pipeline->through([
+            $pipeline->pipe([
                 new ExternalSourceStage(config('profile.external')),
             ]);
         }
 
         // Apply ruleset filtering if configured.
         if (config('profile.rules')) {
-            $pipeline->through([
+            $pipeline->pipe([
                 new RulesetFilterStage(
                     new RulesetFilter(
                         config('profile.rules'),
@@ -130,7 +133,7 @@ class CopyTreeCommand extends Command
         }
 
         // Always add a sorting stage.
-        $pipeline->through([
+        $pipeline->pipe([
             new SortFilesStage,
         ]);
 

@@ -2,6 +2,7 @@
 
 namespace App\Pipeline;
 
+use Illuminate\Support\Arr;
 use Symfony\Component\Finder\SplFileInfo;
 
 class RulesetFilter
@@ -138,7 +139,7 @@ class RulesetFilter
             case '<=':
                 return $fieldValue <= $value;
             case 'oneOf':
-                return is_array($value) && in_array($fieldValue, $value);
+                return in_array($fieldValue, Arr::wrap($value));
             case 'regex':
                 return is_string($value) && preg_match($value, $fieldValue) === 1;
             case 'glob':
