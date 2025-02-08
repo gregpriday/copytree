@@ -28,12 +28,12 @@ Copytree is a command‑line utility that copies a directory’s structure and f
 - **Pandoc:** For document conversion (used in transforming certain file types).  
   Install via Homebrew:
   ```
-brew install pandoc
+  brew install pandoc
   ```
 - **Poppler:** For PDF-to-text conversion (used by the PDF transformer).  
   Install via Homebrew:
   ```
-brew install poppler
+  brew install poppler
   ```
 - **Gemini API (optional):** Set your `GEMINI_API_KEY` (and optionally `GEMINI_BASE_URL`) in your environment if you plan to use AI‑based features.
 
@@ -77,17 +77,17 @@ With Copytree installed globally, simply run the command from your terminal.
 **Basic Commands:**
 - **Copy the Current Directory Structure to the Clipboard:**
   ```
-copytree
+  copytree
   ```
 - **Copy a Specific Directory or GitHub Repository:**
   ```
-copytree /path/to/project
-copytree https://github.com/username/repository/tree/main/src
+  copytree /path/to/project
+  copytree https://github.com/username/repository/tree/main/src
   ```
 - **AI‑Based File Filtering:**
   Use the `--ai-filter` option to pass a natural language description. For example:
   ```
-copytree --ai-filter="Find all authentication related files"
+  copytree --ai-filter="Find all authentication related files"
   ```
 - **Output Options:**
     - **Display in Console:**
@@ -105,12 +105,41 @@ copytree --ai-filter="Find all authentication related files"
 - **Git Filtering:**
   To include only files modified since the last commit or between two commits:
   ```
-copytree --modified
-copytree --changes=commit1:commit2
+  copytree --modified
+  copytree --changes=commit1:commit2
   ```
 
 **Profiles:**
 Copytree uses JSON‑formatted profiles to control file selection, filtering, external merging, and transformation. Place your profile files in a `.ctree` directory within your project or in a designated profiles folder. Profiles are automatically detected based on your project structure, or you can specify a profile using the `--profile` option.
+
+---
+
+## Profile Creation
+
+Copytree also lets you create a new profile interactively. To generate a new profile based on your project’s files and your goals, run the following command:
+
+```
+copytree profile:create [path] [--char-limit=1500]
+```
+
+**Process:**
+
+1. **Specify the Project Directory (Optional):**  
+   If no path is provided, Copytree uses the current working directory. You can also specify a different directory.
+
+2. **Set a Character Limit (Optional):**  
+   The `--char-limit` option (default is 1500) limits the number of characters extracted per file for profile creation.
+
+3. **Enter Profile Goals:**  
+   The command will prompt you to enter the primary goals for the profile. You can enter multiple goals—press Enter without input to finish.
+
+4. **Name Your Profile:**  
+   Next, you will be asked to provide a name for your new profile (without the file extension). If you leave it blank, it defaults to “default.”
+
+5. **Profile Generation and Saving:**  
+   Copytree scans your project files, uses the Gemini API to help generate the profile data based on your goals, and then saves the profile JSON to your project’s `.ctree` directory. The generated profile is also automatically revealed in Finder for easy access.
+
+Once created, you can use the new profile in subsequent Copytree commands with the `--profile` option.
 
 ---
 
@@ -119,8 +148,8 @@ Copytree uses JSON‑formatted profiles to control file selection, filtering, ex
 - **GitHub URL Handling:**  
   Copytree can clone and cache remote GitHub repositories. For example:
   ```
-copytree https://github.com/username/repository/tree/main/src --no-cache
-copytree --clear-cache
+  copytree https://github.com/username/repository/tree/main/src --no-cache
+  copytree --clear-cache
   ```
 - **File Transformation Pipeline:**  
   The system uses a pipeline of transformers (for images, PDFs, Markdown, etc.) to convert file contents as needed. Custom transformers can be added by modifying the configuration.
