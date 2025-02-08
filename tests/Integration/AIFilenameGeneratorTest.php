@@ -3,27 +3,46 @@
 namespace Tests\Integration;
 
 use App\Services\AIFilenameGenerator;
+use Symfony\Component\Finder\SplFileInfo;
 use Tests\TestCase;
 
 class AIFilenameGeneratorTest extends TestCase
 {
     public function test_generate_filename_integration()
     {
-        // Skip the test if the OpenAI API key is not provided.
-        if (empty(env('OPENAI_API_KEY'))) {
-            $this->markTestSkipped('OpenAI API key not set in .env file.');
+        // Skip the test if the GEMINI_API_KEY is not provided.
+        if (empty(env('GEMINI_API_KEY'))) {
+            $this->markTestSkipped('Gemini API key not set in .env file.');
+        }
+
+        // Create a temporary directory for the test files.
+        $tempDir = sys_get_temp_dir().'/ai_filename_generator_test_'.uniqid();
+        mkdir($tempDir, 0777, true);
+
+        // Define the relative paths for our dummy files.
+        $relativePaths = [
+            'src/Controller/UserController.php',
+            'src/Model/User.php',
+            'README.md',
+        ];
+
+        $files = [];
+        // Create dummy files and wrap them in SplFileInfo.
+        foreach ($relativePaths as $relativePath) {
+            $fullPath = $tempDir.'/'.$relativePath;
+            $dir = dirname($fullPath);
+            if (! is_dir($dir)) {
+                mkdir($dir, 0777, true);
+            }
+            // Write some dummy content.
+            file_put_contents($fullPath, "Dummy content for {$relativePath}");
+            // Create a SplFileInfo instance.
+            $files[] = new SplFileInfo($fullPath, dirname($relativePath), $relativePath);
         }
 
         $generator = new AIFilenameGenerator;
 
-        // Create a sample files array.
-        $files = [
-            ['path' => 'src/Controller/UserController.php'],
-            ['path' => 'src/Model/User.php'],
-            ['path' => 'README.md'],
-        ];
-
-        // Generate the filename using the AI service.
+        // Generate the filename using the Gemini API.
         $filename = $generator->generateFilename($files);
 
         // Assert that a filename is generated.
@@ -38,5 +57,8 @@ class AIFilenameGeneratorTest extends TestCase
         // Optionally, check that the base filename (without ".txt") does not exceed 90 characters.
         $baseFilename = substr($filename, 0, -4);
         $this->assertLessThanOrEqual(90, strlen($baseFilename), 'Filename (without extension) should be at most 90 characters.');
+
+        // Cleanup temporary files.
+        $this->removeDirectory($tempDir);
     }
 }

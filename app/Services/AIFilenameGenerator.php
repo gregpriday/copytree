@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use OpenAI\Laravel\Facades\OpenAI;
+use Gemini\Laravel\Facades\Gemini;
 use RuntimeException;
 
 class AIFilenameGenerator
@@ -18,7 +18,7 @@ class AIFilenameGenerator
     protected int $maxFilenameLength = 90;
 
     /**
-     * The OpenAI model to use.
+     * The Gemini model to use.
      */
     protected string $model;
 
@@ -27,14 +27,14 @@ class AIFilenameGenerator
      */
     public function __construct()
     {
-        // Use the configured model or fall back to a default.
-        $this->model = config('openai.model', 'gpt-4o');
+        // Use the Gemini model defined in config('gemini.model')
+        $this->model = config('gemini.model', 'gemini-pro');
     }
 
     /**
      * Generate a descriptive filename based on an array of files.
      *
-     * Each file in the array is expected to be an associative array with at least a 'path' key.
+     * Each file in the array is expected to be a SplFileInfo instance.
      *
      * @param  array  $files  The files to analyze.
      * @param  string|null  $outputDirectory  (Optional) Directory to check for filename uniqueness.
@@ -48,47 +48,49 @@ class AIFilenameGenerator
             throw new RuntimeException('No files provided for filename generation');
         }
 
-        // Limit the files array to the maximum allowed to avoid token issues.
+        // Limit the files array to avoid token issues.
         $files = array_slice($files, 0, $this->maxFiles);
 
-        // Prepare a list of file paths.
+        // Build a list of file paths.
         $filesList = '';
-
         if (count($files)) {
             $file = $files[0];
+            // Remove the file’s relative part from its full path to obtain the parent folder.
             $folder = str_replace($file->getRelativePathname(), '', $file->getPathname());
             $filesList .= 'Parent Folder: '.$folder."\n";
         }
-
         foreach ($files as $file) {
             $filesList .= '- '.$file->getRelativePathname()."\n";
         }
 
         // Build the prompt for filename generation.
-        $prompt = "Generate a descriptive filename for the following set of files:\n\n".$filesList;
+        $prompt = "Generate a descriptive filename for the following set of files and return the requested JSON:\n\n".$filesList;
 
         // Load the system prompt from the filename generator prompt file.
-        $systemPrompt = file_get_contents(base_path('prompts/filename-generator/system.txt'));
+        $systemPromptPath = base_path('prompts/filename-generator/system.txt');
+        if (! file_exists($systemPromptPath)) {
+            throw new RuntimeException('System prompt for filename generation not found.');
+        }
+        $systemPrompt = file_get_contents($systemPromptPath);
 
-        $response = OpenAI::chat()->create([
-            'model' => $this->model,
-            'messages' => [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $prompt],
-            ],
-            'temperature' => 0.1,
-            'response_format' => [
-                'type' => 'json_object',
-            ],
-            'max_tokens' => 120,
-        ]);
+        $prompt = $systemPrompt."\n\n===\n\n".$prompt;
 
-        // Decode the response expecting a JSON with a "filename" key.
-        $content = $response->choices[0]->message->content ?? '';
+        // Call the Gemini API using the generative model with our custom configuration.
+        try {
+            $response = Gemini::generativeModel(model: $this->model)
+                ->generateContent($prompt);
+        } catch (\Exception $e) {
+            throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
+        }
+
+        // Extract and decode the JSON response.
+        $content = $response->text() ?? '';
+        // Extract the JSON from inside code fences (```json ... ```)
+        $content = preg_replace('/^```json(.*)```$/s', '$1', $content);
         $data = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['filename'])) {
-            throw new RuntimeException('Invalid response from OpenAI: '.json_last_error_msg());
+            throw new RuntimeException('Invalid response from Gemini: '.json_last_error_msg());
         }
 
         $rawFilename = $data['filename'];
@@ -99,7 +101,7 @@ class AIFilenameGenerator
     /**
      * Sanitize and format the generated filename.
      *
-     * Ensures the filename is in hyphen-case, only contains lowercase letters, numbers, and hyphens,
+     * Ensures the filename is in hyphen-case (only lowercase letters, numbers, and hyphens)
      * and appends a .txt extension. If an output directory is provided, it ensures uniqueness.
      *
      * @param  string  $filename  The raw filename to sanitize.

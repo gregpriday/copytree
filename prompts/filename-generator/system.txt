@@ -91,3 +91,5 @@ Always return a JSON object
     "filename": "your-generated-filename"
 }
 ```
+
+Return a JSON object without any additional supporting text, always surrounded in code fences (```json ... ```).

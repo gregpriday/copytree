@@ -2,5 +2,5 @@
 
 return [
     App\Providers\AppServiceProvider::class,
-    \Gemini\Laravel\ServiceProvider::class
+    \Gemini\Laravel\ServiceProvider::class,
 ];

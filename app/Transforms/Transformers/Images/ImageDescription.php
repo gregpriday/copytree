@@ -5,10 +5,10 @@ namespace App\Transforms\Transformers\Images;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use Gemini\Enums\MimeType;
-use Illuminate\Support\Facades\File;
-use Gemini\Laravel\Facades\Gemini;
 use Gemini\Data\Blob;
+use Gemini\Enums\MimeType;
+use Gemini\Laravel\Facades\Gemini;
+use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -42,7 +42,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
         }
 
         // Use the caching helper to cache the expensive transformation.
-        return $this->cacheTransformResult($input, function () use ($input, $mimeType) {
+        return $this->cacheTransformResult($input, function () use ($input) {
             // Resize the image if necessary.
             $resizedImageData = $this->resizeImage($input->getRealPath());
 
@@ -57,21 +57,21 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             $systemPrompt = File::get($systemPromptPath);
 
             // Create a combined prompt by appending the user instruction.
-            $userInstruction = 'Please describe the image with the filename: ' . $input->getPath();
-            $prompt = $systemPrompt . "\n\n===\n\n" . $userInstruction;
+            $userInstruction = 'Please describe the image with the filename: '.$input->getPath();
+            $prompt = $systemPrompt."\n\n===\n\n".$userInstruction;
 
             // Call the Gemini API using the Gemini-Pro-Vision model.
             try {
                 $response = Gemini::generativeModel(model: config('gemini.model'))
                     ->generateContent([
-                    $prompt,
-                    new Blob(
-                        mimeType: MimeType::IMAGE_JPEG,
-                        data: $base64
-                    )
-                ]);
+                        $prompt,
+                        new Blob(
+                            mimeType: MimeType::IMAGE_JPEG,
+                            data: $base64
+                        ),
+                    ]);
             } catch (\Exception $e) {
-                throw new RuntimeException('Gemini API call failed: ' . $e->getMessage());
+                throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
             }
 
             // Extract and return the text description.
