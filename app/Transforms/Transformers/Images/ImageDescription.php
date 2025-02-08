@@ -5,8 +5,10 @@ namespace App\Transforms\Transformers\Images;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Loaders\FileLoader;
+use Gemini\Enums\MimeType;
 use Illuminate\Support\Facades\File;
-use OpenAI\Laravel\Facades\OpenAI;
+use Gemini\Laravel\Facades\Gemini;
+use Gemini\Data\Blob;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -18,8 +20,8 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
     protected int $maxDimension = 1024;
 
     /**
-     * Transform an image file into a text description using the OpenAI API.
-     * If the file is not an image, return its content unchanged.
+     * Transform an image file into a text description using the Gemini API.
+     * If the file is not an image, returns its content unchanged.
      *
      * @param  SplFileInfo|string  $input
      *
@@ -34,7 +36,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
 
         // Check if the file is an image.
         $mimeType = File::mimeType($input->getRealPath());
-        if (strpos($mimeType, 'image/') !== 0) {
+        if (! str_starts_with($mimeType, 'image/')) {
             // If not an image, fall back to the default file loader transformer.
             return (new FileLoader)->transform($input);
         }
@@ -44,9 +46,8 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             // Resize the image if necessary.
             $resizedImageData = $this->resizeImage($input->getRealPath());
 
-            // Encode the (resized) image data as base64.
+            // Base64-encode the (possibly resized) image data.
             $base64 = base64_encode($resizedImageData);
-            $dataUrl = 'data:'.$mimeType.';base64,'.$base64;
 
             // Load the system prompt from the prompts directory.
             $systemPromptPath = base_path('prompts/image-description/system.txt');
@@ -55,34 +56,28 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             }
             $systemPrompt = File::get($systemPromptPath);
 
-            // Prepare the messages: a system prompt and a user message that includes the image.
-            $messages = [
-                ['role' => 'system', 'content' => $systemPrompt],
-                [
-                    'role' => 'user',
-                    'content' => [
-                        ['type' => 'text', 'text' => 'Please describe the image with the filename: '.$input->getPath()],
-                        ['type' => 'image_url', 'image_url' => ['url' => $dataUrl]],
-                    ],
-                ],
-            ];
+            // Create a combined prompt by appending the user instruction.
+            $userInstruction = 'Please describe the image with the filename: ' . $input->getPath();
+            $prompt = $systemPrompt . "\n\n===\n\n" . $userInstruction;
 
-            // Call the OpenAI API using the Facade.
+            // Call the Gemini API using the Gemini-Pro-Vision model.
             try {
-                $response = OpenAI::chat()->create([
-                    'model' => config('openai.model', 'gpt-4o'),
-                    'messages' => $messages,
-                    'temperature' => 0.3,
-                    'max_tokens' => 300,
+                $response = Gemini::generativeModel(model: config('gemini.model'))
+                    ->generateContent([
+                    $prompt,
+                    new Blob(
+                        mimeType: MimeType::IMAGE_JPEG,
+                        data: $base64
+                    )
                 ]);
             } catch (\Exception $e) {
-                throw new RuntimeException('OpenAI API call failed: '.$e->getMessage());
+                throw new RuntimeException('Gemini API call failed: ' . $e->getMessage());
             }
 
             // Extract and return the text description.
-            $description = $response->choices[0]->message->content ?? '';
+            $description = $response->text() ?? '';
             if (empty($description)) {
-                throw new RuntimeException('No description returned from OpenAI.');
+                throw new RuntimeException('No description returned from Gemini.');
             }
 
             return $description;
@@ -156,18 +151,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
 
         // Open a temporary memory stream.
         $stream = fopen('php://memory', 'r+');
-
-        switch ($imageType) {
-            case IMAGETYPE_JPEG:
-                imagejpeg($dstImage, $stream);
-                break;
-            case IMAGETYPE_PNG:
-                imagepng($dstImage, $stream);
-                break;
-            case IMAGETYPE_GIF:
-                imagegif($dstImage, $stream);
-                break;
-        }
+        imagejpeg($dstImage, $stream);
 
         // Rewind the stream and read its contents.
         rewind($stream);

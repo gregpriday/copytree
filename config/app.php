@@ -54,7 +54,6 @@ return [
     */
 
     'providers' => [
-        App\Providers\AppServiceProvider::class,
-        \OpenAI\Laravel\ServiceProvider::class,
+        App\Providers\AppServiceProvider::class
     ],
 ];

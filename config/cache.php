@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'default' => 'file',
+    'default' => env('CACHE_DRIVER', 'file'),
 
     /*
     |--------------------------------------------------------------------------
@@ -32,6 +32,9 @@ return [
             'driver' => 'file',
             'path' => copytree_path('cache'),
             'lock_path' => copytree_path('cache'),
+        ],
+        'array' => [
+            'driver' => 'array',
         ],
     ],
 

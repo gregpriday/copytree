@@ -2,8 +2,11 @@
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
-         colors="true"
->
+         colors="true">
+    <php>
+        <!-- Set the cache driver to in-memory for testing -->
+        <env name="CACHE_DRIVER" value="array"/>
+    </php>
     <testsuites>
         <testsuite name="Feature">
             <directory>./tests/Feature</directory>
