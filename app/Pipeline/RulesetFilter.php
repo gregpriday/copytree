@@ -3,6 +3,7 @@
 namespace App\Pipeline;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Symfony\Component\Finder\SplFileInfo;
 
 class RulesetFilter
@@ -118,13 +119,89 @@ class RulesetFilter
      *
      * A rule is defined as a triple: [field, operator, value].
      * Supported fields: folder, path, dirname, basename, extension, filename, contents, contents_slice, size, mtime, mimeType.
-     * Supported operators include: "=", "!=", ">", ">=", "<", "<=", "oneOf", "regex", "glob", "fnmatch", "contains", "startsWith", "endsWith".
+     * Supported operators include basic comparisons ("=", "!=", ">", ">=", "<", "<="),
+     * string operations ("oneOf", "regex", "glob", "fnmatch", "contains", "startsWith", "endsWith"),
+     * and now also any of the above with suffixes "Any" or "All". Additionally, if the operator starts with "not"
+     * (followed by a capital letter), the result is negated.
      */
     protected function evaluateRule(SplFileInfo $file, array $rule): bool
     {
         [$field, $operator, $value] = $rule;
         $fieldValue = $this->getFieldValue($file, $field);
 
+        return $this->evaluateOperator($fieldValue, $operator, $value);
+    }
+
+    /**
+     * Evaluate an operator against a field value.
+     *
+     * This method supports modifiers encoded in the operator string:
+     * - If the operator starts with "not" (followed by a capital letter), the result is negated.
+     * - If the operator ends with "Any", then if $value is an array, it returns true if any element
+     *   of $value satisfies the base operator.
+     * - If the operator ends with "All", then it returns true only if all elements satisfy the base operator.
+     *
+     * @param  mixed  $fieldValue  The value from the file.
+     * @param  string  $operator  The operator string.
+     * @param  mixed  $value  The value to compare against.
+     * @return bool The result of the evaluation.
+     */
+    protected function evaluateOperator($fieldValue, string $operator, $value): bool
+    {
+        $negate = false;
+        // Check for "not" prefix if followed by a capital letter.
+        if (str_starts_with($operator, 'not') && isset($operator[3]) && ctype_upper($operator[3])) {
+            $negate = true;
+            $operator = substr($operator, 3);
+            $operator = lcfirst($operator);
+        }
+
+        // Check for "Any" or "All" suffix.
+        $suffix = null;
+        if (str_ends_with($operator, 'Any')) {
+            $suffix = 'Any';
+            $operator = substr($operator, 0, -3);
+            $operator = lcfirst($operator);
+        } elseif (str_ends_with($operator, 'All')) {
+            $suffix = 'All';
+            $operator = substr($operator, 0, -3);
+            $operator = lcfirst($operator);
+        }
+
+        // If $value is an array and a suffix was detected, apply the base operator to each element.
+        if (is_array($value) && $suffix !== null) {
+            if ($suffix === 'Any') {
+                $result = false;
+                foreach (Arr::wrap($value) as $item) {
+                    if ($this->evaluateOperator($fieldValue, $operator, $item)) {
+                        $result = true;
+                        break;
+                    }
+                }
+            } elseif ($suffix === 'All') {
+                $result = true;
+                foreach (Arr::wrap($value) as $item) {
+                    if (! $this->evaluateOperator($fieldValue, $operator, $item)) {
+                        $result = false;
+                        break;
+                    }
+                }
+            }
+        } else {
+            $result = $this->evaluateSimpleOperator($fieldValue, $operator, $value);
+        }
+
+        return $negate ? ! $result : $result;
+    }
+
+    /**
+     * Evaluate a basic operator (without any "not", "Any", or "All" modifiers).
+     *
+     * @param  mixed  $fieldValue
+     * @param  mixed  $value
+     */
+    protected function evaluateSimpleOperator($fieldValue, string $operator, $value): bool
+    {
         switch ($operator) {
             case '=':
                 return $fieldValue == $value;
@@ -146,14 +223,14 @@ class RulesetFilter
             case 'fnmatch':
                 return fnmatch($value, $fieldValue);
             case 'contains':
-                return is_string($fieldValue) && strpos($fieldValue, $value) !== false;
+                return strpos($fieldValue, $value) !== false;
             case 'startsWith':
-                return is_string($fieldValue) && strpos($fieldValue, $value) === 0;
+                return Str::startsWith($fieldValue, $value);
             case 'endsWith':
-                return is_string($fieldValue) && substr($fieldValue, -strlen($value)) === $value;
+                return Str::endsWith($fieldValue, $value);
             default:
-                // Unsupported operator
-                return false;
+                // Fallback to using the Str facade method.
+                return Str::{$operator}($fieldValue, $value);
         }
     }
 

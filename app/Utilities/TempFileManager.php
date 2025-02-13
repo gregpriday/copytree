@@ -6,9 +6,9 @@ use DirectoryIterator;
 
 class TempFileManager
 {
-    private const MAX_AGE_MINUTES = 15;
+    public const MAX_AGE_MINUTES = 15;
 
-    private const PREFIX = 'ctree_output_';
+    public const PREFIX = 'ctree_output_';
 
     /**
      * Get the temporary directory for storing copytree output files.

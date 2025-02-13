@@ -11,6 +11,7 @@ use Tests\TestCase;
 class ProfileLoaderTest extends TestCase
 {
     protected string $tempDir;
+
     protected string $profilePath;
 
     protected function setUp(): void
@@ -40,7 +41,7 @@ class ProfileLoaderTest extends TestCase
         ];
         File::put($this->profilePath, json_encode($profileData));
 
-        $loader = new ProfileLoader();
+        $loader = new ProfileLoader;
         $loader->load($this->profilePath);
 
         // Assert that the profile data is loaded into the config.
@@ -52,7 +53,7 @@ class ProfileLoaderTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage("Profile configuration not found at {$this->tempDir}/nonexistent.json");
 
-        $loader = new ProfileLoader();
+        $loader = new ProfileLoader;
         $loader->load($this->tempDir.'/nonexistent.json');
     }
 
@@ -64,7 +65,7 @@ class ProfileLoaderTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Invalid JSON in profile configuration:');
 
-        $loader = new ProfileLoader();
+        $loader = new ProfileLoader;
         $loader->load($this->profilePath);
     }
 
@@ -84,7 +85,7 @@ class ProfileLoaderTest extends TestCase
             'depth' => 5,
         ];
 
-        $loader = new ProfileLoader();
+        $loader = new ProfileLoader;
         $loader->load($this->profilePath, $commandOptions);
 
         // Assert that command options are merged and override profile settings.
@@ -92,19 +93,19 @@ class ProfileLoaderTest extends TestCase
         $this->assertEquals($expected, Config::get('profile'));
     }
 
-    public function test_getProfile_returns_empty_array_if_not_loaded()
+    public function test_get_profile_returns_empty_array_if_not_loaded()
     {
-        $loader = new ProfileLoader();
+        $loader = new ProfileLoader;
         $this->assertEquals([], $loader->getProfile());
     }
 
-    public function test_getProfile_returns_loaded_profile()
+    public function test_get_profile_returns_loaded_profile()
     {
         // Create a valid profile JSON file
         $profileData = ['rules' => [[['extension', '=', 'php']]]];
         File::put($this->profilePath, json_encode($profileData));
 
-        $loader = new ProfileLoader();
+        $loader = new ProfileLoader;
         $loader->load($this->profilePath);
 
         $this->assertEquals($profileData, $loader->getProfile());
