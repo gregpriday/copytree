@@ -1,7 +1,6 @@
-
 # Copytree Fields and Operations Reference
 
-This page documents all available fields and operations that can be used in Copytree profiles to filter files and directories. These building blocks let you specify exactly which files to include, exclude, or process with transformations. For a complete guide on writing profiles, see the [Writing Profiles for Copytree](./profiles.md) documentation.
+This page documents all available fields and operations that can be used in Copytree profiles to filter files and directories. These building blocks let you specify exactly which files to include, exclude, or process with transformations. All available string‐related operations are built on top of Laravel’s powerful `Str` class methods. For a complete guide on writing profiles, see the [Writing Profiles for Copytree](./profiles.md) documentation.
 
 ---
 
@@ -45,7 +44,7 @@ Copytree profiles let you match against various file attributes. These fields ca
 
 - **`contents`**  
   The complete file contents.
-    - **Usage:** Enables full-text search and pattern matching.
+    - **Usage:** Enables full‑text search and pattern matching.
     - **Note:** This can be slow for very large files.
     - **Example:**
       ```json
@@ -54,7 +53,7 @@ Copytree profiles let you match against various file attributes. These fields ca
 
 - **`contents_slice`**  
   The first 256 characters of the file contents.
-    - **Usage:** Ideal for quick checks (e.g., header inspection or file type detection) without reading the entire file.
+    - **Usage:** Ideal for quick checks (e.g. header inspection or file type detection) without reading the entire file.
     - **Example:**
       ```json
       ["contents_slice", "isAscii"]
@@ -97,7 +96,7 @@ Copytree profiles let you match against various file attributes. These fields ca
 
 ## Operations
 
-The following operations can be used to compare field values and build complex filtering rules.
+Operations are used to compare field values and build complex filtering rules. In Copytree profiles, most string operations are powered by Laravel’s `Str` class, which provides a rich set of methods for manipulating and comparing strings.
 
 ### Comparison Operations
 
@@ -121,7 +120,7 @@ The following operations can be used to compare field values and build complex f
 
 ### String Operations
 
-- **Basic String Matching:**
+- **Basic String Matching (based on Laravel `Str` methods):**
     - `startsWith`: Field starts with the specified prefix.
     - `endsWith`: Field ends with the specified suffix.
     - `contains`: Field contains the given substring.
@@ -141,18 +140,22 @@ The following operations can be used to compare field values and build complex f
       ```
     - `fnmatch`: Uses shell‑style pattern matching.
 
-- **Multiple Value Variants:**
-    - `startsWithAny`: Field starts with any of the prefixes provided in an array.
-    - `endsWithAny`: Field ends with any of the suffixes provided.
-    - `containsAny`: Field contains any of the specified substrings.
+- **Multiple Value Variants (using Any/All suffixes):**
+    - **Suffix `Any`:**  
+      When appended to an operator (e.g. `startsWithAny`, `endsWithAny`, `containsAny`), it indicates that the field should satisfy the condition for *at least one* of the values provided in an array.
       ```json
-      ["folder", "startsWithAny", ["src/", "test/", "docs/"]]
+      ["folder", "startsWithAny", ["src/", "tests/", "docs/"]]
+      ```
+    - **Suffix `All`:**  
+      When appended (e.g. `containsAll`), it indicates that the field must satisfy the condition for *all* of the values in the array.
+      ```json
+      ["basename", "containsAll", [".min", ".js"]]
       ```
 
 ### File Type and Content Checks
 
 - **Content Validation:**
-    - `isAscii`: Checks whether the file (or its contents slice) contains only ASCII characters.
+    - `isAscii`: Checks whether the file (or its `contents_slice`) contains only ASCII characters.
     - `isJson`: Checks if the file’s content is valid JSON.
     - `isUrl`: Validates whether a string is a URL.
     - `isUuid`: Checks for a valid UUID.
@@ -161,8 +164,7 @@ The following operations can be used to compare field values and build complex f
 ### Compound Operations
 
 - **AND Logic (within a single rule set):**  
-  All rules in a rule set must be true for a file to be included.
-
+  All rules in a rule set must be true for the file to be included.
   ```json
   [
     ["folder", "startsWith", "src"],
@@ -173,7 +175,6 @@ The following operations can be used to compare field values and build complex f
 
 - **OR Logic (across multiple rule sets):**  
   A file is included if it satisfies at least one complete rule set.
-
   ```json
   {
     "rules": [
@@ -187,15 +188,17 @@ The following operations can be used to compare field values and build complex f
   }
   ```
 
-### Operation Modifiers
+### Operator Modifiers
 
-- **Negation:**  
-  Many operations can be negated by prefixing the operator with `not`. For example:
-    - `notContains`
-    - `notStartsWith`
-    - `notEndsWith`
-    - `notRegex`
-    - `notIsAscii`
+- **Negation (using the `not` prefix):**  
+  Any operator can be negated by prefixing it with `not` (e.g. `notStartsWith`, `notContains`, `notRegex`). This modifier inverts the result of the base operation.
+
+- **Any/All Suffixes:**  
+  Many string operations support the suffixes `Any` and `All`:
+    - **`Any` Suffix:** The condition passes if **at least one** element in the provided array satisfies the operator.
+    - **`All` Suffix:** The condition passes only if **all** elements in the provided array satisfy the operator.
+
+  These modifiers allow for flexible, compound string checks using Laravel's `Str` methods.
 
 ---
 
@@ -215,7 +218,3 @@ These fields and operations are the building blocks for all filtering rules in C
 For additional details on writing profiles and examples of complete profiles, refer to [Writing Profiles for Copytree](./profiles.md).
 
 For a complete list of string operations supported by Laravel’s `Str` class, please see the [Laravel String documentation](https://laravel.com/docs/11.x/strings#strings-method-list).
-
----
-
-This reference is intended to help you build precise and effective filtering rules as part of your Copytree profiles.

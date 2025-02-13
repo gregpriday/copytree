@@ -13,9 +13,7 @@ class CopyDocsCommand extends Command
      * All parameters are defined as options so that nothing is required.
      */
     protected $signature = 'copy:docs
-        {--f|filter=* : (Optional) Filter files using glob patterns.}
-        {--a|ai-filter=? : (Optional) Filter files using a natural language description.}
-        {--o|output? : (Optional) Output to a file (the filename is always "profile-docs.txt").}
+        {--o|output= : (Optional) Output to a file (the filename is always "profile-docs.txt").}
         {--i|display : (Optional) Display output in the console.}
         {--S|stream : (Optional) Stream output directly.}
         {--r|as-reference : (Optional) Copy a reference to a temporary file.}';
@@ -29,7 +27,7 @@ class CopyDocsCommand extends Command
      * Execute the command.
      *
      * This command sets a fixed source (the "docs/profiles" directory) and passes along the
-     * relevant options (filter, ai-filter, output, display, stream, as-reference) to the main CopyTreeCommand.
+     * relevant options (output, display, stream, as-reference) to the main CopyTreeCommand.
      *
      * @throws \Symfony\Component\Console\Exception\ExceptionInterface
      */
@@ -38,8 +36,8 @@ class CopyDocsCommand extends Command
         // Set the fixed source path for profile docs.
         $fixedPath = base_path('docs/profiles');
 
-        // Build the basic argument list for the main command.
-        $args = [
+        // Build the basic input array for the main command.
+        $inputArray = [
             'command' => 'copy',
             'path' => $fixedPath,
         ];
@@ -47,17 +45,22 @@ class CopyDocsCommand extends Command
         // Get all options; they are all optional.
         $options = $this->options();
 
-        // If an output file is specified, force it to "profile-docs.txt".
-        if (isset($options['output'])) {
+        // Force the output option to "profile-docs.txt" if provided.
+        if (! empty($options['output'])) {
             $options['output'] = 'profile-docs.txt';
         }
 
-        // Merge the options with the arguments.
-        $args = array_merge($args, $options);
+        // Convert the options to the "--option" format.
+        foreach ($options as $key => $value) {
+            if (empty($value)) {
+                continue;
+            }
+            $inputArray['--'.$key] = $value;
+        }
 
         // Retrieve and run the main CopyTreeCommand.
         $command = $this->getApplication()->find('copy');
 
-        return $command->run(new ArrayInput($args), $this->output);
+        return $command->run(new ArrayInput($inputArray), $this->output);
     }
 }
