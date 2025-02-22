@@ -54,8 +54,8 @@ abstract class BaseTransformer
         // Compute the current MD5 hash of the file.
         $currentMd5 = md5_file($realPath);
 
-        // Create a cache key based on the file's real path.
-        $cacheKey = 'transformer_result:'.md5($realPath);
+        // Use get_called_class() to include the name of the calling class in the cache key.
+        $cacheKey = 'transformer_result:'.md5(get_called_class().$realPath);
 
         // Check if we have a cached result and that the file has not changed.
         $cached = Cache::get($cacheKey);
