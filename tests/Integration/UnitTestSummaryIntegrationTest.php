@@ -34,6 +34,6 @@ class UnitTestSummaryIntegrationTest extends TestCase
         $this->assertNotEmpty($summary, 'The unit test summary should not be empty.');
 
         // Output the summary for manual inspection.
-        fwrite(STDOUT, "Complex Unit Test Summary:\n" . $summary . "\n");
+        fwrite(STDOUT, "Complex Unit Test Summary:\n".$summary."\n");
     }
 }

@@ -48,12 +48,12 @@ class UnitTestSummary extends BaseTransformer implements FileTransformerInterfac
      */
     public function transform(SplFileInfo|string $input): string
     {
-        if (!($input instanceof SplFileInfo)) {
+        if (! ($input instanceof SplFileInfo)) {
             throw new RuntimeException('UnitTestSummary transformer expects a SplFileInfo instance.');
         }
 
         $mimeType = File::mimeType($input->getRealPath());
-        if (!str_starts_with($mimeType, 'text/')) {
+        if (! str_starts_with($mimeType, 'text/')) {
             return (new FileLoader)->transform($input);
         }
 
@@ -85,14 +85,14 @@ class UnitTestSummary extends BaseTransformer implements FileTransformerInterfac
             $systemPrompt = File::get(base_path('prompts/test-summary/system.txt'));
 
             // Include the relative path and filename in the prompt.
-            $prompt = "File: `{$relativePath}`\n\nPlease provide a detailed summary of the key insights from the following test file:\n\n" . $wrappedContent;
+            $prompt = "File: `{$relativePath}`\n\nPlease provide a detailed summary of the key insights from the following test file:\n\n".$wrappedContent;
 
             try {
                 $response = Gemini::generativeModel(model: config('gemini.model'))
                     ->withSystemInstruction(Content::parse($systemPrompt))
                     ->generateContent($prompt);
             } catch (\Exception $e) {
-                throw new RuntimeException('Gemini API call failed: ' . $e->getMessage());
+                throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
             }
 
             $rawOutput = $response->text() ?? '';
@@ -100,6 +100,7 @@ class UnitTestSummary extends BaseTransformer implements FileTransformerInterfac
             if (empty($summary)) {
                 throw new RuntimeException('No test summary returned from Gemini.');
             }
+
             return $summary;
         });
     }
