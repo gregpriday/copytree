@@ -65,12 +65,7 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
             $wrappedCode = '```'.$language."\n".$content."\n```";
 
             // Load the system prompt from a file if available; otherwise, use a placeholder.
-            $systemPromptPath = base_path('prompts/code-summary/system.txt');
-            if (File::exists($systemPromptPath)) {
-                $systemPrompt = File::get($systemPromptPath);
-            } else {
-                $systemPrompt = 'Please summarize the following source code. Return only the code summary wrapped in code fences with no additional text.';
-            }
+            $systemPrompt = File::get(base_path('prompts/code-summary/system.txt'));
 
             // Build the prompt using the wrapped code.
             $prompt = "Please provide a concise summary for the following source code:\n\n".$wrappedCode;
