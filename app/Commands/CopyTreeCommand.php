@@ -87,7 +87,7 @@ class CopyTreeCommand extends Command
             return self::FAILURE;
         }
 
-        $profileLoader = new ProfileLoader;
+        $profileLoader = new ProfileLoader($projectPath);
         $profileLoader->load($profilePath, [
             'profile' => $this->option('profile'),
             'filter' => (array) $this->option('filter'),
