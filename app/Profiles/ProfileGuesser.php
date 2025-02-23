@@ -2,8 +2,15 @@
 
 namespace App\Profiles;
 
+use RuntimeException;
+
 /**
- * Guesses the appropriate profile based on the project structure.
+ * Class ProfileGuesser
+ *
+ * Determines the most appropriate profile for a project based on its structure.
+ * It first checks for dedicated or legacy profile files in the ".ctree" directory,
+ * then applies heuristics (e.g. Laravel or SvelteKit detection) before finally
+ * defaulting to "default" if no other match is found.
  */
 class ProfileGuesser
 {
@@ -15,7 +22,7 @@ class ProfileGuesser
      * Constructor.
      *
      * @param  string  $projectPath  The base path of the project.
-     * @param  array  $availableProfiles  (Optional) An array of available profile names.
+     * @param  array  $availableProfiles  Optional list of available profile names.
      */
     public function __construct(string $projectPath, array $availableProfiles = [])
     {
@@ -24,48 +31,46 @@ class ProfileGuesser
     }
 
     /**
-     * Guess the appropriate profile for this project.
+     * Guess the appropriate profile name for the project.
      *
-     * The method checks for the following (in order):
-     *
-     * 1. If a dedicated profile file exists at .ctree/profile.json, returns "profile".
-     * 2. If a legacy ruleset file exists at .ctree/ruleset.json, returns "ruleset".
-     * 3. Uses heuristics to detect common project types (e.g. Laravel, SvelteKit).
-     * 4. Returns "default" if no other match is found.
+     * Checks in the following order:
+     * 1. If a dedicated profile file exists at ".ctree/profile.json", returns "profile".
+     * 2. If a legacy ruleset file exists at ".ctree/ruleset.json", returns "ruleset".
+     * 3. If the project structure indicates Laravel, returns "laravel".
+     * 4. If the project structure indicates SvelteKit, returns "sveltekit".
+     * 5. Otherwise, returns "default".
      *
      * @return string The guessed profile name.
      */
     public function guess(): string
     {
-        $ctreeDir = $this->projectPath.DIRECTORY_SEPARATOR.'.ctree';
+        $ctreeDirectory = $this->projectPath.DIRECTORY_SEPARATOR.'.ctree';
 
-        // Check for the new profile file.
-        if (file_exists($ctreeDir.DIRECTORY_SEPARATOR.'profile.json')) {
+        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.json')) {
             return 'profile';
         }
 
-        // Fallback to legacy ruleset file.
-        if (file_exists($ctreeDir.DIRECTORY_SEPARATOR.'ruleset.json')) {
+        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.json')) {
             return 'ruleset';
         }
 
-        // Heuristic: detect Laravel project.
         if ($this->isLaravelProject()) {
             return 'laravel';
         }
 
-        // Heuristic: detect SvelteKit project.
         if ($this->isSvelteKitProject()) {
             return 'sveltekit';
         }
-
-        // More heuristics can be added here as needed.
 
         return 'default';
     }
 
     /**
-     * Check if the project is a Laravel project.
+     * Determine if the project is a Laravel project.
+     *
+     * Checks for the existence of "artisan" and key Laravel directories.
+     *
+     * @return bool True if the project appears to be Laravel.
      */
     private function isLaravelProject(): bool
     {
@@ -77,7 +82,11 @@ class ProfileGuesser
     }
 
     /**
-     * Check if the project is a SvelteKit project.
+     * Determine if the project is a SvelteKit project.
+     *
+     * Looks for a "package.json" containing a dependency or devDependency on "@sveltejs/kit".
+     *
+     * @return bool True if the project appears to be SvelteKit.
      */
     private function isSvelteKitProject(): bool
     {
@@ -93,28 +102,30 @@ class ProfileGuesser
     }
 
     /**
-     * Retrieve the absolute path to a profile file based on a given profile name.
+     * Retrieve the absolute path to the profile file for a given profile name.
      *
-     * This method supports both the legacy file naming (.ctree/ruleset.json or .ctree/profile.json)
-     * and also checks the "profiles" folder at the project root.
+     * Searches first in the ".ctree" directory (e.g. ".ctree/laravel.json")
+     * and then in the global "profiles" folder at the project root.
      *
-     * @param  string  $profileName  The profile name to retrieve.
-     * @return string|null The absolute path to the profile file, or null if not found.
+     * @param  string  $profileName  The profile name to look up.
+     * @return string The absolute path to the profile file.
+     *
+     * @throws RuntimeException if no profile file is found.
      */
-    public function getProfilePath(string $profileName): ?string
+    public function getProfilePath(string $profileName): string
     {
-        // First, check for a file in the .ctree directory (e.g., ".ctree/laravel.json").
+        // Look in the .ctree directory first.
         $profilePath = $this->projectPath.DIRECTORY_SEPARATOR.'.ctree'.DIRECTORY_SEPARATOR.$profileName.'.json';
         if (file_exists($profilePath)) {
             return realpath($profilePath);
         }
 
-        // Next, check the profiles folder at the project root.
+        // Fallback to the profiles directory at the project root.
         $profilePath = base_path('profiles').DIRECTORY_SEPARATOR.$profileName.'.json';
         if (file_exists($profilePath)) {
             return realpath($profilePath);
         }
 
-        return null;
+        throw new RuntimeException("Profile '{$profileName}' not found.");
     }
 }

@@ -18,6 +18,7 @@ use App\Services\AIFilenameGenerator;
 use App\Services\GitHubUrlHandler;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
+use Exception;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\Event;
 use LaravelZero\Framework\Commands\Command;
@@ -73,12 +74,18 @@ class CopyTreeCommand extends Command
             $projectPath = $handler->getFiles();
         }
 
-        // Load the profile configuration.
-        $profileGuesser = new ProfileGuesser($projectPath);
-        $profileName = $this->option('profile') === 'auto'
-            ? $profileGuesser->guess()
-            : $this->option('profile');
-        $profilePath = $profileGuesser->getProfilePath($profileName);
+        try {
+            // Load the profile configuration.
+            $profileGuesser = new ProfileGuesser($projectPath);
+            $profileName = $this->option('profile') === 'auto'
+                ? $profileGuesser->guess()
+                : $this->option('profile');
+            $profilePath = $profileGuesser->getProfilePath($profileName);
+        } catch (Exception $e) {
+            $this->error('Profile error: '.$e->getMessage());
+
+            return self::FAILURE;
+        }
 
         $profileLoader = new ProfileLoader;
         $profileLoader->load($profilePath, [
