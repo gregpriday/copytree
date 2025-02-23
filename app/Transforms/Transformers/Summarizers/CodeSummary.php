@@ -4,6 +4,7 @@ namespace App\Transforms\Transformers\Summarizers;
 
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
+use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
 use Gemini\Data\Content;
 use Gemini\Laravel\Facades\Gemini;
@@ -13,6 +14,8 @@ use Symfony\Component\Finder\SplFileInfo;
 
 class CodeSummary extends BaseTransformer implements FileTransformerInterface
 {
+    use SlowTransformerTrait;
+
     const MAX_CODE_LENGTH = 32000;
 
     /**

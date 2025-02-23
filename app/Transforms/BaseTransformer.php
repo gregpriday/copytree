@@ -31,6 +31,34 @@ abstract class BaseTransformer
     }
 
     /**
+     * Check if the transformation result for the given file is already cached.
+     *
+     * This computes the MD5 hash of the file (using its full path) and looks up
+     * the corresponding cache entry using a key derived from the calling class and file path.
+     *
+     * @param  SplFileInfo  $file  The file for which to check the cache.
+     * @return bool True if a valid cached result exists, false otherwise.
+     */
+    public function isCached(SplFileInfo $file): bool
+    {
+        $realPath = $file->getRealPath();
+
+        if (! $realPath || ! file_exists($realPath)) {
+            return false;
+        }
+
+        $currentMd5 = md5_file($realPath);
+        $cacheKey = 'transformer_result:'.md5(get_called_class().$realPath);
+
+        $cached = Cache::get($cacheKey);
+
+        return
+            $cached &&
+            isset($cached['md5'], $cached['result']) &&
+            $cached['md5'] === $currentMd5;
+    }
+
+    /**
      * Cache the result of an expensive transformation for a given file.
      *
      * This helper computes the MD5 hash of the file (using its full path),

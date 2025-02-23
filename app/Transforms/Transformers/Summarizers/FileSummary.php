@@ -4,6 +4,7 @@ namespace App\Transforms\Transformers\Summarizers;
 
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
+use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
 use Gemini\Data\Content;
 use Gemini\Data\GenerationConfig;
@@ -17,6 +18,8 @@ use Symfony\Component\Finder\SplFileInfo;
 
 class FileSummary extends BaseTransformer implements FileTransformerInterface
 {
+    use SlowTransformerTrait;
+
     /**
      * Transform the given file into a concise summary using Gemini.
      *

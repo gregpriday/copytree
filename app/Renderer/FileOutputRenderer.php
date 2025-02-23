@@ -77,6 +77,14 @@ class FileOutputRenderer
     }
 
     /**
+     * Count the number of files with pending transforms.
+     */
+    public function countPendingTransforms(array $files): int
+    {
+        return $this->transformer->countTransforms($files, true, false);
+    }
+
+    /**
      * Format a file size in bytes into a human-readable string.
      *
      * @param  int  $bytes  The size in bytes.

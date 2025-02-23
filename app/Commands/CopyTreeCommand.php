@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Events\TransformCompleteEvent;
 use App\Pipeline\FileLoader;
 use App\Pipeline\RulesetFilter;
 use App\Pipeline\Stages\AIFilterStage;
@@ -18,6 +19,7 @@ use App\Services\GitHubUrlHandler;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
 use Illuminate\Pipeline\Pipeline;
+use Illuminate\Support\Facades\Event;
 use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Process\Process;
 
@@ -57,7 +59,7 @@ class CopyTreeCommand extends Command
      */
     public function handle(): int
     {
-        // Display warning if this is not MacOS
+        // Display warning if this is not macOS
         if (PHP_OS_FAMILY !== 'Darwin') {
             $this->warn('This command is designed for macOS and may not work as expected on other operating systems.');
         }
@@ -151,9 +153,29 @@ class CopyTreeCommand extends Command
         if (! $this->option('only-tree')) {
             // Resolve the FileOutputRenderer so that its dependency (FileTransformer) is injected.
             $fileRenderer = app(FileOutputRenderer::class);
+            $transformCount = $fileRenderer->countPendingTransforms($finalFiles);
+
             $maxLines = (int) $this->option('max-lines');
             $maxCharacters = (int) $this->option('max-characters');
+
+            // Add a progress bar if there are heavy transforms pending.
+            if ($transformCount > 0) {
+                $progressBar = $this->output->createProgressBar($transformCount);
+                $progressBar->start();
+                Event::listen(TransformCompleteEvent::class, function ($event) use ($progressBar) {
+                    // Only update the progress bar for heavy transforms.
+                    if (method_exists($event->transformer, 'isHeavy') && $event->transformer->isHeavy()) {
+                        $progressBar->advance();
+                    }
+                });
+            }
+
             $fileOutput = $fileRenderer->render($finalFiles, $maxLines, $maxCharacters);
+
+            if (isset($progressBar)) {
+                $progressBar->finish();
+                $this->line(''); // Add a new line after the progress bar.
+            }
         }
 
         // Combine the outputs into the final XML.
