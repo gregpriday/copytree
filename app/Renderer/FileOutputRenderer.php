@@ -2,6 +2,7 @@
 
 namespace App\Renderer;
 
+use App\Services\ByteCounter;
 use App\Transforms\FileTransformer;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -52,6 +53,9 @@ class FileOutputRenderer
 
             // Get the transformed file content.
             $content = $this->transformer->transform($file);
+
+            // Count tokens in the content
+            ByteCounter::count($content);
 
             // If maxLines is set, limit the content preview by lines.
             if ($maxLines > 0) {

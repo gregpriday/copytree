@@ -15,6 +15,7 @@ use App\Profiles\ProfileLoader;
 use App\Renderer\FileOutputRenderer;
 use App\Renderer\TreeRenderer;
 use App\Services\AIFilenameGenerator;
+use App\Services\ByteCounter;
 use App\Services\GitHubUrlHandler;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
@@ -225,7 +226,7 @@ class CopyTreeCommand extends Command
         } else {
             // Copy the output directly to the clipboard.
             (new Clipboard)->copy($combinedOutput);
-            $this->info('Copied '.count($finalFiles).' files to clipboard.');
+            $this->info('Copied '.count($finalFiles).' files ['.ByteCounter::getFormattedTotal().'] to clipboard.');
         }
 
         return self::SUCCESS;

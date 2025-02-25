@@ -2,6 +2,7 @@
 
 namespace App\Renderer;
 
+use App\Services\ByteCounter;
 use Symfony\Component\Finder\SplFileInfo;
 
 class TreeRenderer
@@ -14,8 +15,10 @@ class TreeRenderer
     public function render(array $files): string
     {
         $tree = $this->buildTree($files);
+        $content = $this->renderTree($tree);
+        ByteCounter::count($content);
 
-        return $this->renderTree($tree);
+        return $content;
     }
 
     /**
