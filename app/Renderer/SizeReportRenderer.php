@@ -15,11 +15,9 @@ class SizeReportRenderer
     protected int $defaultLimit = 20;
 
     /**
-     * @param FileTransformer  $transformer  The file transformer instance.
+     * @param  FileTransformer  $transformer  The file transformer instance.
      */
-    public function __construct(protected FileTransformer $transformer)
-    {
-    }
+    public function __construct(protected FileTransformer $transformer) {}
 
     /**
      * Render a size report for the files, sorted by transformed output size.
@@ -30,6 +28,7 @@ class SizeReportRenderer
     {
         if (empty($files)) {
             $output->writeln('<comment>No files to analyze.</comment>');
+
             return;
         }
 
@@ -59,7 +58,7 @@ class SizeReportRenderer
         // Build report lines in an array
         $lines = [];
         $lines[] = '';
-        $lines[] = '<fg=green;options=bold>File Size Report - Total: ' . ByteCounter::formatBytes($totalAllFiles) . '</>';
+        $lines[] = '<fg=green;options=bold>File Size Report - Total: '.ByteCounter::formatBytes($totalAllFiles).'</>';
         $lines[] = '';
         $lines[] = sprintf(
             '<options=bold>%-60s %-10s %-8s</>',
@@ -77,7 +76,7 @@ class SizeReportRenderer
                 continue;
             }
 
-            $filename = strlen($file) > 55 ? '...' . substr($file, -52) : $file;
+            $filename = strlen($file) > 55 ? '...'.substr($file, -52) : $file;
             $sizeStr = ByteCounter::formatBytes($sizes['total_size']);
             $percentStr = $percentage >= 10 ?
                 sprintf('%d%%', round($percentage)) :
