@@ -13,10 +13,12 @@ use App\Pipeline\Stages\SortFilesStage;
 use App\Profiles\ProfileGuesser;
 use App\Profiles\ProfileLoader;
 use App\Renderer\FileOutputRenderer;
+use App\Renderer\SizeReportRenderer;
 use App\Renderer\TreeRenderer;
 use App\Services\AIFilenameGenerator;
 use App\Services\ByteCounter;
 use App\Services\GitHubUrlHandler;
+use App\Transforms\FileTransformer;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
 use Exception;
@@ -47,7 +49,8 @@ class CopyTreeCommand extends Command
         {--i|display : Display the output in the console.}
         {--S|stream : Stream output directly (useful for piping).}
         {--r|as-reference : Copy a reference to a temporary file instead of copying the content directly.}
-        {--no-cache : Do not use or keep cached GitHub repositories.}';
+        {--no-cache : Do not use or keep cached GitHub repositories.}
+        {--s|size-report : Display a report of files sorted by size after transformation.}';
 
     /**
      * The description of the command.
@@ -151,6 +154,17 @@ class CopyTreeCommand extends Command
         $finalFiles = $pipeline->then(function ($files) {
             return $files;
         });
+
+        // If the size-report option is selected, render the size report and exit
+        if ($this->option('size-report')) {
+            $maxLines = (int) $this->option('max-lines');
+            $maxCharacters = (int) $this->option('max-characters');
+
+            $sizeReportRenderer = app(SizeReportRenderer::class);
+            $sizeReportRenderer->render($finalFiles, $this->output, $maxLines, $maxCharacters);
+
+            return self::SUCCESS;
+        }
 
         // Render the tree view.
         $treeRenderer = new TreeRenderer;

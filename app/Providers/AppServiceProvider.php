@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Renderer\SizeReportRenderer;
 use App\Transforms\FileTransformer;
 use Illuminate\Support\ServiceProvider;
 
@@ -20,9 +21,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(FileTransformer::class, function ($app) {
+        $this->app->singleton(FileTransformer::class, function ($app) {
             return new FileTransformer(
                 config('profile.transforms', [])
+            );
+        });
+
+        $this->app->singleton(SizeReportRenderer::class, function ($app) {
+            return new SizeReportRenderer(
+                $app->make(FileTransformer::class)
             );
         });
     }
