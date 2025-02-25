@@ -46,34 +46,61 @@ class GitIgnoreManager
     }
 
     /**
-     * Scan for all .gitignore files under the base path and parse them.
+     * Scan for all .gitignore and .ctreeignore files under the base path and parse them.
      */
     protected function loadAllGitIgnoreFiles(): void
     {
         $finder = new Finder;
-        // Tell Finder not to ignore dot files so that ".gitignore" is found.
+        // Tell Finder not to ignore dot files so that ".gitignore" and ".ctreeignore" are found.
         $finder->files()
             ->in($this->basePath)
             ->ignoreDotFiles(false)
-            ->name('.gitignore')
+            ->name(['.gitignore', '.ctreeignore'])
             ->followLinks(false);
 
         foreach ($finder as $file) {
             /** @var SplFileInfo $file */
-            // Get the directory where this .gitignore file lives, relative to basePath.
+            // Get the directory where this ignore file lives, relative to basePath.
             $ignoreDir = str_replace($this->basePath, '', $file->getPath());
             $ignoreDir = ltrim($ignoreDir, DIRECTORY_SEPARATOR); // May be empty for top-level.
             $rules = $this->loadGitIgnoreFile($file->getRealPath());
+
+            // Prioritize .ctreeignore by adding it later in the array (last matching rule wins)
             $this->ignoreRules[] = [
                 'dir' => $ignoreDir,
                 'rules' => $rules,
+                // Store the type of ignore file for debugging or future functionality
+                'type' => $file->getFilename() === '.ctreeignore' ? 'ctreeignore' : 'gitignore',
+            ];
+        }
+
+        // Check for a root-level .ctreeignore specifically (in case the finder missed it)
+        $ctreeIgnorePath = $this->basePath.DIRECTORY_SEPARATOR.'.ctreeignore';
+        if (file_exists($ctreeIgnorePath) && is_file($ctreeIgnorePath)) {
+            $rules = $this->loadGitIgnoreFile($ctreeIgnorePath);
+
+            // Add root-level .ctreeignore at the end so it takes precedence
+            $this->ignoreRules[] = [
+                'dir' => '',
+                'rules' => $rules,
+                'type' => 'ctreeignore',
             ];
         }
 
         // Sort the ignore rules by directory depth (shallower directories first).
+        // For same depth, place .ctreeignore after .gitignore so it takes precedence.
         usort($this->ignoreRules, function ($a, $b) {
             $depthA = $a['dir'] === '' ? 0 : substr_count($a['dir'], DIRECTORY_SEPARATOR) + 1;
             $depthB = $b['dir'] === '' ? 0 : substr_count($b['dir'], DIRECTORY_SEPARATOR) + 1;
+
+            if ($depthA === $depthB) {
+                // If in the same directory, prioritize .ctreeignore over .gitignore
+                if ($a['type'] === 'ctreeignore' && $b['type'] === 'gitignore') {
+                    return 1; // Put .ctreeignore after .gitignore
+                } elseif ($a['type'] === 'gitignore' && $b['type'] === 'ctreeignore') {
+                    return -1; // Put .gitignore before .ctreeignore
+                }
+            }
 
             return $depthA <=> $depthB;
         });
