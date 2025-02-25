@@ -5,8 +5,8 @@
             ["extension", "oneOf", ["php", "blade.php"]]
         ],
         [
-            ["folder", "startsWith", "resources/sql"],
-            ["extension", "=", "sql"]
+            ["folder", "=", ""],
+            ["extension", "oneOf", ["js", "json"]]
         ]
     ],
     "globalExcludeRules": [
