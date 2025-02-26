@@ -1,0 +1,30 @@
+# .ctree.yaml example with better transform handling
+include:
+    - "app/**/*.php"
+    - "resources/**/*.blade.php"
+    - "README.md"
+
+exclude:
+    - "**/*.log"
+    - "storage/**"
+
+always:
+    - "config/app.php"
+    - ".env.example"
+
+# Transforms are optional, and only required when necessary
+transforms:
+    - files: "**/*.md"
+      type: Summarizers.FileSummary
+
+    - files: "docs/architecture/*.md"
+      type: Markdown.MarkdownLinkStripper
+
+    - files: "/foo/bar/*.md"
+      type: Summarizers.FileSummary
+
+external:
+    - source: "https://github.com/user/repo/tree/master"
+      destination: "ext/"
+      include:
+          - "**/*.md"

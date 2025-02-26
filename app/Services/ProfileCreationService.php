@@ -5,10 +5,10 @@ namespace App\Services;
 use Gemini\Data\Content;
 use Gemini\Data\GenerationConfig;
 use Gemini\Data\Schema;
-use Gemini\Enums\ResponseMimeType;
 use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\Artisan;
 use RuntimeException;
+use Symfony\Component\Yaml\Yaml;
 
 class ProfileCreationService
 {
@@ -26,7 +26,7 @@ class ProfileCreationService
      * Constructor.
      *
      * @param  string  $projectPath  The full path to the project.
-     * @param  int  $charLimit  Maximum characters per file preview (default 1500).
+     * @param  int  $charLimit  Maximum characters per file preview (default: 1500).
      */
     public function __construct(string $projectPath, int $charLimit = 1500)
     {
@@ -65,7 +65,7 @@ class ProfileCreationService
      * @param  array  $goals  An array of goal strings. These will be converted into a bullet list.
      * @return array The generated profile data.
      *
-     * @throws RuntimeException if profile generation or saving fails.
+     * @throws RuntimeException if profile generation or parsing fails.
      */
     public function createProfile(array $goals): array
     {
@@ -81,8 +81,8 @@ class ProfileCreationService
         // Get all the available transforms.
         $transformsOutput = $this->getCopytreeOutput(base_path('app/Transforms/Transformers'));
 
-        // Get the schema
-        $schema = file_get_contents(base_path('docs/profiles/profile-schema.json'));
+        // Load the example YAML instead of a JSON schema.
+        $example = file_get_contents(base_path('docs/profiles/example.yaml'));
 
         if (empty($projectOutput)) {
             throw new RuntimeException('Failed to get output from the copytree command.');
@@ -96,16 +96,16 @@ class ProfileCreationService
         // 2. Load the system prompt from system.txt.
         $systemPrompt = file_get_contents(base_path('prompts/profile-creation/system.txt'));
         $systemPrompt = str_replace(
-            ['{{profilesDocsOutput}}', '{{transformsOutput}}', '{{schema}}'],
-            [$profilesDocsOutput, $transformsOutput, $schema],
+            ['{{profilesDocsOutput}}', '{{transformsOutput}}', '{{example}}'],
+            [$profilesDocsOutput, $transformsOutput, $example],
             $systemPrompt
         );
 
         // 3. Load the prompt template from prompt.txt and substitute placeholders.
         $prompt = file_get_contents(base_path('prompts/profile-creation/prompt.txt'));
         $prompt = str_replace(
-            ['{{projectOutput}}', '{{goals}}'],
-            [$projectOutput, $goalsBulletList],
+            ['{{projectOutput}}', '{{goals}}', '{{example}}'],
+            [$projectOutput, $goalsBulletList, $example],
             $prompt
         );
 
@@ -119,25 +119,33 @@ class ProfileCreationService
             throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
         }
 
-        $profileJson = $response->text() ?? '';
-        if (empty($profileJson)) {
-            throw new RuntimeException('Received empty profile JSON from Gemini.');
+        $yamlResponse = $response->text() ?? '';
+        if (empty($yamlResponse)) {
+            throw new RuntimeException('Received empty profile YAML from Gemini.');
         }
 
-        // Validate JSON.
-        $profileData = json_decode($profileJson, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Generated profile JSON is invalid: '.json_last_error_msg());
+        // Unwrap YAML code fences if present.
+        $yamlContent = preg_replace('/^```(?:yaml)?\s*(.*?)\s*```$/s', '$1', $yamlResponse);
+
+        // Parse the YAML to an array.
+        try {
+            $profileData = Yaml::parse($yamlContent);
+        } catch (\Exception $e) {
+            throw new RuntimeException('Failed to parse generated profile YAML: '.$e->getMessage());
+        }
+
+        if (! is_array($profileData)) {
+            throw new RuntimeException('Generated profile YAML did not parse into an array.');
         }
 
         return $profileData;
     }
 
     /**
-     * Saves the generated profile JSON into the project’s .ctree directory.
+     * Saves the generated profile into the project’s .ctree directory in YAML format.
      *
      * @param  string  $profileName  The name (without extension) for the profile.
-     * @param  array  $profileData  The generated JSON content.
+     * @param  array  $profileData  The generated profile data.
      * @return string The full path to the saved profile.
      *
      * @throws RuntimeException if the profile cannot be saved.
@@ -151,9 +159,10 @@ class ProfileCreationService
                 throw new RuntimeException("Failed to create profile directory: {$profileDir}");
             }
         }
-        $profilePath = $profileDir.DIRECTORY_SEPARATOR.$profileName.'.json';
-        $profileJson = json_encode($profileData, JSON_PRETTY_PRINT);
-        if (file_put_contents($profilePath, $profileJson) === false) {
+        // Save the profile with a .yaml extension.
+        $profilePath = $profileDir.DIRECTORY_SEPARATOR.$profileName.'.yaml';
+        $profileYaml = Yaml::dump($profileData, 4, 2);
+        if (file_put_contents($profilePath, $profileYaml) === false) {
             throw new RuntimeException("Failed to save the profile to {$profilePath}");
         }
 
@@ -163,7 +172,7 @@ class ProfileCreationService
     private function getGenerationConfig(): GenerationConfig
     {
         return new GenerationConfig(
-            responseMimeType: ResponseMimeType::APPLICATION_JSON
+            maxOutputTokens: 4096,
         );
     }
 }

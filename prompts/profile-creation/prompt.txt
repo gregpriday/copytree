@@ -1,12 +1,12 @@
-You are an expert in generating CopyTree profiles. Using the information provided below, your task is to create a valid CopyTree profile as a JSON object. The profile must adhere strictly to the CopyTree profile schema and include, at a minimum, the following keys:
+You are an expert in generating CopyTree profiles. Using the information provided below, your task is to create a valid CopyTree profile as a YAML document. The profile must adhere strictly to the CopyTree profile schema and include, at a minimum, the following keys:
 
-• "rules" – an array of rule sets specifying file inclusion criteria.
-• "globalExcludeRules" – an array of rule sets that always exclude files if any rule matches.
-• "always" – an object with "include" and "exclude" arrays to explicitly include or exclude specific files.
+• **include** – a sequence of gitignore-style glob patterns specifying which files should be included. Can be specific files or directories.
+• **exclude** – a sequence of gitignore-style glob patterns specifying which files should be excluded. Can be specific files or directories.
 
 Optionally, you may also include:
-• "external" – an array of external source definitions.
-• "transforms" – an array of transformation configurations.
+• **always** – a sequence of relative file paths that must always be included. This is useful for including hidden files files that would otherwise be excluded. Generally not needed for simple profiles.
+• **external** – a sequence of external source definitions. Only include this key if explicitly requested.
+• **transforms** – a sequence of transformation configurations. Only include this key if explicitly requested.
 
 Below is the project output generated from scanning the project:
 {{projectOutput}}
@@ -14,29 +14,12 @@ Below is the project output generated from scanning the project:
 And here are the goals for this profile:
 {{goals}}
 
-Based on the project output and the stated goals, generate a JSON object that defines a CopyTree profile. The JSON must be valid, include only the required keys (and the optional ones if appropriate), and contain no additional text or commentary. Your response should consist solely of the JSON object.
+Based on the project output and the stated goals, generate a YAML document that defines a CopyTree profile. The YAML must be valid, include only the required keys (and the optional ones if appropriate), and contain no additional text or commentary. Your response should consist solely of the YAML document.
 
 Example Output Format:
-```json
-{
-  "rules": [
-    [ ... ],
-    [ ... ],
-    [ ... ]
-   ],
-  "globalExcludeRules": [ ... ],
-  "always": {
-    "include": [ ... ],
-    "exclude": [ ... ]
-  },
-  "external": [ ... ],
-  "transforms": [
-    {
-      "rules": [ ... ],
-      "transforms": [ "Markdown.MarkdownStripper" ]
-    }
-  ]
-}
+
+```yaml
+{{example}}
 ```
 
-Take note of the schema, and what's actually required. Try to create a rule that will match the user's goals, while allowing for future expension of the project.
+Take note of the schema, and what's actually required. Try to create rules that match the user's goals, while allowing for future expansion of the project.

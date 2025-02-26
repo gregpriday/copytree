@@ -62,10 +62,14 @@ class FileLoader
      * whose relative path indicates they are located in a base path directory that should be excluded.
      * Finally, it applies Git ignore rules by using the GitIgnoreManager.
      *
+     * Additionally, any filenames provided in the $always parameter will be added even if they
+     * would have otherwise been excluded.
+     *
      * @param  int|null  $maxDepth  Optional maximum depth (if null, no depth limit is applied).
+     * @param  array  $always  An array of relative filenames that must always be included.
      * @return SplFileInfo[] An array of SplFileInfo objects.
      */
-    public function loadFiles(?int $maxDepth = null): array
+    public function loadFiles(?int $maxDepth = null, array $always = []): array
     {
         $finder = new Finder;
         $finder->files()->in($this->basePath);
@@ -107,6 +111,21 @@ class FileLoader
         $gitIgnoreManager = new GitIgnoreManager($this->basePath);
         $files = array_filter($files, fn (SplFileInfo $file) => $gitIgnoreManager->accept($file));
 
-        return array_values($files);
+        // Add "always" files: these files are included regardless of exclusion.
+        foreach ($always as $filename) {
+            $fullPath = $this->basePath.DIRECTORY_SEPARATOR.$filename;
+            if (file_exists($fullPath)) {
+                $alwaysFile = new SplFileInfo($fullPath, dirname($filename), $filename);
+                $files[] = $alwaysFile;
+            }
+        }
+
+        // Remove duplicate files based on relative path.
+        $uniqueFiles = [];
+        foreach ($files as $file) {
+            $uniqueFiles[$file->getRelativePathname()] = $file;
+        }
+
+        return array_values($uniqueFiles);
     }
 }

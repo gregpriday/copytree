@@ -105,9 +105,9 @@ class CopyTreeCommand extends Command
         // Load the initial file set.
         $depth = (int) $this->option('depth');
         $fileLoader = new FileLoader($projectPath);
-        $files = $fileLoader->loadFiles($depth);
+        $files = $fileLoader->loadFiles($depth, config('profile.always', []));
 
-        // Build the pipeline using Laravel's Pipeline.
+        // Build the pipeline using a Laravel Pipeline.
         $pipeline = app(Pipeline::class)->send($files);
 
         // Add Git filtering if requested.
@@ -133,13 +133,12 @@ class CopyTreeCommand extends Command
         }
 
         // Apply ruleset filtering if configured.
-        if (config('profile.rules')) {
+        if (config('profile.include') || config('profile.exclude')) {
             $pipeline->pipe([
                 new RulesetFilterStage(
                     new RulesetFilter(
-                        config('profile.rules'),
-                        config('profile.global_exclude_rules', []),
-                        config('profile.always', [])
+                        config('profile.include'),
+                        config('profile.exclude'),
                     )
                 ),
             ]);

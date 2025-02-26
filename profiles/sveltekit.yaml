@@ -1,0 +1,17 @@
+include:
+    - "src/**/*.{js,ts,svelte}"
+    - "static/**/*.{js,ts,svelte}"
+    - "tests/**/*.{js,ts,svelte}"
+    - "docs/**/*.md"
+
+exclude:
+    - "node_modules/**"
+    - "build/**"
+    - ".svelte-kit/**"
+    - "*.log"
+
+always:
+    - "package.json"
+    - "README.md"
+    - "tailwind.config.js"
+    - "svelte.config.js"

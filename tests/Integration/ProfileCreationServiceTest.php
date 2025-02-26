@@ -1,7 +1,5 @@
 <?php
 
-// tests/Integration/ProfileCreationServiceTest.php
-
 namespace Tests\Integration;
 
 use App\Services\ProfileCreationService;
@@ -25,25 +23,25 @@ class ProfileCreationServiceTest extends TestCase
 
         // Define the goals for the profile.
         $goals = [
-            'Filter for only files that make Gemini AI API calls.',
+            'Give me only files that are involved in creating the filtering pipeline.',
         ];
 
         // Call createProfile to generate the profile data.
         $profileData = $service->createProfile($goals);
 
-        // Assert that the profile data is a non-empty array/object.
+        // Assert that the profile data is a non-empty array.
         $this->assertNotEmpty($profileData, 'The generated profile data should not be empty.');
+        $this->assertIsArray($profileData, 'The generated profile data should be an array.');
 
-        // Assert that required keys exist.
-        $this->assertArrayHasKey('rules', $profileData, 'Profile data must contain a "rules" key.');
-        $this->assertArrayHasKey('globalExcludeRules', $profileData, 'Profile data must contain a "globalExcludeRules" key.');
-        $this->assertArrayHasKey('always', $profileData, 'Profile data must contain an "always" key.');
+        // Assert that required keys exist in the new YAML format.
+        $this->assertArrayHasKey('include', $profileData, 'Profile data must contain an "include" key.');
+        $this->assertArrayHasKey('exclude', $profileData, 'Profile data must contain an "exclude" key.');
 
-        // Optionally, check that "rules" and "globalExcludeRules" are arrays.
-        $this->assertIsArray($profileData['rules'], 'The "rules" key should be an array.');
-        $this->assertIsArray($profileData['globalExcludeRules'], 'The "globalExcludeRules" key should be an array.');
+        // Optionally, check that "include", "exclude", and "always" are arrays.
+        $this->assertIsArray($profileData['include'], 'The "include" key should be an array.');
+        $this->assertIsArray($profileData['exclude'], 'The "exclude" key should be an array.');
 
         // Output the generated profile data to STDOUT for manual inspection.
-        fwrite(STDOUT, "Generated Profile Data:\n".json_encode($profileData, JSON_PRETTY_PRINT)."\n");
+        fwrite(STDOUT, "Generated Profile Data (YAML parsed as JSON):\n".json_encode($profileData, JSON_PRETTY_PRINT)."\n");
     }
 }
