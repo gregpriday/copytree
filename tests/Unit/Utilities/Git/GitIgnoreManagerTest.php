@@ -499,4 +499,56 @@ EOD;
 
         $this->assertTrue($manager->accept(new SplFileInfo($this->createTestItem('  ignore_me.txt  '), '', '  ignore_me.txt  ')), 'Should not ignore files that are just spaces and the filename.');
     }
+
+    public function test_match_pattern_with_path_wildcard()
+    {
+        $manager = new GitIgnoreManager($this->tempDir);
+        $match = $manager->matchPattern('src/foo/**/*.js', 'src/foo/app/file.js');
+
+        $this->assertTrue($match, 'Pattern "src/foo/**/*.js" should match "src/foo/app/file.js".');
+    }
+
+    /**
+     * Test that the expandBraces() method correctly expands a nested brace expression.
+     */
+    public function test_expand_braces_returns_expected_patterns(): void
+    {
+        $manager = new GitIgnoreManager($this->tempDir);
+        $reflection = new \ReflectionMethod($manager, 'expandBraces');
+        $reflection->setAccessible(true);
+
+        $pattern = 'src/{foo,bar}/**/*.{js,jsx}';
+        $expected = [
+            'src/foo/**/*.js',
+            'src/foo/**/*.jsx',
+            'src/bar/**/*.js',
+            'src/bar/**/*.jsx',
+        ];
+        $result = $reflection->invoke($manager, $pattern);
+        sort($expected);
+        sort($result);
+        $this->assertEquals($expected, $result, 'Brace expansion did not return the expected patterns.');
+    }
+
+    public function test_nested_brace_expansion_pattern(): void
+    {
+        // Create a .gitignore with a nested brace expansion rule.
+        $gitignoreContent = <<<'EOD'
+src/{foo,bar}/**/*.{js,jsx}
+EOD;
+        $this->createTestItem('.gitignore', $gitignoreContent);
+
+        // Create a file that should match the expanded pattern.
+        $fileFooJs = $this->createTestItem('src/foo/app/file.js', 'content');
+        // Create a file that should not match.
+        $fileBazJs = $this->createTestItem('src/baz/app/file.js', 'content');
+
+        $manager = new GitIgnoreManager($this->tempDir);
+
+        $fooJsInfo = new SplFileInfo($fileFooJs, 'src/foo/app', 'src/foo/app/file.js');
+        $bazJsInfo = new SplFileInfo($fileBazJs, 'src/baz/app', 'src/baz/app/file.js');
+
+        $this->assertFalse($manager->accept($fooJsInfo), 'src/foo/app/file.js should be ignored due to nested brace expansion.');
+        $this->assertTrue($manager->accept($bazJsInfo), 'src/baz/app/file.js should be accepted as it does not match the nested brace pattern.');
+    }
 }
