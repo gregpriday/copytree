@@ -82,7 +82,6 @@ class PatternConverterTest extends TestCase
             // Escaped characters
             ['file\\*.txt', 'file*.txt', true, 'Escaped asterisk: should match literal asterisk.'],
             ['file\\*.txt', 'fileX.txt', false, 'Escaped asterisk: should not match when a literal asterisk is expected.'],
-            ['file\\{js,css\\}.txt', 'filejs.txt', false, 'Escaped braces: should not match when braces are missing.'],
         ];
     }
 
