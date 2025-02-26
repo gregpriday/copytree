@@ -150,7 +150,7 @@ class GitIgnoreManager
      */
     protected function expandBraces(string $pattern): array
     {
-        if (strpos($pattern, '{') === false) {
+        if (! str_contains($pattern, '{')) {
             return [$pattern];
         }
         $posOpen = strpos($pattern, '{');
@@ -187,7 +187,7 @@ class GitIgnoreManager
                 $relative = $relativePath;
             } else {
                 $prefix = str_replace('\\', '/', $ignoreDir).'/';
-                if (strpos($relativePath, $prefix) !== 0) {
+                if (! str_starts_with($relativePath, $prefix)) {
                     continue;
                 }
                 $relative = substr($relativePath, strlen($prefix));
@@ -306,13 +306,6 @@ class GitIgnoreManager
             } elseif ($pattern === '**/d/e/**') {
                 // This should match any path containing d/e/
                 if (preg_match('#^(.*/)?d/e/(.*)$#', $subject)) {
-                    return true;
-                }
-            } elseif (preg_match('#^src/(foo|bar)/.*/\*\.\{js,jsx\}$#', $pattern)) {
-                // Handle brace expansion pattern in the test
-                $basePath = substr($pattern, 0, strrpos($pattern, '/*'));
-                $extensions = ['js', 'jsx'];
-                if (preg_match('#^'.$basePath.'/(.*/)?[^/]+\.('.implode('|', $extensions).')$#', $subject)) {
                     return true;
                 }
             } else {
