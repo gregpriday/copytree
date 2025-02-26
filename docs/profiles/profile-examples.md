@@ -6,9 +6,7 @@ This profile includes JavaScript, CSS, and HTML files from the source directory 
 
 ```yaml
 include:
-  - "src/**/*.js"
-  - "src/**/*.css"
-  - "src/**/*.html"
+  - "src/**/*.{js,css,html}"
   - "README.md"
 
 exclude:

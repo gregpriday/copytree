@@ -18,7 +18,6 @@ use App\Renderer\TreeRenderer;
 use App\Services\AIFilenameGenerator;
 use App\Services\ByteCounter;
 use App\Services\GitHubUrlHandler;
-use App\Transforms\FileTransformer;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
 use Exception;

@@ -28,8 +28,12 @@ class GitIgnoreManager
     protected bool $caseSensitive;
 
     /**
-     * Create a new GitIgnoreManager.
-     *
+     * The pattern converter instance.
+     */
+    protected PatternConverter $patternConverter;
+
+    /**
+     * Create a new GitIgnoreManager instance.
      *
      * @throws RuntimeException if the base path is not a valid directory.
      */
@@ -40,6 +44,7 @@ class GitIgnoreManager
         }
         $this->basePath = realpath($basePath);
         $this->caseSensitive = $caseSensitive;
+        $this->patternConverter = new PatternConverter();
         $this->loadAllGitIgnoreFiles();
     }
 
@@ -78,16 +83,10 @@ class GitIgnoreManager
             ];
         }
 
+        // Order ignore rules by directory depth.
         usort($this->ignoreRules, function ($a, $b) {
             $depthA = $a['dir'] === '' ? 0 : substr_count($a['dir'], DIRECTORY_SEPARATOR) + 1;
             $depthB = $b['dir'] === '' ? 0 : substr_count($b['dir'], DIRECTORY_SEPARATOR) + 1;
-            if ($depthA === $depthB) {
-                if ($a['type'] === 'ctreeignore' && $b['type'] === 'gitignore') {
-                    return 1;
-                } elseif ($a['type'] === 'gitignore' && $b['type'] === 'ctreeignore') {
-                    return -1;
-                }
-            }
 
             return $depthA <=> $depthB;
         });
@@ -97,7 +96,7 @@ class GitIgnoreManager
      * Load and parse a single ignore file.
      *
      * Each rule is returned as an associative array with keys:
-     * 'pattern', 'isNegation', 'directoryOnly', 'hasLeadingSlash', and 'containsSlash'.
+     * 'pattern', 'isNegation', 'directoryOnly', and 'hasLeadingSlash'.
      */
     protected function loadGitIgnoreFile(string $filePath): array
     {
@@ -124,7 +123,8 @@ class GitIgnoreManager
                 $hasLeadingSlash = true;
                 $line = ltrim($line, '/');
             }
-            $expandedPatterns = $this->expandBraces($line);
+            // Use PatternConverter's expandBraces method
+            $expandedPatterns = $this->patternConverter->expandBraces($line);
             foreach ($expandedPatterns as $pattern) {
                 $pattern = trim($pattern);
                 if ($pattern === '') {
@@ -144,39 +144,10 @@ class GitIgnoreManager
     }
 
     /**
-     * Recursively expand brace expressions in a pattern.
-     *
-     * Returns an array of expanded patterns.
-     */
-    protected function expandBraces(string $pattern): array
-    {
-        if (! str_contains($pattern, '{')) {
-            return [$pattern];
-        }
-        $posOpen = strpos($pattern, '{');
-        $posClose = strpos($pattern, '}', $posOpen);
-        if ($posClose === false) {
-            return [$pattern];
-        }
-        $prefix = substr($pattern, 0, $posOpen);
-        $suffix = substr($pattern, $posClose + 1);
-        $inside = substr($pattern, $posOpen + 1, $posClose - $posOpen - 1);
-        $options = explode(',', $inside);
-        $results = [];
-        foreach ($options as $option) {
-            $expanded = $prefix.$option.$suffix;
-            $results = array_merge($results, $this->expandBraces($expanded));
-        }
-
-        return $results;
-    }
-
-    /**
      * Determine whether a given file should be accepted based on all ignore rules.
      */
     public function accept(SplFileInfo $file): bool
     {
-        // Compute the relative path from the project base.
         $fullPath = $file->getRealPath();
         $relativePath = ltrim(str_replace('\\', '/', substr($fullPath, strlen($this->basePath))), '/');
 
@@ -254,143 +225,40 @@ class GitIgnoreManager
     /**
      * Check if a given pattern matches the subject.
      *
-     * @param  string  $pattern  The pattern from the ignore rule.
+     * @param  string  $pattern  The ignore pattern.
      * @param  string  $subject  The string to match against.
+     * @return bool Whether the subject matches the pattern.
      */
     public function matchPattern(string $pattern, string $subject): bool
     {
-        // Special case for the tests with "foo/ba?.txt" pattern
-        if ($pattern === 'foo/ba?.txt' && $subject === 'foo/baz.txt') {
-            return false;
-        }
-
-        // Handle patterns with double asterisks
-        if (strpos($pattern, '**') !== false) {
-            // Special case handling for common patterns in the tests
-            if ($pattern === 'src/foo/**/*.js') {
-                // This pattern should match both:
-                // 1. src/foo/file.js
-                // 2. src/foo/any/path/file.js
-                if (preg_match('#^src/foo/(.*/)?[^/]+\.js$#', $subject)) {
-                    return true;
-                }
-            } elseif ($pattern === 'src/**/temp.txt') {
-                // This pattern should match both:
-                // 1. src/temp.txt
-                // 2. src/any/path/temp.txt
-                if (preg_match('#^src/(.*/)?temp\.txt$#', $subject)) {
-                    return true;
-                }
-            } elseif ($pattern === '**/temp.txt') {
-                // This pattern should match:
-                // 1. temp.txt (at root)
-                // 2. any/path/temp.txt (at any depth)
-                if (preg_match('#^(.*/)?temp\.txt$#', $subject)) {
-                    return true;
-                }
-            } elseif ($pattern === 'src/**') {
-                // This should match all files under src/
-                if (preg_match('#^src/(.*)$#', $subject)) {
-                    return true;
-                }
-            } elseif ($pattern === 'src/**/*.log') {
-                // This should match all .log files under src/
-                if (preg_match('#^src/(.*/)?[^/]+\.log$#', $subject)) {
-                    return true;
-                }
-            } elseif ($pattern === 'a/**/b/c') {
-                // This should match a/b/c, a/x/b/c, a/x/y/b/c, etc.
-                if (preg_match('#^a/(.*/)?b/c$#', $subject)) {
-                    return true;
-                }
-            } elseif ($pattern === '**/d/e/**') {
-                // This should match any path containing d/e/
-                if (preg_match('#^(.*/)?d/e/(.*)$#', $subject)) {
-                    return true;
-                }
-            } else {
-                // Use our fallback for other double asterisk patterns
-                $regex = $this->convertPatternToRegex($pattern);
-                try {
-                    if (preg_match($regex, $subject)) {
-                        return true;
-                    }
-                } catch (ErrorException $e) {
-                    return false;
-                }
-            }
-
-            return false;
-        }
-
-        // Handle literal matching (no wildcards)
+        // If no wildcards exist, use a literal comparison.
         if (! str_contains($pattern, '*') && ! str_contains($pattern, '?')) {
             return $this->caseSensitive
                 ? ($pattern === $subject)
                 : (strcasecmp($pattern, $subject) === 0);
         }
 
-        // Standard globbing for patterns with single asterisks or question marks
-        $flags = FNM_PATHNAME;
-        if (! $this->caseSensitive) {
-            $flags |= FNM_CASEFOLD;
+        // Convert the pattern to a regex and match using PatternConverter
+        $regex = $this->patternConverter->patternToRegex($pattern);
+        try {
+            return preg_match($regex, $subject) === 1;
+        } catch (ErrorException $e) {
+            return false;
         }
-
-        return fnmatch($pattern, $subject, $flags);
     }
 
     /**
      * Convert an ignore pattern into a regular expression.
-     * This method handles the conversion for all pattern types, with special attention
-     * to the double-asterisk pattern.
+     *
+     * This method is now a wrapper around PatternConverter::convertPatternToRegex.
      *
      * @param  string  $pattern  The ignore pattern.
      * @return string The corresponding regular expression.
+     *
+     * @deprecated Use PatternConverter::convertPatternToRegex directly
      */
     public function convertPatternToRegex(string $pattern): string
     {
-        // Special check for the common pattern "dir/**/*.ext"
-        if (preg_match('#^(.*?)\*\*/\*\.([^/]+)$#', $pattern, $matches)) {
-            $prefix = $matches[1];  // e.g., "src/foo/"
-            $ext = $matches[2];     // e.g., "js"
-
-            // Create a regex that matches both direct files and files in subdirectories
-            return '#^'.preg_quote($prefix, '#').'(?:.*/)?[^/]*\.'.preg_quote($ext, '#').'$#';
-        }
-
-        // Handle other patterns with double asterisks
-        if (strpos($pattern, '**') !== false) {
-            $parts = explode('**', $pattern);
-            $result = '';
-
-            for ($i = 0; $i < count($parts); $i++) {
-                // Escape special regex characters in each part
-                $part = preg_quote($parts[$i], '#');
-
-                // Convert single asterisks to non-slash wildcards
-                $part = str_replace('\*', '[^/]*', $part);
-
-                // Convert question marks to single character wildcards
-                $part = str_replace('\?', '.', $part);
-
-                // Add the part to the result
-                $result .= $part;
-
-                // If this is not the last part, add the double-asterisk replacement
-                if ($i < count($parts) - 1) {
-                    // This is a general "**" pattern
-                    $result .= '(?:.*?)';
-                }
-            }
-
-            return '#^'.$result.'$#';
-        }
-
-        // For patterns without double asterisks
-        $result = preg_quote($pattern, '#');
-        $result = str_replace('\*', '[^/]*', $result);
-        $result = str_replace('\?', '.', $result);
-
-        return '#^'.$result.'$#';
+        return $this->patternConverter->convertPatternToRegex($pattern);
     }
 }

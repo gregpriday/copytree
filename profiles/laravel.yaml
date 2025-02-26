@@ -5,8 +5,7 @@ include:
     - "database/factories/**/*.php"
     - "routes/**/*.php"
     - "tests/**/*.php"
-    - "*.js"
-    - "*.json"
+    - "*.{js,json,md}"
 
 exclude: []
 

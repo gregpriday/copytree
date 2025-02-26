@@ -3,6 +3,7 @@ include:
     - "static/**/*.{js,ts,svelte}"
     - "tests/**/*.{js,ts,svelte}"
     - "docs/**/*.md"
+    - "*.{json,js,ts,md}"
 
 exclude:
     - "node_modules/**"
