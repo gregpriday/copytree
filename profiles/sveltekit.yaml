@@ -10,9 +10,3 @@ exclude:
     - "build/**"
     - ".svelte-kit/**"
     - "*.log"
-
-always:
-    - "package.json"
-    - "README.md"
-    - "tailwind.config.js"
-    - "svelte.config.js"

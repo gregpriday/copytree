@@ -1,8 +1,7 @@
 include:
     - "app/**/*.php"
     - "app/**/*.blade.php"
-    - "database/migrations/**/*.php"
-    - "database/factories/**/*.php"
+    - "database/{migrations,factories}/**/*.php"
     - "routes/**/*.php"
     - "tests/**/*.php"
     - "*.{js,json,md}"
