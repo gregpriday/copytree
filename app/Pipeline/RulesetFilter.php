@@ -2,8 +2,8 @@
 
 namespace App\Pipeline;
 
-use App\Utilities\Git\GitIgnoreManager;
-use App\Utilities\Git\PatternConverter;
+use GregPriday\GitIgnore\GitIgnoreManager;
+use GregPriday\GitIgnore\PatternConverter;
 use Symfony\Component\Finder\SplFileInfo;
 
 class RulesetFilter

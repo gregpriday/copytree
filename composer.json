@@ -25,6 +25,7 @@
         "czproject/git-php": "^4.3",
         "google-gemini-php/client": "1.0.7-beta@beta",
         "google-gemini-php/laravel": "^1.0",
+        "gregpriday/gitignore-php": "^1.0",
         "illuminate/support": "^11.15",
         "laravel-zero/framework": "^11",
         "league/commonmark": "^2.6",

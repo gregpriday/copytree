@@ -8,11 +8,47 @@ Advanced profiles often need to select files based on more than one condition. Y
 
 ```yaml
 include:
-  - "src/**/components/**/*.vue"
-  - "src/**/widgets/**/*.vue"
+    - "src/**/components/**/*.vue"
+    - "src/**/widgets/**/*.vue"
 ```
 
 Here, files are selected from two distinct sub‑directories using different glob patterns.
+
+## Brace Expansion for Concise Patterns
+
+The new GitIgnore PHP library provides powerful brace expansion, allowing you to write more compact patterns. Instead of defining multiple similar patterns, you can use braces to generate variations:
+
+```yaml
+include:
+  - "*.{js,css,html}"           # Matches *.js, *.css, and *.html
+  - "src/{controllers,models}/" # Matches src/controllers/ and src/models/
+```
+
+This even supports multiple expansions for complex combinations:
+
+```yaml
+include:
+  - "{src,lib}/{test,unit,integration}/**/*.{js,php,ts}"
+```
+
+This single pattern expands to cover multiple combinations like `src/test/**/*.js`, `lib/unit/**/*.php`, etc.
+
+## Advanced Pattern Matching with Character Classes
+
+You can use character classes in square brackets for more precise matching:
+
+```yaml
+include:
+  - "[a-z]est.php"  # Matches test.php, best.php, etc.
+  - "file[0-9].log" # Matches file0.log through file9.log
+```
+
+Negated character classes are also supported:
+
+```yaml
+exclude:
+  - "[!a-z]*.txt"   # Excludes files not starting with lowercase letter
+```
 
 ## Overriding Exclusions with the Always List
 
@@ -36,9 +72,19 @@ external:
       - "**/*.md"
 ```
 
+## Advanced Directory Handling
+
+Control directory inclusion/exclusion with specialized patterns:
+
+```yaml
+exclude:
+  - "build/"      # Trailing slash matches directories only, including contents
+  - "/node_modules" # Leading slash matches only at root level
+```
+
 ## Advanced Transformations
 
-Advanced profiles also support transforming file contents based on sophisticated selection criteria. You can chain multiple transformers for files that meet very specific conditions. For example, you might want to first summarize Markdown files and then further strip out links:
+Advanced profiles also support transforming file contents based on sophisticated selection criteria. You can chain multiple transformers for files that meet very specific conditions:
 
 ```yaml
 transforms:
@@ -78,6 +124,18 @@ external:
 
 This profile demonstrates how to enforce critical file inclusion while allowing external documentation to be merged in under a separate destination.
 
+## Using .ctreeignore Files
+
+With the new GitIgnore PHP integration, CopyTree now supports `.ctreeignore` files alongside `.gitignore`. These work exactly like `.gitignore` files but are specifically for CopyTree, allowing you to have different ignore rules for copying versus committing to git:
+
+```
+# Example .ctreeignore file
+# Ignore files that should be copied but not committed
+*-temp.md
+.env.local
+*.generated.js
+```
+
 ## Best Practices for Advanced File Selection
 
 - **Test Your Globs:**  
@@ -86,12 +144,18 @@ This profile demonstrates how to enforce critical file inclusion while allowing 
 - **Keep It Maintainable:**  
   Document complex patterns and transformations within your YAML file comments or in separate documentation to ensure long‑term maintainability.
 
+- **Use Brace Expansion:**  
+  Prefer brace expansion over multiple separate patterns when rules follow a clear pattern. This improves readability and maintenance.
+
 - **Use the Always Section Wisely:**  
-  Reserve the `always` list for files that are mission‑critical. Avoid overusing it, as the goal is to let your include/exclude rules define most of the behavior. Always just makes sure that files that would be otherwise excluded are still included.
+  Reserve the `always` list for files that are mission‑critical. Avoid overusing it, as the goal is to let your include/exclude rules define most of the behavior.
 
 - **Leverage External Filters:**  
   If external sources contain a lot of noise, use their own include rules to narrow down the selection before merging.
 
+- **Consider Using .ctreeignore:**  
+  For project-specific ignore rules that shouldn't be committed to git, create a `.ctreeignore` file rather than modifying `.gitignore`.
+
 ## Conclusion
 
-Advanced YAML profiles in Copytree empower you to precisely control file selection in large or complex projects. By combining compound glob patterns, dedicated always‑include lists, refined external source filters, and sequential file transformations, you can build robust profiles that meet even the most specific project needs. Use these techniques to ensure that your Copytree output is both comprehensive and tailored to your workflow.
+Advanced YAML profiles in Copytree empower you to precisely control file selection in large or complex projects. By combining compound glob patterns, brace expansion, character classes, dedicated always‑include lists, refined external source filters, and sequential file transformations, you can build robust profiles that meet even the most specific project needs. Use these techniques to ensure that your Copytree output is both comprehensive and tailored to your workflow.

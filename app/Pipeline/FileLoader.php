@@ -2,7 +2,7 @@
 
 namespace App\Pipeline;
 
-use App\Utilities\Git\GitIgnoreManager;
+use GregPriday\GitIgnore\GitIgnoreManager;
 use InvalidArgumentException;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
@@ -108,7 +108,8 @@ class FileLoader
         });
 
         // Filter out files that are ignored by Git ignore rules.
-        $gitIgnoreManager = new GitIgnoreManager($this->basePath);
+        // Using the new GitIgnore PHP library with .ctreeignore support
+        $gitIgnoreManager = new GitIgnoreManager($this->basePath, true, ['.ctreeignore']);
         $files = array_filter($files, fn (SplFileInfo $file) => $gitIgnoreManager->accept($file));
 
         // Add "always" files: these files are included regardless of exclusion.
