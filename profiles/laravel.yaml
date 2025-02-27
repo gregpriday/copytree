@@ -4,6 +4,7 @@ include:
     - "database/{migrations,factories}/**/*.php"
     - "routes/**/*.php"
     - "tests/**/*.php"
+    - "docs/**/*.md"
     - "*.{js,json,md}"
 
 exclude: []
