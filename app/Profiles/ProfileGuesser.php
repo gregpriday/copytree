@@ -16,18 +16,14 @@ class ProfileGuesser
 {
     private string $projectPath;
 
-    private array $availableProfiles;
-
     /**
      * Constructor.
      *
      * @param  string  $projectPath  The base path of the project.
-     * @param  array  $availableProfiles  Optional list of available profile names.
      */
-    public function __construct(string $projectPath, array $availableProfiles = [])
+    public function __construct(string $projectPath)
     {
         $this->projectPath = rtrim($projectPath, DIRECTORY_SEPARATOR);
-        $this->availableProfiles = $availableProfiles;
     }
 
     /**
@@ -40,7 +36,7 @@ class ProfileGuesser
      * 4. If the project structure indicates SvelteKit, returns "sveltekit".
      * 5. Otherwise, returns "default".
      *
-     * @return string The guessed profile name.
+     * @return ?string The guessed profile name.
      */
     public function guess(): ?string
     {

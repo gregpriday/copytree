@@ -54,7 +54,7 @@ class RulesetFilter
     ) {
         $this->include = $include;
         $this->exclude = $exclude;
-        $this->patternConverter = $patternConverter ?? new PatternConverter();
+        $this->patternConverter = $patternConverter ?? new PatternConverter;
         $this->compilePatterns();
     }
 
