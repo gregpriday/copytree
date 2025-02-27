@@ -1,5 +1,5 @@
 include:
-    - "src/**/*.{js,ts,svelte}"
+    - "src/**/*.{js,ts,svelte,css,html,json}"
     - "static/**/*.{js,ts,svelte}"
     - "tests/**/*.{js,ts,svelte}"
     - "docs/**/*.md"
