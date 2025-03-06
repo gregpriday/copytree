@@ -6,6 +6,7 @@ use App\Events\TransformCompleteEvent;
 use App\Pipeline\FileLoader;
 use App\Pipeline\RulesetFilter;
 use App\Pipeline\Stages\AIFilterStage;
+use App\Pipeline\Stages\AlwaysIncludeStage;
 use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\GitFilterStage;
 use App\Pipeline\Stages\RulesetFilterStage;
@@ -104,7 +105,7 @@ class CopyTreeCommand extends Command
         // Load the initial file set.
         $depth = (int) $this->option('depth');
         $fileLoader = new FileLoader($projectPath);
-        $files = $fileLoader->loadFiles($depth, config('profile.always', []));
+        $files = $fileLoader->loadFiles($depth);
 
         // Build the pipeline using a Laravel Pipeline.
         $pipeline = app(Pipeline::class)->send($files);
@@ -136,8 +137,9 @@ class CopyTreeCommand extends Command
             $pipeline->pipe([
                 new RulesetFilterStage(
                     new RulesetFilter(
-                        config('profile.include'),
-                        config('profile.exclude'),
+                        config('profile.include', []),
+                        config('profile.exclude', []),
+                        config('profile.always', [])
                     )
                 ),
             ]);
@@ -147,6 +149,14 @@ class CopyTreeCommand extends Command
         $pipeline->pipe([
             new SortFilesStage,
         ]);
+        
+        // Add AlwaysIncludeStage as the last stage to ensure "always" files are included
+        // regardless of earlier exclusions.
+        if (!empty(config('profile.always', []))) {
+            $pipeline->pipe([
+                new AlwaysIncludeStage($projectPath, config('profile.always', [])),
+            ]);
+        }
 
         // Execute the pipeline.
         $finalFiles = $pipeline->then(function ($files) {

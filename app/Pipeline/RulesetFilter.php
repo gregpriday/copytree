@@ -17,6 +17,11 @@ class RulesetFilter
      * @var array Raw glob patterns that, if matched, force exclusion.
      */
     protected array $exclude = [];
+    
+    /**
+     * @var array File paths that should always be included, regardless of other rules.
+     */
+    protected array $always = [];
 
     /**
      * @var array Compiled regular expressions for include patterns.
@@ -43,17 +48,20 @@ class RulesetFilter
      *
      * @param  array  $include  Array of glob patterns to include.
      * @param  array  $exclude  Array of glob patterns to exclude.
+     * @param  array  $always   Array of file paths that should always be included.
      * @param  GitIgnoreManager|null  $gitIgnoreManager  Optional GitIgnoreManager for extra filtering.
      * @param  PatternConverter|null  $patternConverter  Optional PatternConverter for pattern conversion.
      */
     public function __construct(
         array $include = [],
         array $exclude = [],
+        array $always = [],
         ?GitIgnoreManager $gitIgnoreManager = null,
         ?PatternConverter $patternConverter = null
     ) {
         $this->include = $include;
         $this->exclude = $exclude;
+        $this->always = $always;
         $this->patternConverter = $patternConverter ?? new PatternConverter;
         $this->compilePatterns();
     }
@@ -74,7 +82,10 @@ class RulesetFilter
     /**
      * Determine whether a given file should be accepted.
      *
-     * The file is rejected if:
+     * The file is accepted if:
+     *   1. Its relative path is in the "always" array.
+     *
+     * Otherwise, the file is rejected if:
      *   1. The GitIgnoreManager rejects it.
      *   2. It matches any compiled exclude pattern.
      *
@@ -85,6 +96,11 @@ class RulesetFilter
     {
         // Normalize the file's relative path to use forward slashes.
         $relativePath = str_replace('\\', '/', $file->getRelativePathname());
+        
+        // Always include files specified in the "always" array
+        if (in_array($relativePath, $this->always, true)) {
+            return true;
+        }
 
         // Reject if any exclude regex matches.
         foreach ($this->excludeRegex as $regex) {
