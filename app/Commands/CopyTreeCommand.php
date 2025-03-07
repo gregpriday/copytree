@@ -8,6 +8,7 @@ use App\Pipeline\RulesetFilter;
 use App\Pipeline\Stages\AIFilterStage;
 use App\Pipeline\Stages\AlwaysIncludeStage;
 use App\Pipeline\Stages\ComposerStage;
+use App\Pipeline\Stages\DeduplicateFilesStage;
 use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\GitFilterStage;
 use App\Pipeline\Stages\NPMStage;
@@ -160,6 +161,11 @@ class CopyTreeCommand extends Command
                 new NPMStage($projectPath),
             ]);
         }
+
+        // Add DeduplicateFilesStage to remove duplicate files based on content
+        $pipeline->pipe([
+            new DeduplicateFilesStage,
+        ]);
 
         // Always add a sorting stage.
         $pipeline->pipe([
