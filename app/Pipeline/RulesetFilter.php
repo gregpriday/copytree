@@ -17,7 +17,7 @@ class RulesetFilter
      * @var array Raw glob patterns that, if matched, force exclusion.
      */
     protected array $exclude = [];
-    
+
     /**
      * @var array File paths that should always be included, regardless of other rules.
      */
@@ -48,7 +48,7 @@ class RulesetFilter
      *
      * @param  array  $include  Array of glob patterns to include.
      * @param  array  $exclude  Array of glob patterns to exclude.
-     * @param  array  $always   Array of file paths that should always be included.
+     * @param  array  $always  Array of file paths that should always be included.
      * @param  GitIgnoreManager|null  $gitIgnoreManager  Optional GitIgnoreManager for extra filtering.
      * @param  PatternConverter|null  $patternConverter  Optional PatternConverter for pattern conversion.
      */
@@ -96,7 +96,7 @@ class RulesetFilter
     {
         // Normalize the file's relative path to use forward slashes.
         $relativePath = str_replace('\\', '/', $file->getRelativePathname());
-        
+
         // Always include files specified in the "always" array
         if (in_array($relativePath, $this->always, true)) {
             return true;

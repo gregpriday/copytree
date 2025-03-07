@@ -7,6 +7,7 @@ use App\Pipeline\FileLoader;
 use App\Pipeline\RulesetFilter;
 use App\Pipeline\Stages\AIFilterStage;
 use App\Pipeline\Stages\AlwaysIncludeStage;
+use App\Pipeline\Stages\ComposerStage;
 use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\GitFilterStage;
 use App\Pipeline\Stages\RulesetFilterStage;
@@ -145,14 +146,22 @@ class CopyTreeCommand extends Command
             ]);
         }
 
+        // Check for composer.json and add ComposerStage if it exists
+        $composerJsonPath = $projectPath.DIRECTORY_SEPARATOR.'composer.json';
+        if (file_exists($composerJsonPath)) {
+            $pipeline->pipe([
+                new ComposerStage($projectPath),
+            ]);
+        }
+
         // Always add a sorting stage.
         $pipeline->pipe([
             new SortFilesStage,
         ]);
-        
+
         // Add AlwaysIncludeStage as the last stage to ensure "always" files are included
         // regardless of earlier exclusions.
-        if (!empty(config('profile.always', []))) {
+        if (! empty(config('profile.always', []))) {
             $pipeline->pipe([
                 new AlwaysIncludeStage($projectPath, config('profile.always', [])),
             ]);
