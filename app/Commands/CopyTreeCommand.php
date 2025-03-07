@@ -10,6 +10,7 @@ use App\Pipeline\Stages\AlwaysIncludeStage;
 use App\Pipeline\Stages\ComposerStage;
 use App\Pipeline\Stages\ExternalSourceStage;
 use App\Pipeline\Stages\GitFilterStage;
+use App\Pipeline\Stages\NPMStage;
 use App\Pipeline\Stages\RulesetFilterStage;
 use App\Pipeline\Stages\SortFilesStage;
 use App\Profiles\ProfileGuesser;
@@ -147,10 +148,16 @@ class CopyTreeCommand extends Command
         }
 
         // Check for composer.json and add ComposerStage if it exists
-        $composerJsonPath = $projectPath.DIRECTORY_SEPARATOR.'composer.json';
-        if (file_exists($composerJsonPath)) {
+        if (file_exists($projectPath.DIRECTORY_SEPARATOR.'composer.json')) {
             $pipeline->pipe([
                 new ComposerStage($projectPath),
+            ]);
+        }
+
+        // Check for package.json and add NPMStage if it exists
+        if (file_exists($projectPath.DIRECTORY_SEPARATOR.'package.json')) {
+            $pipeline->pipe([
+                new NPMStage($projectPath),
             ]);
         }
 
