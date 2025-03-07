@@ -8,7 +8,7 @@ use Symfony\Component\Finder\SplFileInfo;
 /**
  * Pipeline stage to ensure files specified in the "always" list are included
  * in the final output, regardless of previous filtering stages.
- * 
+ *
  * This stage should be placed at the end of the pipeline to ensure these files
  * are always included, even if they were excluded by earlier stages or not found
  * in the initial FileLoader scan.
@@ -61,14 +61,14 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
         foreach ($this->alwaysInclude as $alwaysFile) {
             // Normalize the path
             $normalizedPath = str_replace('\\', '/', $alwaysFile);
-            
+
             // Skip if the file is already included
             if (isset($existingFiles[$normalizedPath])) {
                 continue;
             }
-            
+
             // Check if the file exists
-            $fullPath = $this->basePath . DIRECTORY_SEPARATOR . $alwaysFile;
+            $fullPath = $this->basePath.DIRECTORY_SEPARATOR.$alwaysFile;
             if (file_exists($fullPath) && is_file($fullPath)) {
                 // Create a new SplFileInfo and add it to the files array
                 $dirname = dirname($alwaysFile);
@@ -84,4 +84,4 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
 
         return $next($files);
     }
-} 
+}
