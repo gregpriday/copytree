@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Services\ExpertSelectorService;
 use App\Services\ProjectQuestionService;
 use Illuminate\Support\Facades\Artisan;
 use LaravelZero\Framework\Commands\Command;
@@ -21,7 +22,8 @@ class ProjectQuestionCommand extends Command
         {--f|filter=* : Filter files using glob patterns.}
         {--a|ai-filter=* : Filter files using AI based on a natural language description.}
         {--m|modified : Only include files that have been modified since the last commit.}
-        {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}';
+        {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
+        {--e|expert=auto : The expert to use for answering the question (use "auto" for automatic selection).}';
 
     /**
      * The description of the command.
@@ -33,10 +35,18 @@ class ProjectQuestionCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(ProjectQuestionService $questionService): int
+    public function handle(ProjectQuestionService $questionService, ExpertSelectorService $expertSelectorService): int
     {
         $path = $this->argument('path') ?: getcwd();
         $question = $this->argument('question');
+        $expert = $this->option('expert');
+
+        // Show available experts if requested with special flag
+        if ($question === '--show-experts') {
+            $this->showExperts($questionService);
+
+            return self::SUCCESS;
+        }
 
         // Show a spinner while generating the copytree
         $this->output->write('<info>Analyzing project structure...</info> ');
@@ -64,12 +74,17 @@ class ProjectQuestionCommand extends Command
         Artisan::call('copy', $options);
         $copytree = Artisan::output();
 
-        $this->output->write('<info>Thinking about your question...</info> ');
+        // Determine the expert to use
+        if ($expert === 'auto') {
+            $expert = $expertSelectorService->selectExpert($question);
+        }
+
+        $this->output->write("<info>Thinking about your question (using expert: {$expert})...</info> ");
         $this->output->newLine();
 
         try {
-            // Get the response from the question service
-            $response = $questionService->askQuestion($copytree, $question);
+            // Get the response from the question service with the specified or selected expert
+            $response = $questionService->askQuestion($copytree, $question, $expert);
 
             // Output the response
             $this->line($response);
@@ -80,5 +95,25 @@ class ProjectQuestionCommand extends Command
 
             return self::FAILURE;
         }
+    }
+
+    /**
+     * Display a list of available experts.
+     */
+    protected function showExperts(ProjectQuestionService $questionService): void
+    {
+        $experts = $questionService->getAvailableExperts();
+
+        $this->info('Available experts:');
+        foreach ($experts as $expertName => $description) {
+            $this->line('- <comment>'.$expertName.'</comment>'.($expertName === 'default' ? ' (default)' : ''));
+            $this->line('  '.$description);
+        }
+
+        $this->info("You can also use '--expert=auto' to automatically select the best expert based on your question and project.");
+        $this->newLine();
+        $this->line('Usage examples:');
+        $this->line('- <comment>copytree ask "Your question here" --expert=expert_name</comment> (replace expert_name with one of the above)');
+        $this->line('- <comment>copytree ask "Your question here" --expert=auto</comment> (for automatic selection)');
     }
 }

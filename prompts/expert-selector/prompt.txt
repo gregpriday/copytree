@@ -1,0 +1,6 @@
+QUESTION: {{question}}
+
+AVAILABLE EXPERTS:
+{{experts}}
+
+Based on the question above, select the most appropriate expert from the available experts list.
