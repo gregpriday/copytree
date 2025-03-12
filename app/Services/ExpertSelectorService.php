@@ -46,8 +46,6 @@ class ExpertSelectorService
      * Select the best expert for a given question.
      *
      * @param  string  $question  The user's question about the project
-     * @param  array  $availableExperts  Associative array of expert names and descriptions
-     * @param  string  $defaultExpert  The default expert to use if selection fails
      * @return string The name of the selected expert
      */
     public function selectExpert(string $question): string
@@ -57,7 +55,10 @@ class ExpertSelectorService
         // Prepare input for the AI
         $prompt = $this->buildPrompt($question, $this->availableExperts);
 
-        // Configure the generation parameters
+        // Get the list of expert names for the schema enum
+        $expertNames = array_keys($this->availableExperts);
+
+        // Configure the generation parameters with an enum-constrained schema
         $generationConfig = new GenerationConfig(
             maxOutputTokens: 512,
             temperature: 0.2,
@@ -67,7 +68,10 @@ class ExpertSelectorService
             responseSchema: new Schema(
                 type: DataType::OBJECT,
                 properties: [
-                    'expert' => new Schema(type: DataType::STRING),
+                    'expert' => new Schema(
+                        type: DataType::STRING,
+                        enum: $expertNames
+                    ),
                 ]
             )
         );
