@@ -2,6 +2,7 @@
 
 namespace App\Commands;
 
+use App\Events\DuplicateFileFoundEvent;
 use App\Events\TransformCompleteEvent;
 use App\Pipeline\FileLoader;
 use App\Pipeline\RulesetFilter;
@@ -109,6 +110,12 @@ class CopyTreeCommand extends Command
         $depth = (int) $this->option('depth');
         $fileLoader = new FileLoader($projectPath);
         $files = $fileLoader->loadFiles($depth);
+
+        // Track duplicate files for verbose output
+        $duplicates = [];
+        Event::listen(DuplicateFileFoundEvent::class, function ($event) use (&$duplicates) {
+            $duplicates[$event->file->getRelativePathname()] = true;
+        });
 
         // Build the pipeline using a Laravel Pipeline.
         $pipeline = app(Pipeline::class)->send($files);
@@ -271,6 +278,14 @@ class CopyTreeCommand extends Command
             // Copy the output directly to the clipboard.
             (new Clipboard)->copy($combinedOutput);
             $this->info('Copied '.count($finalFiles).' files ['.ByteCounter::getFormattedTotal().'] to clipboard.');
+        }
+
+        // If in verbose mode, display information about duplicate files
+        if ($this->output->isVerbose() && !empty($duplicates)) {
+            $this->info("\nDuplicate files removed:");
+            foreach (array_keys($duplicates) as $duplicate) {
+                $this->line("  - {$duplicate}");
+            }
         }
 
         return self::SUCCESS;

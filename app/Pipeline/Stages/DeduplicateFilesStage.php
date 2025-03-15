@@ -2,6 +2,7 @@
 
 namespace App\Pipeline\Stages;
 
+use App\Events\DuplicateFileFoundEvent;
 use App\Pipeline\FilePipelineStageInterface;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -31,6 +32,9 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
                 continue;
             }
 
+            // We've found a duplicate, fire an event with the duplicate file
+            event(new DuplicateFileFoundEvent($file));
+
             // We've found a duplicate, decide which one to keep
             // Strategy: prefer the file with the shorter path (usually closer to project root)
             $existingFile = $uniqueMap[$hash];
@@ -39,6 +43,8 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
 
             if (strlen($currentPath) < strlen($existingPath)) {
                 // The current file has a shorter path, so keep it instead
+                // Fire an event for the file we're replacing
+                event(new DuplicateFileFoundEvent($existingFile));
                 $uniqueMap[$hash] = $file;
             }
 
