@@ -4,6 +4,7 @@ namespace Tests\Unit\Renderer;
 
 use App\Renderer\FileOutputRenderer;
 use App\Transforms\FileTransformer;
+use CzProject\GitPhp\GitRepository;
 use Symfony\Component\Finder\SplFileInfo;
 use Tests\TestCase;
 
@@ -86,6 +87,189 @@ class FileOutputRendererTest extends TestCase
         $this->assertStringContainsString($expectedTruncatedContent, $output);
 
         // Clean up the temporary file.
+        unlink($tempFile);
+    }
+
+    /**
+     * Test that the modified time attribute is correctly included in the output.
+     */
+    public function test_render_includes_modified_time()
+    {
+        // Create a temporary file with known content.
+        $tempFile = tempnam(sys_get_temp_dir(), 'testfile');
+        $content = "line 1\nline 2\nline 3";
+        file_put_contents($tempFile, $content);
+        
+        // Set a specific modification time
+        $modificationTime = strtotime('2023-01-01 12:00:00');
+        touch($tempFile, $modificationTime);
+
+        // Create a partial mock for SplFileInfo.
+        $file = $this->getMockBuilder(SplFileInfo::class)
+            ->setConstructorArgs([$tempFile, '', 'testfile.txt'])
+            ->onlyMethods(['getRelativePathname'])
+            ->getMock();
+        $file->method('getRelativePathname')->willReturn('testfile.txt');
+
+        // Create a dummy transformer
+        $dummyTransformer = $this->getMockBuilder(FileTransformer::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['transform'])
+            ->getMock();
+        $dummyTransformer->method('transform')->willReturn('transformed content');
+
+        // Instantiate the FileOutputRenderer
+        $renderer = new FileOutputRenderer($dummyTransformer);
+
+        // Render the file
+        $output = $renderer->render([$file]);
+
+        // Assert that the output contains the expected modified time
+        $expectedModifiedTime = date('Y-m-d H:i:s', $modificationTime);
+        $this->assertStringContainsString('modified-time="' . $expectedModifiedTime . '"', $output);
+        
+        // Remove the temporary file.
+        unlink($tempFile);
+    }
+    
+    /**
+     * Test that the has-uncommitted-changes attribute is included when a Git repository is set.
+     */
+    public function test_render_includes_uncommitted_changes_when_git_repo_is_set()
+    {
+        // Create a temporary file with known content.
+        $tempFile = tempnam(sys_get_temp_dir(), 'testfile');
+        $content = "line 1\nline 2\nline 3";
+        file_put_contents($tempFile, $content);
+
+        // Create a partial mock for SplFileInfo.
+        $file = $this->getMockBuilder(SplFileInfo::class)
+            ->setConstructorArgs([$tempFile, '', 'testfile.txt'])
+            ->onlyMethods(['getRelativePathname'])
+            ->getMock();
+        $file->method('getRelativePathname')->willReturn('testfile.txt');
+
+        // Create a dummy transformer
+        $dummyTransformer = $this->getMockBuilder(FileTransformer::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['transform'])
+            ->getMock();
+        $dummyTransformer->method('transform')->willReturn('transformed content');
+        
+        // Create a mock RunnerResult to use with the GitRepository
+        $runnerResult = $this->getMockBuilder(\CzProject\GitPhp\RunnerResult::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getOutput'])
+            ->getMock();
+        $runnerResult->method('getOutput')->willReturn([' M testfile.txt']);
+        
+        // Create a mock for GitRepository that returns modified files
+        $gitRepo = $this->getMockBuilder(GitRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['run'])
+            ->getMock();
+        $gitRepo->method('run')->willReturn($runnerResult);
+
+        // Instantiate the FileOutputRenderer and set the Git repository
+        $renderer = new FileOutputRenderer($dummyTransformer);
+        $renderer->setGitRepository($gitRepo);
+
+        // Render the file
+        $output = $renderer->render([$file]);
+
+        // Assert that the output contains the uncommitted changes attribute set to true
+        $this->assertStringContainsString('has-uncommitted-changes="true"', $output);
+        
+        // Remove the temporary file.
+        unlink($tempFile);
+    }
+    
+    /**
+     * Test that the has-uncommitted-changes attribute is not included when no Git repository is set.
+     */
+    public function test_render_does_not_include_uncommitted_changes_when_no_git_repo()
+    {
+        // Create a temporary file with known content.
+        $tempFile = tempnam(sys_get_temp_dir(), 'testfile');
+        $content = "line 1\nline 2\nline 3";
+        file_put_contents($tempFile, $content);
+
+        // Create a partial mock for SplFileInfo.
+        $file = $this->getMockBuilder(SplFileInfo::class)
+            ->setConstructorArgs([$tempFile, '', 'testfile.txt'])
+            ->onlyMethods(['getRelativePathname'])
+            ->getMock();
+        $file->method('getRelativePathname')->willReturn('testfile.txt');
+
+        // Create a dummy transformer
+        $dummyTransformer = $this->getMockBuilder(FileTransformer::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['transform'])
+            ->getMock();
+        $dummyTransformer->method('transform')->willReturn('transformed content');
+
+        // Instantiate the FileOutputRenderer without setting a Git repository
+        $renderer = new FileOutputRenderer($dummyTransformer);
+
+        // Render the file
+        $output = $renderer->render([$file]);
+
+        // Assert that the output does not contain the uncommitted changes attribute
+        $this->assertStringNotContainsString('has-uncommitted-changes', $output);
+        
+        // Remove the temporary file.
+        unlink($tempFile);
+    }
+    
+    /**
+     * Test that the has-uncommitted-changes attribute is set to false for files without uncommitted changes.
+     */
+    public function test_render_shows_false_for_files_without_uncommitted_changes()
+    {
+        // Create a temporary file with known content.
+        $tempFile = tempnam(sys_get_temp_dir(), 'testfile');
+        $content = "line 1\nline 2\nline 3";
+        file_put_contents($tempFile, $content);
+
+        // Create a partial mock for SplFileInfo.
+        $file = $this->getMockBuilder(SplFileInfo::class)
+            ->setConstructorArgs([$tempFile, '', 'testfile.txt'])
+            ->onlyMethods(['getRelativePathname'])
+            ->getMock();
+        $file->method('getRelativePathname')->willReturn('testfile.txt');
+
+        // Create a dummy transformer
+        $dummyTransformer = $this->getMockBuilder(FileTransformer::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['transform'])
+            ->getMock();
+        $dummyTransformer->method('transform')->willReturn('transformed content');
+        
+        // Create a mock RunnerResult to use with the GitRepository
+        $runnerResult = $this->getMockBuilder(\CzProject\GitPhp\RunnerResult::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getOutput'])
+            ->getMock();
+        $runnerResult->method('getOutput')->willReturn(['?? other_file.txt']); // Only untracked files
+        
+        // Create a mock for GitRepository that reports no modified files
+        $gitRepo = $this->getMockBuilder(GitRepository::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['run'])
+            ->getMock();
+        $gitRepo->method('run')->willReturn($runnerResult);
+
+        // Instantiate the FileOutputRenderer and set the Git repository
+        $renderer = new FileOutputRenderer($dummyTransformer);
+        $renderer->setGitRepository($gitRepo);
+
+        // Render the file
+        $output = $renderer->render([$file]);
+
+        // Assert that the output contains the uncommitted changes attribute set to false
+        $this->assertStringContainsString('has-uncommitted-changes="false"', $output);
+        
+        // Remove the temporary file.
         unlink($tempFile);
     }
 }

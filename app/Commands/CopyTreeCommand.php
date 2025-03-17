@@ -25,6 +25,8 @@ use App\Services\ByteCounter;
 use App\Services\GitHubUrlHandler;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
+use CzProject\GitPhp\Git;
+use CzProject\GitPhp\GitException;
 use Exception;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\Event;
@@ -212,6 +214,16 @@ class CopyTreeCommand extends Command
         if (! $this->option('only-tree')) {
             // Resolve the FileOutputRenderer so that its dependency (FileTransformer) is injected.
             $fileRenderer = app(FileOutputRenderer::class);
+            
+            // Initialize Git repository if the project path is a Git repository
+            try {
+                $git = new Git();
+                $gitRepo = $git->open($projectPath);
+                $fileRenderer->setGitRepository($gitRepo);
+            } catch (GitException $e) {
+                // Not a Git repository or Git error, continue without Git information
+            }
+            
             $transformCount = $fileRenderer->countPendingTransforms($finalFiles);
 
             $maxLines = (int) $this->option('max-lines');
