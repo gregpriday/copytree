@@ -40,6 +40,7 @@ class Clipboard
         );
 
         $process = Process::fromShellCommandline($command);
+        $process->setWorkingDirectory(getcwd() ?: sys_get_temp_dir());
         $process->run();
 
         if (! $process->isSuccessful()) {
@@ -51,6 +52,7 @@ class Clipboard
     {
         $process = Process::fromShellCommandline('pbcopy');
         $process->setInput($this->contents);
+        $process->setWorkingDirectory(getcwd() ?: sys_get_temp_dir());
         $process->run();
 
         if (! $process->isSuccessful()) {

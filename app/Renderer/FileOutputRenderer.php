@@ -4,6 +4,7 @@ namespace App\Renderer;
 
 use App\Services\ByteCounter;
 use App\Transforms\FileTransformer;
+use App\Utilities\FileUtils;
 use CzProject\GitPhp\GitRepository;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -20,6 +21,12 @@ class FileOutputRenderer
      * Cached list of files with uncommitted changes.
      */
     private ?array $modifiedFiles = null;
+    
+    /**
+     * Maximum file size in bytes for which to count lines.
+     * Files larger than this will have "N/A" as line count.
+     */
+    private const MAX_SIZE_FOR_LINE_COUNT = 10 * 1024 * 1024; // 10MB threshold
 
     /**
      * Constructor.
@@ -69,6 +76,61 @@ class FileOutputRenderer
     }
 
     /**
+     * Check if a file is binary by reading a small initial chunk.
+     *
+     * @param SplFileInfo $file The file to check.
+     * @param int $checkBytes Number of bytes to read (default: 1024).
+     * @return bool True if the file appears binary, false otherwise.
+     */
+    private function isBinaryFile(SplFileInfo $file, int $checkBytes = 1024): bool
+    {
+        $handle = fopen($file->getRealPath(), 'rb');
+        if ($handle === false) {
+            return false; // Cannot open file; assume non-binary to proceed safely
+        }
+        $chunk = fread($handle, $checkBytes);
+        fclose($handle);
+        return strpos($chunk, "\0") !== false;
+    }
+
+    /**
+     * Determine if a file's content should be included or replaced with a placeholder.
+     *
+     * @param SplFileInfo $file The file to evaluate.
+     * @return bool True if content should be loaded, false if a placeholder should be used.
+     */
+    private function shouldIncludeContent(SplFileInfo $file): bool
+    {
+        // Check file size (1MB threshold)
+        $maxSize = 1024 * 1024; // 1MB
+        if ($file->getSize() > $maxSize) {
+            return false;
+        }
+
+        // Check if the file is binary
+        if ($this->isBinaryFile($file)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if a file has uncommitted changes in the Git repository.
+     * 
+     * @param  SplFileInfo  $file  The file to check.
+     * @return bool|null True if the file has uncommitted changes, false if not, or null if not in a Git repo.
+     */
+    private function hasUncommittedChanges(SplFileInfo $file): ?bool
+    {
+        if ($this->gitRepo === null) {
+            return null;
+        }
+        
+        return in_array($file->getRelativePathname(), $this->modifiedFiles, true);
+    }
+
+    /**
      * Render the file outputs.
      *
      * This method takes an array of SplFileInfo objects, applies the transformer
@@ -77,7 +139,7 @@ class FileOutputRenderer
      * - path: Relative path to the file
      * - mime-type: MIME type of the file
      * - size: Formatted file size
-     * - lines: Number of lines in the file
+     * - lines: Number of lines in the file (or 'N/A' for large or binary files)
      * - modified-time: Last modification time in 'YYYY-MM-DD HH:MM:SS' format
      * - has-uncommitted-changes: 'true' or 'false' if in a Git repo, omitted otherwise
      * 
@@ -95,8 +157,19 @@ class FileOutputRenderer
         foreach ($files as $file) {
             $relativePath = $file->getRelativePathname();
             $mimeType = mime_content_type($file->getRealPath());
-            $size = $this->formatFileSize($file->getSize());
-            $lines = count(file($file->getRealPath()));
+            $fileSize = $file->getSize();
+            $size = $this->formatFileSize($fileSize);
+            
+            // Get line count using memory-efficient method
+            // Skip line counting for large files or binary files
+            $isText = str_starts_with($mimeType, 'text/') || $mimeType === 'application/json';
+            
+            if ($isText && $fileSize <= self::MAX_SIZE_FOR_LINE_COUNT) {
+                $lineCount = FileUtils::countLinesEfficiently($file->getRealPath());
+                $lines = $lineCount >= 0 ? (string)$lineCount : 'N/A';
+            } else {
+                $lines = 'N/A';
+            }
             
             // Get the last modified time
             try {
@@ -110,14 +183,13 @@ class FileOutputRenderer
                 'path' => htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8'),
                 'mime-type' => htmlspecialchars($mimeType, ENT_QUOTES, 'UTF-8'),
                 'size' => htmlspecialchars($size, ENT_QUOTES, 'UTF-8'),
-                'lines' => $lines,
+                'lines' => htmlspecialchars($lines, ENT_QUOTES, 'UTF-8'),
                 'modified-time' => htmlspecialchars($modifiedTime, ENT_QUOTES, 'UTF-8'),
             ];
             
             // Add Git uncommitted changes indicator if in a Git repository
-            if ($this->gitRepo !== null) {
-                // Use pre-fetched list of modified files for better performance
-                $hasUncommittedChanges = in_array($relativePath, $this->modifiedFiles, true);
+            $hasUncommittedChanges = $this->hasUncommittedChanges($file);
+            if ($hasUncommittedChanges !== null) {
                 $attributes['has-uncommitted-changes'] = $hasUncommittedChanges ? 'true' : 'false';
             }
             
@@ -130,8 +202,8 @@ class FileOutputRenderer
             // Start file block
             $output[] = '<ct:file_contents' . $attributeString . '>';
 
-            // Get the transformed file content.
-            $content = $this->transformer->transform($file);
+            // Always apply transformer to get the content
+            $content = $this->getFileContent($file);
 
             // Count tokens in the content
             ByteCounter::count($content);
@@ -157,6 +229,17 @@ class FileOutputRenderer
         }
 
         return implode("\n", $output);
+    }
+
+    /**
+     * Get the content of a file by applying the transformer.
+     * 
+     * @param SplFileInfo $file The file to get content from
+     * @return string The transformed content
+     */
+    protected function getFileContent(SplFileInfo $file): string
+    {
+        return $this->transformer->transform($file);
     }
 
     /**

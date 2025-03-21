@@ -272,4 +272,132 @@ class FileOutputRendererTest extends TestCase
         // Remove the temporary file.
         unlink($tempFile);
     }
+
+    /**
+     * Test that binary files are replaced with a placeholder.
+     */
+    public function test_render_replaces_binary_files_with_placeholder()
+    {
+        // Create a temporary file with binary content (including null bytes)
+        $tempFile = tempnam(sys_get_temp_dir(), 'binary_test');
+        // Write binary content with null bytes
+        file_put_contents($tempFile, "text\0binary");
+
+        // Create a partial mock for SplFileInfo
+        $file = $this->getMockBuilder(SplFileInfo::class)
+            ->setConstructorArgs([$tempFile, '', 'binary.pth'])
+            ->onlyMethods(['getRelativePathname'])
+            ->getMock();
+        $file->method('getRelativePathname')->willReturn('binary.pth');
+
+        // Create a dummy transformer that should NOT be called for binary files
+        $dummyTransformer = $this->getMockBuilder(FileTransformer::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['transform'])
+            ->getMock();
+        
+        // The transform method should never be called for binary files
+        $dummyTransformer->expects($this->never())->method('transform');
+
+        // Instantiate the FileOutputRenderer
+        $renderer = new FileOutputRenderer($dummyTransformer);
+
+        // Render the file
+        $output = $renderer->render([$file]);
+
+        // Assert that the output contains the placeholder message
+        $this->assertStringContainsString('File content omitted due to size or binary content.', $output);
+        
+        // Clean up
+        unlink($tempFile);
+    }
+
+    /**
+     * Test that large files are replaced with a placeholder.
+     */
+    public function test_render_replaces_large_files_with_placeholder()
+    {
+        // Create a temporary file
+        $tempFile = tempnam(sys_get_temp_dir(), 'large_test');
+        
+        // Get a mock to avoid actually creating a huge file
+        $file = $this->getMockBuilder(SplFileInfo::class)
+            ->setConstructorArgs([$tempFile, '', 'large.txt'])
+            ->onlyMethods(['getRelativePathname', 'getSize', 'getRealPath'])
+            ->getMock();
+        
+        // Configure the mock to report a size larger than 1MB
+        $file->method('getRelativePathname')->willReturn('large.txt');
+        $file->method('getSize')->willReturn(1024 * 1024 + 1); // 1MB + 1 byte
+        $file->method('getRealPath')->willReturn($tempFile);
+
+        // Create a dummy transformer that should NOT be called for large files
+        $dummyTransformer = $this->getMockBuilder(FileTransformer::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['transform'])
+            ->getMock();
+        
+        // The transform method should never be called for large files
+        $dummyTransformer->expects($this->never())->method('transform');
+
+        // Instantiate the FileOutputRenderer
+        $renderer = new FileOutputRenderer($dummyTransformer);
+
+        // Render the file
+        $output = $renderer->render([$file]);
+
+        // Assert that the output contains the placeholder message
+        $this->assertStringContainsString('File content omitted due to size or binary content.', $output);
+        
+        // Clean up
+        unlink($tempFile);
+    }
+
+    /**
+     * Test that large files have line count set to N/A and content replaced with placeholder.
+     */
+    public function test_render_handles_large_files_efficiently()
+    {
+        // Create a temporary file larger than MAX_SIZE_FOR_LINE_COUNT
+        $tempFile = tempnam(sys_get_temp_dir(), 'large_file_test');
+        
+        // Generate a large content
+        // For test purposes, we'll mock a large file rather than actually creating one
+        $mockFileSize = 11 * 1024 * 1024; // 11MB (just over the 10MB threshold)
+        
+        // Create a partial mock for SplFileInfo
+        $file = $this->getMockBuilder(SplFileInfo::class)
+            ->setConstructorArgs([$tempFile, '', 'large_file.csv'])
+            ->onlyMethods(['getRelativePathname', 'getSize', 'getRealPath'])
+            ->getMock();
+        $file->method('getRelativePathname')->willReturn('large_file.csv');
+        $file->method('getSize')->willReturn($mockFileSize);
+        $file->method('getRealPath')->willReturn($tempFile);
+        
+        // Write a small amount of content to the temp file
+        file_put_contents($tempFile, "Sample content\n");
+        
+        // Create a dummy transformer
+        $dummyTransformer = $this->getMockBuilder(FileTransformer::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['transform'])
+            ->getMock();
+        // The transformer should not be called for large files
+        $dummyTransformer->expects($this->never())->method('transform');
+        
+        // Instantiate the renderer
+        $renderer = new FileOutputRenderer($dummyTransformer);
+        
+        // Render the file
+        $output = $renderer->render([$file]);
+        
+        // Assert that the line count is set to N/A for large files
+        $this->assertStringContainsString('lines="N/A"', $output);
+        
+        // Assert that content is replaced with placeholder
+        $this->assertStringContainsString('File content omitted due to size', $output);
+        
+        // Remove the temporary file
+        unlink($tempFile);
+    }
 }

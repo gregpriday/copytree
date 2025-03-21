@@ -9,12 +9,11 @@ use Symfony\Component\Finder\SplFileInfo;
 class DeduplicateFilesStage implements FilePipelineStageInterface
 {
     /**
-     * Process the array of files by removing duplicates based on file content.
-     * Only one copy of each unique file content will be kept.
+     * Process files through the deduplication stage.
      *
-     * @param  array  $files  An array of Symfony Finder SplFileInfo objects.
-     * @param  \Closure  $next  The next stage in the pipeline.
-     * @return array The deduplicated array of files.
+     * @param array $files Array of SplFileInfo objects to process.
+     * @param Closure $next The next stage in the pipeline.
+     * @return array The filtered array of unique files.
      */
     public function handle(array $files, \Closure $next): array
     {
@@ -22,13 +21,19 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
         $duplicatesRemoved = 0;
 
         foreach ($files as $file) {
+            // Skip content-based deduplication for large or binary files
+            if ($this->shouldSkipDeduplication($file)) {
+                // Large or binary files are always included without content checks
+                $uniqueMap[$file->getRelativePathname()] = $file;
+                continue;
+            }
+
             // Hash the file contents to identify duplicates
             $hash = md5_file($file->getRealPath());
 
             // If we haven't seen this file content yet, add it to our map
             if (! isset($uniqueMap[$hash])) {
                 $uniqueMap[$hash] = $file;
-
                 continue;
             }
 
@@ -51,11 +56,34 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
             $duplicatesRemoved++;
         }
 
-        if ($duplicatesRemoved > 0) {
-            // Report how many duplicates were removed (could use a logger here)
-            echo "Removed {$duplicatesRemoved} duplicate file(s).\n";
-        }
-
         return $next(array_values($uniqueMap));
+    }
+
+    /**
+     * Determine if a file should skip content-based deduplication.
+     *
+     * @param SplFileInfo $file The file to check.
+     * @return bool True if the file is large (>1MB) or binary, false otherwise.
+     */
+    private function shouldSkipDeduplication(SplFileInfo $file): bool
+    {
+        return $file->getSize() > 1024 * 1024 || $this->isBinaryFile($file);
+    }
+
+    /**
+     * Check if a file is binary by examining the first 8192 bytes for null bytes.
+     *
+     * @param SplFileInfo $file The file to inspect.
+     * @return bool True if binary, false otherwise.
+     */
+    private function isBinaryFile(SplFileInfo $file): bool
+    {
+        $handle = fopen($file->getRealPath(), 'r');
+        if ($handle === false) {
+            return false; // Cannot open file, treat as non-binary
+        }
+        $chunk = fread($handle, 8192);
+        fclose($handle);
+        return $chunk !== false && str_contains($chunk, "\0");
     }
 }

@@ -1,0 +1,9 @@
+name: Test Profile
+description: Test profile for brace expansion in transforms
+
+transforms:
+  - files: "data/{drop_data,price_data}.csv"
+    type: App\Transforms\Transformers\CSV\CSVFirstLinesTransformer
+
+include:
+  - "test/**/*" 

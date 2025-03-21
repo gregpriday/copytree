@@ -1,0 +1,9 @@
+name: Dot Test Profile
+description: Test profile for dot notation in transforms
+
+transforms:
+  - files: "data/{drop_data,price_data}.csv"
+    type: CSV.CSVFirstLinesTransformer
+
+include:
+  - "test/**/*" 
