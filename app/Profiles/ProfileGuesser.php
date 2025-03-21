@@ -30,8 +30,8 @@ class ProfileGuesser
      * Guess the appropriate profile name for the project.
      *
      * Checks in the following order:
-     * 1. If a dedicated profile file exists at ".ctree/profile.yaml" or ".ctree/profile.yml", returns "profile".
-     * 2. If a legacy ruleset file exists at ".ctree/ruleset.yaml" or ".ctree/ruleset.yml", returns "ruleset".
+     * 1. If a dedicated profile file exists at ".ctree/profile.yaml" or ".ctree/profile.yml" or ".ctree/profile.json", returns "profile".
+     * 2. If a legacy ruleset file exists at ".ctree/ruleset.yaml" or ".ctree/ruleset.yml" or ".ctree/ruleset.json", returns "ruleset".
      * 3. If the project structure indicates Laravel, returns "laravel".
      * 4. If the project structure indicates SvelteKit, returns "sveltekit".
      * 5. Otherwise, returns "default".
@@ -42,11 +42,15 @@ class ProfileGuesser
     {
         $ctreeDirectory = $this->projectPath.DIRECTORY_SEPARATOR.'.ctree';
 
-        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.yaml') || file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.yml')) {
+        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.yaml') || 
+            file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.yml') ||
+            file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.json')) {
             return 'profile';
         }
 
-        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.yaml') || file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.yml')) {
+        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.yaml') || 
+            file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.yml') ||
+            file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.json')) {
             return 'ruleset';
         }
 
@@ -58,7 +62,7 @@ class ProfileGuesser
             return 'sveltekit';
         }
 
-        return null;
+        return 'default';
     }
 
     /**
@@ -121,12 +125,23 @@ class ProfileGuesser
             }
         }
 
-        // Fallback to the profiles directory at the project root.
+        // Next look in the profiles directory at the project root.
         $profilesDir = base_path('profiles');
         foreach ($possibleExtensions as $ext) {
             $profilePath = $profilesDir.DIRECTORY_SEPARATOR.$profileName.'.'.$ext;
             if (file_exists($profilePath)) {
                 return realpath($profilePath);
+            }
+        }
+
+        // Finally, check for test profiles in the tests/Fixtures/profiles directory
+        if (in_array($profileName, ['test', 'dot-test'])) {
+            $testProfilesDir = base_path('tests/Fixtures/profiles');
+            foreach ($possibleExtensions as $ext) {
+                $profilePath = $testProfilesDir.DIRECTORY_SEPARATOR.$profileName.'.'.$ext;
+                if (file_exists($profilePath)) {
+                    return realpath($profilePath);
+                }
             }
         }
 

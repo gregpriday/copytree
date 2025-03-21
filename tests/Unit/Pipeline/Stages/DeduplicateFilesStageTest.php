@@ -225,11 +225,11 @@ class DeduplicateFilesStageTest extends TestCase
     public function test_csv_files_for_transformer_are_handled_efficiently()
     {
         // Create CSV file paths that would match CSVFirstLinesTransformer
-        $dropDataPath = 'data/drop_data.csv';
-        $priceDataPath = 'data/price_data.csv';
+        $dropDataPath = 'tests/Fixtures/data/drop_data.csv';
+        $priceDataPath = 'tests/Fixtures/data/price_data.csv';
         
         // Create directory structure
-        mkdir($this->tempDir.'/data', 0777, true);
+        mkdir($this->tempDir.'/tests/Fixtures/data', 0777, true);
         
         // Touch the files to create them
         touch($this->tempDir.'/'.$dropDataPath);
@@ -237,7 +237,7 @@ class DeduplicateFilesStageTest extends TestCase
         
         // Create mock SplFileInfo objects for large CSV files
         $dropDataFile = $this->getMockBuilder(SplFileInfo::class)
-            ->setConstructorArgs([$this->tempDir.'/'.$dropDataPath, 'data', $dropDataPath])
+            ->setConstructorArgs([$this->tempDir.'/'.$dropDataPath, 'tests/Fixtures', $dropDataPath])
             ->onlyMethods(['getSize', 'getRelativePathname', 'getRealPath'])
             ->getMock();
         
@@ -246,7 +246,7 @@ class DeduplicateFilesStageTest extends TestCase
         $dropDataFile->method('getRealPath')->willReturn($this->tempDir.'/'.$dropDataPath);
         
         $priceDataFile = $this->getMockBuilder(SplFileInfo::class)
-            ->setConstructorArgs([$this->tempDir.'/'.$priceDataPath, 'data', $priceDataPath])
+            ->setConstructorArgs([$this->tempDir.'/'.$priceDataPath, 'tests/Fixtures', $priceDataPath])
             ->onlyMethods(['getSize', 'getRelativePathname', 'getRealPath'])
             ->getMock();
         

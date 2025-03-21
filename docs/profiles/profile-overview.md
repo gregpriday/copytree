@@ -89,7 +89,10 @@ This filtering mechanism is based on standard gitignore behavior, ensuring intui
   Use the **always** key to ensure critical files are never omitted.
 
 - **Organize Your Patterns:**  
-  Group related patterns logically to mirror your project’s structure.
+  Group related patterns logically to mirror your project's structure.
+
+- **Separate Test Profiles:**  
+  Keep test profiles in the `tests/Fixtures/profiles/` directory and project-type profiles in the main `profiles/` directory. This separation helps maintain a clear distinction between production and test configurations.
 
 - **Test Your Profile:**  
   Run Copytree with the `--display` option to verify that your profile selects the intended files.
