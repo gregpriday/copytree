@@ -6,10 +6,23 @@ use Gemini\Data\Content;
 use Gemini\Data\GenerationConfig;
 use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
+use ValueError;
 
 class ProjectQuestionService
 {
+    /**
+     * Maximum number of retries for API calls.
+     */
+    const MAX_RETRIES = 3;
+
+    /**
+     * Delay between retries in milliseconds.
+     */
+    const RETRY_DELAY_MS = 500;
+
     /**
      * The Gemini model to use, defaulting to the thinking model.
      */
@@ -40,6 +53,7 @@ class ProjectQuestionService
      * @return iterable The stream of partial responses from Gemini
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
+     * @throws ValueError When the API returns no candidates after all retries
      */
     public function askQuestion(string $projectCopytree, string $question, string $expert = 'default'): iterable
     {
@@ -70,15 +84,33 @@ class ProjectQuestionService
         );
 
         try {
-            // Stream content using Gemini thinking model
-            $stream = Gemini::generativeModel(model: $this->model)
-                ->withSystemInstruction(Content::parse($systemPrompt))
-                ->withGenerationConfig($generationConfig)
-                ->streamGenerateContent($prompt);
+            // Use Laravel's retry helper
+            return retry(self::MAX_RETRIES, function () use ($systemPrompt, $generationConfig, $prompt, $projectCopytree, $question) {
+                try {
+                    // Stream content using Gemini thinking model
+                    return Gemini::generativeModel(model: $this->model)
+                        ->withSystemInstruction(Content::parse($systemPrompt))
+                        ->withGenerationConfig($generationConfig)
+                        ->streamGenerateContent($prompt);
+                } catch (ValueError $e) {
+                    // For ValueError, modify the prompt slightly on retries
+                    Log::warning('ValueError in askQuestion: '.$e->getMessage());
 
-            return $stream;
-        } catch (\Exception $e) {
-            throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
+                    // Slight variation in the prompt to avoid the same filtering
+                    $prompt = "Project structure:\n\n{$projectCopytree}\n\nPlease answer this question: {$question}";
+
+                    // Rethrow to trigger retry
+                    throw $e;
+                }
+            }, self::RETRY_DELAY_MS);
+        } catch (ValueError $e) {
+            // This will only be triggered if all retries with ValueError fail
+            Log::error('All retries failed with ValueError: '.$e->getMessage());
+            throw $e; // Re-throw the ValueError for special handling upstream
+        } catch (Throwable $e) {
+            // For any other exception after all retries
+            Log::error('Gemini API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage());
+            throw new RuntimeException('Gemini API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage(), 0, $e);
         }
     }
 

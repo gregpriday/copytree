@@ -6,6 +6,7 @@ use App\Services\ExpertSelectorService;
 use App\Services\ProjectQuestionService;
 use Illuminate\Support\Facades\Artisan;
 use LaravelZero\Framework\Commands\Command;
+use ValueError;
 
 class ProjectQuestionCommand extends Command
 {
@@ -74,9 +75,18 @@ class ProjectQuestionCommand extends Command
         Artisan::call('copy', $options);
         $copytree = Artisan::output();
 
-        // Determine the expert to use
+        // Determine the expert to use with proper error handling
         if ($expert === 'auto') {
-            $expert = $expertSelectorService->selectExpert($question);
+            try {
+                $expert = $expertSelectorService->selectExpert($question);
+                // If we get the default expert after auto-selection, let the user know
+                if ($expert === ExpertSelectorService::DEFAULT_EXPERT) {
+                    $this->comment('Note: Expert auto-selection defaulted to "default" expert. This may happen due to API limitations or content filters.');
+                }
+            } catch (\Exception $e) {
+                $this->warning('Expert auto-selection failed, using default expert instead: '.$e->getMessage());
+                $expert = ExpertSelectorService::DEFAULT_EXPERT;
+            }
         }
 
         $this->output->write("<info>Thinking about your question (using expert: {$expert})...</info> ");
@@ -95,6 +105,11 @@ class ProjectQuestionCommand extends Command
             $this->output->newLine();
 
             return self::SUCCESS;
+        } catch (ValueError $e) {
+            $this->error('Gemini API Content Error: '.$e->getMessage());
+            $this->info('This error can occur when content is filtered by safety systems. Try rephrasing your question.');
+
+            return self::FAILURE;
         } catch (\Exception $e) {
             $this->error('Error: '.$e->getMessage());
 

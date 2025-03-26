@@ -9,10 +9,18 @@ use Gemini\Enums\DataType;
 use Gemini\Enums\ResponseMimeType;
 use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
+use Throwable;
+use ValueError;
 
 class ExpertSelectorService
 {
     const DEFAULT_EXPERT = 'default';
+
+    const MAX_RETRIES = 3;
+
+    const RETRY_DELAY_MS = 500;
 
     /**
      * The Gemini model to use for selecting experts.
@@ -43,7 +51,7 @@ class ExpertSelectorService
     }
 
     /**
-     * Select the best expert for a given question.
+     * Select the best expert for a given question using Laravel's retry helper.
      *
      * @param  string  $question  The user's question about the project
      * @return string The name of the selected expert
@@ -77,28 +85,43 @@ class ExpertSelectorService
         );
 
         try {
-            // Generate content using Gemini
-            $response = Gemini::generativeModel(model: $this->model)
-                ->withSystemInstruction(Content::parse($systemPrompt))
-                ->withGenerationConfig($generationConfig)
-                ->generateContent($prompt);
+            // Use Laravel's retry helper
+            $selectedExpert = retry(self::MAX_RETRIES, function () use ($systemPrompt, $generationConfig, $prompt) {
+                // Generate content using Gemini
+                $response = Gemini::generativeModel(model: $this->model)
+                    ->withSystemInstruction(Content::parse($systemPrompt))
+                    ->withGenerationConfig($generationConfig)
+                    ->generateContent($prompt);
 
-            $content = $response->text() ?? '';
+                $content = $response->text() ?? '';
 
-            if (empty($content)) {
-                return self::DEFAULT_EXPERT;
-            }
+                // Throw an exception if content is empty to trigger retry
+                if (empty($content)) {
+                    Log::warning('Empty content received from Gemini API');
+                    throw new RuntimeException('Empty content received from Gemini API');
+                }
 
-            $result = json_decode($content, true);
+                $result = json_decode($content, true);
 
-            // Check if we received valid JSON with the expected structure
-            if (isset($result['expert']) && is_string($result['expert']) && array_key_exists($result['expert'], $this->availableExperts)) {
+                // Throw an exception if JSON is invalid or structure is wrong to trigger retry
+                if (! isset($result['expert']) || ! is_string($result['expert']) || ! array_key_exists($result['expert'], $this->availableExperts)) {
+                    Log::warning('Invalid response format from Gemini API: '.$content);
+                    throw new RuntimeException('Invalid response format from Gemini API');
+                }
+
+                // If everything is okay, return the expert name
                 return $result['expert'];
-            }
+            }, self::RETRY_DELAY_MS); // Delay between retries in milliseconds
+
+            return $selectedExpert;
+        } catch (ValueError $e) {
+            // Handle final ValueError after all retries (often due to content filtering)
+            Log::error('Expert selection failed after '.self::MAX_RETRIES.' attempts due to ValueError: '.$e->getMessage());
 
             return self::DEFAULT_EXPERT;
-        } catch (\Exception $e) {
-            \Log::error('Expert selection failed: '.$e->getMessage());
+        } catch (Throwable $e) {
+            // Catch any other exception after retries
+            Log::error('Expert selection failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage());
 
             return self::DEFAULT_EXPERT;
         }
