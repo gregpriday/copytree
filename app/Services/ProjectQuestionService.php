@@ -26,22 +26,22 @@ class ProjectQuestionService
     public function __construct()
     {
         // Use the Gemini thinking model defined in config
-        $this->model = config('gemini.model_thinking');
+        $this->model = config('gemini.model_pro');
         // Set the base directory for expert prompts
         $this->promptsBaseDir = base_path('prompts/project-question');
     }
 
     /**
-     * Ask a question about the project using a specified expert.
+     * Ask a question about the project using a specified expert and stream the response.
      *
      * @param  string  $projectCopytree  The copytree output of the project
      * @param  string  $question  The user's question about the project
      * @param  string  $expert  The expert to use (defaults to 'default')
-     * @return string The response from Gemini
+     * @return iterable The stream of partial responses from Gemini
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
      */
-    public function askQuestion(string $projectCopytree, string $question, string $expert = 'default'): string
+    public function askQuestion(string $projectCopytree, string $question, string $expert = 'default'): iterable
     {
         // Build the path to the expert's system prompt
         $expertPromptPath = $this->getExpertPromptPath($expert);
@@ -70,22 +70,16 @@ class ProjectQuestionService
         );
 
         try {
-            // Generate content using Gemini thinking model
-            $response = Gemini::generativeModel(model: $this->model)
+            // Stream content using Gemini thinking model
+            $stream = Gemini::generativeModel(model: $this->model)
                 ->withSystemInstruction(Content::parse($systemPrompt))
                 ->withGenerationConfig($generationConfig)
-                ->generateContent($prompt);
+                ->streamGenerateContent($prompt);
+                
+            return $stream;
         } catch (\Exception $e) {
             throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
         }
-
-        // Retrieve the response text
-        $content = $response->text() ?? '';
-        if (empty($content)) {
-            throw new RuntimeException('No response returned from Gemini.');
-        }
-
-        return $content;
     }
 
     /**

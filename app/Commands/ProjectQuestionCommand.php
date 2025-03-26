@@ -30,7 +30,7 @@ class ProjectQuestionCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Ask a question about the project codebase and get AI assistance';
+    protected $description = 'Ask a question about the project codebase and get AI assistance with streaming output';
 
     /**
      * Execute the console command.
@@ -83,11 +83,16 @@ class ProjectQuestionCommand extends Command
         $this->output->newLine();
 
         try {
-            // Get the response from the question service with the specified or selected expert
-            $response = $questionService->askQuestion($copytree, $question, $expert);
-
-            // Output the response
-            $this->line($response);
+            // Get the stream of responses from the question service
+            $stream = $questionService->askQuestion($copytree, $question, $expert);
+            
+            // Process and display each partial response as it arrives
+            foreach ($stream as $partialResponse) {
+                $this->output->write($partialResponse->text());
+            }
+            
+            // Add a final newline after the complete response
+            $this->output->newLine();
 
             return self::SUCCESS;
         } catch (\Exception $e) {
