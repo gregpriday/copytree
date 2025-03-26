@@ -7,6 +7,7 @@ When making your selection:
 2. Match the question's subject matter with the expert's specialty
 3. Consider the user's intention (are they trying to understand, improve, debug, etc.)
 4. Default to the "default" expert for general questions that don't clearly align with a specialty
+5. Always consider what the biggest part of the task will be and who is best suited to handle it
 
 Your output must be a valid JSON object with the following fields:
 - "expert": The name/key of the selected expert (must be an exact match from the provided list)
@@ -14,7 +15,7 @@ Your output must be a valid JSON object with the following fields:
 Sample output:
 ```json
 {
-  "expert": "code-reviewer",
+  "expert": "implementation-review",
 }
 ```
 
