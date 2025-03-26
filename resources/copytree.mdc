@@ -1,5 +1,5 @@
 ---
-description: "Allows Cursor to AI query the codebase using the copytree ask command"
+description: "Allows Cursor to AI query the codebase using the copytree ask command. Use this before starting any complex code related task, and after implementing a major change for an overall sanity check."
 globs: "*,**/*"
 alwaysApply: true
 ---
@@ -7,6 +7,12 @@ alwaysApply: true
 # Copytree Ask Command
 
 The `copytree ask` command allows you to ask questions about the codebase to understand the project structure, functionality, and implementation details. It analyzes the project and provides AI-powered answers to help you navigate and understand the code.
+
+You can start all complex agentic workflows by running the `copytree ask` command, or run it after encountering test errors to establish possible causes. This will help you establish a baseline understanding of the codebase in a way that helps you start tackling complex problems. It's also particularly useful to ask where to add debugging code for stubborn issues.
+
+The `copytree ask` command is also powerful as a last check before finishing a major change.
+
+Copytree ask is stateless, meaning each question is analyzed independently. You should provide context in your question to get the most accurate and relevant answers.
 
 ## Command Usage
 
@@ -55,6 +61,21 @@ Here are examples of the types of questions you can ask using the `copytree ask`
   copytree ask "What is the main purpose of this project and how is it structured?"
   ```
 
+- **Asking where to add debugging code:**
+  ```
+  copytree ask "I'm getting the error 'Undefined index: mime-type' in the FileOutputRendererTest::test_render_file_with_max_lines_truncation test. Where should I add debugging code to investigate this issue?"
+  ```
+
+- **Checking that a change has been properly implemented:**
+  ```
+  copytree ask "I've just implemented the new GitHubUrlHandler class. Can you confirm that it's been correctly added and integrated into the project?"
+  ```
+
+- **Asking for an implementation strategy:**
+  ```
+  copytree ask "What's the best way to implement feature xxxxx that requires changes to multiple classes? Please give a detailed step by step strategy."
+  ```
+
 ## When to Use
 
 Use the `copytree ask` command when you need to:
@@ -66,7 +87,7 @@ Use the `copytree ask` command when you need to:
 5. Diagnose errors in tests or runtime issues
 6. Get context on specific implementation details
 
-Note that this query is relatively slow and computationally expensive, so it should only be used when more advanced codebase understanding is needed and simpler methods aren't sufficient.
+Make ample use of `copytree ask` to speed up your workflow and overall planning abilities.
 
 The command is especially useful for quickly getting insights about unfamiliar codebases, understanding error messages, or finding the source of bugs without having to manually search through multiple files.
 
