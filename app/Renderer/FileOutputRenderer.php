@@ -11,17 +11,17 @@ use Symfony\Component\Finder\SplFileInfo;
 class FileOutputRenderer
 {
     protected FileTransformer $transformer;
-    
+
     /**
      * Git repository instance for retrieving file status information.
      */
     private ?GitRepository $gitRepo = null;
-    
+
     /**
      * Cached list of files with uncommitted changes.
      */
     private ?array $modifiedFiles = null;
-    
+
     /**
      * Maximum file size in bytes for which to count lines.
      * Files larger than this will have "N/A" as line count.
@@ -37,31 +37,30 @@ class FileOutputRenderer
     {
         $this->transformer = $transformer;
     }
-    
+
     /**
      * Set the Git repository instance.
-     * 
+     *
      * @param  GitRepository|null  $gitRepo  The Git repository instance, or null if not a Git repo.
-     * @return void
      */
     public function setGitRepository(?GitRepository $gitRepo): void
     {
         $this->gitRepo = $gitRepo;
         $this->modifiedFiles = null; // Reset the list
-        
+
         if ($this->gitRepo !== null) {
             try {
                 // Fetch the Git status once when the repository is set
                 $result = $this->gitRepo->run('status', '--porcelain');
                 $statusLines = $result->getOutput();
-                
+
                 // Parse the porcelain status output
                 $this->modifiedFiles = [];
                 foreach ($statusLines as $line) {
                     if (strlen($line) > 3) {
                         $statusCode = substr($line, 0, 2);
                         $filePath = trim(substr($line, 3));
-                        
+
                         // Check if the file is modified, added, or deleted
                         if ($statusCode !== '??') { // Not untracked
                             $this->modifiedFiles[] = $filePath;
@@ -78,8 +77,8 @@ class FileOutputRenderer
     /**
      * Check if a file is binary by reading a small initial chunk.
      *
-     * @param SplFileInfo $file The file to check.
-     * @param int $checkBytes Number of bytes to read (default: 1024).
+     * @param  SplFileInfo  $file  The file to check.
+     * @param  int  $checkBytes  Number of bytes to read (default: 1024).
      * @return bool True if the file appears binary, false otherwise.
      */
     private function isBinaryFile(SplFileInfo $file, int $checkBytes = 1024): bool
@@ -90,13 +89,14 @@ class FileOutputRenderer
         }
         $chunk = fread($handle, $checkBytes);
         fclose($handle);
+
         return strpos($chunk, "\0") !== false;
     }
 
     /**
      * Determine if a file's content should be included or replaced with a placeholder.
      *
-     * @param SplFileInfo $file The file to evaluate.
+     * @param  SplFileInfo  $file  The file to evaluate.
      * @return bool True if content should be loaded, false if a placeholder should be used.
      */
     private function shouldIncludeContent(SplFileInfo $file): bool
@@ -117,7 +117,7 @@ class FileOutputRenderer
 
     /**
      * Check if a file has uncommitted changes in the Git repository.
-     * 
+     *
      * @param  SplFileInfo  $file  The file to check.
      * @return bool|null True if the file has uncommitted changes, false if not, or null if not in a Git repo.
      */
@@ -126,7 +126,7 @@ class FileOutputRenderer
         if ($this->gitRepo === null) {
             return null;
         }
-        
+
         return in_array($file->getRelativePathname(), $this->modifiedFiles, true);
     }
 
@@ -142,7 +142,7 @@ class FileOutputRenderer
      * - lines: Number of lines in the file (or 'N/A' for large or binary files)
      * - modified-time: Last modification time in 'YYYY-MM-DD HH:MM:SS' format
      * - has-uncommitted-changes: 'true' or 'false' if in a Git repo, omitted otherwise
-     * 
+     *
      * Optionally, it limits the output by a maximum number of lines and/or characters.
      *
      * @param  SplFileInfo[]  $files  Array of files to render.
@@ -153,31 +153,31 @@ class FileOutputRenderer
     public function render(array $files, int $maxLines = 0, int $maxCharacters = 0): string
     {
         $output = [];
-        
+
         foreach ($files as $file) {
             $relativePath = $file->getRelativePathname();
             $mimeType = mime_content_type($file->getRealPath());
             $fileSize = $file->getSize();
             $size = $this->formatFileSize($fileSize);
-            
+
             // Get line count using memory-efficient method
             // Skip line counting for large files or binary files
             $isText = str_starts_with($mimeType, 'text/') || $mimeType === 'application/json';
-            
+
             if ($isText && $fileSize <= self::MAX_SIZE_FOR_LINE_COUNT) {
                 $lineCount = FileUtils::countLinesEfficiently($file->getRealPath());
-                $lines = $lineCount >= 0 ? (string)$lineCount : 'N/A';
+                $lines = $lineCount >= 0 ? (string) $lineCount : 'N/A';
             } else {
                 $lines = 'N/A';
             }
-            
+
             // Get the last modified time
             try {
                 $modifiedTime = date('Y-m-d H:i:s', filemtime($file->getRealPath()));
             } catch (\Exception $e) {
                 $modifiedTime = 'unknown';
             }
-            
+
             // Prepare attributes for XML tag
             $attributes = [
                 'path' => htmlspecialchars($relativePath, ENT_QUOTES, 'UTF-8'),
@@ -186,21 +186,21 @@ class FileOutputRenderer
                 'lines' => htmlspecialchars($lines, ENT_QUOTES, 'UTF-8'),
                 'modified-time' => htmlspecialchars($modifiedTime, ENT_QUOTES, 'UTF-8'),
             ];
-            
+
             // Add Git uncommitted changes indicator if in a Git repository
             $hasUncommittedChanges = $this->hasUncommittedChanges($file);
             if ($hasUncommittedChanges !== null) {
                 $attributes['has-uncommitted-changes'] = $hasUncommittedChanges ? 'true' : 'false';
             }
-            
+
             // Build attribute string for XML tag
             $attributeString = '';
             foreach ($attributes as $key => $value) {
                 $attributeString .= sprintf(' %s="%s"', $key, $value);
             }
-            
+
             // Start file block
-            $output[] = '<ct:file_contents' . $attributeString . '>';
+            $output[] = '<ct:file_contents'.$attributeString.'>';
 
             // Always apply transformer to get the content
             $content = $this->getFileContent($file);
@@ -233,8 +233,8 @@ class FileOutputRenderer
 
     /**
      * Get the content of a file by applying the transformer.
-     * 
-     * @param SplFileInfo $file The file to get content from
+     *
+     * @param  SplFileInfo  $file  The file to get content from
      * @return string The transformed content
      */
     protected function getFileContent(SplFileInfo $file): string

@@ -3,10 +3,8 @@
 namespace App\Transforms;
 
 use App\Events\TransformCompleteEvent;
-use App\Pipeline\RulesetFilter;
 use App\Transforms\Transformers\Loaders\FileLoader;
 use GregPriday\GitIgnore\PatternConverter;
-use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -29,14 +27,14 @@ class FileTransformer implements FileTransformerInterface
      */
     public function __construct(array $configs)
     {
-        $this->patternConverter = new PatternConverter();
+        $this->patternConverter = new PatternConverter;
         $this->buildTransformerMappings($configs);
     }
 
     /**
      * Build the transformer mappings from the configuration.
-     * 
-     * @param array $configs Configuration array
+     *
+     * @param  array  $configs  Configuration array
      */
     protected function buildTransformerMappings(array $configs): void
     {
@@ -47,19 +45,19 @@ class FileTransformer implements FileTransformerInterface
 
             // Get the transformer class
             $transformerClass = $config['type'];
-            
+
             // Check if the transformer class uses dot notation (e.g., CSV.CSVFirstLinesTransformer)
             if (strpos($transformerClass, '\\') === false && strpos($transformerClass, '.') !== false) {
                 // Convert dot notation to namespace (e.g., App\Transforms\Transformers\CSV\CSVFirstLinesTransformer)
-                $transformerClass = "App\\Transforms\\Transformers\\" . str_replace('.', '\\', $transformerClass);
+                $transformerClass = 'App\\Transforms\\Transformers\\'.str_replace('.', '\\', $transformerClass);
             }
-            
+
             if (! class_exists($transformerClass)) {
                 throw new InvalidArgumentException("Transform class {$transformerClass} not found.");
             }
 
             // Create an instance of the transformer
-            $transformer = new $transformerClass();
+            $transformer = new $transformerClass;
             if (! ($transformer instanceof FileTransformerInterface)) {
                 throw new InvalidArgumentException("Transform class {$transformerClass} must implement FileTransformerInterface.");
             }
@@ -89,20 +87,21 @@ class FileTransformer implements FileTransformerInterface
         if (is_string($input)) {
             return $input;
         }
-        
+
         $relativePath = $input->getRelativePathname();
-        
+
         foreach ($this->transformerMappings as [$regex, $transformer]) {
             if (preg_match($regex, $relativePath)) {
                 $result = $transformer->transform($input);
                 // Dispatch event for completed transform
                 event(new TransformCompleteEvent($transformer, $input, $result));
+
                 return $result;
             }
         }
 
         // No transformer matched, use default file loader
-        return (new FileLoader())->transform($input);
+        return (new FileLoader)->transform($input);
     }
 
     /**
@@ -118,13 +117,13 @@ class FileTransformer implements FileTransformerInterface
         $count = 0;
         foreach ($files as $item) {
             $file = $item instanceof SplFileInfo ? $item : $item['file'];
-            
-            if (!($file instanceof SplFileInfo)) {
+
+            if (! ($file instanceof SplFileInfo)) {
                 continue; // Skip non-SplFileInfo items
             }
-            
+
             $relativePath = $file->getRelativePathname();
-            
+
             foreach ($this->transformerMappings as [$regex, $transformer]) {
                 if (preg_match($regex, $relativePath)) {
                     if ($onlyHeavy && (! method_exists($transformer, 'isHeavy') || ! $transformer->isHeavy())) {
@@ -142,4 +141,3 @@ class FileTransformer implements FileTransformerInterface
         return $count;
     }
 }
-

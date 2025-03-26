@@ -11,8 +11,8 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
     /**
      * Process files through the deduplication stage.
      *
-     * @param array $files Array of SplFileInfo objects to process.
-     * @param Closure $next The next stage in the pipeline.
+     * @param  array  $files  Array of SplFileInfo objects to process.
+     * @param  Closure  $next  The next stage in the pipeline.
      * @return array The filtered array of unique files.
      */
     public function handle(array $files, \Closure $next): array
@@ -25,6 +25,7 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
             if ($this->shouldSkipDeduplication($file)) {
                 // Large or binary files are always included without content checks
                 $uniqueMap[$file->getRelativePathname()] = $file;
+
                 continue;
             }
 
@@ -34,6 +35,7 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
             // If we haven't seen this file content yet, add it to our map
             if (! isset($uniqueMap[$hash])) {
                 $uniqueMap[$hash] = $file;
+
                 continue;
             }
 
@@ -62,7 +64,7 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
     /**
      * Determine if a file should skip content-based deduplication.
      *
-     * @param SplFileInfo $file The file to check.
+     * @param  SplFileInfo  $file  The file to check.
      * @return bool True if the file is large (>1MB) or binary, false otherwise.
      */
     private function shouldSkipDeduplication(SplFileInfo $file): bool
@@ -73,7 +75,7 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
     /**
      * Check if a file is binary by examining the first 8192 bytes for null bytes.
      *
-     * @param SplFileInfo $file The file to inspect.
+     * @param  SplFileInfo  $file  The file to inspect.
      * @return bool True if binary, false otherwise.
      */
     private function isBinaryFile(SplFileInfo $file): bool
@@ -84,6 +86,7 @@ class DeduplicateFilesStage implements FilePipelineStageInterface
         }
         $chunk = fread($handle, 8192);
         fclose($handle);
+
         return $chunk !== false && str_contains($chunk, "\0");
     }
 }

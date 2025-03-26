@@ -85,12 +85,12 @@ class ProjectQuestionCommand extends Command
         try {
             // Get the stream of responses from the question service
             $stream = $questionService->askQuestion($copytree, $question, $expert);
-            
+
             // Process and display each partial response as it arrives
             foreach ($stream as $partialResponse) {
                 $this->output->write($partialResponse->text());
             }
-            
+
             // Add a final newline after the complete response
             $this->output->newLine();
 

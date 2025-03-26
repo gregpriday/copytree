@@ -10,15 +10,13 @@ class CSVFirstLinesTransformer extends BaseTransformer implements FileTransforme
 {
     /**
      * The number of lines to read from CSV files
-     *
-     * @var int
      */
     protected int $lines = 20;
 
     /**
      * Determine if this transformer supports the given file.
      *
-     * @param SplFileInfo $file The file to check.
+     * @param  SplFileInfo  $file  The file to check.
      * @return bool True if the file is a CSV, false otherwise.
      */
     public function supports(SplFileInfo $file): bool
@@ -31,7 +29,7 @@ class CSVFirstLinesTransformer extends BaseTransformer implements FileTransforme
      * This method is optimized for large files by using streaming
      * to read only the necessary lines.
      *
-     * @param SplFileInfo|string $input The CSV file or content to transform.
+     * @param  SplFileInfo|string  $input  The CSV file or content to transform.
      * @return string The first N lines of the file.
      */
     public function transform(SplFileInfo|string $input): string

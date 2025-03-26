@@ -42,13 +42,13 @@ class ProfileGuesser
     {
         $ctreeDirectory = $this->projectPath.DIRECTORY_SEPARATOR.'.ctree';
 
-        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.yaml') || 
+        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.yaml') ||
             file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.yml') ||
             file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'profile.json')) {
             return 'profile';
         }
 
-        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.yaml') || 
+        if (file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.yaml') ||
             file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.yml') ||
             file_exists($ctreeDirectory.DIRECTORY_SEPARATOR.'ruleset.json')) {
             return 'ruleset';

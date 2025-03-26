@@ -99,7 +99,7 @@ class FileOutputRendererTest extends TestCase
         $tempFile = tempnam(sys_get_temp_dir(), 'testfile');
         $content = "line 1\nline 2\nline 3";
         file_put_contents($tempFile, $content);
-        
+
         // Set a specific modification time
         $modificationTime = strtotime('2023-01-01 12:00:00');
         touch($tempFile, $modificationTime);
@@ -126,12 +126,12 @@ class FileOutputRendererTest extends TestCase
 
         // Assert that the output contains the expected modified time
         $expectedModifiedTime = date('Y-m-d H:i:s', $modificationTime);
-        $this->assertStringContainsString('modified-time="' . $expectedModifiedTime . '"', $output);
-        
+        $this->assertStringContainsString('modified-time="'.$expectedModifiedTime.'"', $output);
+
         // Remove the temporary file.
         unlink($tempFile);
     }
-    
+
     /**
      * Test that the has-uncommitted-changes attribute is included when a Git repository is set.
      */
@@ -155,14 +155,14 @@ class FileOutputRendererTest extends TestCase
             ->onlyMethods(['transform'])
             ->getMock();
         $dummyTransformer->method('transform')->willReturn('transformed content');
-        
+
         // Create a mock RunnerResult to use with the GitRepository
         $runnerResult = $this->getMockBuilder(\CzProject\GitPhp\RunnerResult::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['getOutput'])
             ->getMock();
         $runnerResult->method('getOutput')->willReturn([' M testfile.txt']);
-        
+
         // Create a mock for GitRepository that returns modified files
         $gitRepo = $this->getMockBuilder(GitRepository::class)
             ->disableOriginalConstructor()
@@ -179,11 +179,11 @@ class FileOutputRendererTest extends TestCase
 
         // Assert that the output contains the uncommitted changes attribute set to true
         $this->assertStringContainsString('has-uncommitted-changes="true"', $output);
-        
+
         // Remove the temporary file.
         unlink($tempFile);
     }
-    
+
     /**
      * Test that the has-uncommitted-changes attribute is not included when no Git repository is set.
      */
@@ -216,11 +216,11 @@ class FileOutputRendererTest extends TestCase
 
         // Assert that the output does not contain the uncommitted changes attribute
         $this->assertStringNotContainsString('has-uncommitted-changes', $output);
-        
+
         // Remove the temporary file.
         unlink($tempFile);
     }
-    
+
     /**
      * Test that the has-uncommitted-changes attribute is set to false for files without uncommitted changes.
      */
@@ -244,14 +244,14 @@ class FileOutputRendererTest extends TestCase
             ->onlyMethods(['transform'])
             ->getMock();
         $dummyTransformer->method('transform')->willReturn('transformed content');
-        
+
         // Create a mock RunnerResult to use with the GitRepository
         $runnerResult = $this->getMockBuilder(\CzProject\GitPhp\RunnerResult::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['getOutput'])
             ->getMock();
         $runnerResult->method('getOutput')->willReturn(['?? other_file.txt']); // Only untracked files
-        
+
         // Create a mock for GitRepository that reports no modified files
         $gitRepo = $this->getMockBuilder(GitRepository::class)
             ->disableOriginalConstructor()
@@ -268,7 +268,7 @@ class FileOutputRendererTest extends TestCase
 
         // Assert that the output contains the uncommitted changes attribute set to false
         $this->assertStringContainsString('has-uncommitted-changes="false"', $output);
-        
+
         // Remove the temporary file.
         unlink($tempFile);
     }
@@ -295,7 +295,7 @@ class FileOutputRendererTest extends TestCase
             ->disableOriginalConstructor()
             ->onlyMethods(['transform'])
             ->getMock();
-        
+
         // The transform method should never be called for binary files
         $dummyTransformer->expects($this->never())->method('transform');
 
@@ -307,7 +307,7 @@ class FileOutputRendererTest extends TestCase
 
         // Assert that the output contains the placeholder message
         $this->assertStringContainsString('File content omitted due to size or binary content.', $output);
-        
+
         // Clean up
         unlink($tempFile);
     }
@@ -319,13 +319,13 @@ class FileOutputRendererTest extends TestCase
     {
         // Create a temporary file
         $tempFile = tempnam(sys_get_temp_dir(), 'large_test');
-        
+
         // Get a mock to avoid actually creating a huge file
         $file = $this->getMockBuilder(SplFileInfo::class)
             ->setConstructorArgs([$tempFile, '', 'large.txt'])
             ->onlyMethods(['getRelativePathname', 'getSize', 'getRealPath'])
             ->getMock();
-        
+
         // Configure the mock to report a size larger than 1MB
         $file->method('getRelativePathname')->willReturn('large.txt');
         $file->method('getSize')->willReturn(1024 * 1024 + 1); // 1MB + 1 byte
@@ -336,7 +336,7 @@ class FileOutputRendererTest extends TestCase
             ->disableOriginalConstructor()
             ->onlyMethods(['transform'])
             ->getMock();
-        
+
         // The transform method should never be called for large files
         $dummyTransformer->expects($this->never())->method('transform');
 
@@ -348,7 +348,7 @@ class FileOutputRendererTest extends TestCase
 
         // Assert that the output contains the placeholder message
         $this->assertStringContainsString('File content omitted due to size or binary content.', $output);
-        
+
         // Clean up
         unlink($tempFile);
     }
@@ -360,11 +360,11 @@ class FileOutputRendererTest extends TestCase
     {
         // Create a temporary file larger than MAX_SIZE_FOR_LINE_COUNT
         $tempFile = tempnam(sys_get_temp_dir(), 'large_file_test');
-        
+
         // Generate a large content
         // For test purposes, we'll mock a large file rather than actually creating one
         $mockFileSize = 11 * 1024 * 1024; // 11MB (just over the 10MB threshold)
-        
+
         // Create a partial mock for SplFileInfo
         $file = $this->getMockBuilder(SplFileInfo::class)
             ->setConstructorArgs([$tempFile, '', 'large_file.csv'])
@@ -373,10 +373,10 @@ class FileOutputRendererTest extends TestCase
         $file->method('getRelativePathname')->willReturn('large_file.csv');
         $file->method('getSize')->willReturn($mockFileSize);
         $file->method('getRealPath')->willReturn($tempFile);
-        
+
         // Write a small amount of content to the temp file
         file_put_contents($tempFile, "Sample content\n");
-        
+
         // Create a dummy transformer
         $dummyTransformer = $this->getMockBuilder(FileTransformer::class)
             ->disableOriginalConstructor()
@@ -384,19 +384,19 @@ class FileOutputRendererTest extends TestCase
             ->getMock();
         // The transformer should not be called for large files
         $dummyTransformer->expects($this->never())->method('transform');
-        
+
         // Instantiate the renderer
         $renderer = new FileOutputRenderer($dummyTransformer);
-        
+
         // Render the file
         $output = $renderer->render([$file]);
-        
+
         // Assert that the line count is set to N/A for large files
         $this->assertStringContainsString('lines="N/A"', $output);
-        
+
         // Assert that content is replaced with placeholder
         $this->assertStringContainsString('File content omitted due to size', $output);
-        
+
         // Remove the temporary file
         unlink($tempFile);
     }

@@ -12,4 +12,4 @@ class DuplicateFileFoundEvent
     {
         $this->file = $file;
     }
-} 
+}

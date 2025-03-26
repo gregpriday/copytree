@@ -19,14 +19,14 @@ class FileUtilsTest extends TestCase
 
         // Count lines
         $lineCount = FileUtils::countLinesEfficiently($tempFile);
-        
+
         // Assert line count is correct (3 lines)
         $this->assertEquals(3, $lineCount);
-        
+
         // Clean up
         unlink($tempFile);
     }
-    
+
     /**
      * Test that countLinesEfficiently handles a file without a trailing newline.
      */
@@ -39,14 +39,14 @@ class FileUtilsTest extends TestCase
 
         // Count lines
         $lineCount = FileUtils::countLinesEfficiently($tempFile);
-        
+
         // Assert line count is correct (3 lines)
         $this->assertEquals(3, $lineCount);
-        
+
         // Clean up
         unlink($tempFile);
     }
-    
+
     /**
      * Test that countLinesEfficiently handles empty files.
      */
@@ -58,14 +58,14 @@ class FileUtilsTest extends TestCase
 
         // Count lines
         $lineCount = FileUtils::countLinesEfficiently($tempFile);
-        
+
         // Assert line count is 0
         $this->assertEquals(0, $lineCount);
-        
+
         // Clean up
         unlink($tempFile);
     }
-    
+
     /**
      * Test that countLinesEfficiently handles non-existent files.
      */
@@ -73,11 +73,11 @@ class FileUtilsTest extends TestCase
     {
         // Count lines in a non-existent file
         $lineCount = FileUtils::countLinesEfficiently('/path/to/nonexistent/file');
-        
+
         // Assert it returns -1 to indicate failure
         $this->assertEquals(-1, $lineCount);
     }
-    
+
     /**
      * Test handling of a larger file (more than one buffer size).
      */
@@ -85,7 +85,7 @@ class FileUtilsTest extends TestCase
     {
         // Create a temporary file with content larger than the buffer size
         $tempFile = tempnam(sys_get_temp_dir(), 'line_count_test');
-        
+
         // Generate content with approximately 10,000 lines
         $content = '';
         $expectedLineCount = 10000;
@@ -96,11 +96,11 @@ class FileUtilsTest extends TestCase
 
         // Count lines
         $lineCount = FileUtils::countLinesEfficiently($tempFile);
-        
+
         // Assert line count is correct
         $this->assertEquals($expectedLineCount, $lineCount);
-        
+
         // Clean up
         unlink($tempFile);
     }
-} 
+}

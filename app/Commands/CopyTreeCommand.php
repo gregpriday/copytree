@@ -214,16 +214,16 @@ class CopyTreeCommand extends Command
         if (! $this->option('only-tree')) {
             // Resolve the FileOutputRenderer so that its dependency (FileTransformer) is injected.
             $fileRenderer = app(FileOutputRenderer::class);
-            
+
             // Initialize Git repository if the project path is a Git repository
             try {
-                $git = new Git();
+                $git = new Git;
                 $gitRepo = $git->open($projectPath);
                 $fileRenderer->setGitRepository($gitRepo);
             } catch (GitException $e) {
                 // Not a Git repository or Git error, continue without Git information
             }
-            
+
             $transformCount = $fileRenderer->countPendingTransforms($finalFiles);
 
             $maxLines = (int) $this->option('max-lines');
@@ -261,7 +261,7 @@ class CopyTreeCommand extends Command
             htmlspecialchars($generationTimestamp, ENT_QUOTES, 'UTF-8'),
             htmlspecialchars($originalSourcePath, ENT_QUOTES, 'UTF-8')
         );
-        
+
         $combinedOutput = "<ct:project{$projectAttributes}>\n";
         $combinedOutput .= "<ct:tree>\n{$treeOutput}\n</ct:tree>\n";
         if (! $this->option('only-tree')) {
@@ -305,7 +305,7 @@ class CopyTreeCommand extends Command
         }
 
         // If in verbose mode, display information about duplicate files
-        if ($this->output->isVerbose() && !empty($duplicates)) {
+        if ($this->output->isVerbose() && ! empty($duplicates)) {
             $this->info("\nDuplicate files removed:");
             foreach (array_keys($duplicates) as $duplicate) {
                 $this->line("  - {$duplicate}");
