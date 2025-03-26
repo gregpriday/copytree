@@ -250,7 +250,19 @@ class CopyTreeCommand extends Command
         }
 
         // Combine the outputs into the final XML.
-        $combinedOutput = "<ct:project>\n";
+        $profileNameUsed = $profileName; // The resolved profile name
+        $generationTimestamp = date('c'); // ISO 8601 timestamp
+        $originalSourcePath = $this->argument('path') ?: getcwd(); // The path argument given
+
+        // Add context attributes to the root tag
+        $projectAttributes = sprintf(
+            ' profile="%s" generated-at="%s" source-path="%s"',
+            htmlspecialchars($profileNameUsed, ENT_QUOTES, 'UTF-8'),
+            htmlspecialchars($generationTimestamp, ENT_QUOTES, 'UTF-8'),
+            htmlspecialchars($originalSourcePath, ENT_QUOTES, 'UTF-8')
+        );
+        
+        $combinedOutput = "<ct:project{$projectAttributes}>\n";
         $combinedOutput .= "<ct:tree>\n{$treeOutput}\n</ct:tree>\n";
         if (! $this->option('only-tree')) {
             $combinedOutput .= "<ct:project_files>\n{$fileOutput}\n</ct:project_files>\n";
