@@ -63,8 +63,8 @@ class ProjectQuestionService
 
         // Configure the generation parameters
         $generationConfig = new GenerationConfig(
-            maxOutputTokens: 4096,
-            temperature: 0.2,
+            maxOutputTokens: 32768,
+            temperature: 0.15,
             topP: 0.95,
             topK: 40
         );
@@ -75,7 +75,7 @@ class ProjectQuestionService
                 ->withSystemInstruction(Content::parse($systemPrompt))
                 ->withGenerationConfig($generationConfig)
                 ->streamGenerateContent($prompt);
-                
+
             return $stream;
         } catch (\Exception $e) {
             throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
