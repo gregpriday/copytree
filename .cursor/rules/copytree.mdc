@@ -1,0 +1,81 @@
+---
+description: "Allows Cursor to AI query the codebase using the copytree ask command"
+globs: "*,**/*"
+alwaysApply: true
+---
+
+# Copytree Ask Command
+
+The `copytree ask` command allows you to ask questions about the codebase to understand the project structure, functionality, and implementation details. It analyzes the project and provides AI-powered answers to help you navigate and understand the code.
+
+## Command Usage
+
+```
+copytree ask "Your question about the codebase"
+```
+
+This command must be executed from the project directory. It will analyze the codebase and provide intelligent responses about the code's structure, functionality, and specific implementation details.
+
+## Examples
+
+Here are examples of the types of questions you can ask using the `copytree ask` command:
+
+- **Error Troubleshooting:**
+  ```
+  copytree ask "When running the test FileOutputRendererTest::test_render_file_with_max_lines_truncation, I'm seeing the error 'Undefined index: mime-type'. What might be causing this error?"
+  ```
+
+- **Understanding Code Flow:**
+  ```
+  copytree ask "How does the pipeline process files from initial loading to final output?"
+  ```
+
+- **Finding Implementations:**
+  ```
+  copytree ask "Where is the GitHubUrlHandler class implemented and what does it do?"
+  ```
+
+- **Architecture Questions:**
+  ```
+  copytree ask "What's the relationship between the Transformer classes and the Pipeline stages?"
+  ```
+
+- **Debugging Issues:**
+  ```
+  copytree ask "The AIFilterStage is throwing an exception with message 'Invalid JSON response'. What could be causing this?"
+  ```
+
+- **Feature Understanding:**
+  ```
+  copytree ask "How does this project handle the transformation of different file types?"
+  ```
+
+- **Project Overview:**
+  ```
+  copytree ask "What is the main purpose of this project and how is it structured?"
+  ```
+
+## When to Use
+
+Use the `copytree ask` command when you need to:
+
+1. Understand code behavior and architecture
+2. Troubleshoot errors and issues in the code
+3. Find relevant files and classes for specific functionality
+4. Get insights about how different components interact
+5. Diagnose errors in tests or runtime issues
+6. Get context on specific implementation details
+
+Note that this query is relatively slow and computationally expensive, so it should only be used when more advanced codebase understanding is needed and simpler methods aren't sufficient.
+
+The command is especially useful for quickly getting insights about unfamiliar codebases, understanding error messages, or finding the source of bugs without having to manually search through multiple files.
+
+## When NOT to Use
+
+Avoid using the `copytree ask` command in these situations:
+
+1. When you need to find specific text or identifiers (use `grep`, `find`, or IDE search instead)
+2. When you just need to locate a file by name (use `find` or IDE file navigation)
+3. For simple questions about syntax or language features (use documentation instead)
+
+For simple text searches, file location, or pattern matching, traditional tools like `grep` or `find`.
