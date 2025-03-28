@@ -83,10 +83,6 @@ class AskCommand extends Command
             return self::SUCCESS;
         }
 
-        // Show a spinner while generating the copytree
-        $this->output->write('<info>Analyzing project structure...</info> ');
-        $this->output->newLine();
-
         // Generate copytree output for the project
         $options = [
             'path' => $path,
