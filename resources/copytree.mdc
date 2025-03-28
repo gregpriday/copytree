@@ -12,7 +12,7 @@ You can start all complex agentic workflows by running the `copytree ask` comman
 
 The `copytree ask` command is also powerful as a last check before finishing a major change.
 
-Copytree ask is stateless, meaning each question is analyzed independently. You should provide context in your question to get the most accurate and relevant answers.
+Copytree ask is stateless, meaning each question is analyzed independently. You should provide context in your question to get the most accurate and relevant answers. The questions can be as long and detailed as you need. The following examples are short for illustrative purposes.
 
 ## Command Usage
 
