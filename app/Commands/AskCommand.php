@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Artisan;
 use LaravelZero\Framework\Commands\Command;
 use ValueError;
 
-class ProjectQuestionCommand extends Command
+class AskCommand extends Command
 {
     /**
      * The signature of the command.
