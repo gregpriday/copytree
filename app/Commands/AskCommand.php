@@ -2,13 +2,12 @@
 
 namespace App\Commands;
 
+use App\Services\ConversationStateService;
 use App\Services\ExpertSelectorService;
 use App\Services\ProjectQuestionService;
-use App\Services\ConversationStateService;
 use Illuminate\Support\Facades\Artisan;
 use LaravelZero\Framework\Commands\Command;
 use ValueError;
-use Illuminate\Support\Str;
 
 class AskCommand extends Command
 {
@@ -44,25 +43,25 @@ class AskCommand extends Command
         $path = $this->argument('path') ?: getcwd();
         $question = $this->argument('question');
         $expert = $this->option('expert');
-        
+
         // Handle state management
         $stateKey = null;
         $history = [];
-        
+
         // Check if the --state flag was provided on the command line
         $stateOptionProvided = $this->input->hasParameterOption(['--state', '-s']);
-        
+
         if ($stateOptionProvided) {
             $stateKeyInput = $this->option('state');
-            
+
             // If a non-empty state key was provided, use it
-            if (!empty($stateKeyInput)) {
+            if (! empty($stateKeyInput)) {
                 $stateKey = $stateKeyInput;
                 $this->info("Continuing conversation with state key: {$stateKey}");
-                
+
                 // Load history for the provided key
                 $history = $stateService->loadHistory($stateKey);
-                if (!empty($history)) {
+                if (! empty($history)) {
                     $this->comment('Loaded previous conversation history.');
                 } else {
                     $this->comment('No previous history found for this state key.');
@@ -76,10 +75,11 @@ class AskCommand extends Command
             // No state option provided - run in stateless mode
             $this->info('Running in stateless mode (use --state to enable conversation history).');
         }
-        
+
         // Show available experts if requested with special flag
         if ($question === '--show-experts') {
             $this->showExperts($questionService);
+
             return self::SUCCESS;
         }
 
@@ -127,7 +127,7 @@ class AskCommand extends Command
         $this->output->newLine();
 
         $fullResponseText = ''; // Accumulate the full response
-        
+
         try {
             // Pass history to the question service
             $stream = $questionService->askQuestion($copytree, $question, $expert, $history);
@@ -138,10 +138,10 @@ class AskCommand extends Command
                 $this->output->write($text);
                 $fullResponseText .= $text; // Accumulate text
             }
-            
+
             // Add a final newline after the complete response
             $this->output->newLine();
-            
+
             // Save interaction if state key is active
             if ($stateKey) {
                 $stateService->saveMessage($stateKey, 'user', $question);
@@ -149,14 +149,23 @@ class AskCommand extends Command
                 $this->comment("Saved interaction to state: {$stateKey}");
             }
 
+            // Perform silent garbage collection
+            $this->runGarbageCollection($stateService);
+
             return self::SUCCESS;
         } catch (ValueError $e) {
             $this->error('Gemini API Content Error: '.$e->getMessage());
             $this->info('This error can occur when content is filtered by safety systems. Try rephrasing your question.');
 
+            // Perform silent garbage collection even on failure
+            $this->runGarbageCollection($stateService);
+
             return self::FAILURE;
         } catch (\Exception $e) {
             $this->error('Error: '.$e->getMessage());
+
+            // Perform silent garbage collection even on failure
+            $this->runGarbageCollection($stateService);
 
             return self::FAILURE;
         }
@@ -180,5 +189,20 @@ class AskCommand extends Command
         $this->line('Usage examples:');
         $this->line('- <comment>copytree ask "Your question here" --expert=expert_name</comment> (replace expert_name with one of the above)');
         $this->line('- <comment>copytree ask "Your question here" --expert=auto</comment> (for automatic selection)');
+    }
+
+    /**
+     * Run the state garbage collection silently.
+     */
+    protected function runGarbageCollection(ConversationStateService $stateService): void
+    {
+        try {
+            $gcDays = config('state.garbage_collection.default_days', 7);
+            if ($gcDays > 0) {
+                $stateService->deleteOldStates($gcDays);
+            }
+        } catch (\Exception $e) {
+            // Fail silently, no logging needed
+        }
     }
 }

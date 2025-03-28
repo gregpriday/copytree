@@ -2,20 +2,30 @@
 
 namespace App\Services;
 
+use Carbon\Carbon;
+use Exception;
+use Gemini\Enums\Role;
+use Gemini\Laravel\Facades\Gemini;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
-use Gemini\Laravel\Facades\Gemini;
-use Gemini\Enums\Role;
+use PDOException;
+use RuntimeException;
 
 class ConversationStateService
 {
     protected string $connection = 'copytree_state';
+
     protected string $table = 'conversation_history';
+
     protected int $maxHistoryItems; // Number of most recent exchanges to load
+
     protected int $summaryMaxLength; // Max characters for summarized response
-    
+
     /**
      * The summarization service instance.
      */
@@ -24,46 +34,80 @@ class ConversationStateService
     public function __construct(SummarizationService $summarizationService)
     {
         $this->summarizationService = $summarizationService;
-        
+
         // Load configuration values
         $this->maxHistoryItems = config('state.history_limit', 10);
         $this->summaryMaxLength = config('state.summary_length', 500);
-        
+
         $this->ensureDatabaseExists();
     }
 
     /**
-     * Ensure the SQLite database file and table exist.
+     * Ensure the SQLite database file exists and has the necessary tables.
+     * This method will:
+     * 1. Check if the database directory exists, create if not
+     * 2. Check if the database file exists, create if not
+     * 3. Check if the conversation_history table exists, run migrations if not
      */
     protected function ensureDatabaseExists(): void
     {
         $dbPath = config("database.connections.{$this->connection}.database");
         $dbDir = dirname($dbPath);
+        $dbFileExisted = File::exists($dbPath);
+        $runMigrations = false;
 
-        if (!File::isDirectory($dbDir)) {
-            File::makeDirectory($dbDir, 0755, true);
+        // Ensure the directory exists
+        if (! File::isDirectory($dbDir)) {
+            try {
+                File::makeDirectory($dbDir, 0755, true);
+            } catch (Exception $e) {
+                throw new RuntimeException("Failed to create state database directory at {$dbDir}: ".$e->getMessage());
+            }
         }
 
-        if (!File::exists($dbPath)) {
-            File::put($dbPath, ''); // Create the file
+        // Ensure the SQLite database file exists
+        if (! $dbFileExisted) {
+            try {
+                File::put($dbPath, ''); // Create the empty file
+                $runMigrations = true; // Need to run migrations for a new file
+            } catch (Exception $e) {
+                throw new RuntimeException("Failed to create state database file at {$dbPath}: ".$e->getMessage());
+            }
+        } else {
+            // Check if the table exists in an existing database file
+            try {
+                if (! Schema::connection($this->connection)->hasTable($this->table)) {
+                    $runMigrations = true; // Table doesn't exist, need to run migrations
+                }
+            } catch (PDOException $e) {
+                // Catch PDO exceptions which might occur if the file is corrupt or not a valid DB
+                Log::warning("Error checking state database table '{$this->table}': ".$e->getMessage().'. Attempting migration.');
+                $runMigrations = true;
+            }
         }
 
-        try {
-            // Use the specific connection
-            $pdo = DB::connection($this->connection)->getPdo();
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS {$this->table} (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    state_key TEXT NOT NULL,
-                    role TEXT NOT NULL CHECK(role IN ('user', 'model')),
-                    content TEXT NOT NULL,
-                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        // Run migrations if needed (new file or missing tables)
+        if ($runMigrations) {
+            Log::info("State database file or table '{$this->table}' missing or check failed. Running migrations...");
+            try {
+                Artisan::call('migrate', [
+                    '--database' => $this->connection,
+                    '--path' => 'database/migrations', // Be explicit about the path
+                    '--force' => true, // Force in production environments
+                ]);
+                Log::info('State database migrations completed successfully.');
+
+                // Verify table exists after migration attempt
+                if (! Schema::connection($this->connection)->hasTable($this->table)) {
+                    throw new RuntimeException("Migrations ran but table '{$this->table}' still not found. Check migration files and permissions.");
+                }
+            } catch (Exception $e) {
+                Log::error('Failed to run migrations for state database: '.$e->getMessage());
+                throw new RuntimeException(
+                    'Failed to automatically set up the state database tables. '.
+                    'Please check logs and ensure migrations can run. Error: '.$e->getMessage()
                 );
-            ");
-            $pdo->exec("CREATE INDEX IF NOT EXISTS idx_state_key ON {$this->table} (state_key);");
-            $pdo->exec("CREATE INDEX IF NOT EXISTS idx_timestamp ON {$this->table} (timestamp);");
-        } catch (\Exception $e) {
-            throw new \RuntimeException("Failed to ensure database table exists: " . $e->getMessage());
+            }
         }
     }
 
@@ -83,30 +127,37 @@ class ConversationStateService
      */
     public function loadHistory(string $stateKey): array
     {
-        $messages = DB::connection($this->connection)
-            ->table($this->table)
-            ->where('state_key', $stateKey)
-            ->orderBy('timestamp', 'asc')
-            // Limit the number of messages retrieved to prevent overly long prompts
-            ->limit($this->maxHistoryItems * 2) // *2 because each interaction is 2 messages
-            ->get(['role', 'content'])
-            ->toArray();
+        try {
+            $messages = DB::connection($this->connection)
+                ->table($this->table)
+                ->where('state_key', $stateKey)
+                ->orderBy('id', 'asc') // Order by id for reliable chronological ordering
+                // Limit the number of messages retrieved to prevent overly long prompts
+                ->limit($this->maxHistoryItems * 2) // *2 because each interaction is 2 messages
+                ->get(['role', 'content'])
+                ->toArray();
 
-        // Format history for Gemini
-        $formattedHistory = [];
-        foreach ($messages as $message) {
-            $formattedHistory[] = [
-                'role' => $message->role, 
-                'content' => $message->content
-            ];
+            // Format history for Gemini
+            $formattedHistory = [];
+            foreach ($messages as $message) {
+                $formattedHistory[] = [
+                    'role' => $message->role,
+                    'content' => $message->content,
+                ];
+            }
+
+            // If history is too long, take only the most recent items
+            if (count($formattedHistory) > $this->maxHistoryItems * 2) {
+                $formattedHistory = array_slice($formattedHistory, -$this->maxHistoryItems * 2);
+            }
+
+            return $formattedHistory;
+        } catch (QueryException $e) {
+            // Log the error and return empty array
+            Log::error("Database error loading history for state {$stateKey}: ".$e->getMessage());
+
+            return [];
         }
-
-        // If history is too long, take only the most recent items
-        if (count($formattedHistory) > $this->maxHistoryItems * 2) {
-            $formattedHistory = array_slice($formattedHistory, -$this->maxHistoryItems * 2);
-        }
-
-        return $formattedHistory;
     }
 
     /**
@@ -125,26 +176,31 @@ class ConversationStateService
         if ($validRole === 'model') {
             try {
                 $saveContent = $this->summarizeResponse($content);
-                
+
                 // Only wrap in XML tags if the content was actually summarized
                 if ($saveContent !== $content) {
                     $saveContent = "<ct:summary>{$saveContent}</ct:summary>";
                 }
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Log the error and save the truncated original content as fallback
-                \Illuminate\Support\Facades\Log::error("Failed to summarize response for state {$stateKey}: " . $e->getMessage());
+                Log::error("Failed to summarize response for state {$stateKey}: ".$e->getMessage());
                 $saveContent = Str::limit($content, $this->summaryMaxLength, '...');
                 // Mark truncated content as well
                 $saveContent = "<ct:truncated>{$saveContent}</ct:truncated>";
             }
         }
 
-        DB::connection($this->connection)->table($this->table)->insert([
-            'state_key' => $stateKey,
-            'role' => $validRole,
-            'content' => $saveContent, // Save summarized or original content
-            'timestamp' => Carbon::now(),
-        ]);
+        try {
+            DB::connection($this->connection)->table($this->table)->insert([
+                'state_key' => $stateKey,
+                'role' => $validRole,
+                'content' => $saveContent, // Save summarized or original content
+                'timestamp' => Carbon::now(),
+            ]);
+        } catch (QueryException $e) {
+            Log::error("Database error saving message for state {$stateKey}: ".$e->getMessage());
+            throw $e;
+        }
     }
 
     /**
@@ -159,14 +215,21 @@ class ConversationStateService
      * Delete conversation history older than a specified number of days.
      * If no days are specified, uses the default from configuration.
      */
-    public function deleteOldStates(int $days = null): int
+    public function deleteOldStates(?int $days = null): int
     {
         $daysToKeep = $days ?? config('state.garbage_collection.default_days', 7);
         $cutoffDate = Carbon::now()->subDays($daysToKeep)->toDateTimeString();
 
-        return DB::connection($this->connection)
-            ->table($this->table)
-            ->where('timestamp', '<', $cutoffDate)
-            ->delete();
+        try {
+            return DB::connection($this->connection)
+                ->table($this->table)
+                ->where('timestamp', '<', $cutoffDate)
+                ->delete();
+        } catch (QueryException $e) {
+            // Log the error but don't halt execution for GC failure
+            Log::warning('Database error during state garbage collection: '.$e->getMessage());
+
+            return 0; // Indicate no rows were deleted
+        }
     }
-} 
+}

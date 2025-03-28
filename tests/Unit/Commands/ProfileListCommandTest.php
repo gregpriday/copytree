@@ -15,4 +15,4 @@ class ProfileListCommandTest extends TestCase
         $this->artisan('profile:list')
             ->assertSuccessful();
     }
-} 
+}

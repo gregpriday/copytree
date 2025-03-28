@@ -4,7 +4,6 @@ namespace App\Services;
 
 use Gemini\Data\Content;
 use Gemini\Data\GenerationConfig;
-use Gemini\Enums\Role;
 use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -52,7 +51,7 @@ class ProjectQuestionService
      * @param  string  $projectCopytree  The copytree output of the project
      * @param  string  $question  The user's question about the project
      * @param  string  $expert  The expert to use (defaults to 'default')
-     * @param  array   $history  Optional conversation history for stateful interactions
+     * @param  array  $history  Optional conversation history for stateful interactions
      * @return iterable The stream of partial responses from Gemini
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
@@ -77,20 +76,20 @@ class ProjectQuestionService
 
         // Format history as text if available
         $historyText = '';
-        if (!empty($history)) {
+        if (! empty($history)) {
             $historyText .= "Previous conversation:\n\n";
             foreach ($history as $histItem) {
                 // Process text to remove XML tags if present
                 $messageText = $histItem['content'];
                 $messageText = preg_replace('/<ct:(summary|truncated)>(.*?)<\/ct:\1>/s', '$2', $messageText);
-                
-                $historyText .= ($histItem['role'] === 'user' ? "User: " : "Assistant: ") . $messageText . "\n\n";
+
+                $historyText .= ($histItem['role'] === 'user' ? 'User: ' : 'Assistant: ').$messageText."\n\n";
             }
             $historyText .= "Current question:\n\n";
         }
 
         // Build the combined prompt with history, project structure, and question
-        $prompt = $historyText . "Here is the project structure and files:\n\n{$projectCopytree}\n\nUser question: {$question}";
+        $prompt = $historyText."Here is the project structure and files:\n\n{$projectCopytree}\n\nUser question: {$question}";
 
         // Configure the generation parameters
         $generationConfig = new GenerationConfig(
@@ -112,7 +111,7 @@ class ProjectQuestionService
                 } catch (ValueError $e) {
                     // For ValueError, log the error
                     Log::warning('ValueError in askQuestion: '.$e->getMessage());
-                    
+
                     // Rethrow to trigger retry
                     throw $e;
                 }

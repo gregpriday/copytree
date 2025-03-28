@@ -19,6 +19,7 @@ Copytree is a command‑line utility for macOS that copies a directory's structu
     - [Profile Creation](#profile-creation)
 - [Advanced Usage](#advanced-usage)
     - [GitHub URL Handling](#github-url-handling)
+    - [Conversation History Management](#conversation-history-management)
     - [File Transformation Pipeline](#file-transformation-pipeline)
     - [Smart Filename Generation](#smart-filename-generation)
 - [Configuration](#configuration)
@@ -199,15 +200,24 @@ Copytree can clone and cache remote GitHub repositories. It supports several URL
 - **Specific Branch:** `https://github.com/username/repository/tree/branch_name`
 - **Subdirectory:** `https://github.com/username/repository/tree/branch_name/path/to/directory`
 
-Examples:
+### Conversation History Management
 
-```bash
-copytree https://github.com/laravel/framework  # Clones the default branch
-copytree https://github.com/laravel/framework/tree/11.x  # Clones the 11.x branch
-copytree https://github.com/laravel/framework/tree/11.x/src/Illuminate/Support # Clones only the src/Illuminate/Support directory
-copytree https://github.com/octocat/Hello-World/tree/master --no-cache #Clones without caching
-copytree cache:clear # Clears the entire github cache
-```
+Copytree manages conversation history for the `ask` command using migrations to set up the necessary database tables. 
+
+- **Migrations:** When you run `copytree install:copytree`, it automatically sets up the database using migrations.
+- **Using History:** To use conversation history with the `ask` command, use the `--state` option:
+
+  ```bash
+  copytree ask "What does this code do?" --state
+  ```
+
+  This generates a new state key for tracking the conversation. For subsequent questions, include the state key to continue the same conversation:
+
+  ```bash
+  copytree ask "How can I improve it?" --state=a1b2c3d4
+  ```
+
+- **Database Management:** The database for conversation history is automatically set up when needed. You don't need to run any separate commands to create or update the database structure.
 
 ### File Transformation Pipeline
 
@@ -257,7 +267,7 @@ Copytree uses a few configuration files to control the behaviour of the applicat
 
 ## Contributing
 
-Contributions are welcome\! If you’d like to add features or fix bugs:
+Contributions are welcome\! If you'd like to add features or fix bugs:
 
 1.  Fork the repository.
 2.  Create a feature branch.

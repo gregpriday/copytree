@@ -6,7 +6,7 @@ return [
     | Conversation State Management
     |--------------------------------------------------------------------------
     |
-    | Here you may configure the conversation state management used by the 
+    | Here you may configure the conversation state management used by the
     | copytree ask command to maintain conversation history between commands.
     |
     */
@@ -47,4 +47,4 @@ return [
         // Default number of days after which history is considered stale
         'default_days' => env('COPYTREE_GC_DAYS', 7),
     ],
-]; 
+];

@@ -23,8 +23,6 @@ class ProfileListCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return int
      */
     public function handle(): int
     {
@@ -32,7 +30,7 @@ class ProfileListCommand extends Command
         $projectPath = getcwd(); // Get current working directory
 
         // --- Find Project-Specific Profiles (.ctree) ---
-        $projectCtreeDir = $projectPath . DIRECTORY_SEPARATOR . '.ctree';
+        $projectCtreeDir = $projectPath.DIRECTORY_SEPARATOR.'.ctree';
         if (File::isDirectory($projectCtreeDir)) {
             // Use glob to find yaml and yml files
             $projectProfileFiles = array_merge(
@@ -54,7 +52,7 @@ class ProfileListCommand extends Command
         // --- Find Built-in Profiles (profiles directory) ---
         $builtinProfilesDir = base_path('profiles');
         if (File::isDirectory($builtinProfilesDir)) {
-             // Use glob to find yaml and yml files
+            // Use glob to find yaml and yml files
             $builtinProfileFiles = array_merge(
                 $this->globFiles($builtinProfilesDir, '*.yaml'),
                 $this->globFiles($builtinProfilesDir, '*.yml')
@@ -63,7 +61,7 @@ class ProfileListCommand extends Command
             foreach ($builtinProfileFiles as $filePath) {
                 $profileName = pathinfo($filePath, PATHINFO_FILENAME);
                 // Only add if not already defined as a project profile (project overrides built-in)
-                if (!isset($profiles[$profileName])) {
+                if (! isset($profiles[$profileName])) {
                     $profiles[$profileName] = [
                         'name' => $profileName,
                         'type' => 'Built-in',
@@ -76,6 +74,7 @@ class ProfileListCommand extends Command
         // --- Display Profiles ---
         if (empty($profiles)) {
             $this->info('No CopyTree profiles found.');
+
             return self::SUCCESS;
         }
 
@@ -87,8 +86,8 @@ class ProfileListCommand extends Command
         foreach ($profiles as $profile) {
             // Make path relative to project or app base for readability
             $displayPath = str_starts_with($profile['path'], $projectPath)
-                ? str_replace($projectPath . DIRECTORY_SEPARATOR, '', $profile['path'])
-                : str_replace(base_path() . DIRECTORY_SEPARATOR, '', $profile['path']);
+                ? str_replace($projectPath.DIRECTORY_SEPARATOR, '', $profile['path'])
+                : str_replace(base_path().DIRECTORY_SEPARATOR, '', $profile['path']);
 
             $tableData[] = [
                 'Name' => $profile['name'],
@@ -108,12 +107,12 @@ class ProfileListCommand extends Command
     /**
      * Wrapper for the glob function to make testing easier.
      *
-     * @param string $directory The directory to search in
-     * @param string $pattern The glob pattern
+     * @param  string  $directory  The directory to search in
+     * @param  string  $pattern  The glob pattern
      * @return array An array of file paths
      */
     protected function globFiles(string $directory, string $pattern): array
     {
-        return glob($directory . DIRECTORY_SEPARATOR . $pattern);
+        return glob($directory.DIRECTORY_SEPARATOR.$pattern);
     }
 }

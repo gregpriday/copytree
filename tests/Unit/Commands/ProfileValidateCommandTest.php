@@ -15,4 +15,4 @@ class ProfileValidateCommandTest extends TestCase
         $this->artisan('profile:validate')
             ->assertSuccessful();
     }
-} 
+}

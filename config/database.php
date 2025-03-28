@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Str;
-
 return [
     'default' => env('DB_CONNECTION', 'sqlite'),
 
@@ -26,4 +24,4 @@ return [
         'table' => 'migrations',
         'path' => database_path('migrations'),
     ],
-]; 
+];

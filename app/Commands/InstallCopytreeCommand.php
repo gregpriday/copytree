@@ -2,6 +2,8 @@
 
 namespace App\Commands;
 
+use App\Services\ConversationStateService;
+use App\Services\SummarizationService;
 use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\File;
 use LaravelZero\Framework\Commands\Command;
@@ -129,6 +131,59 @@ class InstallCopytreeCommand extends Command
 
         // All done!
         $this->line('');
+
+        // Step 6: Set up the database for conversation history
+        $this->line('Setting up the database for conversation history...');
+        try {
+            // Check if the old conversation_history table already exists
+            $oldTableExists = false;
+            $dbPath = config('database.connections.copytree_state.database');
+
+            if (File::exists($dbPath)) {
+                // Connect to the database and check if the table exists
+                $pdo = new \PDO("sqlite:{$dbPath}");
+                $stmt = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_history'");
+
+                // Check if the conversation_history table exists
+                $oldTableExists = $stmt->fetch() !== false;
+
+                // Check if the migrations table exists (indicating the table was created via migrations)
+                $stmtMigrations = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'");
+                if ($stmtMigrations->fetch() !== false) {
+                    $oldTableExists = false; // Not considered an "old" table if migrations table exists
+                }
+            }
+
+            if ($oldTableExists) {
+                $this->warn('Detected existing conversation_history table created with the old method.');
+                if ($this->confirm('Would you like to recreate it using migrations? This will delete your existing conversation history.', false)) {
+                    // Backup the existing database
+                    $backupPath = $dbPath.'.bak.'.date('YmdHis');
+                    File::copy($dbPath, $backupPath);
+                    $this->info("✓ Backed up existing database to {$backupPath}");
+
+                    // Delete the existing database file to start fresh
+                    File::delete($dbPath);
+                    $this->info('✓ Removed existing database to allow fresh migration');
+
+                    // Instantiate the ConversationStateService to trigger automatic migration
+                    app(SummarizationService::class); // Dependency for ConversationStateService
+                    app(ConversationStateService::class);
+                    $this->info('✓ Database setup completed successfully via service');
+                } else {
+                    $this->info('Keeping existing conversation_history table.');
+                }
+            } else {
+                // Instantiate the ConversationStateService to trigger automatic migration
+                app(SummarizationService::class); // Dependency for ConversationStateService
+                app(ConversationStateService::class);
+                $this->info('✓ Database setup completed successfully');
+            }
+        } catch (\Exception $e) {
+            $this->error('Failed to setup database: '.$e->getMessage());
+            $this->warn('You may need to manually check permissions or database file corruption.');
+        }
+
         $this->info('🎉 Copytree installation completed successfully!');
 
         return self::SUCCESS;
