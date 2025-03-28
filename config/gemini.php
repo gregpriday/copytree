@@ -40,4 +40,5 @@ return [
     'model' => env('GEMINI_MODEL', 'models/gemini-2.0-flash'),
     'model_pro' => env('GEMINI_MODEL_PRO', 'gemini-2.5-pro-exp-03-25'),
     'model_thinking' => env('GEMINI_MODEL_THINKING', 'gemini-2.0-flash-thinking-exp-01-21'),
+    'model_flash' => env('GEMINI_MODEL_FLASH', 'models/gemini-2.0-flash'),
 ];

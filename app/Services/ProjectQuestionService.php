@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Gemini\Data\Content;
 use Gemini\Data\GenerationConfig;
+use Gemini\Enums\Role;
 use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -46,16 +47,18 @@ class ProjectQuestionService
 
     /**
      * Ask a question about the project using a specified expert and stream the response.
+     * Optionally includes conversation history for stateful interactions.
      *
      * @param  string  $projectCopytree  The copytree output of the project
      * @param  string  $question  The user's question about the project
      * @param  string  $expert  The expert to use (defaults to 'default')
+     * @param  array   $history  Optional conversation history for stateful interactions
      * @return iterable The stream of partial responses from Gemini
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
      * @throws ValueError When the API returns no candidates after all retries
      */
-    public function askQuestion(string $projectCopytree, string $question, string $expert = 'default'): iterable
+    public function askQuestion(string $projectCopytree, string $question, string $expert = 'default', array $history = []): iterable
     {
         // Build the path to the expert's system prompt
         $expertPromptPath = $this->getExpertPromptPath($expert);
@@ -64,7 +67,7 @@ class ProjectQuestionService
         if (! File::exists($expertPromptPath)) {
             // If expert doesn't exist, fall back to the default expert
             if ($expert !== 'default') {
-                return $this->askQuestion($projectCopytree, $question, 'default');
+                return $this->askQuestion($projectCopytree, $question, 'default', $history);
             }
 
             throw new RuntimeException("System prompt for expert '{$expert}' not found at {$expertPromptPath}.");
@@ -72,8 +75,22 @@ class ProjectQuestionService
 
         $systemPrompt = File::get($expertPromptPath);
 
-        // Build the combined prompt with the project copytree and the user's question
-        $prompt = "Here is the project structure and files:\n\n{$projectCopytree}\n\nUser question: {$question}";
+        // Format history as text if available
+        $historyText = '';
+        if (!empty($history)) {
+            $historyText .= "Previous conversation:\n\n";
+            foreach ($history as $histItem) {
+                // Process text to remove XML tags if present
+                $messageText = $histItem['content'];
+                $messageText = preg_replace('/<ct:(summary|truncated)>(.*?)<\/ct:\1>/s', '$2', $messageText);
+                
+                $historyText .= ($histItem['role'] === 'user' ? "User: " : "Assistant: ") . $messageText . "\n\n";
+            }
+            $historyText .= "Current question:\n\n";
+        }
+
+        // Build the combined prompt with history, project structure, and question
+        $prompt = $historyText . "Here is the project structure and files:\n\n{$projectCopytree}\n\nUser question: {$question}";
 
         // Configure the generation parameters
         $generationConfig = new GenerationConfig(
@@ -85,7 +102,7 @@ class ProjectQuestionService
 
         try {
             // Use Laravel's retry helper
-            return retry(self::MAX_RETRIES, function () use ($systemPrompt, $generationConfig, $prompt, $projectCopytree, $question) {
+            return retry(self::MAX_RETRIES, function () use ($systemPrompt, $generationConfig, $prompt) {
                 try {
                     // Stream content using Gemini thinking model
                     return Gemini::generativeModel(model: $this->model)
@@ -93,12 +110,9 @@ class ProjectQuestionService
                         ->withGenerationConfig($generationConfig)
                         ->streamGenerateContent($prompt);
                 } catch (ValueError $e) {
-                    // For ValueError, modify the prompt slightly on retries
+                    // For ValueError, log the error
                     Log::warning('ValueError in askQuestion: '.$e->getMessage());
-
-                    // Slight variation in the prompt to avoid the same filtering
-                    $prompt = "Project structure:\n\n{$projectCopytree}\n\nPlease answer this question: {$question}";
-
+                    
                     // Rethrow to trigger retry
                     throw $e;
                 }

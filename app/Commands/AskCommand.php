@@ -4,9 +4,11 @@ namespace App\Commands;
 
 use App\Services\ExpertSelectorService;
 use App\Services\ProjectQuestionService;
+use App\Services\ConversationStateService;
 use Illuminate\Support\Facades\Artisan;
 use LaravelZero\Framework\Commands\Command;
 use ValueError;
+use Illuminate\Support\Str;
 
 class AskCommand extends Command
 {
@@ -24,28 +26,60 @@ class AskCommand extends Command
         {--a|ai-filter=* : Filter files using AI based on a natural language description.}
         {--m|modified : Only include files that have been modified since the last commit.}
         {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
-        {--e|expert=auto : The expert to use for answering the question (use "auto" for automatic selection).}';
+        {--e|expert=auto : The expert to use for answering the question (use "auto" for automatic selection).}
+        {--s|state= : Optional state key to maintain conversation history. If provided without value, a new key is generated.}';
 
     /**
      * The description of the command.
      *
      * @var string
      */
-    protected $description = 'Ask a question about the project codebase and get AI assistance with streaming output';
+    protected $description = 'Ask a question about the project codebase with optional state management';
 
     /**
      * Execute the console command.
      */
-    public function handle(ProjectQuestionService $questionService, ExpertSelectorService $expertSelectorService): int
+    public function handle(ProjectQuestionService $questionService, ExpertSelectorService $expertSelectorService, ConversationStateService $stateService): int
     {
         $path = $this->argument('path') ?: getcwd();
         $question = $this->argument('question');
         $expert = $this->option('expert');
-
+        
+        // Handle state management
+        $stateKey = null;
+        $history = [];
+        
+        // Check if the --state flag was provided on the command line
+        $stateOptionProvided = $this->input->hasParameterOption(['--state', '-s']);
+        
+        if ($stateOptionProvided) {
+            $stateKeyInput = $this->option('state');
+            
+            // If a non-empty state key was provided, use it
+            if (!empty($stateKeyInput)) {
+                $stateKey = $stateKeyInput;
+                $this->info("Continuing conversation with state key: {$stateKey}");
+                
+                // Load history for the provided key
+                $history = $stateService->loadHistory($stateKey);
+                if (!empty($history)) {
+                    $this->comment('Loaded previous conversation history.');
+                } else {
+                    $this->comment('No previous history found for this state key.');
+                }
+            } else {
+                // If --state was provided without a value or with an empty value, generate a new key
+                $stateKey = $stateService->generateStateKey();
+                $this->info("Starting new conversation with state key: {$stateKey}");
+            }
+        } else {
+            // No state option provided - run in stateless mode
+            $this->info('Running in stateless mode (use --state to enable conversation history).');
+        }
+        
         // Show available experts if requested with special flag
         if ($question === '--show-experts') {
             $this->showExperts($questionService);
-
             return self::SUCCESS;
         }
 
@@ -92,17 +126,28 @@ class AskCommand extends Command
         $this->output->write("<info>Thinking about your question (using expert: {$expert})...</info> ");
         $this->output->newLine();
 
+        $fullResponseText = ''; // Accumulate the full response
+        
         try {
-            // Get the stream of responses from the question service
-            $stream = $questionService->askQuestion($copytree, $question, $expert);
+            // Pass history to the question service
+            $stream = $questionService->askQuestion($copytree, $question, $expert, $history);
 
             // Process and display each partial response as it arrives
             foreach ($stream as $partialResponse) {
-                $this->output->write($partialResponse->text());
+                $text = $partialResponse->text();
+                $this->output->write($text);
+                $fullResponseText .= $text; // Accumulate text
             }
-
+            
             // Add a final newline after the complete response
             $this->output->newLine();
+            
+            // Save interaction if state key is active
+            if ($stateKey) {
+                $stateService->saveMessage($stateKey, 'user', $question);
+                $stateService->saveMessage($stateKey, 'model', $fullResponseText);
+                $this->comment("Saved interaction to state: {$stateKey}");
+            }
 
             return self::SUCCESS;
         } catch (ValueError $e) {
