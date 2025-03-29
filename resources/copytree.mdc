@@ -10,6 +10,8 @@ The `copytree ask` command allows you to ask questions about the codebase to und
 
 You can start all complex agentic workflows by running the `copytree ask` command, or run it after encountering test errors to establish possible causes. This will help you establish a baseline understanding of the codebase in a way that helps you start tackling complex problems. It's also particularly useful to ask where to add debugging code for stubborn issues.
 
+Always use `--state=<state_key>` to ask a follow up question. This will let copytree maintain context and understanding across multiple queries.
+
 The `copytree ask` command is also powerful as a last check before finishing a major change.
 
 ## Command Usage

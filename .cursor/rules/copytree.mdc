@@ -10,6 +10,8 @@ The `copytree ask` command allows you to ask questions about the codebase to und
 
 You can start all complex agentic workflows by running the `copytree ask` command, or run it after encountering test errors to establish possible causes. This will help you establish a baseline understanding of the codebase in a way that helps you start tackling complex problems. It's also particularly useful to ask where to add debugging code for stubborn issues.
 
+Always use `--state=<state_key>` to ask a follow up question. This will let copytree maintain context and understanding across multiple queries.
+
 The `copytree ask` command is also powerful as a last check before finishing a major change.
 
 ## Command Usage
@@ -20,11 +22,13 @@ copytree ask "Your question about the codebase" [--state[=<state_key>]] [other o
 
 This command must be executed from the project directory. It will analyze the codebase and provide intelligent responses about the code's structure, functionality, and specific implementation details.
 
-## State Management (Optional)
+## State Management
 
 By default, `copytree ask` is stateless, meaning each question is analyzed independently without knowledge of previous interactions.
 
 You can optionally maintain conversation history using the `--state` flag. This is useful when you need to ask follow-up questions or perform a series of related commands where context is important. Start a state whenever you expect to ask follow-up questions or need to maintain context across multiple queries.
+
+Generally, it's safer to use stateful mode for most interactions, as it allows you to build on previous context and maintain a coherent conversation. Only use stateless mode for isolated questions where you know you won't need follow up questions.
 
 * **Starting a New Stateful Conversation:**
     To begin a new conversation and generate a state key, use the flag without a value:
