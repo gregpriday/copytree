@@ -26,14 +26,14 @@ class AskCommand extends Command
         {--m|modified : Only include files that have been modified since the last commit.}
         {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
         {--e|expert=auto : The expert to use for answering the question (use "auto" for automatic selection).}
-        {--s|state= : Optional state key to maintain conversation history. If provided without value, a new key is generated.}';
+        {--s|state= : Optional state key to continue a previous conversation. If not provided, a new state key is generated.}';
 
     /**
      * The description of the command.
      *
      * @var string
      */
-    protected $description = 'Ask a question about the project codebase with optional state management';
+    protected $description = 'Ask a question about the project codebase with the ability to maintain conversation state.';
 
     /**
      * Execute the console command.
@@ -45,35 +45,25 @@ class AskCommand extends Command
         $expert = $this->option('expert');
 
         // Handle state management
-        $stateKey = null;
         $history = [];
+        $stateKeyInput = $this->option('state');
 
-        // Check if the --state flag was provided on the command line
-        $stateOptionProvided = $this->input->hasParameterOption(['--state', '-s']);
+        // If a non-empty state key was provided, use it to continue conversation
+        if (!empty($stateKeyInput)) {
+            $stateKey = $stateKeyInput;
+            $this->info("Continuing conversation with state key: {$stateKey}");
 
-        if ($stateOptionProvided) {
-            $stateKeyInput = $this->option('state');
-
-            // If a non-empty state key was provided, use it
-            if (! empty($stateKeyInput)) {
-                $stateKey = $stateKeyInput;
-                $this->info("Continuing conversation with state key: {$stateKey}");
-
-                // Load history for the provided key
-                $history = $stateService->loadHistory($stateKey);
-                if (! empty($history)) {
-                    $this->comment('Loaded previous conversation history.');
-                } else {
-                    $this->comment('No previous history found for this state key.');
-                }
+            // Load history for the provided key
+            $history = $stateService->loadHistory($stateKey);
+            if (!empty($history)) {
+                $this->comment('Loaded previous conversation history.');
             } else {
-                // If --state was provided without a value or with an empty value, generate a new key
-                $stateKey = $stateService->generateStateKey();
-                $this->info("Starting new conversation with state key: {$stateKey}");
+                $this->comment('No previous history found for this state key. Starting fresh.');
             }
         } else {
-            // No state option provided - run in stateless mode
-            $this->info('Running in stateless mode (use --state to enable conversation history).');
+            // No state key provided, always generate a new one
+            $stateKey = $stateService->generateStateKey();
+            $this->info("Starting new conversation with state key: {$stateKey}");
         }
 
         // Show available experts if requested with special flag
@@ -138,12 +128,12 @@ class AskCommand extends Command
             // Add a final newline after the complete response
             $this->output->newLine();
 
-            // Save interaction if state key is active
-            if ($stateKey) {
-                $stateService->saveMessage($stateKey, 'user', $question);
-                $stateService->saveMessage($stateKey, 'model', $fullResponseText);
-                $this->comment("Saved interaction to state: {$stateKey}");
-            }
+            // Save interaction - state key will always be set now
+            $stateService->saveMessage($stateKey, 'user', $question);
+            $stateService->saveMessage($stateKey, 'model', $fullResponseText);
+
+            $this->newLine();
+            $this->comment("Continue conversation using `copytree ask \"{{question}}\" --state {$stateKey}`");
 
             // Perform silent garbage collection
             $this->runGarbageCollection($stateService);
