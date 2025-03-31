@@ -100,9 +100,6 @@ class AskCommand extends Command
             try {
                 $expert = $expertSelectorService->selectExpert($question);
                 // If we get the default expert after auto-selection, let the user know
-                if ($expert === ExpertSelectorService::DEFAULT_EXPERT) {
-                    $this->comment('Note: Expert auto-selection defaulted to "default" expert. This may happen due to API limitations or content filters.');
-                }
             } catch (\Exception $e) {
                 $this->warning('Expert auto-selection failed, using default expert instead: '.$e->getMessage());
                 $expert = ExpertSelectorService::DEFAULT_EXPERT;
@@ -133,7 +130,7 @@ class AskCommand extends Command
             $stateService->saveMessage($stateKey, 'model', $fullResponseText);
 
             $this->newLine();
-            $this->comment("Continue conversation using `copytree ask \"{{question}}\" --state {$stateKey}`");
+            $this->info("Ask follow up questions using `copytree ask '{{question}}' --state {$stateKey}`");
 
             // Perform silent garbage collection
             $this->runGarbageCollection($stateService);
