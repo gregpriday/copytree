@@ -24,8 +24,8 @@ class SummarizationService
      */
     public function __construct()
     {
-        // Use the Gemini Flash model defined in config, or fallback to the default model
-        $this->model = config('gemini.model_flash', config('gemini.model'));
+        // Use the model specifically configured for summarization tasks
+        $this->model = config('gemini.summarization_model');
     }
 
     /**

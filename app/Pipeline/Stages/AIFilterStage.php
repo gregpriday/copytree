@@ -7,6 +7,8 @@ use Gemini\Data\Content;
 use Gemini\Laravel\Facades\Gemini;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class AIFilterStage implements FilePipelineStageInterface
 {
@@ -65,8 +67,8 @@ class AIFilterStage implements FilePipelineStageInterface
         }
 
         try {
-            // Generate content using Gemini.
-            $response = Gemini::generativeModel(model: config('gemini.model'))
+            // Generate content using Gemini with the model optimized for classification tasks
+            $response = Gemini::generativeModel(model: config('gemini.classification_model'))
                 ->withSystemInstruction(Content::parse($systemPrompt))
                 ->generateContent($promptText);
         } catch (\Exception $e) {
@@ -108,5 +110,49 @@ class AIFilterStage implements FilePipelineStageInterface
         $contents = file_get_contents($file->getRealPath());
 
         return mb_substr($contents, 0, $this->previewLength);
+    }
+
+    /**
+     * Uses Gemini API to determine if a content item should be included based on content analysis
+     *
+     * @param  string  $content  The content to analyze
+     * @param  array  $options  Additional options for filtering
+     * @return bool True if the content should be included, false otherwise
+     */
+    protected function aiFilter(string $content, array $options = []): bool
+    {
+        // Generate a system prompt based on the filter configuration
+        $systemPrompt = $this->buildSystemPrompt($options);
+
+        // Generate a user prompt with the content to analyze
+        $userPrompt = $this->buildUserPrompt($content, $options);
+
+        // Set up a schema for structured output from Gemini
+        $responseSchema = $this->buildResponseSchema();
+
+        // Configure generation parameters
+        $generationConfig = new GenerationConfig(
+            maxOutputTokens: 300,
+            temperature: 0.1,
+            topP: 0.95,
+            topK: 40
+        );
+
+        try {
+            // Make the API call to Gemini
+            $response = Gemini::generativeModel(model: config('gemini.classification_model'))
+                ->withSystemInstruction(Content::parse($systemPrompt))
+                ->withGenerationConfig($generationConfig)
+                ->generateContent($userPrompt);
+
+            // Process the response
+            $result = $this->processResponse($response, $options);
+
+            return $result;
+        } catch (Throwable $e) {
+            // Log the error but include the content by default in case of API errors
+            Log::error('AI Filter failed: '.$e->getMessage());
+            return true; // Include by default if the filter fails
+        }
     }
 }

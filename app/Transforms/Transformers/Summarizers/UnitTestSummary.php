@@ -11,6 +11,8 @@ use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Class UnitTestSummary
@@ -20,7 +22,7 @@ use Symfony\Component\Finder\SplFileInfo;
  * It works similarly to the CodeSummary transformer: it reads the file content,
  * determines its MIME type to extract a language identifier, wraps the content
  * in markdown code fences with that language, and then sends the wrapped content
- * along with the file’s relative path and filename to Gemini for summarization.
+ * along with the file's relative path and filename to Gemini for summarization.
  * The final output is plain text.
  *
  * Since this transformer is specific to unit test files, it is named UnitTestSummary.
@@ -88,10 +90,12 @@ class UnitTestSummary extends BaseTransformer implements FileTransformerInterfac
             $prompt = "File: `{$relativePath}`\n\nPlease provide a detailed summary of the key insights from the following test file:\n\n".$wrappedContent;
 
             try {
-                $response = Gemini::generativeModel(model: config('gemini.model'))
+                $response = Gemini::generativeModel(model: config('gemini.summarization_model'))
                     ->withSystemInstruction(Content::parse($systemPrompt))
+                    ->withGenerationConfig($generationConfig)
                     ->generateContent($prompt);
-            } catch (\Exception $e) {
+            } catch (Throwable $e) {
+                Log::error('Failed to generate unit test summary: '.$e->getMessage());
                 throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
             }
 

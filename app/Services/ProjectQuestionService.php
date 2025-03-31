@@ -38,8 +38,8 @@ class ProjectQuestionService
      */
     public function __construct()
     {
-        // Use the Gemini thinking model defined in config
-        $this->model = config('gemini.model_pro');
+        // Use the model specifically configured for the Copytree Ask functionality
+        $this->model = config('gemini.ask_model');
         // Set the base directory for expert prompts
         $this->promptsBaseDir = base_path('prompts/project-question');
     }

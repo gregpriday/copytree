@@ -42,8 +42,8 @@ class ExpertSelectorService
      */
     public function __construct()
     {
-        // Use the standard Gemini model (it doesn't need the thinking model for this task)
-        $this->model = config('gemini.model');
+        // Use the model specifically configured for expert selection tasks
+        $this->model = config('gemini.expert_selector_model');
         // Path to the system prompt specific to expert selection
         $this->systemPromptPath = base_path('prompts/expert-selector/system.txt');
 
@@ -51,79 +51,33 @@ class ExpertSelectorService
     }
 
     /**
-     * Select the best expert for a given question using Laravel's retry helper.
+     * Select the most appropriate expert for a question.
      *
-     * @param  string  $question  The user's question about the project
-     * @return string The name of the selected expert
+     * @param  string  $question  The user's question
+     * @param  array|null  $availableExperts  An array of available experts (names => descriptions), defaults to class property if not provided
+     * @return string  The name of the selected expert
+     *
+     * @throws RuntimeException When the Gemini API call fails
      */
-    public function selectExpert(string $question): string
+    public function selectExpert(string $question, ?array $availableExperts = null): string
     {
-        $systemPrompt = File::get($this->systemPromptPath);
-
-        // Prepare input for the AI
-        $prompt = $this->buildPrompt($question, $this->availableExperts);
-
-        // Get the list of expert names for the schema enum
-        $expertNames = array_keys($this->availableExperts);
-
-        // Configure the generation parameters with an enum-constrained schema
-        $generationConfig = new GenerationConfig(
-            maxOutputTokens: 512,
-            temperature: 0.2,
-            topP: 0.95,
-            topK: 40,
-            responseMimeType: ResponseMimeType::APPLICATION_JSON,
-            responseSchema: new Schema(
-                type: DataType::OBJECT,
-                properties: [
-                    'expert' => new Schema(
-                        type: DataType::STRING,
-                        enum: $expertNames
-                    ),
-                ]
-            )
-        );
+        // Use the provided array or fall back to the class property
+        $experts = $availableExperts ?? $this->availableExperts;
 
         try {
-            // Use Laravel's retry helper
-            $selectedExpert = retry(self::MAX_RETRIES, function () use ($systemPrompt, $generationConfig, $prompt) {
-                // Generate content using Gemini
-                $response = Gemini::generativeModel(model: $this->model)
-                    ->withSystemInstruction(Content::parse($systemPrompt))
-                    ->withGenerationConfig($generationConfig)
-                    ->generateContent($prompt);
+            // Prepare a prompt that describes the available experts and asks for the best match
+            $prompt = $this->buildPrompt($question, $experts);
 
-                $content = $response->text() ?? '';
+            // Make a request to Gemini for expert selection
+            $response = Gemini::generativeModel(model: config('gemini.expert_selector_model'))
+                ->generateContent($prompt);
 
-                // Throw an exception if content is empty to trigger retry
-                if (empty($content)) {
-                    Log::warning('Empty content received from Gemini API');
-                    throw new RuntimeException('Empty content received from Gemini API');
-                }
-
-                $result = json_decode($content, true);
-
-                // Throw an exception if JSON is invalid or structure is wrong to trigger retry
-                if (! isset($result['expert']) || ! is_string($result['expert']) || ! array_key_exists($result['expert'], $this->availableExperts)) {
-                    Log::warning('Invalid response format from Gemini API: '.$content);
-                    throw new RuntimeException('Invalid response format from Gemini API');
-                }
-
-                // If everything is okay, return the expert name
-                return $result['expert'];
-            }, self::RETRY_DELAY_MS); // Delay between retries in milliseconds
-
-            return $selectedExpert;
-        } catch (ValueError $e) {
-            // Handle final ValueError after all retries (often due to content filtering)
-            Log::error('Expert selection failed after '.self::MAX_RETRIES.' attempts due to ValueError: '.$e->getMessage());
-
-            return self::DEFAULT_EXPERT;
+            // Parse the response to determine the selected expert
+            return $this->parseExpertResponse($response, array_keys($experts));
         } catch (Throwable $e) {
-            // Catch any other exception after retries
-            Log::error('Expert selection failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage());
-
-            return self::DEFAULT_EXPERT;
+            Log::error('Expert selection failed: '.$e->getMessage());
+            // For simplicity, fall back to the default expert
+            return 'default';
         }
     }
 
@@ -150,5 +104,36 @@ class ExpertSelectorService
 
         // Replace placeholders in the template
         return str_replace(array_keys($replacements), array_values($replacements), $template);
+    }
+
+    /**
+     * Parse the response from Gemini to determine the selected expert.
+     *
+     * @param  mixed  $response  The response from Gemini
+     * @param  array  $expertNames  An array of available expert names
+     * @return string  The name of the selected expert
+     *
+     * @throws RuntimeException When the response format is invalid
+     */
+    protected function parseExpertResponse($response, array $expertNames): string
+    {
+        // Extract text from the response object
+        $responseText = is_string($response) ? $response : ($response->text() ?? '');
+
+        try {
+            $result = json_decode($responseText, true);
+
+            // Throw an exception if JSON is invalid or structure is wrong to trigger retry
+            if (! isset($result['expert']) || ! is_string($result['expert']) || ! in_array($result['expert'], $expertNames)) {
+                Log::warning('Invalid response format from Gemini API: '.$responseText);
+                throw new RuntimeException('Invalid response format from Gemini API');
+            }
+
+            // If everything is okay, return the expert name
+            return $result['expert'];
+        } catch (\JsonException $e) {
+            Log::warning('Failed to parse JSON response: '.$responseText);
+            throw new RuntimeException('Failed to parse JSON response from Gemini API');
+        }
     }
 }

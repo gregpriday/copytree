@@ -9,6 +9,9 @@ use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\Artisan;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ProfileCreationService
 {
@@ -111,7 +114,7 @@ class ProfileCreationService
 
         // 4. Call Gemini to generate the profile.
         try {
-            $response = Gemini::generativeModel(model: config('gemini.model'))
+            $response = Gemini::generativeModel(model: config('gemini.ask_model'))
                 ->withSystemInstruction(Content::parse($systemPrompt))
                 ->withGenerationConfig($this->getGenerationConfig())
                 ->generateContent($prompt);
@@ -142,7 +145,7 @@ class ProfileCreationService
     }
 
     /**
-     * Saves the generated profile into the project’s .ctree directory in YAML format.
+     * Saves the generated profile into the project's .ctree directory in YAML format.
      *
      * @param  string  $profileName  The name (without extension) for the profile.
      * @param  array  $profileData  The generated profile data.
@@ -174,5 +177,45 @@ class ProfileCreationService
         return new GenerationConfig(
             maxOutputTokens: 4096,
         );
+    }
+
+    /**
+     * Generate a user profile from a conversation history.
+     *
+     * @param  Collection  $messages  Collection of chat messages
+     * @return string  Generated profile or null if unable to generate
+     */
+    public function generateProfile(Collection $messages): ?string
+    {
+        try {
+            // Build the prompt for profile generation
+            $prompt = $this->buildProfilePrompt($messages);
+
+            // Configure the generation parameters
+            $generationConfig = new GenerationConfig(
+                maxOutputTokens: 4096,
+                temperature: 0.4,
+                topP: 0.8,
+                topK: 30
+            );
+
+            // Make a request to Gemini for profile generation
+            $response = Gemini::generativeModel(model: config('gemini.ask_model'))
+                ->withGenerationConfig($generationConfig)
+                ->generateContent($prompt);
+
+            // Store and return the generated profile
+            $profile = $response->text();
+            if (! empty($profile)) {
+                // Save the profile to the database
+                $this->saveProfile($profile);
+                return $profile;
+            }
+
+            return null;
+        } catch (Throwable $e) {
+            Log::error('Profile generation failed: '.$e->getMessage());
+            return null;
+        }
     }
 }

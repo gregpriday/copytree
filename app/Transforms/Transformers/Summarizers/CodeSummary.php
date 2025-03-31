@@ -11,6 +11,13 @@ use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+use App\Contracts\InputContract;
+use App\Contracts\OutputContract;
+use App\Models\TransformCodeInput;
+use App\Models\TransformSummaryOutput;
+use Illuminate\Support\Facades\InvalidArgumentException;
 
 class CodeSummary extends BaseTransformer implements FileTransformerInterface
 {
@@ -71,12 +78,24 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
             $prompt = "Please provide a concise summary for the following source code:\n\n".$wrappedCode;
 
             try {
-                $response = Gemini::generativeModel(
-                    model: config('gemini.model'))
-                    ->withSystemInstruction(Content::parse($systemPrompt)
-                    )->generateContent($prompt);
-            } catch (\Exception $e) {
-                throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
+                $response = Gemini::generativeModel(model: config('gemini.summarization_model'))
+                    ->withSystemInstruction(Content::parse($systemPrompt))
+                    ->withGenerationConfig(
+                        new GenerationConfig(
+                            maxOutputTokens: 512,
+                            temperature: 0.2,
+                        )
+                    )
+                    ->generateContent($prompt);
+            } catch (Throwable $e) {
+                // Log the exception
+                Log::error('Failed to summarize code: '.$e->getMessage(), [
+                    'code_length' => strlen($content),
+                    'language' => $language,
+                ]);
+
+                // Return a fallback summary
+                return '[Summary generation failed: The AI model encountered an error while summarizing this code.]';
             }
 
             $rawOutput = $response->text() ?? '';

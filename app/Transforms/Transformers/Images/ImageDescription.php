@@ -77,9 +77,9 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
 
             // Call the Gemini API using the Gemini-Pro-Vision model with structured output.
             try {
-                $response = Gemini::generativeModel(model: config('gemini.model'))
-                    ->withGenerationConfig($generationConfig)
+                $response = Gemini::generativeModel(model: config('gemini.general_model'))
                     ->withSystemInstruction(Content::parse($systemPrompt))
+                    ->withGenerationConfig($generationConfig)
                     ->generateContent([
                         $userInstruction,
                         new Blob(

@@ -75,10 +75,10 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
                 )
             );
 
+            // Generate a summary of the file
             try {
-                $response = Gemini::generativeModel(model: config('gemini.model'))
+                $response = Gemini::generativeModel(model: config('gemini.summarization_model'))
                     ->withSystemInstruction(Content::parse($systemPrompt))
-                    ->withGenerationConfig($generationConfig)
                     ->generateContent($prompt);
             } catch (\Exception $e) {
                 throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
