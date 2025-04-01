@@ -17,7 +17,7 @@ class AskCommand extends Command
      * @var string
      */
     protected $signature = 'ask
-        {question : The question to ask about the project}
+        {question? : The question to ask about the project (optional if using --question-file or stdin)}
         {path? : The directory path or GitHub URL (default: current working directory)}
         {--d|depth=10 : Maximum depth of the tree.}
         {--p|profile=auto : Profile to apply.}
@@ -26,6 +26,7 @@ class AskCommand extends Command
         {--m|modified : Only include files that have been modified since the last commit.}
         {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
         {--e|expert=auto : The expert to use for answering the question (use "auto" for automatic selection).}
+        {--question-file= : Read the question from a file.}
         {--s|state= : Optional state key to continue a previous conversation. If not provided, a new state key is generated.}';
 
     /**
@@ -41,7 +42,62 @@ class AskCommand extends Command
     public function handle(ProjectQuestionService $questionService, ExpertSelectorService $expertSelectorService, ConversationStateService $stateService): int
     {
         $path = $this->argument('path') ?: getcwd();
-        $question = $this->argument('question');
+        $question = null; // Initialize question as null
+
+        // Check for --question-file
+        $questionFile = $this->option('question-file');
+        if ($questionFile) {
+            if (! file_exists($questionFile) || ! is_readable($questionFile)) {
+                $this->error("Error: Question file not found or not readable: {$questionFile}");
+
+                return self::FAILURE;
+            }
+            $question = file_get_contents($questionFile);
+            if ($question === false) {
+                $this->error("Error: Could not read question file: {$questionFile}");
+
+                return self::FAILURE;
+            }
+            $this->info("Reading question from file: {$questionFile}");
+        }
+
+        // Check for question argument (if file wasn't used)
+        if (is_null($question)) {
+            $questionArg = $this->argument('question');
+            if ($questionArg) {
+                $question = $questionArg;
+            }
+        }
+
+        // Check for stdin (if file and argument weren't used)
+        if (is_null($question)) {
+            // Check if stdin is associated with a terminal (false if piped/redirected)
+            if (stream_isatty(STDIN) === false) {
+                $stdinContent = stream_get_contents(STDIN);
+                if (! empty(trim($stdinContent))) {
+                    $question = $stdinContent;
+                    $this->info('Reading question from stdin.');
+                }
+            }
+        }
+
+        // Validate that we have a question
+        if (is_null($question) || trim($question) === '') {
+            // Special case for --show-experts command
+            if ($this->argument('question') === '--show-experts') {
+                $this->showExperts($questionService);
+
+                return self::SUCCESS;
+            }
+
+            $this->error('Error: No question provided. Please provide a question as an argument, via --question-file, or pipe it via stdin.');
+
+            return self::FAILURE;
+        }
+
+        // Trim whitespace from the question
+        $question = trim($question);
+
         $expert = $this->option('expert');
 
         // Handle state management
@@ -49,13 +105,13 @@ class AskCommand extends Command
         $stateKeyInput = $this->option('state');
 
         // If a non-empty state key was provided, use it to continue conversation
-        if (!empty($stateKeyInput)) {
+        if (! empty($stateKeyInput)) {
             $stateKey = $stateKeyInput;
             $this->info("Continuing conversation with state key: {$stateKey}");
 
             // Load history for the provided key
             $history = $stateService->loadHistory($stateKey);
-            if (!empty($history)) {
+            if (! empty($history)) {
                 $this->comment('Loaded previous conversation history.');
             } else {
                 $this->comment('No previous history found for this state key. Starting fresh.');
@@ -64,13 +120,6 @@ class AskCommand extends Command
             // No state key provided, always generate a new one
             $stateKey = $stateService->generateStateKey();
             $this->info("Starting new conversation with state key: {$stateKey}");
-        }
-
-        // Show available experts if requested with special flag
-        if ($question === '--show-experts') {
-            $this->showExperts($questionService);
-
-            return self::SUCCESS;
         }
 
         // Generate copytree output for the project
@@ -130,7 +179,7 @@ class AskCommand extends Command
             $stateService->saveMessage($stateKey, 'model', $fullResponseText);
 
             $this->newLine();
-            $this->info("Ask follow up questions using `copytree ask '{{question}}' --state {$stateKey}`");
+            $this->info("Ask follow up questions using:\n```\ncopytree ask --state {$stateKey} <<EOF\nYour follow up question here\nEOF\n```");
 
             // Perform silent garbage collection
             $this->runGarbageCollection($stateService);
