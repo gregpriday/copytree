@@ -6,11 +6,11 @@ use Gemini\Data\Content;
 use Gemini\Data\GenerationConfig;
 use Gemini\Data\Schema;
 use Gemini\Laravel\Facades\Gemini;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class ProfileCreationService
@@ -183,7 +183,7 @@ class ProfileCreationService
      * Generate a user profile from a conversation history.
      *
      * @param  Collection  $messages  Collection of chat messages
-     * @return string  Generated profile or null if unable to generate
+     * @return string Generated profile or null if unable to generate
      */
     public function generateProfile(Collection $messages): ?string
     {
@@ -209,12 +209,14 @@ class ProfileCreationService
             if (! empty($profile)) {
                 // Save the profile to the database
                 $this->saveProfile($profile);
+
                 return $profile;
             }
 
             return null;
         } catch (Throwable $e) {
             Log::error('Profile generation failed: '.$e->getMessage());
+
             return null;
         }
     }

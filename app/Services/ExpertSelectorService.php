@@ -2,17 +2,11 @@
 
 namespace App\Services;
 
-use Gemini\Data\Content;
-use Gemini\Data\GenerationConfig;
-use Gemini\Data\Schema;
-use Gemini\Enums\DataType;
-use Gemini\Enums\ResponseMimeType;
 use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
-use ValueError;
 
 class ExpertSelectorService
 {
@@ -55,7 +49,7 @@ class ExpertSelectorService
      *
      * @param  string  $question  The user's question
      * @param  array|null  $availableExperts  An array of available experts (names => descriptions), defaults to class property if not provided
-     * @return string  The name of the selected expert
+     * @return string The name of the selected expert
      *
      * @throws RuntimeException When the Gemini API call fails
      */
@@ -76,6 +70,7 @@ class ExpertSelectorService
             return $this->parseExpertResponse($response, array_keys($experts));
         } catch (Throwable $e) {
             Log::error('Expert selection failed: '.$e->getMessage());
+
             // For simplicity, fall back to the default expert
             return 'default';
         }
@@ -111,7 +106,7 @@ class ExpertSelectorService
      *
      * @param  mixed  $response  The response from Gemini
      * @param  array  $expertNames  An array of available expert names
-     * @return string  The name of the selected expert
+     * @return string The name of the selected expert
      *
      * @throws RuntimeException When the response format is invalid
      */

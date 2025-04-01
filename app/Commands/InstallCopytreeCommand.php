@@ -103,11 +103,12 @@ class InstallCopytreeCommand extends Command
         $this->saveConfigToEnv($envPath, $envContent, $configValues);
 
         // Step 5: Test the Gemini API key
-        if (!empty($configValues['GEMINI_API_KEY'])) {
+        if (! empty($configValues['GEMINI_API_KEY'])) {
             if ($this->testGeminiApiKey($configValues['GEMINI_API_KEY'])) {
                 $this->info('✓ Gemini API key is valid!');
             } else {
                 $this->error('Invalid API key. AI features will not be available.');
+
                 return self::FAILURE;
             }
         }
@@ -126,17 +127,18 @@ class InstallCopytreeCommand extends Command
     protected function collectConfigValues(string $envContent): array
     {
         $configValues = [];
-        
+
         // Extract existing values from env content if available
-        $extractValue = function($key, $default = '') use ($envContent) {
+        $extractValue = function ($key, $default = '') use ($envContent) {
             preg_match("/{$key}=([^\s]+)/", $envContent, $matches);
-            return isset($matches[1]) && !empty($matches[1]) ? $matches[1] : $default;
+
+            return isset($matches[1]) && ! empty($matches[1]) ? $matches[1] : $default;
         };
 
         // Step 1: Collect Gemini API Key
         $existingKey = $extractValue('GEMINI_API_KEY');
-        if (!empty($existingKey)) {
-            $this->info('Found existing Gemini API key: ' . $this->maskApiKey($existingKey));
+        if (! empty($existingKey)) {
+            $this->info('Found existing Gemini API key: '.$this->maskApiKey($existingKey));
             if ($this->confirm('Do you want to use this existing API key?', true)) {
                 $configValues['GEMINI_API_KEY'] = $existingKey;
             } else {
@@ -214,72 +216,73 @@ class InstallCopytreeCommand extends Command
     {
         $options = $this->availableModels[$taskType];
         $modelNames = array_keys($options);
-        
+
         // Check if the default model exists in our options
         $customModel = false;
-        if (!in_array($defaultModel, $modelNames)) {
+        if (! in_array($defaultModel, $modelNames)) {
             $customModel = true;
             // Add the currently set model if it's not in our standard list
             $options[$defaultModel] = "Custom model: {$defaultModel}";
         }
-        
+
         // Create an array for the choice method with the default option at the top
         $choices = [];
-        
+
         // Add the default option first with a special label
         if ($customModel) {
             $choices[$defaultModel] = "{$defaultModel} [current custom model]";
         } else {
             $choices[$defaultModel] = "{$defaultModel}: {$options[$defaultModel]} [current]";
         }
-        
+
         // Add the rest of the options
         foreach ($options as $name => $description) {
             if ($name !== $defaultModel) {
                 $choices[$name] = "{$name}: {$description}";
             }
         }
-        
+
         // Add a custom model option at the end
-        $choices['custom'] = "Enter a custom model name";
-        
+        $choices['custom'] = 'Enter a custom model name';
+
         // Convert to indexed array for the choice method
         $indexedChoices = array_values($choices);
         // Default is the first option (index 0)
         $defaultIndex = 0;
-        
+
         $this->line('');
         $this->line('Available models (use arrow keys to navigate, press Enter to select the default):');
         $this->line("<info>Default: {$indexedChoices[0]}</info>");
-        
+
         // Use the choice method for arrow key navigation with explicit default
         $selection = $this->choice('Select model', $indexedChoices, $defaultIndex);
-        
+
         // Handle the "Enter a custom model name" option
-        if ($selection === "Enter a custom model name") {
+        if ($selection === 'Enter a custom model name') {
             $customModelName = $this->ask('Enter custom model name');
-            
+
             if (empty($customModelName)) {
                 $this->warn('No model name provided, using default.');
+
                 return $defaultModel;
             }
-            
+
             if ($this->confirm("'{$customModelName}' is not in the predefined list. Use it anyway?", true)) {
                 return $customModelName;
             }
-            
+
             return $this->selectModelFromOptions($taskType, $defaultModel);
         }
-        
+
         // Extract the model name from the selection (it's before the first colon or space)
         preg_match('/^([^:[:space:]]+)/', $selection, $matches);
         $modelName = $matches[1] ?? $defaultModel;
-        
+
         // If it's the default with [current] marker, clean it up
         if (strpos($modelName, '[current') !== false) {
             $modelName = $defaultModel;
         }
-        
+
         return $modelName;
     }
 
@@ -291,8 +294,8 @@ class InstallCopytreeCommand extends Command
         if (strlen($key) <= 8) {
             return '********';
         }
-        
-        return substr($key, 0, 4) . '...' . substr($key, -4);
+
+        return substr($key, 0, 4).'...'.substr($key, -4);
     }
 
     /**
@@ -301,11 +304,11 @@ class InstallCopytreeCommand extends Command
     protected function promptForApiKey(): string
     {
         $apiKey = $this->secret('Enter your Gemini API key');
-        
+
         if (empty($apiKey)) {
             $this->warn('No API key provided. AI features will not be available.');
         }
-        
+
         return $apiKey;
     }
 
@@ -324,9 +327,10 @@ class InstallCopytreeCommand extends Command
             $response = Gemini::generativeModel(model: config('gemini.general_model'))
                 ->generateContent('Hello, this is a test from Copytree installation.');
 
-            return ($response && $response->text());
+            return $response && $response->text();
         } catch (\Exception $e) {
             $this->error('API key test failed: '.$e->getMessage());
+
             return false;
         }
     }
@@ -337,13 +341,13 @@ class InstallCopytreeCommand extends Command
     protected function saveConfigToEnv(string $envPath, string $envContent, array $configValues): void
     {
         $newEnvContent = $envContent;
-        
+
         foreach ($configValues as $key => $value) {
             // Skip empty values
             if (empty($value)) {
                 continue;
             }
-            
+
             if (strpos($newEnvContent, "{$key}=") !== false) {
                 // Update existing value
                 $newEnvContent = preg_replace("/{$key}=([^\s]*)/", "{$key}={$value}", $newEnvContent);
@@ -352,12 +356,12 @@ class InstallCopytreeCommand extends Command
                 $newEnvContent .= "\n{$key}={$value}";
             }
         }
-        
+
         // Ensure the file ends with a newline
-        if (!empty($newEnvContent) && substr($newEnvContent, -1) !== "\n") {
+        if (! empty($newEnvContent) && substr($newEnvContent, -1) !== "\n") {
             $newEnvContent .= "\n";
         }
-        
+
         // Save the updated content
         file_put_contents($envPath, $newEnvContent);
         $this->info('✓ Configuration saved to .env file.');

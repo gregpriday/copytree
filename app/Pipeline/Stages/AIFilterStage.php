@@ -5,9 +5,9 @@ namespace App\Pipeline\Stages;
 use App\Pipeline\FilePipelineStageInterface;
 use Gemini\Data\Content;
 use Gemini\Laravel\Facades\Gemini;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
-use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class AIFilterStage implements FilePipelineStageInterface
@@ -152,6 +152,7 @@ class AIFilterStage implements FilePipelineStageInterface
         } catch (Throwable $e) {
             // Log the error but include the content by default in case of API errors
             Log::error('AI Filter failed: '.$e->getMessage());
+
             return true; // Include by default if the filter fails
         }
     }

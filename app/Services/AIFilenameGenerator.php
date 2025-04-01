@@ -8,9 +8,9 @@ use Gemini\Data\Schema;
 use Gemini\Enums\DataType;
 use Gemini\Enums\ResponseMimeType;
 use Gemini\Laravel\Facades\Gemini;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
-use Illuminate\Support\Facades\Log;
 
 class AIFilenameGenerator
 {
@@ -43,7 +43,7 @@ class AIFilenameGenerator
      *
      * @param  string  $content  The file content to generate a name from
      * @param  string|null  $extension  Optional file extension (without the dot)
-     * @return string  The generated file name
+     * @return string The generated file name
      *
      * @throws RuntimeException if filename generation fails
      */
