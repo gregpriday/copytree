@@ -273,7 +273,7 @@ class CopyTreeCommand extends Command
         if ($this->input->hasParameterOption(['--output', '-o'])) {
             $outputOption = $this->option('output') ?? '';
             $filename = ($outputOption === '')
-                ? app(AIFilenameGenerator::class)->generateFilename(
+                ? app(AIFilenameGenerator::class)->generateFilenameFromFiles(
                     // Pass the array of files (or file paths) to the AI filename generator.
                     $finalFiles,
                     copytree_path('outputs')
