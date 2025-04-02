@@ -166,9 +166,18 @@ class AskCommand extends Command
 
             // Process and display each partial response as it arrives
             foreach ($stream as $partialResponse) {
-                $text = $partialResponse->text();
-                $this->output->write($text);
-                $fullResponseText .= $text; // Accumulate text
+                try {
+                    $text = $partialResponse->text();
+                    $this->output->write($text);
+                    $fullResponseText .= $text; // Accumulate text
+                } catch (\ErrorException | \Exception $e) {
+                    // If "Undefined array key 'parts'" occurs, it usually means we've reached the end of the output
+                    // So we'll just continue processing without displaying an error
+                    if (!str_contains($e->getMessage(), "Undefined array key 'parts'")) {
+                        // Only throw if it's not the specific error we're trying to catch
+                        throw $e;
+                    }
+                }
             }
 
             // Add a final newline after the complete response
@@ -179,7 +188,7 @@ class AskCommand extends Command
             $stateService->saveMessage($stateKey, 'model', $fullResponseText);
 
             $this->newLine();
-            $this->info("Ask follow up questions using:\n```\ncopytree ask --state {$stateKey} <<EOF\nYour follow up question here\nEOF\n```");
+            $this->info("Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
 
             // Perform silent garbage collection
             $this->runGarbageCollection($stateService);
