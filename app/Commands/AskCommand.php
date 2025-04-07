@@ -6,6 +6,7 @@ use App\Services\ConversationStateService;
 use App\Services\ExpertSelectorService;
 use App\Services\ProjectQuestionService;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
 use ValueError;
 
@@ -167,16 +168,45 @@ class AskCommand extends Command
             // Process and display each partial response as it arrives
             foreach ($stream as $partialResponse) {
                 try {
-                    $text = $partialResponse->text();
-                    $this->output->write($text);
-                    $fullResponseText .= $text; // Accumulate text
-                } catch (\ErrorException | \Exception $e) {
-                    // If "Undefined array key 'parts'" occurs, it usually means we've reached the end of the output
-                    // So we'll just continue processing without displaying an error
-                    if (!str_contains($e->getMessage(), "Undefined array key 'parts'")) {
-                        // Only throw if it's not the specific error we're trying to catch
-                        throw $e;
+                    // Use optional chaining to safely access nested properties
+                    $text = $partialResponse?->candidates[0]?->content?->parts[0]?->text;
+
+                    if ($text !== null) {
+                        // Text found via the expected path
+                        $this->output->write($text);
+                        $fullResponseText .= $text;
+                    } elseif (method_exists($partialResponse, 'text')) {
+                        // Fallback to the text() method if the primary path failed
+                        try {
+                            $fallbackText = $partialResponse->text();
+                            if (!empty($fallbackText)) {
+                                $this->output->write($fallbackText);
+                                $fullResponseText .= $fallbackText;
+                            }
+                        } catch (\Exception $textException) {
+                            // Log but silently ignore text() method errors
+                            Log::debug('Fallback text() method failed for a chunk.', [
+                                'stateKey' => $stateKey ?? 'unknown', 
+                                'error' => $textException->getMessage()
+                            ]);
+                        }
+                    } else {
+                        // Optional: Log chunks that don't match either structure for debugging
+                        Log::debug('Received Gemini chunk with unexpected structure.', [
+                            'stateKey' => $stateKey ?? 'unknown',
+                            'chunk_structure' => json_encode($partialResponse) // Log the structure
+                        ]);
                     }
+                } catch (\Exception $e) {
+                    // Log the error for troubleshooting
+                    Log::warning('Error processing Gemini response chunk: ' . $e->getMessage(), [
+                        'stateKey' => $stateKey ?? 'unknown',
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'chunk_structure' => json_encode($partialResponse) // Log structure on error
+                    ]);
+                    // We're intentionally ignoring issues with malformed responses
+                    // as a fallback for the more robust checking above
                 }
             }
 
@@ -203,7 +233,22 @@ class AskCommand extends Command
 
             return self::FAILURE;
         } catch (\Exception $e) {
-            $this->error('Error: '.$e->getMessage());
+            // Check for common errors with specific messaging
+            if (str_contains($e->getMessage(), "Undefined array key 'parts'")) {
+                $this->error('Error: Malformed response from Gemini API: '.$e->getMessage());
+                $this->info('This is usually a temporary issue with the response format. Please try your question again.');
+            } else if (str_contains($e->getMessage(), "API key not valid")) {
+                $this->error('Error: Gemini API key validation failed: '.$e->getMessage());
+                $this->info('Please check that your API key is correctly set in your .env file or environment variables.');
+            } else {
+                $this->error('Error: '.$e->getMessage());
+            }
+
+            // Log the full error for developer troubleshooting
+            Log::error('AskCommand error: '.$e->getMessage(), [
+                'exception' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
 
             // Perform silent garbage collection even on failure
             $this->runGarbageCollection($stateService);

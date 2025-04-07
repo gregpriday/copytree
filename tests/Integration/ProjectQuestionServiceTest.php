@@ -17,21 +17,13 @@ class ProjectQuestionServiceTest extends TestCase
         parent::setUp();
 
         // Ensure the prompts directory exists
-        $promptsDir = base_path('prompts/project-question');
+        $promptsDir = base_path('prompts/project-question/default');
         if (! File::isDirectory($promptsDir)) {
             File::makeDirectory($promptsDir, 0755, true);
         }
 
         // Ensure the system prompt file exists
         $systemPromptPath = $promptsDir.'/system.txt';
-        if (! File::exists($systemPromptPath)) {
-            // Copy the content from our artifact to ensure the test has the prompt
-            $promptContent = file_get_contents(base_path('prompts/project-question/system.txt'));
-            if (! $promptContent) {
-                $promptContent = 'You are a codebase navigation assistant. Provide relevant files and code snippets.';
-            }
-            File::put($systemPromptPath, $promptContent);
-        }
     }
 
     public function test_ask_question_returns_valid_response()
