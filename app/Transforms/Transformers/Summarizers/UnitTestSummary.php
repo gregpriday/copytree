@@ -6,8 +6,7 @@ use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use Gemini\Data\Content;
-use Gemini\Laravel\Facades\Gemini;
+use App\Facades\Fireworks;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -17,12 +16,12 @@ use Throwable;
 /**
  * Class UnitTestSummary
  *
- * This transformer analyzes a unit test file and uses the Gemini API to generate
+ * This transformer analyzes a unit test file and uses the Fireworks API to generate
  * a plain-text summary of important insights gained from the tests.
  * It works similarly to the CodeSummary transformer: it reads the file content,
  * determines its MIME type to extract a language identifier, wraps the content
  * in markdown code fences with that language, and then sends the wrapped content
- * along with the file's relative path and filename to Gemini for summarization.
+ * along with the file's relative path and filename to Fireworks for summarization.
  * The final output is plain text.
  *
  * Since this transformer is specific to unit test files, it is named UnitTestSummary.
@@ -41,7 +40,7 @@ class UnitTestSummary extends BaseTransformer implements FileTransformerInterfac
      *
      * The method wraps the file content in markdown code fences using the language
      * determined from the MIME type, then includes the file's relative path and filename
-     * in the prompt sent to the Gemini API for summarization.
+     * in the prompt sent to the Fireworks API for summarization.
      *
      * @param  SplFileInfo|string  $input  The unit test file to summarize.
      * @return string The plain text summary.
@@ -90,19 +89,24 @@ class UnitTestSummary extends BaseTransformer implements FileTransformerInterfac
             $prompt = "File: `{$relativePath}`\n\nPlease provide a detailed summary of the key insights from the following test file:\n\n".$wrappedContent;
 
             try {
-                $response = Gemini::generativeModel(model: config('gemini.summarization_model'))
-                    ->withSystemInstruction(Content::parse($systemPrompt))
-                    ->withGenerationConfig($generationConfig)
-                    ->generateContent($prompt);
+                $response = Fireworks::chat()->create([
+                    'model' => config('fireworks.summarization_model'),
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => $prompt],
+                    ],
+                    'max_tokens' => 512,
+                    'temperature' => 0.2,
+                ]);
             } catch (Throwable $e) {
                 Log::error('Failed to generate unit test summary: '.$e->getMessage());
-                throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
+                throw new RuntimeException('Fireworks API call failed: '.$e->getMessage());
             }
 
-            $rawOutput = $response->text() ?? '';
-            $summary = trim($rawOutput);
+            $summary = $response->choices[0]->message->content ?? '';
+            $summary = trim($summary);
             if (empty($summary)) {
-                throw new RuntimeException('No test summary returned from Gemini.');
+                throw new RuntimeException('No test summary returned from Fireworks.');
             }
 
             return $summary;

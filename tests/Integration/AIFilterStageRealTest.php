@@ -11,8 +11,8 @@ class AIFilterStageRealTest extends TestCase
     public function test_integration_real_open_ai_filter_stage()
     {
         // Skip the test if no OpenAI API key is set.
-        if (empty(env('GEMINI_API_KEY'))) {
-            $this->markTestSkipped('OPENAI_API_KEY is not set. Skipping OpenAI integration test.');
+        if (empty(env('FIREWORKS_API_KEY'))) {
+            $this->markTestSkipped('Fireworks API key not set. Skipping AIFilterStage integration test.');
         }
 
         // Create a temporary directory.

@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
-use Gemini\Data\Content;
-use Gemini\Data\GenerationConfig;
-use Gemini\Data\Schema;
-use Gemini\Enums\DataType;
-use Gemini\Enums\ResponseMimeType;
-use Gemini\Laravel\Facades\Gemini;
+// Remove Gemini imports
+// use Gemini\Data\Content;
+// use Gemini\Data\GenerationConfig;
+// use Gemini\Data\Schema;
+// use Gemini\Enums\DataType;
+// use Gemini\Enums\ResponseMimeType;
+// use Gemini\Laravel\Facades\Gemini;
+// Add Fireworks import
+use App\Facades\Fireworks;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -25,7 +28,7 @@ class AIFilenameGenerator
     protected int $maxFilenameLength = 90;
 
     /**
-     * The Gemini model to use.
+     * The Fireworks model to use.
      */
     protected string $model;
 
@@ -35,7 +38,7 @@ class AIFilenameGenerator
     public function __construct()
     {
         // Use the model specifically configured for classification tasks
-        $this->model = config('gemini.classification_model');
+        $this->model = config('fireworks.classification_model');
     }
 
     /**
@@ -55,22 +58,20 @@ class AIFilenameGenerator
         // Build the prompt for filename generation
         $prompt = "Generate a concise, descriptive filename for the following content. The filename should be lowercase, use dashes or underscores instead of spaces, and be no more than 50 characters long. Do not include the file extension in your response.\n\nContent:\n{$trimmedContent}";
 
-        // Configure the generation parameters
-        $generationConfig = new GenerationConfig(
-            maxOutputTokens: 60,
-            temperature: 0.2,
-            topP: 0.95,
-            topK: 40
-        );
-
         try {
-            // Make a request to Gemini for filename generation
-            $response = Gemini::generativeModel(model: config('gemini.classification_model'))
-                ->withGenerationConfig($generationConfig)
-                ->generateContent($prompt);
+            // Make a request to Fireworks for filename generation
+            $response = Fireworks::chat()->create([
+                'model' => config('fireworks.classification_model'),
+                'messages' => [
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+                'max_tokens' => 60,
+                'temperature' => 0.2,
+                'top_p' => 0.95,
+            ]);
 
             // Get the generated filename
-            $filename = $response->text() ?? '';
+            $filename = $response->choices[0]->message->content ?? '';
             $filename = trim($filename);
 
             // Clean up the filename
@@ -127,7 +128,7 @@ class AIFilenameGenerator
         }
 
         // Build the prompt for filename generation.
-        $prompt = "Generate a descriptive filename for the following set of files and return a structured JSON output:\n\n".$filesList;
+        $prompt = "Generate a descriptive filename for the following set of files and return a structured JSON output with a 'filename' field:\n\n".$filesList;
 
         // Load the system prompt from the filename generator prompt file.
         $systemPromptPath = base_path('prompts/filename-generator/system.txt');
@@ -136,33 +137,28 @@ class AIFilenameGenerator
         }
         $systemPrompt = file_get_contents($systemPromptPath);
 
-        // Configure Gemini to return structured JSON output.
-        $generationConfig = new GenerationConfig(
-            responseMimeType: ResponseMimeType::APPLICATION_JSON,
-            responseSchema: new Schema(
-                type: DataType::OBJECT,
-                properties: [
-                    'filename' => new Schema(type: DataType::STRING),
-                ]
-            )
-        );
-
         try {
-            // Generate content using Gemini with structured output.
-            $response = Gemini::generativeModel(model: $this->model)
-                ->withSystemInstruction(Content::parse($systemPrompt))
-                ->withGenerationConfig($generationConfig)
-                ->generateContent($prompt);
+            // Generate content using Fireworks with JSON response format
+            $response = Fireworks::chat()->create([
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+                'max_tokens' => 256,
+                'temperature' => 0.2,
+                'response_format' => ['type' => 'json_object'],
+            ]);
         } catch (\Exception $e) {
-            throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
+            throw new RuntimeException('Fireworks API call failed: '.$e->getMessage());
         }
 
         // Retrieve the structured JSON response.
-        $content = $response->text() ?? '';
+        $content = $response->choices[0]->message->content ?? '';
         $data = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['filename'])) {
-            throw new RuntimeException('Invalid response from Gemini: '.json_last_error_msg());
+            throw new RuntimeException('Invalid response from Fireworks: '.json_last_error_msg());
         }
 
         $rawFilename = $data['filename'];

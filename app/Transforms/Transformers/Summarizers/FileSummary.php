@@ -6,12 +6,7 @@ use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use Gemini\Data\Content;
-use Gemini\Data\GenerationConfig;
-use Gemini\Data\Schema;
-use Gemini\Enums\DataType;
-use Gemini\Enums\ResponseMimeType;
-use Gemini\Laravel\Facades\Gemini;
+use App\Facades\Fireworks;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -21,7 +16,7 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
     use SlowTransformerTrait;
 
     /**
-     * Transform the given file into a concise summary using Gemini.
+     * Transform the given file into a concise summary using Fireworks.
      *
      * If the file is not a text file (determined by its MIME type), this transformer
      * falls back to the default file loader.
@@ -52,7 +47,7 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
             $content = substr($content, 0, $maxLength);
         }
 
-        // Use caching so that if the file hasn't changed, we don't call Gemini again.
+        // Use caching so that if the file hasn't changed, we don't call Fireworks again.
         return $this->cacheTransformResult($input, function () use ($content) {
             // Load the system prompt for file summarization.
             $systemPromptPath = base_path('prompts/file-summary/system.txt');
@@ -64,36 +59,27 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
             // Build the prompt.
             $prompt = "Please provide a concise summary for the following file content:\n\n".$content;
 
-            // Configure Gemini to return structured JSON output with a "summary" field.
-            $generationConfig = new GenerationConfig(
-                responseMimeType: ResponseMimeType::APPLICATION_JSON,
-                responseSchema: new Schema(
-                    type: DataType::OBJECT,
-                    properties: [
-                        'summary' => new Schema(type: DataType::STRING),
-                    ]
-                )
-            );
-
-            // Generate a summary of the file
+            // Call Fireworks API to generate a summary
             try {
-                $response = Gemini::generativeModel(model: config('gemini.summarization_model'))
-                    ->withSystemInstruction(Content::parse($systemPrompt))
-                    ->generateContent($prompt);
+                $response = Fireworks::chat()->create([
+                    'model' => config('fireworks.summarization_model'),
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => $prompt],
+                    ],
+                    'max_tokens' => 512,
+                    'temperature' => 0.2,
+                ]);
             } catch (\Exception $e) {
-                throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
+                throw new RuntimeException('Fireworks API call failed: '.$e->getMessage());
             }
 
-            $contentText = $response->text() ?? '';
-            $data = json_decode($contentText, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['summary'])) {
-                throw new RuntimeException('Invalid response from Gemini: '.json_last_error_msg());
-            }
-
-            $summary = $data['summary'];
+            // Get the content from the response
+            $summary = $response->choices[0]->message->content ?? '';
+            
+            // Verify we got something back
             if (empty($summary)) {
-                throw new RuntimeException('No summary returned from Gemini.');
+                throw new RuntimeException('No summary returned from Fireworks.');
             }
 
             return $summary;

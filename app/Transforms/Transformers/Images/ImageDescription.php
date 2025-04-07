@@ -5,14 +5,7 @@ namespace App\Transforms\Transformers\Images;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use Gemini\Data\Blob;
-use Gemini\Data\Content;
-use Gemini\Data\GenerationConfig;
-use Gemini\Data\Schema;
-use Gemini\Enums\DataType;
-use Gemini\Enums\MimeType;
-use Gemini\Enums\ResponseMimeType;
-use Gemini\Laravel\Facades\Gemini;
+use App\Facades\Fireworks;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -25,7 +18,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
     protected int $maxDimension = 1024;
 
     /**
-     * Transform an image file into a text description using the Gemini API.
+     * Transform an image file into a text description using the Fireworks API.
      * If the file is not an image, returns its content unchanged.
      *
      * @param  SplFileInfo|string  $input
@@ -64,45 +57,34 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             // Create a combined prompt by appending the user instruction.
             $userInstruction = 'Please describe the image with the filename: '.$input->getPath();
 
-            // Configure Gemini to return structured JSON output with a "description" field.
-            $generationConfig = new GenerationConfig(
-                responseMimeType: ResponseMimeType::APPLICATION_JSON,
-                responseSchema: new Schema(
-                    type: DataType::OBJECT,
-                    properties: [
-                        'description' => new Schema(type: DataType::STRING),
-                    ]
-                )
-            );
-
-            // Call the Gemini API using the Gemini-Pro-Vision model with structured output.
+            // Call the Fireworks API with the base64-encoded image
             try {
-                $response = Gemini::generativeModel(model: config('gemini.general_model'))
-                    ->withSystemInstruction(Content::parse($systemPrompt))
-                    ->withGenerationConfig($generationConfig)
-                    ->generateContent([
-                        $userInstruction,
-                        new Blob(
-                            mimeType: MimeType::IMAGE_JPEG,
-                            data: $base64
-                        ),
-                    ]);
+                $response = Fireworks::chat()->create([
+                    'model' => config('fireworks.general_model'),
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => [
+                            ['type' => 'text', 'text' => $userInstruction],
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => 'data:image/jpeg;base64,'.$base64
+                                ]
+                            ]
+                        ]]
+                    ],
+                    'max_tokens' => 1024,
+                    'temperature' => 0.2,
+                ]);
             } catch (\Exception $e) {
-                throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
+                throw new RuntimeException('Fireworks API call failed: '.$e->getMessage());
             }
 
-            // Extract and decode the JSON response.
-            $content = $response->text() ?? '';
-            $data = json_decode($content, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['description'])) {
-                throw new RuntimeException('Invalid response from Gemini: '.json_last_error_msg());
-            }
-
-            $description = $data['description'];
+            // Extract the response content
+            $description = $response->choices[0]->message->content ?? '';
 
             if (empty($description)) {
-                throw new RuntimeException('No description returned from Gemini.');
+                throw new RuntimeException('No description returned from Fireworks.');
             }
 
             return $description;

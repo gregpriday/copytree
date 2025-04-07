@@ -5,7 +5,7 @@ Welcome to the Copytree documentation. This guide will help you get started with
 ## Getting Started
 
 - [Installation Guide](installation/installation-guide.md) - Complete guide to installing Copytree
-- [Obtaining a Gemini API Key](installation/gemini-api-key.md) - Instructions for getting your Gemini API key
+- [Obtaining a Fireworks API Key](installation/fireworks-api-key.md) - Instructions for getting your Fireworks API key
 - [Cursor Integration](installation/cursor-integration.md) - How to integrate Copytree with Cursor
 
 ## Additional Documentation

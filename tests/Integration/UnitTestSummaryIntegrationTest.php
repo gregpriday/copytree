@@ -10,9 +10,9 @@ class UnitTestSummaryIntegrationTest extends TestCase
 {
     public function test_unit_test_summary_integration_with_complex_test_file(): void
     {
-        // Skip the test if the Gemini API key is not set.
-        if (empty(env('GEMINI_API_KEY'))) {
-            $this->markTestSkipped('Gemini API key not set. Skipping UnitTestSummary integration test.');
+        // Skip the test if the Fireworks API key is not set.
+        if (empty(env('FIREWORKS_API_KEY'))) {
+            $this->markTestSkipped('Fireworks API key not set. Skipping UnitTestSummary integration test.');
         }
 
         // Use a complex unit test file that tests intricate functionality:
@@ -26,7 +26,7 @@ class UnitTestSummaryIntegrationTest extends TestCase
         // Instantiate the UnitTestSummary transformer.
         $transformer = new UnitTestSummary;
 
-        // Generate the summary by making an actual request to the Gemini API.
+        // Generate the summary by making an actual request to the Fireworks API.
         $summary = $transformer->transform($fileInfo);
 
         // Assert that a non-empty summary is returned.

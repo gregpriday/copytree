@@ -28,11 +28,6 @@ class ProjectQuestionServiceTest extends TestCase
 
     public function test_ask_question_returns_valid_response()
     {
-        // Skip if no Gemini key
-        if (empty(env('GEMINI_API_KEY'))) {
-            $this->markTestSkipped('Gemini key not found.');
-        }
-
         // Generate a limited copytree of the project
         // We'll focus on just the Commands directory to keep it manageable
         Artisan::call('copy', [

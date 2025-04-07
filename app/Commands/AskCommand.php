@@ -8,7 +8,6 @@ use App\Services\ProjectQuestionService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
-use ValueError;
 
 class AskCommand extends Command
 {
@@ -168,45 +167,27 @@ class AskCommand extends Command
             // Process and display each partial response as it arrives
             foreach ($stream as $partialResponse) {
                 try {
-                    // Use optional chaining to safely access nested properties
-                    $text = $partialResponse?->candidates[0]?->content?->parts[0]?->text;
-
+                    // Extract delta content from Fireworks/OpenAI response
+                    $text = $partialResponse->choices[0]->delta->content ?? null;
+                    
                     if ($text !== null) {
                         // Text found via the expected path
                         $this->output->write($text);
                         $fullResponseText .= $text;
-                    } elseif (method_exists($partialResponse, 'text')) {
-                        // Fallback to the text() method if the primary path failed
-                        try {
-                            $fallbackText = $partialResponse->text();
-                            if (!empty($fallbackText)) {
-                                $this->output->write($fallbackText);
-                                $fullResponseText .= $fallbackText;
-                            }
-                        } catch (\Exception $textException) {
-                            // Log but silently ignore text() method errors
-                            Log::debug('Fallback text() method failed for a chunk.', [
-                                'stateKey' => $stateKey ?? 'unknown', 
-                                'error' => $textException->getMessage()
-                            ]);
-                        }
                     } else {
-                        // Optional: Log chunks that don't match either structure for debugging
-                        Log::debug('Received Gemini chunk with unexpected structure.', [
+                        // Optional: Log chunks that don't match the expected structure for debugging
+                        Log::debug('Received Fireworks chunk with unexpected structure or empty delta.', [
                             'stateKey' => $stateKey ?? 'unknown',
-                            'chunk_structure' => json_encode($partialResponse) // Log the structure
                         ]);
                     }
                 } catch (\Exception $e) {
                     // Log the error for troubleshooting
-                    Log::warning('Error processing Gemini response chunk: ' . $e->getMessage(), [
+                    Log::warning('Error processing Fireworks response chunk: ' . $e->getMessage(), [
                         'stateKey' => $stateKey ?? 'unknown',
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString(),
-                        'chunk_structure' => json_encode($partialResponse) // Log structure on error
                     ]);
-                    // We're intentionally ignoring issues with malformed responses
-                    // as a fallback for the more robust checking above
+                    // We're intentionally ignoring issues with malformed responses as a fallback
                 }
             }
 
@@ -224,50 +205,19 @@ class AskCommand extends Command
             $this->runGarbageCollection($stateService);
 
             return self::SUCCESS;
-        } catch (ValueError $e) {
-            // Log but don't display error to user
-            Log::error('Gemini API Content Error (Silently handled): '.$e->getMessage(), [
-                'stateKey' => $stateKey ?? 'unknown',
-                'exception' => get_class($e),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            
-            // Instead of error, just show a subtle info about completion
-            if (!empty($fullResponseText)) {
-                // We have some partial response, so just add a note about completion
-                $this->output->newLine();
-                $this->info("Response complete. Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
-                
-                // Save whatever partial response we have
-                $stateService->saveMessage($stateKey, 'user', $question);
-                $stateService->saveMessage($stateKey, 'model', $fullResponseText);
-                
-                // Perform silent garbage collection
-                $this->runGarbageCollection($stateService);
-                
-                return self::SUCCESS;
-            } else {
-                // No content at all - use generic message without revealing error
-                $this->info("No response generated. Please try again or rephrase your question.");
-                
-                // Perform silent garbage collection
-                $this->runGarbageCollection($stateService);
-                
-                return self::FAILURE;
-            }
         } catch (\Exception $e) {
-            // Log all errors but don't display to user
-            Log::error('AskCommand error (Silently handled): '.$e->getMessage(), [
+            // Log error to console
+            Log::error('API Error: '.$e->getMessage(), [
                 'stateKey' => $stateKey ?? 'unknown',
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
             ]);
             
-            // Instead of error, just handle based on whether we have partial content
+            // Handle based on whether we have partial content
             if (!empty($fullResponseText)) {
                 // We have some partial response, so just add a note about completion
                 $this->output->newLine();
-                $this->info("Response complete. Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
+                $this->info("Response partially complete. Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
                 
                 // Save whatever partial response we have
                 $stateService->saveMessage($stateKey, 'user', $question);
@@ -278,12 +228,9 @@ class AskCommand extends Command
                 
                 return self::SUCCESS;
             } else {
-                // No content at all - use generic message without revealing error
-                $this->info("No response generated. Please try again or rephrase your question.");
-                
-                // Perform silent garbage collection
+                // No content at all - use generic message
+                $this->error("Failed to generate a response. Please try again or use a different question.");
                 $this->runGarbageCollection($stateService);
-                
                 return self::FAILURE;
             }
         }

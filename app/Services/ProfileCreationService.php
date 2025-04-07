@@ -2,10 +2,7 @@
 
 namespace App\Services;
 
-use Gemini\Data\Content;
-use Gemini\Data\GenerationConfig;
-use Gemini\Data\Schema;
-use Gemini\Laravel\Facades\Gemini;
+use App\Facades\Fireworks;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -112,19 +109,24 @@ class ProfileCreationService
             $prompt
         );
 
-        // 4. Call Gemini to generate the profile.
+        // 4. Call Fireworks to generate the profile.
         try {
-            $response = Gemini::generativeModel(model: config('gemini.ask_model'))
-                ->withSystemInstruction(Content::parse($systemPrompt))
-                ->withGenerationConfig($this->getGenerationConfig())
-                ->generateContent($prompt);
+            $response = Fireworks::chat()->create([
+                'model' => config('fireworks.ask_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+                'max_tokens' => 4096,
+                'temperature' => 0.4,
+            ]);
         } catch (\Exception $e) {
-            throw new RuntimeException('Gemini API call failed: '.$e->getMessage());
+            throw new RuntimeException('Fireworks API call failed: '.$e->getMessage());
         }
 
-        $yamlResponse = $response->text() ?? '';
+        $yamlResponse = $response->choices[0]->message->content ?? '';
         if (empty($yamlResponse)) {
-            throw new RuntimeException('Received empty profile YAML from Gemini.');
+            throw new RuntimeException('Received empty profile YAML from Fireworks.');
         }
 
         // Unwrap YAML code fences if present.
@@ -172,13 +174,6 @@ class ProfileCreationService
         return $profilePath;
     }
 
-    private function getGenerationConfig(): GenerationConfig
-    {
-        return new GenerationConfig(
-            maxOutputTokens: 4096,
-        );
-    }
-
     /**
      * Generate a user profile from a conversation history.
      *
@@ -191,21 +186,19 @@ class ProfileCreationService
             // Build the prompt for profile generation
             $prompt = $this->buildProfilePrompt($messages);
 
-            // Configure the generation parameters
-            $generationConfig = new GenerationConfig(
-                maxOutputTokens: 4096,
-                temperature: 0.4,
-                topP: 0.8,
-                topK: 30
-            );
-
-            // Make a request to Gemini for profile generation
-            $response = Gemini::generativeModel(model: config('gemini.ask_model'))
-                ->withGenerationConfig($generationConfig)
-                ->generateContent($prompt);
+            // Make a request to Fireworks for profile generation
+            $response = Fireworks::chat()->create([
+                'model' => config('fireworks.ask_model'),
+                'messages' => [
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+                'max_tokens' => 4096,
+                'temperature' => 0.4,
+                'top_p' => 0.8,
+            ]);
 
             // Store and return the generated profile
-            $profile = $response->text();
+            $profile = $response->choices[0]->message->content ?? '';
             if (! empty($profile)) {
                 // Save the profile to the database
                 $this->saveProfile($profile);

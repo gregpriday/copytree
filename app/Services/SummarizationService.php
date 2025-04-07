@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use Gemini\Laravel\Facades\Gemini;
+use App\Facades\Fireworks;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -14,8 +14,8 @@ class SummarizationService
     protected int $defaultMaxLength = 1000;
 
     /**
-     * The Gemini model to use for summarization.
-     * Preferably a fast, efficient model like Flash.
+     * The Fireworks model to use for summarization.
+     * Preferably a fast, efficient model like Llama4-Maverick.
      */
     protected string $model;
 
@@ -25,11 +25,11 @@ class SummarizationService
     public function __construct()
     {
         // Use the model specifically configured for summarization tasks
-        $this->model = config('gemini.summarization_model');
+        $this->model = config('fireworks.summarization_model');
     }
 
     /**
-     * Summarize a text to a specified maximum length using Gemini.
+     * Summarize a text to a specified maximum length using Fireworks.
      *
      * @param  string  $text  The text to summarize
      * @param  int|null  $maxLength  Maximum summary length (defaults to $defaultMaxLength)
@@ -48,11 +48,17 @@ class SummarizationService
             // Simple summarization prompt
             $prompt = "Summarize the following text concisely, capturing the main points, in under {$maxChars} characters:\n\n{$text}";
 
-            // Use Gemini Flash model for fast, efficient summarization
-            $response = Gemini::generativeModel(model: $this->model)
-                ->generateContent($prompt);
+            // Use Fireworks for summarization
+            $response = Fireworks::chat()->create([
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+                'max_tokens' => 512,
+                'temperature' => 0.2,
+            ]);
 
-            $summary = trim($response->text());
+            $summary = trim($response->choices[0]->message->content ?? '');
 
             // Fallback if summary is empty or longer than requested
             if (empty($summary)) {

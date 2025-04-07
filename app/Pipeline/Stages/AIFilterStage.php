@@ -3,8 +3,7 @@
 namespace App\Pipeline\Stages;
 
 use App\Pipeline\FilePipelineStageInterface;
-use Gemini\Data\Content;
-use Gemini\Laravel\Facades\Gemini;
+use App\Facades\Fireworks;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -17,7 +16,7 @@ class AIFilterStage implements FilePipelineStageInterface
     protected int $previewLength;
 
     /**
-     * Create a new GeminiFilterStage.
+     * Create a new AIFilterStage.
      *
      * @param  string  $description  The natural language description to filter files.
      * @param  int  $previewLength  Optional maximum preview length (default 450).
@@ -29,7 +28,7 @@ class AIFilterStage implements FilePipelineStageInterface
     }
 
     /**
-     * Filter files using Gemini.
+     * Filter files using Fireworks.
      *
      * @param  array  $files  An array of Symfony Finder SplFileInfo objects.
      * @param  \Closure  $next  The next stage in the pipeline.
@@ -43,7 +42,7 @@ class AIFilterStage implements FilePipelineStageInterface
             return $next($files);
         }
 
-        // Prepare file data for Gemini: each file's relative path and a content preview.
+        // Prepare file data for API: each file's relative path and a content preview.
         $fileData = [];
         foreach ($files as $file) {
             /** @var SplFileInfo $file */
@@ -67,26 +66,32 @@ class AIFilterStage implements FilePipelineStageInterface
         }
 
         try {
-            // Generate content using Gemini with the model optimized for classification tasks
-            $response = Gemini::generativeModel(model: config('gemini.classification_model'))
-                ->withSystemInstruction(Content::parse($systemPrompt))
-                ->generateContent($promptText);
+            // Generate content using Fireworks with the model optimized for classification tasks
+            $response = Fireworks::chat()->create([
+                'model' => config('fireworks.classification_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $promptText],
+                ],
+                'temperature' => 0.1,
+                'max_tokens' => 1024,
+            ]);
         } catch (\Exception $e) {
-            throw new RuntimeException('Gemini filtering failed: '.$e->getMessage());
+            throw new RuntimeException('Fireworks filtering failed: '.$e->getMessage());
         }
 
         // Retrieve the response text.
-        $content = $response->text() ?? '';
+        $content = $response->choices[0]->message->content ?? '';
         // Remove code fences if present.
         $content = preg_replace('/^```json(.*)```$/s', '$1', $content);
 
         $result = json_decode($content, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Invalid JSON response from Gemini: '.json_last_error_msg());
+            throw new RuntimeException('Invalid JSON response from Fireworks: '.json_last_error_msg());
         }
 
         if (! isset($result['files']) || ! is_array($result['files'])) {
-            throw new RuntimeException('Gemini response did not include a valid "files" array.');
+            throw new RuntimeException('Fireworks response did not include a valid "files" array.');
         }
 
         $acceptedPaths = $result['files'];
@@ -113,7 +118,7 @@ class AIFilterStage implements FilePipelineStageInterface
     }
 
     /**
-     * Uses Gemini API to determine if a content item should be included based on content analysis
+     * Uses Fireworks API to determine if a content item should be included based on content analysis
      *
      * @param  string  $content  The content to analyze
      * @param  array  $options  Additional options for filtering
@@ -127,23 +132,18 @@ class AIFilterStage implements FilePipelineStageInterface
         // Generate a user prompt with the content to analyze
         $userPrompt = $this->buildUserPrompt($content, $options);
 
-        // Set up a schema for structured output from Gemini
-        $responseSchema = $this->buildResponseSchema();
-
-        // Configure generation parameters
-        $generationConfig = new GenerationConfig(
-            maxOutputTokens: 300,
-            temperature: 0.1,
-            topP: 0.95,
-            topK: 40
-        );
-
         try {
-            // Make the API call to Gemini
-            $response = Gemini::generativeModel(model: config('gemini.classification_model'))
-                ->withSystemInstruction(Content::parse($systemPrompt))
-                ->withGenerationConfig($generationConfig)
-                ->generateContent($userPrompt);
+            // Make the API call to Fireworks
+            $response = Fireworks::chat()->create([
+                'model' => config('fireworks.classification_model'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+                'temperature' => 0.1,
+                'top_p' => 0.95,
+                'max_tokens' => 300,
+            ]);
 
             // Process the response
             $result = $this->processResponse($response, $options);

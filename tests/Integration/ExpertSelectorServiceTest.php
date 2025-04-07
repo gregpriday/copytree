@@ -9,11 +9,6 @@ class ExpertSelectorServiceTest extends TestCase
 {
     public function test_select_expert_returns_appropriate_expert_for_questions()
     {
-        // Skip if no Gemini API key
-        if (empty(env('GEMINI_API_KEY'))) {
-            $this->markTestSkipped('Gemini API key not found.');
-        }
-
         // Create service instance
         $service = new ExpertSelectorService;
 

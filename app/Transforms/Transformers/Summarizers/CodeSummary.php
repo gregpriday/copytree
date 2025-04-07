@@ -6,8 +6,7 @@ use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use Gemini\Data\Content;
-use Gemini\Laravel\Facades\Gemini;
+use App\Facades\Fireworks;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -26,7 +25,7 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
      * @param  SplFileInfo|string  $input  The source code file to summarize.
      * @return string The generated code summary.
      *
-     * @throws RuntimeException If the input is not a SplFileInfo instance or if the Gemini API call fails.
+     * @throws RuntimeException If the input is not a SplFileInfo instance or if the Fireworks API call fails.
      */
     public function transform(SplFileInfo|string $input): string
     {
@@ -73,15 +72,15 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
             $prompt = "Please provide a concise summary for the following source code:\n\n".$wrappedCode;
 
             try {
-                $response = Gemini::generativeModel(model: config('gemini.summarization_model'))
-                    ->withSystemInstruction(Content::parse($systemPrompt))
-                    ->withGenerationConfig(
-                        new GenerationConfig(
-                            maxOutputTokens: 512,
-                            temperature: 0.2,
-                        )
-                    )
-                    ->generateContent($prompt);
+                $response = Fireworks::chat()->create([
+                    'model' => config('fireworks.summarization_model'),
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => $prompt],
+                    ],
+                    'max_tokens' => 512,
+                    'temperature' => 0.2,
+                ]);
             } catch (Throwable $e) {
                 // Log the exception
                 Log::error('Failed to summarize code: '.$e->getMessage(), [
@@ -93,14 +92,14 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
                 return '[Summary generation failed: The AI model encountered an error while summarizing this code.]';
             }
 
-            $rawOutput = $response->text() ?? '';
+            $summary = $response->choices[0]->message->content ?? '';
 
             // Remove code fences if present.
-            $cleanOutput = preg_replace('/^```(?:[a-zA-Z]*\n)?(.*?)```$/s', '$1', trim($rawOutput));
+            $cleanOutput = preg_replace('/^```(?:[a-zA-Z]*\n)?(.*?)```$/s', '$1', trim($summary));
 
             $summary = trim($cleanOutput);
             if (empty($summary)) {
-                throw new RuntimeException('No code summary returned from Gemini.');
+                throw new RuntimeException('No code summary returned from Fireworks.');
             }
 
             return $summary;

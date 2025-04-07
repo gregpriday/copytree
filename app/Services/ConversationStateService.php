@@ -4,8 +4,6 @@ namespace App\Services;
 
 use Carbon\Carbon;
 use Exception;
-use Gemini\Enums\Role;
-use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -123,7 +121,7 @@ class ConversationStateService
 
     /**
      * Load conversation history for a given state key.
-     * Returns an array formatted for Gemini history (alternating roles).
+     * Returns an array formatted for API history (alternating roles).
      */
     public function loadHistory(string $stateKey): array
     {
@@ -137,7 +135,7 @@ class ConversationStateService
                 ->get(['role', 'content'])
                 ->toArray();
 
-            // Format history for Gemini
+            // Format history for API
             $formattedHistory = [];
             foreach ($messages as $message) {
                 $formattedHistory[] = [
@@ -165,15 +163,12 @@ class ConversationStateService
      */
     public function saveMessage(string $stateKey, string $role, string $content): void
     {
-        // Ensure role is a valid string value (either 'user' or 'model')
+        // Ensure role is a valid string value (either 'user' or 'assistant')
         $validRole = $role;
-        if ($role instanceof Role) {
-            $validRole = $role->value;
-        }
 
         // Summarize model responses before saving
         $saveContent = $content;
-        if ($validRole === 'model') {
+        if ($validRole === 'assistant') {
             try {
                 $saveContent = $this->summarizeResponse($content);
 

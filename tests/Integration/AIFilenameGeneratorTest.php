@@ -10,9 +10,9 @@ class AIFilenameGeneratorTest extends TestCase
 {
     public function test_generate_filename_integration()
     {
-        // Skip the test if the GEMINI_API_KEY is not provided.
-        if (empty(env('GEMINI_API_KEY'))) {
-            $this->markTestSkipped('Gemini API key not set in .env file.');
+        // Skip the test if the FIREWORKS_API_KEY is not provided.
+        if (empty(env('FIREWORKS_API_KEY'))) {
+            $this->markTestSkipped('Fireworks API key not set in .env file.');
         }
 
         // Create a temporary directory for the test files.

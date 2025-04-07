@@ -2,14 +2,17 @@
 
 namespace App\Services;
 
-use Gemini\Data\Content;
-use Gemini\Data\GenerationConfig;
-use Gemini\Laravel\Facades\Gemini;
+// Remove Gemini specific imports
+// use Gemini\Data\Content;
+// use Gemini\Data\GenerationConfig;
+// use Gemini\Laravel\Facades\Gemini;
+use App\Facades\Fireworks; // Add Fireworks Facade
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
-use ValueError;
+// Remove ValueError and replace with OpenAI exceptions
+// use ValueError;
 
 class ProjectQuestionService
 {
@@ -24,7 +27,7 @@ class ProjectQuestionService
     const RETRY_DELAY_MS = 500;
 
     /**
-     * The Gemini model to use, defaulting to the thinking model.
+     * The Fireworks model to use.
      */
     protected string $model;
 
@@ -39,7 +42,7 @@ class ProjectQuestionService
     public function __construct()
     {
         // Use the model specifically configured for the Copytree Ask functionality
-        $this->model = config('gemini.ask_model');
+        $this->model = config('fireworks.ask_model', config('fireworks.model'));
         // Set the base directory for expert prompts
         $this->promptsBaseDir = base_path('prompts/project-question');
     }
@@ -52,10 +55,9 @@ class ProjectQuestionService
      * @param  string  $question  The user's question about the project
      * @param  string  $expert  The expert to use (defaults to 'default')
      * @param  array  $history  Optional conversation history for stateful interactions
-     * @return iterable The stream of partial responses from Gemini
+     * @return iterable The stream of partial responses from Fireworks
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
-     * @throws ValueError When the API returns no candidates after all retries
      */
     public function askQuestion(string $projectCopytree, string $question, string $expert = 'default', array $history = []): iterable
     {
@@ -74,56 +76,63 @@ class ProjectQuestionService
 
         $systemPrompt = File::get($expertPromptPath);
 
-        // Format history as text if available
-        $historyText = '';
-        if (! empty($history)) {
-            $historyText .= "Previous conversation:\n\n";
+        // --- Prepare Messages for Fireworks API ---
+        $messages = [];
+
+        // Add system message
+        $messages[] = [
+            'role' => 'system',
+            'content' => $systemPrompt
+        ];
+
+        // Add history messages
+        if (!empty($history)) {
             foreach ($history as $histItem) {
                 // Process text to remove XML tags if present
                 $messageText = $histItem['content'];
                 $messageText = preg_replace('/<ct:(summary|truncated)>(.*?)<\/ct:\1>/s', '$2', $messageText);
 
-                $historyText .= ($histItem['role'] === 'user' ? 'User: ' : 'Assistant: ').$messageText."\n\n";
+                $messages[] = [
+                    'role' => $histItem['role'],
+                    'content' => $messageText
+                ];
             }
-            $historyText .= "Current question:\n\n";
         }
 
-        // Build the combined prompt with history, project structure, and question
-        $prompt = $historyText."Here is the project structure and files:\n\n{$projectCopytree}\n\nUser question: {$question}";
+        // Add the current user question with project context
+        $currentPrompt = "Here is the project structure and files:\n\n{$projectCopytree}\n\nUser question: {$question}";
+        $messages[] = [
+            'role' => 'user',
+            'content' => $currentPrompt
+        ];
 
-        // Configure the generation parameters
-        $generationConfig = new GenerationConfig(
-            maxOutputTokens: 32768,
-            temperature: 0.15,
-            topP: 0.95,
-            topK: 40
-        );
+        // Configure generation parameters for Fireworks
+        $parameters = [
+            'model' => $this->model,
+            'messages' => $messages,
+            'max_tokens' => 8192,
+            'temperature' => 0.15,
+            'top_p' => 0.95,
+        ];
 
         try {
             // Use Laravel's retry helper
-            return retry(self::MAX_RETRIES, function () use ($systemPrompt, $generationConfig, $prompt) {
+            return retry(self::MAX_RETRIES, function () use ($parameters) {
                 try {
-                    // Stream content using Gemini thinking model
-                    return Gemini::generativeModel(model: $this->model)
-                        ->withSystemInstruction(Content::parse($systemPrompt))
-                        ->withGenerationConfig($generationConfig)
-                        ->streamGenerateContent($prompt);
-                } catch (ValueError $e) {
-                    // For ValueError, log the error
-                    Log::warning('ValueError in askQuestion: '.$e->getMessage());
+                    // Stream content using Fireworks
+                    return Fireworks::chat()->createStreamed($parameters);
+                } catch (Throwable $e) {
+                    // Log the error
+                    Log::warning('Fireworks API error in askQuestion: '.$e->getMessage());
 
                     // Rethrow to trigger retry
                     throw $e;
                 }
             }, self::RETRY_DELAY_MS);
-        } catch (ValueError $e) {
-            // This will only be triggered if all retries with ValueError fail
-            Log::error('All retries failed with ValueError: '.$e->getMessage());
-            throw $e; // Re-throw the ValueError for special handling upstream
         } catch (Throwable $e) {
-            // For any other exception after all retries
-            Log::error('Gemini API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage());
-            throw new RuntimeException('Gemini API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage(), 0, $e);
+            // For any exception after all retries
+            Log::error('Fireworks API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage());
+            throw new RuntimeException('Fireworks API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage(), 0, $e);
         }
     }
 

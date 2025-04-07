@@ -9,9 +9,9 @@ class ProfileCreationServiceTest extends TestCase
 {
     public function test_create_profile_integration(): void
     {
-        // Skip this test if the Gemini API key is not set.
-        if (empty(env('GEMINI_API_KEY'))) {
-            $this->markTestSkipped('Gemini API key is not set. Skipping ProfileCreationService integration test.');
+        // Skip this test if the Fireworks API key is not set.
+        if (empty(env('FIREWORKS_API_KEY'))) {
+            $this->markTestSkipped('Fireworks API key is not set. Skipping ProfileCreationService integration test.');
         }
 
         // Use the actual Copytree project folder as the project path.

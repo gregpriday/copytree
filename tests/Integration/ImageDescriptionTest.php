@@ -10,9 +10,9 @@ class ImageDescriptionTest extends TestCase
 {
     public function test_transform_returns_description_for_image()
     {
-        // Skip this integration test if the OpenAI API key is not set.
-        if (empty(env('GEMINI_API_KEY'))) {
-            $this->markTestSkipped('GEMINI_API_KEY is not set. Skipping ImageDescription integration test.');
+        // Skip this integration test if the Fireworks API key is not set.
+        if (empty(env('FIREWORKS_API_KEY'))) {
+            $this->markTestSkipped('FIREWORKS_API_KEY is not set. Skipping ImageDescription integration test.');
         }
 
         // Get the path to the test image.

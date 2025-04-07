@@ -4,7 +4,7 @@ namespace App\Commands;
 
 use App\Services\ConversationStateService;
 use App\Services\SummarizationService;
-use Gemini\Laravel\Facades\Gemini;
+use App\Facades\Fireworks;
 use Illuminate\Support\Facades\File;
 use LaravelZero\Framework\Commands\Command;
 
@@ -22,36 +22,31 @@ class InstallCopytreeCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Sets up the Copytree environment, including directory creation and Gemini API key configuration';
+    protected $description = 'Sets up the Copytree environment, including directory creation and Fireworks API key configuration';
 
     /**
-     * List of available Gemini models for different tasks
+     * List of available Fireworks models for different tasks
      */
     protected array $availableModels = [
         'ask' => [
-            'gemini-2.5-pro-exp-03-25' => 'Gemini 2.5 Pro - Latest experimental model for complex reasoning (March 2025)',
-            'gemini-2.0-pro' => 'Gemini 2.0 Pro - Powerful reasoning with 2M token context window',
-            'gemini-1.5-pro' => 'Gemini 1.5 Pro - Legacy model with 2M token context window',
+            'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Latest model for complex reasoning',
+            'accounts/fireworks/models/mixtral-8x7b-instruct' => 'Mixtral 8x7B - Powerful model with excellent reasoning',
         ],
         'expert_selector' => [
-            'models/gemini-2.0-flash' => 'Gemini 2.0 Flash - Fast model for classification tasks',
-            'models/gemini-2.0-flash-lite' => 'Gemini 2.0 Flash-Lite - Cost-effective model for simple tasks',
-            'models/gemini-1.5-flash' => 'Gemini 1.5 Flash - Legacy fast model for simple tasks',
+            'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Fast model for classification tasks',
+            'accounts/fireworks/models/llama3-8b-instruct' => 'LLaMa 3 8B - Cost-effective model for simple tasks',
         ],
         'summarization' => [
-            'models/gemini-2.0-flash-lite' => 'Gemini 2.0 Flash-Lite - Most cost-effective for summarization',
-            'models/gemini-2.0-flash' => 'Gemini 2.0 Flash - Balanced efficiency and quality',
-            'models/gemini-1.5-flash' => 'Gemini 1.5 Flash - Legacy model for summarization',
+            'accounts/fireworks/models/llama3-8b-instruct' => 'LLaMa 3 8B - Most cost-effective for summarization',
+            'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Balanced efficiency and quality',
         ],
         'classification' => [
-            'models/gemini-2.0-flash' => 'Gemini 2.0 Flash - Balanced performance for classification/filtering',
-            'models/gemini-2.0-flash-lite' => 'Gemini 2.0 Flash-Lite - Cost-effective for simple classification',
-            'models/gemini-1.5-flash' => 'Gemini 1.5 Flash - Legacy model for classification',
+            'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Balanced performance for classification/filtering',
+            'accounts/fireworks/models/llama3-8b-instruct' => 'LLaMa 3 8B - Cost-effective for simple classification',
         ],
         'general' => [
-            'models/gemini-2.0-flash' => 'Gemini 2.0 Flash - Balanced model for general tasks',
-            'models/gemini-2.0-flash-lite' => 'Gemini 2.0 Flash-Lite - Cost-effective for general tasks',
-            'models/gemini-1.5-flash' => 'Gemini 1.5 Flash - Legacy model for general tasks',
+            'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Balanced model for general tasks',
+            'accounts/fireworks/models/llama3-8b-instruct' => 'LLaMa 3 8B - Cost-effective for general tasks',
         ],
     ];
 
@@ -102,10 +97,10 @@ class InstallCopytreeCommand extends Command
         // Step 4: Save the configuration to .env file
         $this->saveConfigToEnv($envPath, $envContent, $configValues);
 
-        // Step 5: Test the Gemini API key
-        if (! empty($configValues['GEMINI_API_KEY'])) {
-            if ($this->testGeminiApiKey($configValues['GEMINI_API_KEY'])) {
-                $this->info('✓ Gemini API key is valid!');
+        // Step 5: Test the Fireworks API key
+        if (! empty($configValues['FIREWORKS_API_KEY'])) {
+            if ($this->testFireworksApiKey($configValues['FIREWORKS_API_KEY'])) {
+                $this->info('✓ Fireworks API key is valid!');
             } else {
                 $this->error('Invalid API key. AI features will not be available.');
 
@@ -135,66 +130,66 @@ class InstallCopytreeCommand extends Command
             return isset($matches[1]) && ! empty($matches[1]) ? $matches[1] : $default;
         };
 
-        // Step 1: Collect Gemini API Key
-        $existingKey = $extractValue('GEMINI_API_KEY');
+        // Step 1: Collect Fireworks API Key
+        $existingKey = $extractValue('FIREWORKS_API_KEY');
         if (! empty($existingKey)) {
-            $this->info('Found existing Gemini API key: '.$this->maskApiKey($existingKey));
+            $this->info('Found existing Fireworks API key: '.$this->maskApiKey($existingKey));
             if ($this->confirm('Do you want to use this existing API key?', true)) {
-                $configValues['GEMINI_API_KEY'] = $existingKey;
+                $configValues['FIREWORKS_API_KEY'] = $existingKey;
             } else {
-                $configValues['GEMINI_API_KEY'] = $this->promptForApiKey();
+                $configValues['FIREWORKS_API_KEY'] = $this->promptForApiKey();
             }
         } else {
             $this->line('');
-            $this->line('A Gemini API key is required for AI features.');
-            $this->line('You can get one from: https://makersuite.google.com');
+            $this->line('A Fireworks API key is required for AI features.');
+            $this->line('You can get one from: https://fireworks.ai/');
             $this->line('');
-            $configValues['GEMINI_API_KEY'] = $this->promptForApiKey();
+            $configValues['FIREWORKS_API_KEY'] = $this->promptForApiKey();
         }
 
         $this->line('');
-        $this->info('Configure Gemini models for specific tasks:');
-        $this->line('Different tasks in Copytree can use different Gemini models optimized for their needs.');
+        $this->info('Configure Fireworks models for specific tasks:');
+        $this->line('Different tasks in Copytree can use different Fireworks models optimized for their needs.');
 
         // Step 2: Model for Copytree Ask functionality
         $this->line('');
         $this->info('1. Copytree Ask Model');
         $this->line('This model is used for the primary "copytree ask" command to answer complex questions about codebases.');
-        $existingAskModel = $extractValue('GEMINI_ASK_MODEL', 'gemini-2.5-pro-exp-03-25');
-        $configValues['GEMINI_ASK_MODEL'] = $this->selectModelFromOptions('ask', $existingAskModel);
+        $existingAskModel = $extractValue('FIREWORKS_ASK_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic');
+        $configValues['FIREWORKS_ASK_MODEL'] = $this->selectModelFromOptions('ask', $existingAskModel);
 
         // Step 3: Model for expert selection
         $this->line('');
         $this->info('2. Expert Selector Model');
         $this->line('This model selects the appropriate expert system prompt based on the user\'s question.');
-        $existingExpertSelectorModel = $extractValue('GEMINI_EXPERT_SELECTOR_MODEL', 'models/gemini-2.0-flash');
-        $configValues['GEMINI_EXPERT_SELECTOR_MODEL'] = $this->selectModelFromOptions('expert_selector', $existingExpertSelectorModel);
+        $existingExpertSelectorModel = $extractValue('FIREWORKS_EXPERT_SELECTOR_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic');
+        $configValues['FIREWORKS_EXPERT_SELECTOR_MODEL'] = $this->selectModelFromOptions('expert_selector', $existingExpertSelectorModel);
 
         // Step 4: Model for summarization tasks
         $this->line('');
         $this->info('3. Summarization Model');
         $this->line('This model is used for summarizing text, code, and other content. A cost-effective model is recommended.');
-        $existingSummarizationModel = $extractValue('GEMINI_SUMMARIZATION_MODEL', 'models/gemini-2.0-flash-lite');
-        $configValues['GEMINI_SUMMARIZATION_MODEL'] = $this->selectModelFromOptions('summarization', $existingSummarizationModel);
+        $existingSummarizationModel = $extractValue('FIREWORKS_SUMMARIZATION_MODEL', 'accounts/fireworks/models/llama3-8b-instruct');
+        $configValues['FIREWORKS_SUMMARIZATION_MODEL'] = $this->selectModelFromOptions('summarization', $existingSummarizationModel);
 
         // Step 5: Model for classification tasks
         $this->line('');
         $this->info('4. Classification Model');
         $this->line('This model is used for filtering files, classifying content, and other decision-making tasks.');
-        $existingClassificationModel = $extractValue('GEMINI_CLASSIFICATION_MODEL', 'models/gemini-2.0-flash');
-        $configValues['GEMINI_CLASSIFICATION_MODEL'] = $this->selectModelFromOptions('classification', $existingClassificationModel);
+        $existingClassificationModel = $extractValue('FIREWORKS_CLASSIFICATION_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic');
+        $configValues['FIREWORKS_CLASSIFICATION_MODEL'] = $this->selectModelFromOptions('classification', $existingClassificationModel);
 
         // Step 6: Default general-purpose model
         $this->line('');
         $this->info('5. General Purpose Model');
         $this->line('This model is used as a fallback for any tasks not covered by the specific models above.');
-        $existingGeneralModel = $extractValue('GEMINI_GENERAL_MODEL', 'models/gemini-2.0-flash');
-        $configValues['GEMINI_GENERAL_MODEL'] = $this->selectModelFromOptions('general', $existingGeneralModel);
+        $existingGeneralModel = $extractValue('FIREWORKS_GENERAL_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic');
+        $configValues['FIREWORKS_GENERAL_MODEL'] = $this->selectModelFromOptions('general', $existingGeneralModel);
 
         // Step 7: Request timeout
         $this->line('');
-        $existingTimeout = $extractValue('GEMINI_REQUEST_TIMEOUT', '120');
-        $configValues['GEMINI_REQUEST_TIMEOUT'] = $this->ask('Enter request timeout in seconds (default: 120)', $existingTimeout);
+        $existingTimeout = $extractValue('FIREWORKS_REQUEST_TIMEOUT', '120');
+        $configValues['FIREWORKS_REQUEST_TIMEOUT'] = $this->ask('Enter request timeout in seconds (default: 120)', $existingTimeout);
 
         // Step 8: History limit
         $this->line('');
@@ -248,51 +243,29 @@ class InstallCopytreeCommand extends Command
         // Convert to indexed array for the choice method
         $indexedChoices = array_values($choices);
         // Default is the first option (index 0)
-        $defaultIndex = 0;
+        $selection = $this->choice('Select a model', $indexedChoices, 0);
 
-        $this->line('');
-        $this->line('Available models (use arrow keys to navigate, press Enter to select the default):');
-        $this->line("<info>Default: {$indexedChoices[0]}</info>");
-
-        // Use the choice method for arrow key navigation with explicit default
-        $selection = $this->choice('Select model', $indexedChoices, $defaultIndex);
-
-        // Handle the "Enter a custom model name" option
+        // If they chose "Enter a custom model name", prompt for it
         if ($selection === 'Enter a custom model name') {
-            $customModelName = $this->ask('Enter custom model name');
+            $customModel = $this->ask('Enter custom model name (e.g., accounts/fireworks/models/model-name)');
 
-            if (empty($customModelName)) {
-                $this->warn('No model name provided, using default.');
-
-                return $defaultModel;
-            }
-
-            if ($this->confirm("'{$customModelName}' is not in the predefined list. Use it anyway?", true)) {
-                return $customModelName;
-            }
-
-            return $this->selectModelFromOptions($taskType, $defaultModel);
+            return $customModel;
         }
 
-        // Extract the model name from the selection (it's before the first colon or space)
-        preg_match('/^([^:[:space:]]+)/', $selection, $matches);
-        $modelName = $matches[1] ?? $defaultModel;
+        // Extract the model name (everything before the colon or space)
+        preg_match('/^([^:]+)(?:[: ].*)?$/', $selection, $matches);
 
-        // If it's the default with [current] marker, clean it up
-        if (strpos($modelName, '[current') !== false) {
-            $modelName = $defaultModel;
-        }
-
-        return $modelName;
+        return trim($matches[1] ?? $defaultModel);
     }
 
     /**
-     * Mask API key for display.
+     * Mask an API key for display, showing only first and last few characters.
      */
     protected function maskApiKey(string $key): string
     {
-        if (strlen($key) <= 8) {
-            return '********';
+        $length = strlen($key);
+        if ($length <= 8) {
+            return '********'; // Just mask completely if it's very short
         }
 
         return substr($key, 0, 4).'...'.substr($key, -4);
@@ -303,125 +276,94 @@ class InstallCopytreeCommand extends Command
      */
     protected function promptForApiKey(): string
     {
-        $apiKey = $this->secret('Enter your Gemini API key');
-
-        if (empty($apiKey)) {
-            $this->warn('No API key provided. AI features will not be available.');
+        $apiKey = '';
+        while (empty($apiKey)) {
+            $apiKey = $this->secret('Enter your Fireworks API key');
+            if (empty($apiKey)) {
+                $this->error('API key cannot be empty if you want to use AI features.');
+                if ($this->confirm('Continue without an API key? (AI features will be disabled)', false)) {
+                    return '';
+                }
+            }
         }
 
         return $apiKey;
     }
 
     /**
-     * Test the provided Gemini API key.
+     * Test if the Fireworks API key is valid.
      */
-    protected function testGeminiApiKey(string $apiKey): bool
+    protected function testFireworksApiKey(string $apiKey): bool
     {
-        $this->line('Testing Gemini API key...');
-
         try {
-            // Set the key in env for testing
-            putenv("GEMINI_API_KEY={$apiKey}");
+            $response = Fireworks::chat()->create([
+                'model' => 'accounts/fireworks/models/llama3-8b-instruct',
+                'messages' => [
+                    ['role' => 'user', 'content' => 'Say "Hello from Copytree" to test this API key'],
+                ],
+                'max_tokens' => 10,
+            ]);
 
-            // Try to make a simple request using the general model
-            $response = Gemini::generativeModel(model: config('gemini.general_model'))
-                ->generateContent('Hello, this is a test from Copytree installation.');
-
-            return $response && $response->text();
+            return isset($response->choices[0]->message->content) && !empty($response->choices[0]->message->content);
         } catch (\Exception $e) {
-            $this->error('API key test failed: '.$e->getMessage());
+            $this->error('API test failed: '.$e->getMessage());
 
             return false;
         }
     }
 
     /**
-     * Save configuration values to .env file.
+     * Save configuration values to the .env file.
      */
     protected function saveConfigToEnv(string $envPath, string $envContent, array $configValues): void
     {
         $newEnvContent = $envContent;
 
+        // Update or add each configuration value
         foreach ($configValues as $key => $value) {
-            // Skip empty values
-            if (empty($value)) {
-                continue;
-            }
+            // Escape any quotes in the value
+            $value = str_replace('"', '\"', $value);
 
-            if (strpos($newEnvContent, "{$key}=") !== false) {
-                // Update existing value
-                $newEnvContent = preg_replace("/{$key}=([^\s]*)/", "{$key}={$value}", $newEnvContent);
+            // If the key already exists in the file, replace its value
+            if (preg_match("/{$key}=/", $newEnvContent)) {
+                $newEnvContent = preg_replace("/{$key}=([^\n]+)/", "{$key}=\"{$value}\"", $newEnvContent);
             } else {
-                // Add new value
-                $newEnvContent .= "\n{$key}={$value}";
+                // Otherwise, add it to the end of the file
+                $newEnvContent .= "\n{$key}=\"{$value}\"";
             }
         }
 
-        // Ensure the file ends with a newline
-        if (! empty($newEnvContent) && substr($newEnvContent, -1) !== "\n") {
+        // Make sure the file ends with a newline
+        if (substr($newEnvContent, -1) !== "\n") {
             $newEnvContent .= "\n";
         }
 
-        // Save the updated content
+        // Save the updated content to the .env file
         file_put_contents($envPath, $newEnvContent);
         $this->info('✓ Configuration saved to .env file.');
     }
 
     /**
-     * Set up the database for conversation history.
+     * Set up the SQLite database for conversation history.
      */
     protected function setupDatabase(): void
     {
-        $this->line('');
-        $this->line('Setting up the database for conversation history...');
-        try {
-            // Check if the old conversation_history table already exists
-            $oldTableExists = false;
-            $dbPath = config('database.connections.copytree_state.database');
+        $dbPath = copytree_path('database.sqlite');
+        if (! file_exists($dbPath)) {
+            // Touch the database file to create it
+            touch($dbPath);
+            $this->info('✓ Created conversation history database.');
 
-            if (File::exists($dbPath)) {
-                // Connect to the database and check if the table exists
-                $pdo = new \PDO("sqlite:{$dbPath}");
-                $stmt = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='conversation_history'");
+            // Initialize the database schema
+            $this->call('copytree:migrate');
 
-                // Check if the conversation_history table exists
-                $oldTableExists = $stmt->fetch() !== false;
-
-                // Check if the migrations table exists (indicating the table was created via migrations)
-                $stmtMigrations = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'");
-                if ($stmtMigrations->fetch() !== false) {
-                    $oldTableExists = false; // Not considered an "old" table if migrations table exists
-                }
-            }
-
-            if ($oldTableExists) {
-                $this->warn('Detected existing conversation_history table created with the old method.');
-                if ($this->confirm('Would you like to recreate it using migrations? This will delete your existing conversation history.', false)) {
-                    // Backup the existing database
-                    $backupPath = $dbPath.'.bak.'.date('YmdHis');
-                    File::copy($dbPath, $backupPath);
-                    $this->info("✓ Backed up existing database to {$backupPath}");
-
-                    // Delete the existing database file to start fresh
-                    File::delete($dbPath);
-                    $this->info('✓ Removed existing database to allow fresh migration');
-
-                    // Instantiate the ConversationStateService to trigger automatic migration
-                    app(SummarizationService::class); // Dependency for ConversationStateService
-                    app(ConversationStateService::class);
-                    $this->info('✓ Database setup completed successfully via service');
-                } else {
-                    $this->info('Keeping existing conversation_history table.');
-                }
-            } else {
-                // Instantiate the ConversationStateService to trigger automatic migration
-                app(SummarizationService::class); // Dependency for ConversationStateService
-                app(ConversationStateService::class);
-                $this->info('✓ Database setup completed successfully');
-            }
-        } catch (\Exception $e) {
-            $this->error('Failed to setup database: '.$e->getMessage());
-            $this->warn('You may need to manually check permissions or database file corruption.');
+            $this->info('✓ Initialized conversation history database schema.');
+        } else {
+            $this->info('✓ Conversation history database already exists.');
         }
+
+        // Create a ConversationStateService instance to ensure the table exists
+        $conversationService = new ConversationStateService();
+        $this->info('✓ Conversation state service initialized.');
     }
 }

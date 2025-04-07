@@ -10,9 +10,9 @@ class CodeTransformerTest extends TestCase
 {
     public function test_code_summary_integration()
     {
-        // Skip the test if the GEMINI_API_KEY is not set.
-        if (empty(env('GEMINI_API_KEY'))) {
-            $this->markTestSkipped('Gemini API key not set. Skipping CodeTransformer integration test.');
+        // Skip the test if the FIREWORKS_API_KEY is not set.
+        if (empty(env('FIREWORKS_API_KEY'))) {
+            $this->markTestSkipped('Fireworks API key not set. Skipping CodeTransformer integration test.');
         }
 
         // Use an actual file from the project. Here we use ClearCacheCommand.php.
@@ -25,7 +25,7 @@ class CodeTransformerTest extends TestCase
         // Instantiate the CodeSummary transformer.
         $transformer = new CodeSummary;
 
-        // Run the transformer. This will make an actual request to Gemini.
+        // Run the transformer. This will make an actual request to Fireworks.
         $summary = $transformer->transform($fileInfo);
 
         // Assert that a non-empty summary is returned.
