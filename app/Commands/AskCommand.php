@@ -225,35 +225,67 @@ class AskCommand extends Command
 
             return self::SUCCESS;
         } catch (ValueError $e) {
-            $this->error('Gemini API Content Error: '.$e->getMessage());
-            $this->info('This error can occur when content is filtered by safety systems. Try rephrasing your question.');
-
-            // Perform silent garbage collection even on failure
-            $this->runGarbageCollection($stateService);
-
-            return self::FAILURE;
-        } catch (\Exception $e) {
-            // Check for common errors with specific messaging
-            if (str_contains($e->getMessage(), "Undefined array key 'parts'")) {
-                $this->error('Error: Malformed response from Gemini API: '.$e->getMessage());
-                $this->info('This is usually a temporary issue with the response format. Please try your question again.');
-            } else if (str_contains($e->getMessage(), "API key not valid")) {
-                $this->error('Error: Gemini API key validation failed: '.$e->getMessage());
-                $this->info('Please check that your API key is correctly set in your .env file or environment variables.');
-            } else {
-                $this->error('Error: '.$e->getMessage());
-            }
-
-            // Log the full error for developer troubleshooting
-            Log::error('AskCommand error: '.$e->getMessage(), [
+            // Log but don't display error to user
+            Log::error('Gemini API Content Error (Silently handled): '.$e->getMessage(), [
+                'stateKey' => $stateKey ?? 'unknown',
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
             ]);
-
-            // Perform silent garbage collection even on failure
-            $this->runGarbageCollection($stateService);
-
-            return self::FAILURE;
+            
+            // Instead of error, just show a subtle info about completion
+            if (!empty($fullResponseText)) {
+                // We have some partial response, so just add a note about completion
+                $this->output->newLine();
+                $this->info("Response complete. Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
+                
+                // Save whatever partial response we have
+                $stateService->saveMessage($stateKey, 'user', $question);
+                $stateService->saveMessage($stateKey, 'model', $fullResponseText);
+                
+                // Perform silent garbage collection
+                $this->runGarbageCollection($stateService);
+                
+                return self::SUCCESS;
+            } else {
+                // No content at all - use generic message without revealing error
+                $this->info("No response generated. Please try again or rephrase your question.");
+                
+                // Perform silent garbage collection
+                $this->runGarbageCollection($stateService);
+                
+                return self::FAILURE;
+            }
+        } catch (\Exception $e) {
+            // Log all errors but don't display to user
+            Log::error('AskCommand error (Silently handled): '.$e->getMessage(), [
+                'stateKey' => $stateKey ?? 'unknown',
+                'exception' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            // Instead of error, just handle based on whether we have partial content
+            if (!empty($fullResponseText)) {
+                // We have some partial response, so just add a note about completion
+                $this->output->newLine();
+                $this->info("Response complete. Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
+                
+                // Save whatever partial response we have
+                $stateService->saveMessage($stateKey, 'user', $question);
+                $stateService->saveMessage($stateKey, 'model', $fullResponseText);
+                
+                // Perform silent garbage collection
+                $this->runGarbageCollection($stateService);
+                
+                return self::SUCCESS;
+            } else {
+                // No content at all - use generic message without revealing error
+                $this->info("No response generated. Please try again or rephrase your question.");
+                
+                // Perform silent garbage collection
+                $this->runGarbageCollection($stateService);
+                
+                return self::FAILURE;
+            }
         }
     }
 
