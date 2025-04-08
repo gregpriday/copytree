@@ -13,13 +13,13 @@ return [
     */
     'providers' => [
         'llama' => [
-            'key' => env('FIREWORKS_API_KEY'),
-            'base_url' => env('FIREWORKS_API_BASE_URL', 'https://api.fireworks.ai/inference/v1'),
-            'timeout' => env('FIREWORKS_REQUEST_TIMEOUT', 120),
+            'key' => env('LAMBDA_API_KEY'),
+            'base_url' => env('LAMBDA_API_BASE_URL', 'https://api.lambda.ai/v1'),
+            'timeout' => env('LAMBDA_REQUEST_TIMEOUT', 120),
 
             'models' => [
-                'medium' => 'accounts/fireworks/models/llama4-maverick-instruct-basic',
-                'small' => 'accounts/fireworks/models/llama4-scout-instruct-basic',
+                'medium' => 'llama-4-maverick-17b-128e-instruct-fp8',
+                'small' => 'llama-4-scout-17b-16e-instruct',
             ]
         ],
 

@@ -55,7 +55,12 @@ class ProjectQuestionServiceTest extends TestCase
         try {
             // Ask a simple question about the commands
             $question = 'I want to enhance the use of AI in this project, where are some places I could look that could be enhanced with AI?';
-            $response = collect($service->askQuestion($copytree, $question))->implode('');
+            $expertConfig = [
+                'expert' => 'default',
+                'provider' => 'llama',
+                'model' => 'medium',
+            ];
+            $response = collect($service->askQuestion($copytree, $question, $expertConfig))->implode('');
 
             // Check that we got a valid response
             $this->assertNotEmpty($response);

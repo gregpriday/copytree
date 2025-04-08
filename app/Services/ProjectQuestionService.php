@@ -66,6 +66,7 @@ class ProjectQuestionService
         $expert = is_array($expertConfig) ? $expertConfig['expert'] : $expertConfig;
         $provider = is_array($expertConfig) ? $expertConfig['provider'] : $this->defaultProvider;
         $model = is_array($expertConfig) ? $expertConfig['model'] : $this->defaultModel;
+        $model = AI::models($provider)[$model];
 
         // Build the path to the expert's system prompt
         $expertPromptPath = $this->getExpertPromptPath($expert);
@@ -117,8 +118,6 @@ class ProjectQuestionService
             'model' => $model,
             'messages' => $messages,
             'max_tokens' => 8192,
-            'temperature' => 0.15,
-            'top_p' => 0.95,
         ];
 
         try {
