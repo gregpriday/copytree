@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Facades\Fireworks;
+use App\Facades\AI;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -14,7 +14,7 @@ class SummarizationService
     protected int $defaultMaxLength = 1000;
 
     /**
-     * The Fireworks model to use for summarization.
+     * The AI model to use for summarization.
      * Preferably a fast, efficient model like Llama4-Maverick.
      */
     protected string $model;
@@ -25,11 +25,11 @@ class SummarizationService
     public function __construct()
     {
         // Use the model specifically configured for summarization tasks
-        $this->model = config('fireworks.summarization_model');
+        $this->model = AI::models()['medium'];
     }
 
     /**
-     * Summarize a text to a specified maximum length using Fireworks.
+     * Summarize a text to a specified maximum length using AI.
      *
      * @param  string  $text  The text to summarize
      * @param  int|null  $maxLength  Maximum summary length (defaults to $defaultMaxLength)
@@ -48,8 +48,8 @@ class SummarizationService
             // Simple summarization prompt
             $prompt = "Summarize the following text concisely, capturing the main points, in under {$maxChars} characters:\n\n{$text}";
 
-            // Use Fireworks for summarization
-            $response = Fireworks::chat()->create([
+            // Use AI for summarization
+            $response = AI::chat()->create([
                 'model' => $this->model,
                 'messages' => [
                     ['role' => 'user', 'content' => $prompt],

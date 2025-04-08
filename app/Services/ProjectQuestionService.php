@@ -2,17 +2,11 @@
 
 namespace App\Services;
 
-// Remove Gemini specific imports
-// use Gemini\Data\Content;
-// use Gemini\Data\GenerationConfig;
-// use Gemini\Laravel\Facades\Gemini;
-use App\Facades\Fireworks; // Add Fireworks Facade
+use App\Facades\AI; // Add AI Facade
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
-// Remove ValueError and replace with OpenAI exceptions
-// use ValueError;
 
 class ProjectQuestionService
 {
@@ -27,7 +21,7 @@ class ProjectQuestionService
     const RETRY_DELAY_MS = 500;
 
     /**
-     * The Fireworks model to use.
+     * The AI model to use.
      */
     protected string $model;
 
@@ -42,7 +36,7 @@ class ProjectQuestionService
     public function __construct()
     {
         // Use the model specifically configured for the Copytree Ask functionality
-        $this->model = config('fireworks.ask_model', config('fireworks.model'));
+        $this->model = AI::models()['medium'];
         // Set the base directory for expert prompts
         $this->promptsBaseDir = base_path('prompts/project-question');
     }
@@ -55,7 +49,7 @@ class ProjectQuestionService
      * @param  string  $question  The user's question about the project
      * @param  string  $expert  The expert to use (defaults to 'default')
      * @param  array  $history  Optional conversation history for stateful interactions
-     * @return iterable The stream of partial responses from Fireworks
+     * @return iterable The stream of partial responses from the AI
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
      */
@@ -76,7 +70,7 @@ class ProjectQuestionService
 
         $systemPrompt = File::get($expertPromptPath);
 
-        // --- Prepare Messages for Fireworks API ---
+        // --- Prepare Messages for AI API ---
         $messages = [];
 
         // Add system message
@@ -106,7 +100,7 @@ class ProjectQuestionService
             'content' => $currentPrompt
         ];
 
-        // Configure generation parameters for Fireworks
+        // Configure generation parameters
         $parameters = [
             'model' => $this->model,
             'messages' => $messages,
@@ -119,11 +113,11 @@ class ProjectQuestionService
             // Use Laravel's retry helper
             return retry(self::MAX_RETRIES, function () use ($parameters) {
                 try {
-                    // Stream content using Fireworks
-                    return Fireworks::chat()->createStreamed($parameters);
+                    // If that worked, now do the streaming request
+                    return AI::chat()->createStreamed($parameters);
                 } catch (Throwable $e) {
                     // Log the error
-                    Log::warning('Fireworks API error in askQuestion: '.$e->getMessage());
+                    Log::warning('AI API error in askQuestion: '.$e->getMessage());
 
                     // Rethrow to trigger retry
                     throw $e;
@@ -131,8 +125,8 @@ class ProjectQuestionService
             }, self::RETRY_DELAY_MS);
         } catch (Throwable $e) {
             // For any exception after all retries
-            Log::error('Fireworks API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage());
-            throw new RuntimeException('Fireworks API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage(), 0, $e);
+            Log::error('AI API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage());
+            throw new RuntimeException('AI API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage(), 0, $e);
         }
     }
 

@@ -7,3 +7,5 @@
 .DS_Store
 /storage
 /.env
+/phpunit.xml
+/.env.testing

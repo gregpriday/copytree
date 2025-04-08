@@ -5,7 +5,7 @@ namespace App\Transforms\Transformers\Images;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use App\Facades\Fireworks;
+use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -18,7 +18,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
     protected int $maxDimension = 1024;
 
     /**
-     * Transform an image file into a text description using the Fireworks API.
+     * Transform an image file into a text description using the AI API.
      * If the file is not an image, returns its content unchanged.
      *
      * @param  SplFileInfo|string  $input
@@ -57,10 +57,10 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             // Create a combined prompt by appending the user instruction.
             $userInstruction = 'Please describe the image with the filename: '.$input->getPath();
 
-            // Call the Fireworks API with the base64-encoded image
+            // Call the AI API with the base64-encoded image
             try {
-                $response = Fireworks::chat()->create([
-                    'model' => config('fireworks.general_model'),
+                $response = AI::chat()->create([
+                    'model' => AI::models()['medium'],
                     'messages' => [
                         ['role' => 'system', 'content' => $systemPrompt],
                         ['role' => 'user', 'content' => [
@@ -77,14 +77,14 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
                     'temperature' => 0.2,
                 ]);
             } catch (\Exception $e) {
-                throw new RuntimeException('Fireworks API call failed: '.$e->getMessage());
+                throw new RuntimeException('AI API call failed: '.$e->getMessage());
             }
 
             // Extract the response content
             $description = $response->choices[0]->message->content ?? '';
 
             if (empty($description)) {
-                throw new RuntimeException('No description returned from Fireworks.');
+                throw new RuntimeException('No description returned from AI.');
             }
 
             return $description;

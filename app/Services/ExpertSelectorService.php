@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Facades\Fireworks;
+use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -17,7 +17,7 @@ class ExpertSelectorService
     const RETRY_DELAY_MS = 500;
 
     /**
-     * The Fireworks model to use for selecting experts.
+     * The AI model to use for selecting experts.
      */
     protected string $model;
 
@@ -37,7 +37,7 @@ class ExpertSelectorService
     public function __construct()
     {
         // Use the model specifically configured for expert selection tasks
-        $this->model = config('fireworks.expert_selector_model', config('fireworks.model'));
+        $this->model = AI::models()['medium'];
         // Path to the system prompt specific to expert selection
         $this->systemPromptPath = base_path('prompts/expert-selector/system.txt');
 
@@ -51,7 +51,7 @@ class ExpertSelectorService
      * @param  array|null  $availableExperts  An array of available experts (names => descriptions), defaults to class property if not provided
      * @return string The name of the selected expert
      *
-     * @throws RuntimeException When the Fireworks API call fails
+     * @throws RuntimeException When the AI API call fails
      */
     public function selectExpert(string $question, ?array $availableExperts = null): string
     {
@@ -62,8 +62,8 @@ class ExpertSelectorService
             // Prepare a prompt that describes the available experts and asks for the best match
             $prompt = $this->buildPrompt($question, $experts);
 
-            // Make a request to Fireworks for expert selection
-            $response = Fireworks::chat()
+            // Make a request to AI for expert selection
+            $response = AI::chat()
                 ->create([
                     'model' => $this->model,
                     'response_format' => [
@@ -117,9 +117,9 @@ class ExpertSelectorService
     }
 
     /**
-     * Parse the response from Fireworks to determine the selected expert.
+     * Parse the response from the AI to determine the selected expert.
      *
-     * @param  mixed  $response  The response from Fireworks
+     * @param  mixed  $response  The response from the AI
      * @param  array  $expertNames  An array of available expert names
      * @return string The name of the selected expert
      *
@@ -135,15 +135,15 @@ class ExpertSelectorService
 
             // Throw an exception if JSON is invalid or structure is wrong to trigger retry
             if (! isset($result['expert']) || ! is_string($result['expert']) || ! in_array($result['expert'], $expertNames)) {
-                Log::warning('Invalid response format from Fireworks API: '.$responseText);
-                throw new RuntimeException('Invalid response format from Fireworks API');
+                Log::warning('Invalid response format from AI API: '.$responseText);
+                throw new RuntimeException('Invalid response format from AI API');
             }
 
             // If everything is okay, return the expert name
             return $result['expert'];
         } catch (\JsonException $e) {
             Log::warning('Failed to parse JSON response: '.$responseText);
-            throw new RuntimeException('Failed to parse JSON response from Fireworks API');
+            throw new RuntimeException('Failed to parse JSON response from AI API');
         }
     }
 }

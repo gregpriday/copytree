@@ -6,8 +6,23 @@
     <php>
         <!-- Set the cache driver to in-memory for testing -->
         <env name="CACHE_DRIVER" value="array"/>
+        <!-- AI configuration -->
+        <env name="AI_DEFAULT_PROVIDER" value="fireworks"/>
+        <env name="FIREWORKS_API_KEY" value=""/>
+        <env name="AI_DEFAULT_MODEL" value="accounts/fireworks/models/llama4-maverick-instruct-basic"/>
+        <env name="AI_ASK_MODEL" value="accounts/fireworks/models/llama4-maverick-instruct-basic"/>
+        <env name="AI_EXPERT_SELECTOR_MODEL" value="accounts/fireworks/models/llama4-maverick-instruct-basic"/>
+        <env name="AI_SUMMARIZATION_MODEL" value="accounts/fireworks/models/llama3-8b-instruct"/>
+        <env name="AI_CLASSIFICATION_MODEL" value="accounts/fireworks/models/llama4-maverick-instruct-basic"/>
+        <env name="AI_GENERAL_MODEL" value="accounts/fireworks/models/llama4-maverick-instruct-basic"/>
+        <env name="AI_REQUEST_TIMEOUT" value="60"/>
+        <!-- Testing environment -->
+        <env name="APP_ENV" value="testing"/>
     </php>
     <testsuites>
+        <testsuite name="Integration">
+            <directory>./tests/Integration</directory>
+        </testsuite>
         <testsuite name="Feature">
             <directory>./tests/Feature</directory>
         </testsuite>

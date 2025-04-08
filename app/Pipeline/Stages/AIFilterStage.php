@@ -3,7 +3,7 @@
 namespace App\Pipeline\Stages;
 
 use App\Pipeline\FilePipelineStageInterface;
-use App\Facades\Fireworks;
+use App\Facades\AI;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -28,7 +28,7 @@ class AIFilterStage implements FilePipelineStageInterface
     }
 
     /**
-     * Filter files using Fireworks.
+     * Filter files using AI.
      *
      * @param  array  $files  An array of Symfony Finder SplFileInfo objects.
      * @param  \Closure  $next  The next stage in the pipeline.
@@ -66,9 +66,9 @@ class AIFilterStage implements FilePipelineStageInterface
         }
 
         try {
-            // Generate content using Fireworks with the model optimized for classification tasks
-            $response = Fireworks::chat()->create([
-                'model' => config('fireworks.classification_model'),
+            // Generate content using AI with the model optimized for classification tasks
+            $response = AI::chat()->create([
+                'model' => AI::models()['medium'],
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $promptText],
@@ -77,7 +77,7 @@ class AIFilterStage implements FilePipelineStageInterface
                 'max_tokens' => 1024,
             ]);
         } catch (\Exception $e) {
-            throw new RuntimeException('Fireworks filtering failed: '.$e->getMessage());
+            throw new RuntimeException('AI filtering failed: '.$e->getMessage());
         }
 
         // Retrieve the response text.
@@ -87,11 +87,11 @@ class AIFilterStage implements FilePipelineStageInterface
 
         $result = json_decode($content, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Invalid JSON response from Fireworks: '.json_last_error_msg());
+            throw new RuntimeException('Invalid JSON response from AI: '.json_last_error_msg());
         }
 
         if (! isset($result['files']) || ! is_array($result['files'])) {
-            throw new RuntimeException('Fireworks response did not include a valid "files" array.');
+            throw new RuntimeException('AI response did not include a valid "files" array.');
         }
 
         $acceptedPaths = $result['files'];
@@ -118,7 +118,7 @@ class AIFilterStage implements FilePipelineStageInterface
     }
 
     /**
-     * Uses Fireworks API to determine if a content item should be included based on content analysis
+     * Uses AI API to determine if a content item should be included based on content analysis
      *
      * @param  string  $content  The content to analyze
      * @param  array  $options  Additional options for filtering
@@ -133,9 +133,9 @@ class AIFilterStage implements FilePipelineStageInterface
         $userPrompt = $this->buildUserPrompt($content, $options);
 
         try {
-            // Make the API call to Fireworks
-            $response = Fireworks::chat()->create([
-                'model' => config('fireworks.classification_model'),
+            // Make the API call to AI
+            $response = AI::chat()->create([
+                'model' => AI::models()['medium'],
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],

@@ -4,7 +4,7 @@ namespace App\Commands;
 
 use App\Services\ConversationStateService;
 use App\Services\SummarizationService;
-use App\Facades\Fireworks;
+use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use LaravelZero\Framework\Commands\Command;
 
@@ -22,10 +22,10 @@ class InstallCopytreeCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Sets up the Copytree environment, including directory creation and Fireworks API key configuration';
+    protected $description = 'Sets up the Copytree environment, including directory creation and AI API configuration';
 
     /**
-     * List of available Fireworks models for different tasks
+     * List of available AI models for different tasks
      */
     protected array $availableModels = [
         'ask' => [
@@ -97,10 +97,10 @@ class InstallCopytreeCommand extends Command
         // Step 4: Save the configuration to .env file
         $this->saveConfigToEnv($envPath, $envContent, $configValues);
 
-        // Step 5: Test the Fireworks API key
+        // Step 5: Test the AI API key
         if (! empty($configValues['FIREWORKS_API_KEY'])) {
-            if ($this->testFireworksApiKey($configValues['FIREWORKS_API_KEY'])) {
-                $this->info('✓ Fireworks API key is valid!');
+            if ($this->testAIApiKey($configValues['FIREWORKS_API_KEY'])) {
+                $this->info('✓ AI API key is valid!');
             } else {
                 $this->error('Invalid API key. AI features will not be available.');
 
@@ -133,7 +133,7 @@ class InstallCopytreeCommand extends Command
         // Step 1: Collect Fireworks API Key
         $existingKey = $extractValue('FIREWORKS_API_KEY');
         if (! empty($existingKey)) {
-            $this->info('Found existing Fireworks API key: '.$this->maskApiKey($existingKey));
+            $this->info('Found existing AI API key: '.$this->maskApiKey($existingKey));
             if ($this->confirm('Do you want to use this existing API key?', true)) {
                 $configValues['FIREWORKS_API_KEY'] = $existingKey;
             } else {
@@ -141,15 +141,15 @@ class InstallCopytreeCommand extends Command
             }
         } else {
             $this->line('');
-            $this->line('A Fireworks API key is required for AI features.');
+            $this->line('An API key is required for AI features.');
             $this->line('You can get one from: https://fireworks.ai/');
             $this->line('');
             $configValues['FIREWORKS_API_KEY'] = $this->promptForApiKey();
         }
 
         $this->line('');
-        $this->info('Configure Fireworks models for specific tasks:');
-        $this->line('Different tasks in Copytree can use different Fireworks models optimized for their needs.');
+        $this->info('Configure AI models for specific tasks:');
+        $this->line('Different tasks in Copytree can use different AI models optimized for their needs.');
 
         // Step 2: Model for Copytree Ask functionality
         $this->line('');
@@ -272,41 +272,45 @@ class InstallCopytreeCommand extends Command
     }
 
     /**
-     * Prompt the user for an API key.
+     * Prompt the user for a valid API key.
      */
     protected function promptForApiKey(): string
     {
-        $apiKey = '';
-        while (empty($apiKey)) {
-            $apiKey = $this->secret('Enter your Fireworks API key');
-            if (empty($apiKey)) {
-                $this->error('API key cannot be empty if you want to use AI features.');
-                if ($this->confirm('Continue without an API key? (AI features will be disabled)', false)) {
-                    return '';
+        $key = '';
+        while (empty($key)) {
+            $key = $this->secret('Enter your AI API key');
+            if (empty($key)) {
+                $this->warn('API key cannot be empty.');
+                if (! $this->confirm('Do you want to enter an API key? AI features will not be available without one.', true)) {
+                    $this->warn('Proceeding without an API key. AI features will not be available.');
+                    break;
                 }
             }
         }
 
-        return $apiKey;
+        return $key;
     }
 
     /**
-     * Test if the Fireworks API key is valid.
+     * Test the API key for validity.
      */
-    protected function testFireworksApiKey(string $apiKey): bool
+    protected function testAIApiKey(string $apiKey): bool
     {
+        $this->info('Testing API key...');
+
         try {
-            $response = Fireworks::chat()->create([
-                'model' => 'accounts/fireworks/models/llama3-8b-instruct',
+            // Use a simple prompt to test the API key
+            $response = AI::chat()->create([
+                'model' => AI::models()['medium'],
                 'messages' => [
-                    ['role' => 'user', 'content' => 'Say "Hello from Copytree" to test this API key'],
+                    ['role' => 'user', 'content' => 'Say hello'],
                 ],
                 'max_tokens' => 10,
             ]);
 
-            return isset($response->choices[0]->message->content) && !empty($response->choices[0]->message->content);
+            return ! empty($response->choices);
         } catch (\Exception $e) {
-            $this->error('API test failed: '.$e->getMessage());
+            $this->error('Error testing API key: '.$e->getMessage());
 
             return false;
         }

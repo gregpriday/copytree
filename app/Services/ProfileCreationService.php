@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Facades\Fireworks;
+use App\Facades\AI;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -109,10 +109,10 @@ class ProfileCreationService
             $prompt
         );
 
-        // 4. Call Fireworks to generate the profile.
+        // 4. Call AI to generate the profile.
         try {
-            $response = Fireworks::chat()->create([
-                'model' => config('fireworks.ask_model'),
+            $response = AI::chat()->create([
+                'model' => AI::models()['medium'],
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $prompt],
@@ -121,12 +121,12 @@ class ProfileCreationService
                 'temperature' => 0.4,
             ]);
         } catch (\Exception $e) {
-            throw new RuntimeException('Fireworks API call failed: '.$e->getMessage());
+            throw new RuntimeException('AI API call failed: '.$e->getMessage());
         }
 
         $yamlResponse = $response->choices[0]->message->content ?? '';
         if (empty($yamlResponse)) {
-            throw new RuntimeException('Received empty profile YAML from Fireworks.');
+            throw new RuntimeException('Received empty profile YAML from AI.');
         }
 
         // Unwrap YAML code fences if present.
@@ -186,9 +186,9 @@ class ProfileCreationService
             // Build the prompt for profile generation
             $prompt = $this->buildProfilePrompt($messages);
 
-            // Make a request to Fireworks for profile generation
-            $response = Fireworks::chat()->create([
-                'model' => config('fireworks.ask_model'),
+            // Make a request to AI for profile generation
+            $response = AI::chat()->create([
+                'model' => AI::models()['medium'],
                 'messages' => [
                     ['role' => 'user', 'content' => $prompt],
                 ],

@@ -38,9 +38,17 @@ class AskCommand extends Command
 
     /**
      * Execute the console command.
+     *
+     * @param ProjectQuestionService $questionService Service to ask questions about the project
+     * @param ExpertSelectorService $expertSelectorService Service to select appropriate experts
+     * @param ConversationStateService $stateService Service to manage conversation state
+     * @return int Command exit code
      */
-    public function handle(ProjectQuestionService $questionService, ExpertSelectorService $expertSelectorService, ConversationStateService $stateService): int
-    {
+    public function handle(
+        ProjectQuestionService $questionService,
+        ExpertSelectorService $expertSelectorService,
+        ConversationStateService $stateService
+    ): int {
         $path = $this->argument('path') ?: getcwd();
         $question = null; // Initialize question as null
 
@@ -169,20 +177,15 @@ class AskCommand extends Command
                 try {
                     // Extract delta content from Fireworks/OpenAI response
                     $text = $partialResponse->choices[0]->delta->content ?? null;
-                    
+
                     if ($text !== null) {
                         // Text found via the expected path
                         $this->output->write($text);
                         $fullResponseText .= $text;
-                    } else {
-                        // Optional: Log chunks that don't match the expected structure for debugging
-                        Log::debug('Received Fireworks chunk with unexpected structure or empty delta.', [
-                            'stateKey' => $stateKey ?? 'unknown',
-                        ]);
                     }
                 } catch (\Exception $e) {
                     // Log the error for troubleshooting
-                    Log::warning('Error processing Fireworks response chunk: ' . $e->getMessage(), [
+                    Log::warning('Error processing response chunk: ' . $e->getMessage(), [
                         'stateKey' => $stateKey ?? 'unknown',
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString(),
@@ -212,20 +215,20 @@ class AskCommand extends Command
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Handle based on whether we have partial content
             if (!empty($fullResponseText)) {
                 // We have some partial response, so just add a note about completion
                 $this->output->newLine();
                 $this->info("Response partially complete. Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
-                
+
                 // Save whatever partial response we have
                 $stateService->saveMessage($stateKey, 'user', $question);
                 $stateService->saveMessage($stateKey, 'model', $fullResponseText);
-                
+
                 // Perform silent garbage collection
                 $this->runGarbageCollection($stateService);
-                
+
                 return self::SUCCESS;
             } else {
                 // No content at all - use generic message
@@ -238,6 +241,9 @@ class AskCommand extends Command
 
     /**
      * Display a list of available experts.
+     *
+     * @param ProjectQuestionService $questionService Service to query available experts
+     * @return void
      */
     protected function showExperts(ProjectQuestionService $questionService): void
     {
@@ -258,6 +264,9 @@ class AskCommand extends Command
 
     /**
      * Run the state garbage collection silently.
+     *
+     * @param ConversationStateService $stateService Service to manage conversation state
+     * @return void
      */
     protected function runGarbageCollection(ConversationStateService $stateService): void
     {

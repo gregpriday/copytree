@@ -3,8 +3,12 @@
 namespace App\Providers;
 
 use App\Renderer\SizeReportRenderer;
+use App\Services\AIManager;
+use App\Services\ConfigValidator;
 use App\Transforms\FileTransformer;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
+use InvalidArgumentException;
 use OpenAI;
 use OpenAI\Client;
 
@@ -15,7 +19,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Validate application configuration
+        try {
+            $validator = $this->app->make(ConfigValidator::class);
+            $validator->validateApplicationConfig();
+        } catch (InvalidArgumentException $e) {
+            Log::error('Configuration validation failed: ' . $e->getMessage());
+            // We don't want to halt the application, just log the error
+            // In a production environment, you might want to add more robust handling
+        }
     }
 
     /**
@@ -23,11 +35,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton('fireworks', function(){
-            return OpenAI::factory()
-                ->withApiKey(config('fireworks.key'))
-                ->withBaseUri('https://api.fireworks.ai/inference/v1')
-                ->make();
+        // Register the config validator service
+        $this->app->singleton(ConfigValidator::class, function ($app) {
+            return new ConfigValidator();
+        });
+
+        // Register the AI Manager
+        $this->app->singleton('ai', function($app) {
+            return new AIManager($app);
         });
 
         $this->app->singleton(FileTransformer::class, function ($app) {

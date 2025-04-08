@@ -9,6 +9,11 @@ class ExpertSelectorServiceTest extends TestCase
 {
     public function test_select_expert_returns_appropriate_expert_for_questions()
     {
+        // Skip if no API key is configured
+        if (empty(config('ai.providers.fireworks.key'))) {
+            $this->markTestSkipped('Fireworks API key not set. Skipping integration test.');
+        }
+
         // Create service instance
         $service = new ExpertSelectorService;
 
@@ -24,8 +29,8 @@ class ExpertSelectorServiceTest extends TestCase
             ],
         ];
 
-        foreach ($testCases as $index => $testCase) {
-            // Select an expert for this question
+        foreach ($testCases as $testCase) {
+            // Select an expert for this question using the real AI service
             $selectedExpert = $service->selectExpert($testCase['question']);
 
             // Output for debugging

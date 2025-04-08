@@ -9,11 +9,12 @@ namespace App\Services;
 // use Gemini\Enums\DataType;
 // use Gemini\Enums\ResponseMimeType;
 // use Gemini\Laravel\Facades\Gemini;
-// Add Fireworks import
-use App\Facades\Fireworks;
+// Add AI import
+use App\Facades\AI;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
+use Illuminate\Support\Facades\File;
 
 class AIFilenameGenerator
 {
@@ -28,7 +29,7 @@ class AIFilenameGenerator
     protected int $maxFilenameLength = 90;
 
     /**
-     * The Fireworks model to use.
+     * The AI model to use.
      */
     protected string $model;
 
@@ -38,7 +39,7 @@ class AIFilenameGenerator
     public function __construct()
     {
         // Use the model specifically configured for classification tasks
-        $this->model = config('fireworks.classification_model');
+        $this->model = AI::models()['medium'];
     }
 
     /**
@@ -59,9 +60,9 @@ class AIFilenameGenerator
         $prompt = "Generate a concise, descriptive filename for the following content. The filename should be lowercase, use dashes or underscores instead of spaces, and be no more than 50 characters long. Do not include the file extension in your response.\n\nContent:\n{$trimmedContent}";
 
         try {
-            // Make a request to Fireworks for filename generation
-            $response = Fireworks::chat()->create([
-                'model' => config('fireworks.classification_model'),
+            // Make a request to AI for filename generation
+            $response = AI::chat()->create([
+                'model' => AI::models()['medium'],
                 'messages' => [
                     ['role' => 'user', 'content' => $prompt],
                 ],
@@ -138,8 +139,8 @@ class AIFilenameGenerator
         $systemPrompt = file_get_contents($systemPromptPath);
 
         try {
-            // Generate content using Fireworks with JSON response format
-            $response = Fireworks::chat()->create([
+            // Generate content using AI with JSON response format
+            $response = AI::chat()->create([
                 'model' => $this->model,
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
@@ -150,7 +151,7 @@ class AIFilenameGenerator
                 'response_format' => ['type' => 'json_object'],
             ]);
         } catch (\Exception $e) {
-            throw new RuntimeException('Fireworks API call failed: '.$e->getMessage());
+            throw new RuntimeException('AI API call failed: '.$e->getMessage());
         }
 
         // Retrieve the structured JSON response.
@@ -158,7 +159,7 @@ class AIFilenameGenerator
         $data = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['filename'])) {
-            throw new RuntimeException('Invalid response from Fireworks: '.json_last_error_msg());
+            throw new RuntimeException('Invalid response from AI: '.json_last_error_msg());
         }
 
         $rawFilename = $data['filename'];

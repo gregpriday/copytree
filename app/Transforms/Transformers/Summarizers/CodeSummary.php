@@ -6,7 +6,7 @@ use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use App\Facades\Fireworks;
+use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -25,7 +25,7 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
      * @param  SplFileInfo|string  $input  The source code file to summarize.
      * @return string The generated code summary.
      *
-     * @throws RuntimeException If the input is not a SplFileInfo instance or if the Fireworks API call fails.
+     * @throws RuntimeException If the input is not a SplFileInfo instance or if the AI API call fails.
      */
     public function transform(SplFileInfo|string $input): string
     {
@@ -72,8 +72,8 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
             $prompt = "Please provide a concise summary for the following source code:\n\n".$wrappedCode;
 
             try {
-                $response = Fireworks::chat()->create([
-                    'model' => config('fireworks.summarization_model'),
+                $response = AI::chat()->create([
+                    'model' => AI::models()['medium'],
                     'messages' => [
                         ['role' => 'system', 'content' => $systemPrompt],
                         ['role' => 'user', 'content' => $prompt],
@@ -99,7 +99,7 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
 
             $summary = trim($cleanOutput);
             if (empty($summary)) {
-                throw new RuntimeException('No code summary returned from Fireworks.');
+                throw new RuntimeException('No code summary returned from AI.');
             }
 
             return $summary;

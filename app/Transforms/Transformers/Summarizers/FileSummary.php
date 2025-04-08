@@ -6,7 +6,7 @@ use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use App\Facades\Fireworks;
+use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -16,7 +16,7 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
     use SlowTransformerTrait;
 
     /**
-     * Transform the given file into a concise summary using Fireworks.
+     * Transform the given file into a concise summary using AI.
      *
      * If the file is not a text file (determined by its MIME type), this transformer
      * falls back to the default file loader.
@@ -47,7 +47,7 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
             $content = substr($content, 0, $maxLength);
         }
 
-        // Use caching so that if the file hasn't changed, we don't call Fireworks again.
+        // Use caching so that if the file hasn't changed, we don't call AI again.
         return $this->cacheTransformResult($input, function () use ($content) {
             // Load the system prompt for file summarization.
             $systemPromptPath = base_path('prompts/file-summary/system.txt');
@@ -59,10 +59,10 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
             // Build the prompt.
             $prompt = "Please provide a concise summary for the following file content:\n\n".$content;
 
-            // Call Fireworks API to generate a summary
+            // Call AI API to generate a summary
             try {
-                $response = Fireworks::chat()->create([
-                    'model' => config('fireworks.summarization_model'),
+                $response = AI::chat()->create([
+                    'model' => AI::models()['medium'],
                     'messages' => [
                         ['role' => 'system', 'content' => $systemPrompt],
                         ['role' => 'user', 'content' => $prompt],
@@ -71,7 +71,7 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
                     'temperature' => 0.2,
                 ]);
             } catch (\Exception $e) {
-                throw new RuntimeException('Fireworks API call failed: '.$e->getMessage());
+                throw new RuntimeException('AI API call failed: '.$e->getMessage());
             }
 
             // Get the content from the response
@@ -79,7 +79,7 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
             
             // Verify we got something back
             if (empty($summary)) {
-                throw new RuntimeException('No summary returned from Fireworks.');
+                throw new RuntimeException('No summary returned from AI.');
             }
 
             return $summary;
