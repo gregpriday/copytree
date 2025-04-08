@@ -9,11 +9,6 @@ class ExpertSelectorServiceTest extends TestCase
 {
     public function test_select_expert_returns_appropriate_expert_for_questions()
     {
-        // Skip if no API key is configured
-        if (empty(config('ai.providers.fireworks.key'))) {
-            $this->markTestSkipped('Fireworks API key not set. Skipping integration test.');
-        }
-
         // Create service instance
         $service = new ExpertSelectorService;
 
@@ -24,6 +19,10 @@ class ExpertSelectorServiceTest extends TestCase
                 'expected_expert_type' => 'default',
             ],
             [
+                'question' => 'Where is error handling done for API requests?',
+                'expected_expert_type' => 'default',
+            ],
+            [
                 'question' => 'I need to design a new button, what is the overall design of this site?',
                 'expected_expert_type' => 'designer',
             ],
@@ -31,13 +30,15 @@ class ExpertSelectorServiceTest extends TestCase
 
         foreach ($testCases as $testCase) {
             // Select an expert for this question using the real AI service
-            $selectedExpert = $service->selectExpert($testCase['question']);
+            $selected = $service->selectConfig($testCase['question']);
 
             // Output for debugging
             fwrite(STDOUT, "Question: {$testCase['question']}\n");
-            fwrite(STDOUT, "Selected expert: {$selectedExpert}\n\n");
+            fwrite(STDOUT, "Selected expert: {$selected['expert']}\n");
+            fwrite(STDOUT, "Selected expert: {$selected['provider']}\n");
+            fwrite(STDOUT, "Selected expert: {$selected['model']}\n\n");
 
-            $this->assertEquals($testCase['expected_expert_type'], $selectedExpert);
+            $this->assertEquals($testCase['expected_expert_type'], $selected['expert']);
         }
     }
 }

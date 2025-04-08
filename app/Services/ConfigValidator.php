@@ -35,8 +35,10 @@ class ConfigValidator
         }
         
         // Validate models
-        if (empty($config['models']['default'])) {
-            throw new InvalidArgumentException('Default AI model must be specified');
+        // Check if the models key exists and is not empty for the default provider
+        $models = $providerConfig['models'] ?? null; 
+        if (empty($models)) {
+            throw new InvalidArgumentException("Default AI provider '{$provider}' has no models configured");
         }
         
         // Check parameters

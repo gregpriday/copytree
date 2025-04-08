@@ -12,25 +12,36 @@ return [
     |
     */
     'providers' => [
-        'fireworks' => [
+        'llama' => [
             'key' => env('FIREWORKS_API_KEY'),
             'base_url' => env('FIREWORKS_API_BASE_URL', 'https://api.fireworks.ai/inference/v1'),
             'timeout' => env('FIREWORKS_REQUEST_TIMEOUT', 120),
 
             'models' => [
                 'medium' => 'accounts/fireworks/models/llama4-maverick-instruct-basic',
-                'flash' => 'accounts/fireworks/models/llama4-scout-instruct-basic',
+                'small' => 'accounts/fireworks/models/llama4-scout-instruct-basic',
             ]
         ],
 
-        'lambda' => [
-            'key' => env('LAMBDA_API_KEY'),
-            'base_url' => env('LAMBDA_API_BASE_URL', 'https://api.lambda.ai/v1'),
-            'timeout' => env('LAMBDA_REQUEST_TIMEOUT', 120),
+//        'llama' => [
+//            'key' => env('GROQ_API_KEY'),
+//            'base_url' => env('GROQ_API_BASE_URL', 'https://api.groq.com/openai/v1'),
+//            'timeout' => env('GROQ_REQUEST_TIMEOUT', 120),
+//
+//            'models' => [
+//                'medium' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
+//                'small' => 'meta-llama/llama-4-scout-17b-16e-instruct',
+//            ]
+//        ],
+
+        'gemini' => [
+            'key' => env('GEMINI_API_KEY'),
+            'base_url' => env('GEMINI_API_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai'),
+            'timeout' => env('GEMINI_REQUEST_TIMEOUT', 120),
 
             'models' => [
-                'medium' => 'llama-4-maverick-17b-128e-instruct-fp8',
-                'flash' => 'llama-4-scout-17b-16e-instruct',
+                'large' => 'gemini-2.5-pro-preview-03-25',
+                'small' => 'gemini-2.0-flash',
             ]
         ],
 
@@ -38,6 +49,11 @@ return [
             'key' => env('OPENAI_API_KEY'),
             'base_url' => env('OPENAI_API_BASE_URL', 'https://api.openai.com/v1'),
             'timeout' => env('OPENAI_REQUEST_TIMEOUT', 120),
+
+            'models' => [
+                'medium' => 'gpt-4o',
+                'small' => 'gpt-4o-mini',
+            ]
         ],
     ],
 
@@ -51,42 +67,7 @@ return [
     | the providers array above.
     |
     */
-    'default_provider' => env('AI_DEFAULT_PROVIDER', 'lambda'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Models Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Here you can define the different models to use for various AI tasks.
-    | Each task can use a different model optimized for that specific purpose.
-    |
-    */
-    'models' => [
-        // Default model used when no specific model is specified
-        'default' => env('AI_DEFAULT_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-
-        // Model for the ask command
-        'ask' => env('AI_ASK_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-
-        // Model for expert selection
-        'expert_selector' => env('AI_EXPERT_SELECTOR_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-
-        // Model for summarization
-        'summarization' => env('AI_SUMMARIZATION_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-
-        // Model for classification
-        'classification' => env('AI_CLASSIFICATION_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-
-        // Model for general purpose tasks
-        'general' => env('AI_GENERAL_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-
-        // Model for file content filtering
-        'filter' => env('AI_FILTER_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-
-        // Model for filename generation
-        'filename_generator' => env('AI_FILENAME_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-    ],
+    'default_provider' => env('AI_DEFAULT_PROVIDER', 'llama'),
 
     /*
     |--------------------------------------------------------------------------

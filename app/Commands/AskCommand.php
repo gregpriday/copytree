@@ -155,22 +155,33 @@ class AskCommand extends Command
         // Determine the expert to use with proper error handling
         if ($expert === 'auto') {
             try {
-                $expert = $expertSelectorService->selectExpert($question);
+                $expertConfig = $expertSelectorService->selectConfig($question);
                 // If we get the default expert after auto-selection, let the user know
             } catch (\Exception $e) {
                 $this->warning('Expert auto-selection failed, using default expert instead: '.$e->getMessage());
-                $expert = ExpertSelectorService::DEFAULT_EXPERT;
+                $expertConfig = [
+                    'expert' => $expert,
+                    'provider' => ExpertSelectorService::DEFAULT_PROVIDER,
+                    'model' => ExpertSelectorService::DEFAULT_MODEL,
+                ];
             }
+        } else {
+            // Use the specified expert but with default provider and model
+            $expertConfig = [
+                'expert' => $expert,
+                'provider' => ExpertSelectorService::DEFAULT_PROVIDER,
+                'model' => ExpertSelectorService::DEFAULT_MODEL,
+            ];
         }
 
-        $this->output->write("<info>Thinking about your question (using expert: {$expert})...</info> ");
+        $this->output->write("<info>Answering your question (using expert: {$expertConfig['expert']}, provider: {$expertConfig['provider']}, model:{$expertConfig['model']}])...</info> ");
         $this->output->newLine();
 
         $fullResponseText = ''; // Accumulate the full response
 
         try {
-            // Pass history to the question service
-            $stream = $questionService->askQuestion($copytree, $question, $expert, $history);
+            // Pass expertConfig instead of just expert to the question service
+            $stream = $questionService->askQuestion($copytree, $question, $expertConfig, $history);
 
             // Process and display each partial response as it arrives
             foreach ($stream as $partialResponse) {

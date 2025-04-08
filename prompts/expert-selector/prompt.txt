@@ -1,6 +1,11 @@
 QUESTION: {{question}}
 
-AVAILABLE EXPERTS:
+== AVAILABLE EXPERTS: ==
 {{experts}}
+== END AVAILABLE EXPERTS ==
 
-Based on the question above, select the most appropriate expert from the available experts list.
+== AVAILABLE MODELS: ==
+{{models}}
+== END AVAILABLE MODELS ==
+
+Based on the question above, select the most appropriate expert from the available experts list, along with a suitable provider and model. Consider the complexity of the question when making your selection.

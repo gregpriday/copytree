@@ -1,0 +1,71 @@
+### Model Descriptions
+
+This document defines the available models provided by the `llama` provider, including capabilities, limitations, and recommended use cases for each. These descriptions guide selection logic based on task complexity and performance needs.
+
+---
+
+#### Meta Llama 4 Scout (Llama 4 Small Model)
+
+```json
+{
+  "provider": "llama",
+  "model": "small"
+}
+```
+
+**Provider**: llama
+**Model Identifier**: `accounts/fireworks/models/llama4-scout-instruct-basic`
+
+**Description**:
+This is the smaller, faster, and more cost-efficient model. It is specialized for tasks that involve identifying locations in large codebases or answering basic structural questions.
+
+**Strengths**:
+- Optimized for searching and pinpointing code implementations across large projects
+- Efficient at answering questions about code structure and inter-component relationships
+- Fast inference times and lower operational cost
+
+**Use Cases**:
+- "Where is X implemented?"
+- "Which part of the system handles Y?"
+- "How does A interact with B?" (at a basic level)
+
+**Limitations**:
+- Not suited for deep reasoning, bug diagnostics, or architectural planning
+- May produce shallow or insufficient responses when deeper analysis is required
+
+**Selection Guidance**:
+Use this model by default for all general and structure-related questions. Prioritize it when the request is lightweight or purely exploratory. Only escalate to the medium model if the task requires diagnostic or reasoning capabilities.
+
+---
+
+#### Meta Llama 4 Maverick (Llama 4 Medium Model)
+
+```json
+{
+  "provider": "llama",
+  "model": "medium"
+}
+```
+
+**Provider**: llama
+**Model Identifier**: `accounts/fireworks/models/llama4-maverick-instruct-basic`
+
+**Description**:
+This is the more capable model designed for tasks that require analysis, debugging, or multi-step planning. It trades some performance and cost for improved reasoning and diagnostic depth.
+
+**Strengths**:
+- Better at handling diagnostic, planning, and reasoning tasks
+- Appropriate for evaluating system behavior, identifying issues, or strategizing implementation changes
+- Produces higher quality answers for complex, analytical questions
+
+**Use Cases**:
+- "Why is this failing?"
+- "How should I approach implementing X?"
+- "Can you help debug or trace Y?"
+
+**Limitations**:
+- Higher cost and slower inference time compared to the small model
+- Overkill for basic code-location or structural inquiries
+
+**Selection Guidance**:
+Use this model when the question demands depth, logic, or analysis. Always prefer this when shallow understanding would lead to inaccurate or incomplete results. Default to this model if there’s uncertainty about whether the small model will suffice.

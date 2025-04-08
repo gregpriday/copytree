@@ -21,9 +21,14 @@ class ProjectQuestionService
     const RETRY_DELAY_MS = 500;
 
     /**
-     * The AI model to use.
+     * The default AI model to use.
      */
-    protected string $model;
+    protected string $defaultModel;
+
+    /**
+     * The default AI provider to use.
+     */
+    protected string $defaultProvider;
 
     /**
      * The path to the directory containing expert system prompts.
@@ -35,8 +40,10 @@ class ProjectQuestionService
      */
     public function __construct()
     {
-        // Use the model specifically configured for the Copytree Ask functionality
-        $this->model = AI::models()['medium'];
+        // Set default model and provider
+        $this->defaultProvider = config('ai.default_provider', 'llama');
+        $this->defaultModel = AI::models($this->defaultProvider)['medium'];
+
         // Set the base directory for expert prompts
         $this->promptsBaseDir = base_path('prompts/project-question');
     }
@@ -47,14 +54,19 @@ class ProjectQuestionService
      *
      * @param  string  $projectCopytree  The copytree output of the project
      * @param  string  $question  The user's question about the project
-     * @param  string  $expert  The expert to use (defaults to 'default')
+     * @param  string|array  $expertConfig  The expert to use (or config array with expert, provider, model)
      * @param  array  $history  Optional conversation history for stateful interactions
      * @return iterable The stream of partial responses from the AI
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
      */
-    public function askQuestion(string $projectCopytree, string $question, string $expert = 'default', array $history = []): iterable
+    public function askQuestion(string $projectCopytree, string $question, string|array $expertConfig = [], array $history = []): iterable
     {
+        // Handle the expertConfig parameter which can now be a string or an array
+        $expert = is_array($expertConfig) ? $expertConfig['expert'] : $expertConfig;
+        $provider = is_array($expertConfig) ? $expertConfig['provider'] : $this->defaultProvider;
+        $model = is_array($expertConfig) ? $expertConfig['model'] : $this->defaultModel;
+
         // Build the path to the expert's system prompt
         $expertPromptPath = $this->getExpertPromptPath($expert);
 
@@ -102,7 +114,7 @@ class ProjectQuestionService
 
         // Configure generation parameters
         $parameters = [
-            'model' => $this->model,
+            'model' => $model,
             'messages' => $messages,
             'max_tokens' => 8192,
             'temperature' => 0.15,
@@ -111,10 +123,9 @@ class ProjectQuestionService
 
         try {
             // Use Laravel's retry helper
-            return retry(self::MAX_RETRIES, function () use ($parameters) {
+            return retry(self::MAX_RETRIES, function () use ($parameters, $provider) {
                 try {
-                    // If that worked, now do the streaming request
-                    return AI::chat()->createStreamed($parameters);
+                    return AI::driver($provider)->chat()->createStreamed($parameters);
                 } catch (Throwable $e) {
                     // Log the error
                     Log::warning('AI API error in askQuestion: '.$e->getMessage());
