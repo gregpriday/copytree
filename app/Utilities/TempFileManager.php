@@ -41,7 +41,7 @@ class TempFileManager
         $tempDir = self::getTempDir();
         $timestamp = date('Y-m-d_H-i-s');
         $hash = substr(hash('sha256', $content.uniqid()), 0, 16);
-        $filename = self::PREFIX.$timestamp.'_'.$hash.'.txt';
+        $filename = $hash . '_' . $timestamp . '.txt';
         $filepath = $tempDir.DIRECTORY_SEPARATOR.$filename;
 
         file_put_contents($filepath, $content);
@@ -77,7 +77,7 @@ class TempFileManager
         $totalCount = 0;
 
         foreach (new DirectoryIterator($tempDir) as $fileInfo) {
-            if ($fileInfo->isFile() && str_starts_with($fileInfo->getFilename(), self::PREFIX)) {
+            if ($fileInfo->isFile() && pathinfo($fileInfo->getFilename(), PATHINFO_EXTENSION) === 'txt') {
                 $totalCount++;
                 
                 // Safely get the modification time
@@ -151,9 +151,11 @@ class TempFileManager
             $aiGenerator = app(AIFilenameGenerator::class);
             $descriptiveFilename = $aiGenerator->generateFilenameFromFiles($files);
             
-            // Add timestamp and prefix to ensure uniqueness
+            // Add timestamp to ensure uniqueness
             $timestamp = date('Y-m-d_H-i-s');
-            $filename = self::PREFIX . $timestamp . '_' . $descriptiveFilename;
+            // Modified to place AI-generated name first, followed by timestamp
+            // Note: descriptiveFilename already includes .txt extension from AIFilenameGenerator
+            $filename = str_replace('.txt', '', $descriptiveFilename) . '_' . $timestamp . '.txt';
             $filepath = $tempDir . DIRECTORY_SEPARATOR . $filename;
             
             file_put_contents($filepath, $content);
