@@ -3,10 +3,11 @@
 namespace App\Utilities;
 
 use DirectoryIterator;
+use App\Services\AIFilenameGenerator;
 
 class TempFileManager
 {
-    public const MAX_AGE_MINUTES = 15;
+    public const MAX_AGE_MINUTES = 1440; // 24 hours
 
     public const PREFIX = 'ctree_output_';
 
@@ -58,15 +59,114 @@ class TempFileManager
     {
         $tempDir = self::getTempDir();
         $maxAge = time() - (self::MAX_AGE_MINUTES * 60);
+        $debugEnabled = env('TEMP_FILE_DEBUG', false);
+        
+        if ($debugEnabled && class_exists('\Illuminate\Support\Facades\Log')) {
+            \Illuminate\Support\Facades\Log::info("TempFileManager: Starting cleanup. Current time: " . time() . ", Max age threshold: " . $maxAge);
+        }
+
+        // Ensure MAX_AGE_MINUTES is reasonable (prevent accidental deletion of all files)
+        if (self::MAX_AGE_MINUTES < 10) {
+            if (class_exists('\Illuminate\Support\Facades\Log')) {
+                \Illuminate\Support\Facades\Log::warning("TempFileManager: MAX_AGE_MINUTES is set too low (" . self::MAX_AGE_MINUTES . "). Skipping cleanup to prevent accidental deletion.");
+            }
+            return;
+        }
+
+        $deletedCount = 0;
+        $totalCount = 0;
 
         foreach (new DirectoryIterator($tempDir) as $fileInfo) {
-            if (
-                $fileInfo->isFile() &&
-                str_starts_with($fileInfo->getFilename(), self::PREFIX) &&
-                $fileInfo->getMTime() < $maxAge
-            ) {
-                unlink($fileInfo->getPathname());
+            if ($fileInfo->isFile() && str_starts_with($fileInfo->getFilename(), self::PREFIX)) {
+                $totalCount++;
+                
+                // Safely get the modification time
+                try {
+                    $modTime = $fileInfo->getMTime();
+                    if ($modTime === false || $modTime === 0) {
+                        // Skip files where we can't determine the modification time
+                        if ($debugEnabled && class_exists('\Illuminate\Support\Facades\Log')) {
+                            \Illuminate\Support\Facades\Log::warning("TempFileManager: Could not get modification time for " . $fileInfo->getFilename());
+                        }
+                        continue;
+                    }
+                } catch (\Exception $e) {
+                    // Log error and skip this file
+                    if (class_exists('\Illuminate\Support\Facades\Log')) {
+                        \Illuminate\Support\Facades\Log::error("TempFileManager: Error getting file info: " . $e->getMessage());
+                    }
+                    continue;
+                }
+                
+                $fileName = $fileInfo->getFilename();
+                $isOld = $modTime < $maxAge;
+                
+                if ($debugEnabled && class_exists('\Illuminate\Support\Facades\Log')) {
+                    \Illuminate\Support\Facades\Log::info("TempFileManager: File: {$fileName}, Mod Time: {$modTime}, Is Old: " . ($isOld ? 'Yes' : 'No'));
+                }
+                
+                if ($isOld) {
+                    // Safety check: don't delete everything
+                    if ($deletedCount > 0 && $deletedCount >= $totalCount * 0.9) {
+                        if (class_exists('\Illuminate\Support\Facades\Log')) {
+                            \Illuminate\Support\Facades\Log::warning("TempFileManager: Safety threshold reached. Stopping cleanup to prevent deleting all files.");
+                        }
+                        break;
+                    }
+                    
+                    try {
+                        if ($debugEnabled && class_exists('\Illuminate\Support\Facades\Log')) {
+                            \Illuminate\Support\Facades\Log::info("TempFileManager: Deleting old file: {$fileName}");
+                        }
+                        
+                        unlink($fileInfo->getPathname());
+                        $deletedCount++;
+                    } catch (\Exception $e) {
+                        if (class_exists('\Illuminate\Support\Facades\Log')) {
+                            \Illuminate\Support\Facades\Log::error("TempFileManager: Failed to delete file {$fileName}: " . $e->getMessage());
+                        }
+                    }
+                }
             }
+        }
+        
+        if ($debugEnabled && class_exists('\Illuminate\Support\Facades\Log')) {
+            \Illuminate\Support\Facades\Log::info("TempFileManager: Cleanup completed. Deleted {$deletedCount} of {$totalCount} files.");
+        }
+    }
+
+    /**
+     * Create a temporary file with the given content, using AI to generate a descriptive filename.
+     *
+     * @param  string  $content  The content to save in the temporary file.
+     * @param  array  $files  The files used to generate the content, for providing context to the AI.
+     * @return string The full path to the created temporary file.
+     */
+    public static function createAITempFile(string $content, array $files = []): string
+    {
+        $tempDir = self::getTempDir();
+        
+        try {
+            // Generate a descriptive filename using AI
+            $aiGenerator = app(AIFilenameGenerator::class);
+            $descriptiveFilename = $aiGenerator->generateFilenameFromFiles($files);
+            
+            // Add timestamp and prefix to ensure uniqueness
+            $timestamp = date('Y-m-d_H-i-s');
+            $filename = self::PREFIX . $timestamp . '_' . $descriptiveFilename;
+            $filepath = $tempDir . DIRECTORY_SEPARATOR . $filename;
+            
+            file_put_contents($filepath, $content);
+            
+            return $filepath;
+        } catch (\Exception $e) {
+            // Log the error
+            if (class_exists('\Illuminate\Support\Facades\Log')) {
+                \Illuminate\Support\Facades\Log::warning('Failed to generate AI filename: '.$e->getMessage());
+            }
+            
+            // Fall back to standard temp file creation
+            return self::createTempFile($content);
         }
     }
 }

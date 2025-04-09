@@ -51,7 +51,7 @@ class CopyTreeCommand extends Command
         {--a|ai-filter=* : Filter files using AI based on a natural language description.}
         {--m|modified : Only include files that have been modified since the last commit.}
         {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
-        {--o|output= : Outputs to a file. If no filename is provided, creates file in ~/.copytree/outputs/.}
+        {--o|output= : Outputs to a file. If no filename is provided, creates a temporary file (will be automatically cleaned up after 24 hours).}
         {--i|display : Display the output in the console.}
         {--S|stream : Stream output directly (useful for piping).}
         {--r|as-reference : Copy a reference to a temporary file instead of copying the content directly.}
@@ -70,6 +70,9 @@ class CopyTreeCommand extends Command
      */
     public function handle(): int
     {
+        // Clean up old temporary files before processing the command
+        TempFileManager::cleanOldFiles();
+
         // Display warning if this is not macOS
         if (PHP_OS_FAMILY !== 'Darwin') {
             $this->warn('This command is designed for macOS and may not work as expected on other operating systems.');
@@ -272,24 +275,26 @@ class CopyTreeCommand extends Command
         // Handle output options.
         if ($this->input->hasParameterOption(['--output', '-o'])) {
             $outputOption = $this->option('output') ?? '';
-            $filename = ($outputOption === '')
-                ? app(AIFilenameGenerator::class)->generateFilenameFromFiles(
-                    // Pass the array of files (or file paths) to the AI filename generator.
-                    $finalFiles,
-                    copytree_path('outputs')
-                )
-                : $outputOption;
+            
+            if ($outputOption === '') {
+                // No filename provided, use TempFileManager to store in temporary folder
+                // with AI-generated descriptive filename
+                $fullPath = TempFileManager::createAITempFile($combinedOutput, $finalFiles);
+                $this->info("Saved output to temporary file: {$fullPath}");
+                $this->revealInFinder($fullPath);
+            } else {
+                // Full filename provided, use it as is
+                // Create the outputs folder if it does not exist.
+                $outputDir = copytree_path('outputs');
+                if (! is_dir($outputDir)) {
+                    mkdir($outputDir, 0755, true);
+                }
 
-            // Create the outputs folder if it does not exist.
-            $outputDir = copytree_path('outputs');
-            if (! is_dir($outputDir)) {
-                mkdir($outputDir, 0755, true);
+                $fullPath = $outputDir.DIRECTORY_SEPARATOR.$outputOption;
+                file_put_contents($fullPath, $combinedOutput);
+                $this->info("Saved output to file: {$fullPath}");
+                $this->revealInFinder($fullPath);
             }
-
-            $fullPath = $outputDir.DIRECTORY_SEPARATOR.$filename;
-            file_put_contents($fullPath, $combinedOutput);
-            $this->info("Saved output to file: {$fullPath}");
-            $this->revealInFinder($fullPath);
         } elseif ($this->option('display')) {
             // Display the output in the console.
             $this->line($combinedOutput);

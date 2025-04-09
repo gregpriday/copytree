@@ -65,8 +65,8 @@ class TempFileManagerTest extends TestCase
         $filePath = TempFileManager::createTempFile($content);
         $this->assertFileExists($filePath, 'Temporary file should be created.');
 
-        // Set its modification time to be older than MAX_AGE (15 minutes + 10 seconds).
-        $oldTime = time() - (15 * 60 + 10);
+        // Set its modification time to be older than MAX_AGE (1440 minutes + 10 seconds).
+        $oldTime = time() - (1440 * 60 + 10);
         touch($filePath, $oldTime);
 
         // Call cleanOldFiles; this should delete the file.
@@ -82,6 +82,37 @@ class TempFileManagerTest extends TestCase
 
         // Clean up the new file.
         unlink($newFilePath);
+    }
+
+    public function test_create_ai_temp_file_creates_file_with_ai_generated_filename(): void
+    {
+        // Mock the AIFilenameGenerator
+        $mockGenerator = $this->getMockBuilder(\App\Services\AIFilenameGenerator::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        
+        // Set up the mock to return a predictable filename
+        $mockGenerator->method('generateFilenameFromFiles')
+            ->willReturn('ai-generated-name.txt');
+        
+        // Bind the mock to the service container
+        app()->instance(\App\Services\AIFilenameGenerator::class, $mockGenerator);
+        
+        // Test the method
+        $content = 'Test content for AI-named temporary file';
+        $filePath = TempFileManager::createAITempFile($content, []);
+        
+        // Assertions
+        $this->assertFileExists($filePath, 'AI-named temporary file should be created.');
+        $this->assertStringContainsString('ai-generated-name', $filePath, 'Filename should contain the AI-generated name.');
+        $this->assertStringStartsWith('ctree_output_', basename($filePath), 'Filename should start with "ctree_output_".');
+        
+        // Verify file content
+        $actualContent = file_get_contents($filePath);
+        $this->assertEquals($content, $actualContent, 'The content of the AI-named temporary file should match the input.');
+        
+        // Clean up
+        unlink($filePath);
     }
 
     /**
