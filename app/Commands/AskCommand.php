@@ -210,7 +210,7 @@ class AskCommand extends Command
 
             // Save interaction - state key will always be set now
             $stateService->saveMessage($stateKey, 'user', $question);
-            $stateService->saveMessage($stateKey, 'model', $fullResponseText);
+            $stateService->saveMessage($stateKey, 'assistant', $fullResponseText);
 
             $this->newLine();
             $this->info("Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
@@ -235,7 +235,7 @@ class AskCommand extends Command
 
                 // Save whatever partial response we have
                 $stateService->saveMessage($stateKey, 'user', $question);
-                $stateService->saveMessage($stateKey, 'model', $fullResponseText);
+                $stateService->saveMessage($stateKey, 'assistant', $fullResponseText);
 
                 // Perform silent garbage collection
                 $this->runGarbageCollection($stateService);
