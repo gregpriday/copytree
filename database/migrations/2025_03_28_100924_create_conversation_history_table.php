@@ -21,7 +21,7 @@ return new class extends Migration
         Schema::connection($this->connection)->create('conversation_history', function (Blueprint $table) {
             $table->id(); // Equivalent to INTEGER PRIMARY KEY AUTOINCREMENT
             $table->string('state_key')->notNullable();
-            $table->enum('role', ['user', 'model'])->notNullable();
+            $table->enum('role', ['user', 'assistant'])->notNullable();
             $table->text('content')->notNullable();
             $table->timestamp('timestamp')->useCurrent(); // DATETIME DEFAULT CURRENT_TIMESTAMP
 
