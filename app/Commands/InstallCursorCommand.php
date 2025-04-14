@@ -19,7 +19,7 @@ class InstallCursorCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Installs the Cursor rules for CopyTree by creating the .cursor/rules/ directory and copying the copytree.mdc file.';
+    protected $description = 'Installs the Cursor rules for CopyTree by creating the .cursor/rules/ directory and linking the copytree.mdc file.';
 
     /**
      * Execute the console command.
@@ -55,23 +55,40 @@ class InstallCursorCommand extends Command
         }
 
         // Step 3: Prompt user for confirmation
-        $fileExists = File::exists($destFile);
-        $confirmMessage = $fileExists
-            ? 'The Cursor rules file (copytree.mdc) already exists in '.$targetDir.'. Do you want to overwrite it?'
-            : 'Do you want to copy the Cursor rules file (copytree.mdc) into '.$targetDir.'?';
-        $default = ! $fileExists; // Default to 'yes' if file doesn't exist, 'no' if it does
+        // Check if anything exists at the destination path (file or link)
+        $destinationExists = file_exists($destFile) || is_link($destFile);
+        $confirmMessage = $destinationExists
+            ? 'An item (file or link) already exists at '.$destFile.'. Do you want to replace it with a symlink to the source rules file?'
+            : 'Do you want to create a symlink at '.$destFile.' pointing to the source rules file?';
+        // Default to 'yes' if it doesn't exist, 'no' if it does
+        $default = ! $destinationExists;
 
         if ($this->confirm($confirmMessage, $default)) {
-            // Step 4: Copy the file if confirmed
-            if (File::copy($sourceFile, $destFile)) {
-                $this->info('File copied successfully to: '.$destFile);
-            } else {
-                $this->error('Failed to copy the file.');
+            // Step 4: Create the symlink if confirmed
+            try {
+                // If something exists at the destination, remove it first
+                if (file_exists($destFile) || is_link($destFile)) {
+                    if (!unlink($destFile)) {
+                        // Throw an exception if deletion fails
+                        throw new \RuntimeException("Could not remove existing item at {$destFile}");
+                    }
+                    $this->comment('Removed existing item at: '.$destFile);
+                }
 
+                // Create the symbolic link (target, link)
+                if (symlink($sourceFile, $destFile)) {
+                    $this->info('Symlink created successfully at: '.$destFile);
+                } else {
+                    // Throw an exception if symlink creation fails
+                    throw new \RuntimeException("Failed to create symlink from {$sourceFile} to {$destFile}");
+                }
+            } catch (\Exception $e) {
+                // Catch any exception during delete or symlink creation
+                $this->error('Error creating symlink: ' . $e->getMessage());
                 return self::FAILURE;
             }
         } else {
-            $this->info('File copy aborted by user.');
+            $this->info('Symlink creation aborted by user.');
         }
 
         return self::SUCCESS;
