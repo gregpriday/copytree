@@ -92,6 +92,14 @@ class ProjectQuestionService
             'content' => $systemPrompt
         ];
 
+        // Add the first user message containing ONLY the project code
+        if (!empty($projectCopytree)) {
+            $messages[] = [
+                'role' => 'user',
+                'content' => $projectCopytree
+            ];
+        }
+
         // Add history messages
         if (!empty($history)) {
             foreach ($history as $histItem) {
@@ -106,11 +114,10 @@ class ProjectQuestionService
             }
         }
 
-        // Add the current user question with project context
-        $currentPrompt = "Here is the project structure and files:\n\n{$projectCopytree}\n\nUser question: {$question}";
+        // Add the final user message containing ONLY the current question
         $messages[] = [
             'role' => 'user',
-            'content' => $currentPrompt
+            'content' => $question
         ];
 
         // Configure generation parameters
