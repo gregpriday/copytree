@@ -19,9 +19,9 @@ Sample output:
 ```json
 {
   "expert": "implementation-review",
-  "provider": "llama",
+  "provider": "openai",
   "model": "medium"
 }
 ```
 
-Be decisive and pick the single most appropriate expert based on the user's question. If multiple experts could address the question, choose the one whose expertise most directly applies to the specific focus of the question. When in doubt, choose `default` as the expert, `llama` as the provider, and `medium` as the model.
+Be decisive and pick the single most appropriate expert based on the user's question. If multiple experts could address the question, choose the one whose expertise most directly applies to the specific focus of the question. When in doubt, choose `default` as the expert, `openai` as the provider, and `small` as the model.

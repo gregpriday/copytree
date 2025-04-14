@@ -12,17 +12,6 @@ return [
     |
     */
     'providers' => [
-//        'llama' => [
-//            'key' => env('LAMBDA_API_KEY'),
-//            'base_url' => env('LAMBDA_API_BASE_URL', 'https://api.lambda.ai/v1'),
-//            'timeout' => env('LAMBDA_REQUEST_TIMEOUT', 120),
-//
-//            'models' => [
-//                'medium' => 'llama-4-maverick-17b-128e-instruct-fp8',
-//                'small' => 'llama-4-scout-17b-16e-instruct',
-//            ]
-//        ],
-
         'llama' => [
             'key' => env('GROQ_API_KEY'),
             'base_url' => env('GROQ_API_BASE_URL', 'https://api.groq.com/openai/v1'),
@@ -51,8 +40,8 @@ return [
             'timeout' => env('OPENAI_REQUEST_TIMEOUT', 120),
 
             'models' => [
-                'medium' => 'gpt-4o',
-                'small' => 'gpt-4o-mini',
+                'medium' => 'gpt-4.1-mini',
+                'small' => 'gpt-4.1-nano',
             ]
         ],
     ],
@@ -67,7 +56,7 @@ return [
     | the providers array above.
     |
     */
-    'default_provider' => env('AI_DEFAULT_PROVIDER', 'llama'),
+    'default_provider' => env('AI_DEFAULT_PROVIDER', 'openai'),
 
     /*
     |--------------------------------------------------------------------------

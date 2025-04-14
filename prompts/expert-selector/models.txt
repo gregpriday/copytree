@@ -1,71 +1,85 @@
 ### Model Descriptions
 
-This document defines the available models provided by the `llama` provider, including capabilities, limitations, and recommended use cases for each. These descriptions guide selection logic based on task complexity and performance needs.
+This document defines the available models provided by the `openai` provider, including capabilities, limitations, and recommended use cases for each. These descriptions guide selection logic based on task complexity, performance needs, and cost efficiency. All models feature a refreshed knowledge cutoff of June 2024 and support context windows up to 1 million tokens.
 
 ---
 
-#### Meta Llama 4 Scout (Llama 4 Small Model)
+#### OpenAI GPT-4.1 nano (Small Model)
 
 ```json
 {
-  "provider": "llama",
+  "provider": "openai",
   "model": "small"
 }
 ```
 
-**Provider**: llama
-**Model Identifier**: `accounts/fireworks/models/llama4-scout-instruct-basic`
+**Provider**: openai
+**Model Identifier**: `gpt-4.1-nano` (Example API identifier; use actual deployment name)
 
 **Description**:
-This is the smaller, faster, and more cost-efficient model. It is specialized for tasks that involve identifying locations in large codebases or answering basic structural questions.
+This is the smallest, fastest, and most cost-efficient model in the GPT-4.1 family. It is optimized for tasks demanding low latency and high throughput, while still offering significant capabilities and a large 1 million token context window. It demonstrates strong performance for its size, surpassing previous generation models like GPT-4o mini on several benchmarks.
 
 **Strengths**:
-- Optimized for searching and pinpointing code implementations across large projects
-- Efficient at answering questions about code structure and inter-component relationships
-- Fast inference times and lower operational cost
+- **Speed and Cost**: Fastest inference times and lowest operational cost in the GPT-4.1 series.
+- **Efficiency**: Ideal for high-volume, low-latency tasks like classification and autocompletion.
+- **Large Context**: Supports up to 1 million tokens, enabling processing of large amounts of information.
+- **Strong Baseline Performance**: Achieves impressive scores on benchmarks like MMLU (80.1%), GPQA (50.3%), and Aider polyglot coding (9.8%), outperforming GPT-4o mini.
+- **Good Long Context Retrieval**: Reliably retrieves information ("needle-in-haystack") across its full context window.
+- **Solid Vision Capabilities**: Strong performance on image understanding benchmarks, often beating GPT-4o mini.
 
 **Use Cases**:
-- "Where is X implemented?"
-- "Which part of the system handles Y?"
-- "How does A interact with B?" (at a basic level)
+- Real-time classification or categorization.
+- Autocompletion suggestions.
+- Simple data extraction or formatting tasks.
+- Basic Q&A over large documents where speed is critical.
+- Routing user requests.
+- Initial checks or lightweight analysis before potentially escalating to a larger model.
 
 **Limitations**:
-- Not suited for deep reasoning, bug diagnostics, or architectural planning
-- May produce shallow or insufficient responses when deeper analysis is required
+- Not designed for deep, complex reasoning, multi-step planning, or intricate problem-solving.
+- Coding capabilities are present but less advanced than GPT-4.1 mini; less suitable for complex code generation or debugging.
+- Instruction following is good but less reliable than the Mini model for highly complex or nuanced instructions.
 
 **Selection Guidance**:
-Use this model by default for all general and structure-related questions. Prioritize it when the request is lightweight or purely exploratory. Only escalate to the medium model if the task requires diagnostic or reasoning capabilities.
+Use this model by default for tasks where speed and cost are the primary drivers. Prioritize it for simple, well-defined tasks like classification, autocompletion, or quick information retrieval. Escalate to the medium (Mini) model if the task requires more sophisticated reasoning, coding power, or complex instruction following.
 
 ---
 
-#### Meta Llama 4 Maverick (Llama 4 Medium Model)
+#### OpenAI GPT-4.1 mini (Medium Model)
 
 ```json
 {
-  "provider": "llama",
+  "provider": "openai",
   "model": "medium"
 }
 ```
 
-**Provider**: llama
-**Model Identifier**: `accounts/fireworks/models/llama4-maverick-instruct-basic`
+**Provider**: openai
+**Model Identifier**: `gpt-4.1-mini` (Example API identifier; use actual deployment name)
 
 **Description**:
-This is the more capable model designed for tasks that require analysis, debugging, or multi-step planning. It trades some performance and cost for improved reasoning and diagnostic depth.
+This model represents a significant leap in performance for mid-tier models, frequently outperforming the previous flagship model (GPT-4o) on various benchmarks. It offers a compelling balance between high capability, improved latency, and reduced cost compared to larger models. It features a 1 million token context window and excels at coding and instruction following.
 
 **Strengths**:
-- Better at handling diagnostic, planning, and reasoning tasks
-- Appropriate for evaluating system behavior, identifying issues, or strategizing implementation changes
-- Produces higher quality answers for complex, analytical questions
+- **Advanced Capabilities**: Significantly outperforms GPT-4o mini and often GPT-4o across coding, instruction following, long context, and vision benchmarks.
+- **Excellent Coding**: Strong performance on SWE-bench (better than GPT-4o mini) and Aider polyglot diff benchmark, making it suitable for complex coding tasks, generation, and debugging.
+- **Superior Instruction Following**: More reliable at following complex, multi-turn, and nuanced instructions compared to Nano (and significantly better than GPT-4o mini). Excels on benchmarks like MultiChallenge and IFEval.
+- **Robust Long Context Understanding**: Excellent performance on tasks requiring retrieval and reasoning over its 1 million token context window (e.g., OpenAI-MRCR, Graphwalks). Suitable for analysing large codebases or document sets.
+- **Strong Vision Performance**: Often beats GPT-4o on challenging vision benchmarks (MMMU, MathVista, CharXiv-Reasoning).
+- **Balanced Performance**: Offers a great mix of intelligence, speed (nearly half the latency of GPT-4o), and cost (83% cheaper than GPT-4o).
 
 **Use Cases**:
-- "Why is this failing?"
-- "How should I approach implementing X?"
-- "Can you help debug or trace Y?"
+- Complex code generation, debugging, and explanation.
+- Advanced reasoning and problem-solving tasks.
+- Reliable execution of detailed, multi-step instructions.
+- In-depth analysis and summarization of large documents or codebases.
+- Powering sophisticated agents requiring reliable tool use and instruction adherence.
+- High-quality content generation requiring nuanced understanding.
+- Vision-based tasks requiring detailed image interpretation.
 
 **Limitations**:
-- Higher cost and slower inference time compared to the small model
-- Overkill for basic code-location or structural inquiries
+- Higher cost and latency compared to the Nano model.
+- May be more than required for very simple, high-volume tasks where Nano excels.
 
 **Selection Guidance**:
-Use this model when the question demands depth, logic, or analysis. Always prefer this when shallow understanding would lead to inaccurate or incomplete results. Default to this model if there’s uncertainty about whether the small model will suffice.
+Use this model when the task complexity exceeds Nano's capabilities, particularly for demanding coding, reasoning, or instruction-following tasks. It's the preferred choice for analyzing large contexts deeply or when high reliability is paramount. Consider it the default if unsure whether Nano will suffice, as it provides a substantial capability boost with good efficiency.
