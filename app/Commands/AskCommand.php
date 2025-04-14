@@ -8,6 +8,9 @@ use App\Services\ProjectQuestionService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
+use App\Constants\AIModelTypes;
+use App\Constants\ExpertNames;
+use App\Constants\ProfileNames;
 
 class AskCommand extends Command
 {
@@ -153,7 +156,7 @@ class AskCommand extends Command
         $copytree = Artisan::output();
 
         // Determine the expert to use with proper error handling
-        if ($expert === 'auto') {
+        if ($expert === ExpertNames::AUTO) {
             try {
                 $expertConfig = $expertSelectorService->selectConfig($question);
                 // If we get the default expert after auto-selection, let the user know
@@ -162,7 +165,7 @@ class AskCommand extends Command
                 $expertConfig = [
                     'expert' => $expert,
                     'provider' => ExpertSelectorService::DEFAULT_PROVIDER,
-                    'model' => ExpertSelectorService::DEFAULT_MODEL,
+                    'model' => AIModelTypes::MEDIUM,
                 ];
             }
         } else {
@@ -170,7 +173,7 @@ class AskCommand extends Command
             $expertConfig = [
                 'expert' => $expert,
                 'provider' => ExpertSelectorService::DEFAULT_PROVIDER,
-                'model' => ExpertSelectorService::DEFAULT_MODEL,
+                'model' => AIModelTypes::MEDIUM,
             ];
         }
 

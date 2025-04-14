@@ -44,7 +44,16 @@ class TempFileManager
         $filename = $hash . '_' . $timestamp . '.txt';
         $filepath = $tempDir.DIRECTORY_SEPARATOR.$filename;
 
-        file_put_contents($filepath, $content);
+        try {
+            if (file_put_contents($filepath, $content) === false) {
+                throw new \RuntimeException('Failed to write temp file: ' . $filepath);
+            }
+        } catch (\Exception $e) {
+            if (class_exists('\\Illuminate\\Support\\Facades\\Log')) {
+                \Illuminate\Support\Facades\Log::error('TempFileManager: Failed to create temp file ' . $filepath . ': ' . $e->getMessage());
+            }
+            throw new \RuntimeException('Failed to create temp file: ' . $filepath . '. Error: ' . $e->getMessage());
+        }
 
         return $filepath;
     }

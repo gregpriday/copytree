@@ -7,12 +7,14 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
+use App\Constants\AIModelTypes;
+use App\Constants\ExpertNames;
 
 class ExpertSelectorService
 {
-    const DEFAULT_EXPERT = 'default';
+    const DEFAULT_EXPERT = ExpertNames::DEFAULT;
     const DEFAULT_PROVIDER = 'openai';
-    const DEFAULT_MODEL = 'medium';
+    const DEFAULT_MODEL = AIModelTypes::MEDIUM;
 
     const MAX_RETRIES = 3;
 
@@ -112,7 +114,7 @@ class ExpertSelectorService
             // Fallback: if model key does not exist for provider, use 'medium'
             $models = $providers[$provider]['models'] ?? [];
             if (!isset($models[$model])) {
-                $model = 'medium';
+                $model = AIModelTypes::MEDIUM;
             }
 
             return [

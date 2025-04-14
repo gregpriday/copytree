@@ -50,6 +50,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             // Load the system prompt from the prompts directory.
             $systemPromptPath = base_path('prompts/image-description/system.txt');
             if (! File::exists($systemPromptPath)) {
+                \Illuminate\Support\Facades\Log::error('System prompt for image description not found at: ' . $systemPromptPath);
                 throw new RuntimeException('System prompt for image description not found.');
             }
             $systemPrompt = File::get($systemPromptPath);
@@ -77,6 +78,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
                     'temperature' => 0.2,
                 ]);
             } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('AI API call failed in ImageDescription: ' . $e->getMessage());
                 throw new RuntimeException('AI API call failed: '.$e->getMessage());
             }
 
@@ -106,6 +108,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
         // Get the original dimensions and image type.
         $imageInfo = getimagesize($imagePath);
         if ($imageInfo === false) {
+            \Illuminate\Support\Facades\Log::error('Unable to get image size for ' . $imagePath);
             throw new RuntimeException("Unable to get image size for {$imagePath}");
         }
         [$width, $height, $imageType] = $imageInfo;
