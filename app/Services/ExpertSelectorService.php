@@ -99,7 +99,27 @@ class ExpertSelectorService
                 ]);
 
             // Parse the response to determine the selected expert, provider, and model
-            return $this->parseConfigResponse($response, array_keys($experts));
+            $parsed = $this->parseConfigResponse($response, array_keys($experts));
+            $provider = $parsed['provider'];
+            $model = $parsed['model'];
+
+            // Fallback: if provider does not exist, use default provider
+            $providers = config('ai.providers');
+            if (!isset($providers[$provider])) {
+                $provider = config('ai.default_provider', self::DEFAULT_PROVIDER);
+            }
+
+            // Fallback: if model key does not exist for provider, use 'medium'
+            $models = $providers[$provider]['models'] ?? [];
+            if (!isset($models[$model])) {
+                $model = 'medium';
+            }
+
+            return [
+                'expert' => $parsed['expert'],
+                'provider' => $provider,
+                'model' => $model,
+            ];
         } catch (Throwable $e) {
             Log::error('Expert selection failed: '.$e->getMessage());
 
