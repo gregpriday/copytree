@@ -13,14 +13,14 @@ When making your selection:
 Your output must be a valid JSON object with the following fields:
 - "expert": The name/key of the selected expert (must be an exact match from the provided list)
 - "provider": The AI provider to use (valid options: "llama", "openai")
-- "model": The model size to use (valid options: "small", "medium")
+- "model": The model size to use (valid options: "small", "medium", "large")
 
 Sample output:
 ```json
 {
   "expert": "implementation-review",
   "provider": "openai",
-  "model": "medium"
+  "model": "small"
 }
 ```
 

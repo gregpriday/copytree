@@ -11,7 +11,7 @@ use Throwable;
 class ExpertSelectorService
 {
     const DEFAULT_EXPERT = 'default';
-    const DEFAULT_PROVIDER = 'llama';
+    const DEFAULT_PROVIDER = 'openai';
     const DEFAULT_MODEL = 'medium';
 
     const MAX_RETRIES = 3;
@@ -39,7 +39,7 @@ class ExpertSelectorService
     public function __construct()
     {
         // Use the model specifically configured for expert selection tasks
-        $this->model = AI::models('llama')['medium']; // Always use a flash model for selection
+        $this->model = AI::models()['medium'];
         // Path to the system prompt specific to expert selection
         $this->systemPromptPath = base_path('prompts/expert-selector/system.txt');
 
@@ -80,7 +80,7 @@ class ExpertSelectorService
             $prompt = $this->buildPrompt($question, $experts);
 
             // Make a request to AI for expert selection
-            $response = AI::driver('llama')->chat()
+            $response = AI::chat()
                 ->create([
                     'model' => $this->model,
                     'response_format' => [

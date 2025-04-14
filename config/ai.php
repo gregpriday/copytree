@@ -40,6 +40,7 @@ return [
             'timeout' => env('OPENAI_REQUEST_TIMEOUT', 120),
 
             'models' => [
+                'large' => 'gpt-4.1',
                 'medium' => 'gpt-4.1-mini',
                 'small' => 'gpt-4.1-nano',
             ]

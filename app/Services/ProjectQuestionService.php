@@ -83,6 +83,13 @@ class ProjectQuestionService
 
         $systemPrompt = File::get($expertPromptPath);
 
+        // Load the additional system message from file and append
+        $additionalPromptPath = base_path('prompts/project-question/additional.txt');
+        if (File::exists($additionalPromptPath)) {
+            $additionalSystemMessage = File::get($additionalPromptPath);
+            $systemPrompt .= "\n\n" . $additionalSystemMessage;
+        }
+
         // --- Prepare Messages for AI API ---
         $messages = [];
 

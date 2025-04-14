@@ -25,7 +25,7 @@ class SummarizationService
     public function __construct()
     {
         // Use the model specifically configured for summarization tasks
-        $this->model = AI::models()['medium'];
+        $this->model = AI::models()['small'];
     }
 
     /**
