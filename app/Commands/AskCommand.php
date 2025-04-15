@@ -178,80 +178,126 @@ class AskCommand extends Command
             ];
         }
 
-        $this->output->write("<info>Answering your question (using expert: {$expertConfig['expert']}, provider: {$expertConfig['provider']}, model:{$expertConfig['model']}])...</info> ");
-        $this->output->newLine();
+        $this->output->write("<info>Answering your question (using expert: {$expertConfig['expert']}, provider: {$expertConfig['provider']}, model:{$expertConfig['model']})...</info> ");
 
-        $fullResponseText = ''; // Accumulate the full response
+        $fullResponseText = '';
+        $inputTokens = 0;
+        $outputTokens = 0;
+        $cachedInputTokens = 0;
 
         try {
-            // Pass expertConfig instead of just expert to the question service
-            $stream = $questionService->askQuestion($copytree, $question, $expertConfig, $history);
+            // --- Call the NON-STREAMING service method ---
+            $apiResponse = $questionService->askQuestion($copytree, $question, $expertConfig, $history);
 
-            // Process and display each partial response as it arrives
-            foreach ($stream as $partialResponse) {
-                try {
-                    // Extract delta content from Fireworks/OpenAI response
-                    $text = $partialResponse->choices[0]->delta->content ?? null;
+            // --- Extract Content ---
+            // Adjust the path based on the actual structure of \OpenAI\Responses\Chat\CreateResponse
+            $fullResponseText = $apiResponse->choices[0]->message->content ?? '';
 
-                    if ($text !== null) {
-                        // Text found via the expected path
-                        $this->output->write($text);
-                        $fullResponseText .= $text;
-                    }
-                } catch (\Exception $e) {
-                    // Log the error for troubleshooting
-                    Log::warning('Error processing response chunk: '.$e->getMessage(), [
-                        'stateKey' => $stateKey ?? 'unknown',
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                    ]);
-                    // We're intentionally ignoring issues with malformed responses as a fallback
-                }
+            // --- Extract Accurate Token Usage ---
+            $usage = $apiResponse->usage ?? null;
+            if ($usage) {
+                $inputTokens = $usage->promptTokens ?? 0;
+                $outputTokens = $usage->completionTokens ?? 0;
+
+                // Attempt to get cached tokens (path might vary slightly)
+                $promptDetails = $usage->promptTokensDetails ?? null;
+                $cachedInputTokens = $promptDetails->cachedTokens ?? 0;
+            } else {
+                 Log::warning('Token usage data missing from API response.', ['response_id' => $apiResponse->id ?? 'N/A']);
             }
 
-            // Add a final newline after the complete response
-            $this->output->newLine();
+            // --- Calculate Cost ---
+            $totalCost = 0.0;
+            $provider = $expertConfig['provider'];
+            $modelSize = $expertConfig['model']; // This should be 'small', 'medium', or 'large'
+            $pricingConfigKey = "ai.providers.{$provider}.pricing.{$modelSize}";
+            $pricingFound = config()->has($pricingConfigKey);
+            if ($pricingFound) {
+                $pricing = config($pricingConfigKey);
+                $inputPrice = $pricing['input'] ?? 0.0;
+                $outputPrice = $pricing['output'] ?? 0.0;
+                $cachedInputPrice = $pricing['cached_input'] ?? 0.0;
+                $nonCachedInputTokens = $inputTokens - $cachedInputTokens;
+                if ($nonCachedInputTokens > 0) {
+                    $totalCost += ($nonCachedInputTokens / 1000000) * $inputPrice;
+                }
+                if ($cachedInputTokens > 0) {
+                    $totalCost += ($cachedInputTokens / 1000000) * $cachedInputPrice;
+                }
+                if ($outputTokens > 0) {
+                    $totalCost += ($outputTokens / 1000000) * $outputPrice;
+                }
+            } else {
+                Log::warning("Pricing configuration not found for provider '{$provider}', model size '{$modelSize}'. Cost will not be calculated.");
+            }
+            // --- End Calculate Cost ---
 
-            // Save interaction - state key will always be set now
-            $stateService->saveMessage($stateKey, 'user', $question);
-            $stateService->saveMessage($stateKey, 'assistant', $fullResponseText);
+            // --- Display Response ---
+            $this->output->newLine(); // Add newline before showing response
+            if (!empty($fullResponseText)) {
+                $this->line($fullResponseText); // Display the full response at once
+            } else {
+                 $this->warning('Received an empty response from the AI.');
+            }
 
-            $this->newLine();
-            $this->info("Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
+            // --- Save State (No Tokens) ---
+            $stateService->saveMessage($stateKey, 'user', $question); // [cite: 48]
+            $stateService->saveMessage($stateKey, 'assistant', $fullResponseText); // [cite: 49]
 
-            // Perform silent garbage collection
-            $this->runGarbageCollection($stateService);
+            // --- Format and Display Token Output ---
+            $this->newLine(); // Add separation
 
-            return self::SUCCESS;
+            if ($inputTokens > 0 || $outputTokens > 0) {
+                // Calculate cached percentage using the ACCURATE counts
+                $cachedPercentage = $inputTokens > 0 ?
+                    round(($cachedInputTokens / $inputTokens) * 100, 1) : 0;
+
+                // Format cost string (only show if cost > 0 and pricing was found)
+                $costString = '';
+                if ($totalCost > 0) {
+                    $formattedCost = number_format($totalCost, 6); // Adjust precision as needed
+                    $costString = sprintf(", Cost: $%s", $formattedCost);
+                } elseif ($pricingFound && $totalCost == 0) {
+                    $costString = ", Cost: $0.00";
+                } else {
+                    $costString = " (Cost N/A)";
+                }
+
+                // Format and display token usage AND cost
+                $tokenInfo = sprintf(
+                    "Token Usage: %s input (%s%% cached), %s output%s",
+                    number_format($inputTokens),
+                    $cachedPercentage,
+                    number_format($outputTokens),
+                    $costString
+                );
+                $this->info($tokenInfo);
+            } else {
+                // Message if usage data was missing from response
+                $this->comment('Token usage information not available in API response.');
+            }
+
+            // --- Display Follow-up Info ---
+            $this->info("Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`"); // [cite: 50]
+
+            // --- Garbage Collection ---
+            $this->runGarbageCollection($stateService); // [cite: 50]
+
+            return self::SUCCESS; // [cite: 50]
+
         } catch (\Exception $e) {
-            // Log error to console
-            Log::error('API Error: '.$e->getMessage(), [
+            // Log error to console and log file
+            Log::error('API Error: '.$e->getMessage(), [ // [cite: 51]
                 'stateKey' => $stateKey ?? 'unknown',
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
-            ]);
+            ]); // [cite: 52]
 
-            // Handle based on whether we have partial content
-            if (! empty($fullResponseText)) {
-                // We have some partial response, so just add a note about completion
-                $this->output->newLine();
-                $this->info("Response partially complete. Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
+            // Different error message since we didn't stream
+            $this->error('Failed to generate a response. Please check logs or try again. Error: '.$e->getMessage());
 
-                // Save whatever partial response we have
-                $stateService->saveMessage($stateKey, 'user', $question);
-                $stateService->saveMessage($stateKey, 'assistant', $fullResponseText);
-
-                // Perform silent garbage collection
-                $this->runGarbageCollection($stateService);
-
-                return self::SUCCESS;
-            } else {
-                // No content at all - use generic message
-                $this->error('Failed to generate a response. Please try again or use a different question.');
-                $this->runGarbageCollection($stateService);
-
-                return self::FAILURE;
-            }
+            $this->runGarbageCollection($stateService); // [cite: 57]
+            return self::FAILURE; // [cite: 57]
         }
     }
 

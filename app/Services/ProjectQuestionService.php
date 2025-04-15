@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
+use OpenAI\Responses\Chat\CreateResponse;
 
 class ProjectQuestionService
 {
@@ -49,18 +50,18 @@ class ProjectQuestionService
     }
 
     /**
-     * Ask a question about the project using a specified expert and stream the response.
+     * Ask a question about the project using a specified expert and return the full response object.
      * Optionally includes conversation history for stateful interactions.
      *
      * @param  string  $projectCopytree  The copytree output of the project
      * @param  string  $question  The user's question about the project
      * @param  string|array  $expertConfig  The expert to use (or config array with expert, provider, model)
      * @param  array  $history  Optional conversation history for stateful interactions
-     * @return iterable The stream of partial responses from the AI
+     * @return CreateResponse The full response object from the AI
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
      */
-    public function askQuestion(string $projectCopytree, string $question, string|array $expertConfig = [], array $history = []): iterable
+    public function askQuestion(string $projectCopytree, string $question, string|array $expertConfig = [], array $history = []): CreateResponse
     {
         // Handle the expertConfig parameter which can now be a string or an array
         $expert = is_array($expertConfig) ? $expertConfig['expert'] : $expertConfig;
@@ -127,30 +128,28 @@ class ProjectQuestionService
             'content' => $question,
         ];
 
-        // Configure generation parameters
+        // Configure generation parameters (NO 'stream_options')
         $parameters = [
             'model' => $model,
             'messages' => $messages,
-            'max_tokens' => 8192,
+            'max_tokens' => 8192, // Or your preferred max
+            // Add other parameters like temperature if needed
         ];
 
         try {
-            // Use Laravel's retry helper
-            return retry(self::MAX_RETRIES, function () use ($parameters, $provider) {
-                try {
-                    return AI::driver($provider)->chat()->createStreamed($parameters);
-                } catch (Throwable $e) {
-                    // Log the error
-                    Log::warning('AI API error in askQuestion: '.$e->getMessage());
-
-                    // Rethrow to trigger retry
-                    throw $e;
-                }
-            }, self::RETRY_DELAY_MS);
+            // Make the NON-STREAMING API call
+            $response = AI::driver($provider)->chat()->create($parameters);
+            return $response; // Return the complete response object
         } catch (Throwable $e) {
-            // For any exception after all retries
-            Log::error('AI API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage());
-            throw new RuntimeException('AI API call failed after '.self::MAX_RETRIES.' attempts: '.$e->getMessage(), 0, $e);
+            // Log the error
+            Log::error("AI API call failed in askQuestion: {$e->getMessage()}", [
+                'provider' => $provider,
+                'model' => $model,
+                'exception' => get_class($e),
+                // Avoid logging full messages/context in production logs if sensitive
+            ]);
+            // Re-throw the exception so the command can handle it
+            throw new RuntimeException("AI API call failed: {$e->getMessage()}", 0, $e);
         }
     }
 
