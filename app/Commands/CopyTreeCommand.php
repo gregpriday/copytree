@@ -259,9 +259,8 @@ class CopyTreeCommand extends Command
 
         // Add context attributes to the root tag
         $projectAttributes = sprintf(
-            ' profile="%s" generated-at="%s" source-path="%s"',
+            ' profile="%s" source-path="%s"',
             htmlspecialchars($profileNameUsed, ENT_QUOTES, 'UTF-8'),
-            htmlspecialchars($generationTimestamp, ENT_QUOTES, 'UTF-8'),
             htmlspecialchars($originalSourcePath, ENT_QUOTES, 'UTF-8')
         );
 
