@@ -41,7 +41,7 @@ class ProjectQuestionService
     public function __construct()
     {
         // Set default model and provider
-        $this->defaultProvider = config('ai.default_provider', 'gemini');
+        $this->defaultProvider = config('ai.default_provider', 'openai');
         $this->defaultModel = AI::models($this->defaultProvider)['medium'];
 
         // Set the base directory for expert prompts

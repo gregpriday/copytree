@@ -59,8 +59,8 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             $userInstruction = 'Please describe the image with the filename: '.$input->getPath();
 
             // Call the AI API with the base64-encoded image
-            $response = AI::driver('gemini')->chat()->create([
-                'model' => AI::models('gemini')['medium'],
+            $response = AI::driver('openai')->chat()->create([
+                'model' => AI::models('openai')['medium'],
                 'messages' => [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => [
