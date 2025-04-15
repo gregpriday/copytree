@@ -20,7 +20,6 @@ use App\Profiles\ProfileLoader;
 use App\Renderer\FileOutputRenderer;
 use App\Renderer\SizeReportRenderer;
 use App\Renderer\TreeRenderer;
-use App\Services\AIFilenameGenerator;
 use App\Services\ByteCounter;
 use App\Services\GitHubUrlHandler;
 use App\Utilities\Clipboard;
@@ -56,7 +55,8 @@ class CopyTreeCommand extends Command
         {--S|stream : Stream output directly (useful for piping).}
         {--r|as-reference : Copy a reference to a temporary file instead of copying the content directly.}
         {--no-cache : Do not use or keep cached GitHub repositories.}
-        {--s|size-report : Display a report of files sorted by size after transformation.}';
+        {--s|size-report : Display a report of files sorted by size after transformation.}
+        {--order-by=default : Specify the file ordering (default|modified).}';
 
     /**
      * The description of the command.
@@ -181,7 +181,7 @@ class CopyTreeCommand extends Command
 
         // Always add a sorting stage.
         $pipeline->pipe([
-            new SortFilesStage,
+            new SortFilesStage($this->option('order-by')),
         ]);
 
         // Add AlwaysIncludeStage as the last stage to ensure "always" files are included
@@ -266,16 +266,16 @@ class CopyTreeCommand extends Command
         );
 
         $combinedOutput = "<ct:project{$projectAttributes}>\n";
-        $combinedOutput .= "<ct:tree>\n{$treeOutput}\n</ct:tree>\n";
         if (! $this->option('only-tree')) {
             $combinedOutput .= "<ct:project_files>\n{$fileOutput}\n</ct:project_files>\n";
         }
+        $combinedOutput .= "<ct:tree>\n{$treeOutput}\n</ct:tree>\n";
         $combinedOutput .= "</ct:project><!-- END OF PROJECT -->\n\n\n";
 
         // Handle output options.
         if ($this->input->hasParameterOption(['--output', '-o'])) {
             $outputOption = $this->option('output') ?? '';
-            
+
             if ($outputOption === '') {
                 // No filename provided, use TempFileManager to store in temporary folder
                 // with AI-generated descriptive filename

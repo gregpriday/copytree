@@ -2,15 +2,14 @@
 
 namespace App\Commands;
 
+use App\Constants\AIModelTypes;
+use App\Constants\ExpertNames;
 use App\Services\ConversationStateService;
 use App\Services\ExpertSelectorService;
 use App\Services\ProjectQuestionService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
-use App\Constants\AIModelTypes;
-use App\Constants\ExpertNames;
-use App\Constants\ProfileNames;
 
 class AskCommand extends Command
 {
@@ -30,7 +29,8 @@ class AskCommand extends Command
         {--c|changes= : Filter for files changed between two commits in format "commit1:commit2".}
         {--e|expert=auto : The expert to use for answering the question (use "auto" for automatic selection).}
         {--question-file= : Read the question from a file.}
-        {--s|state= : Optional state key to continue a previous conversation. If not provided, a new state key is generated.}';
+        {--s|state= : Optional state key to continue a previous conversation. If not provided, a new state key is generated.}
+        {--order-by=modified : Specify the file ordering for the context (default|modified).}';
 
     /**
      * The description of the command.
@@ -42,9 +42,9 @@ class AskCommand extends Command
     /**
      * Execute the console command.
      *
-     * @param ProjectQuestionService $questionService Service to ask questions about the project
-     * @param ExpertSelectorService $expertSelectorService Service to select appropriate experts
-     * @param ConversationStateService $stateService Service to manage conversation state
+     * @param  ProjectQuestionService  $questionService  Service to ask questions about the project
+     * @param  ExpertSelectorService  $expertSelectorService  Service to select appropriate experts
+     * @param  ConversationStateService  $stateService  Service to manage conversation state
      * @return int Command exit code
      */
     public function handle(
@@ -141,6 +141,7 @@ class AskCommand extends Command
             '--profile' => $this->option('profile'),
             '--filter' => $this->option('filter'),
             '--ai-filter' => $this->option('ai-filter'),
+            '--order-by' => $this->option('order-by'),
         ];
 
         if ($this->option('modified')) {
@@ -199,7 +200,7 @@ class AskCommand extends Command
                     }
                 } catch (\Exception $e) {
                     // Log the error for troubleshooting
-                    Log::warning('Error processing response chunk: ' . $e->getMessage(), [
+                    Log::warning('Error processing response chunk: '.$e->getMessage(), [
                         'stateKey' => $stateKey ?? 'unknown',
                         'error' => $e->getMessage(),
                         'trace' => $e->getTraceAsString(),
@@ -231,7 +232,7 @@ class AskCommand extends Command
             ]);
 
             // Handle based on whether we have partial content
-            if (!empty($fullResponseText)) {
+            if (! empty($fullResponseText)) {
                 // We have some partial response, so just add a note about completion
                 $this->output->newLine();
                 $this->info("Response partially complete. Ask follow up questions using: `copytree ask \"{question}\" --state {$stateKey}`");
@@ -246,8 +247,9 @@ class AskCommand extends Command
                 return self::SUCCESS;
             } else {
                 // No content at all - use generic message
-                $this->error("Failed to generate a response. Please try again or use a different question.");
+                $this->error('Failed to generate a response. Please try again or use a different question.');
                 $this->runGarbageCollection($stateService);
+
                 return self::FAILURE;
             }
         }
@@ -256,8 +258,7 @@ class AskCommand extends Command
     /**
      * Display a list of available experts.
      *
-     * @param ProjectQuestionService $questionService Service to query available experts
-     * @return void
+     * @param  ProjectQuestionService  $questionService  Service to query available experts
      */
     protected function showExperts(ProjectQuestionService $questionService): void
     {
@@ -279,8 +280,7 @@ class AskCommand extends Command
     /**
      * Run the state garbage collection silently.
      *
-     * @param ConversationStateService $stateService Service to manage conversation state
-     * @return void
+     * @param  ConversationStateService  $stateService  Service to manage conversation state
      */
     protected function runGarbageCollection(ConversationStateService $stateService): void
     {

@@ -7,6 +7,13 @@ use Symfony\Component\Finder\SplFileInfo;
 
 class SortFilesStage implements FilePipelineStageInterface
 {
+    protected string $orderBy = 'default';
+
+    public function __construct(string $orderBy = 'default')
+    {
+        $this->orderBy = $orderBy;
+    }
+
     /**
      * Compare two files based on their relative paths in a nested alphabetical order.
      *
@@ -49,7 +56,13 @@ class SortFilesStage implements FilePipelineStageInterface
      */
     public function handle(array $files, \Closure $next): array
     {
-        usort($files, [$this, 'compareFiles']);
+        if ($this->orderBy === 'modified') {
+            usort($files, function (\Symfony\Component\Finder\SplFileInfo $a, \Symfony\Component\Finder\SplFileInfo $b) {
+                return $a->getMTime() <=> $b->getMTime();
+            });
+        } else {
+            usort($files, [$this, 'compareFiles']);
+        }
 
         return $next($files);
     }
