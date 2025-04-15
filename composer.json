@@ -28,7 +28,7 @@
         "illuminate/support": "^11.15",
         "laravel-zero/framework": "^11",
         "league/commonmark": "^2.6",
-        "openai-php/client": "^0.10.3",
+        "openai-php/client": "dev-main",
         "spatie/pdf-to-text": "^1.54",
         "symfony/console": "^6.0|^7.0",
         "symfony/finder": "^7.1",

@@ -41,7 +41,7 @@ class ExpertSelectorService
     public function __construct()
     {
         // Use the model specifically configured for expert selection tasks
-        $this->model = AI::models()['medium'];
+        $this->model = AI::models('openai')['medium'];
         // Path to the system prompt specific to expert selection
         $this->systemPromptPath = base_path('prompts/expert-selector/system.txt');
 
@@ -82,7 +82,7 @@ class ExpertSelectorService
             $prompt = $this->buildPrompt($question, $experts);
 
             // Make a request to AI for expert selection
-            $response = AI::chat()
+            $response = AI::driver('openai')->chat()
                 ->create([
                     'model' => $this->model,
                     'response_format' => [

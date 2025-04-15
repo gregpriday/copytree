@@ -59,28 +59,23 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             $userInstruction = 'Please describe the image with the filename: '.$input->getPath();
 
             // Call the AI API with the base64-encoded image
-            try {
-                $response = AI::chat()->create([
-                    'model' => AI::models()['medium'],
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => [
-                            ['type' => 'text', 'text' => $userInstruction],
-                            [
-                                'type' => 'image_url',
-                                'image_url' => [
-                                    'url' => 'data:image/jpeg;base64,'.$base64
-                                ]
+            $response = AI::driver('gemini')->chat()->create([
+                'model' => AI::models('gemini')['medium'],
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => [
+                        ['type' => 'text', 'text' => $userInstruction],
+                        [
+                            'type' => 'image_url',
+                            'image_url' => [
+                                'url' => 'data:image/jpeg;base64,'.$base64
                             ]
-                        ]]
-                    ],
-                    'max_tokens' => 1024,
-                    'temperature' => 0.2,
-                ]);
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('AI API call failed in ImageDescription: ' . $e->getMessage());
-                throw new RuntimeException('AI API call failed: '.$e->getMessage());
-            }
+                        ]
+                    ]]
+                ],
+                'max_tokens' => 1024,
+                'temperature' => 0.2,
+            ]);
 
             // Extract the response content
             $description = $response->choices[0]->message->content ?? '';

@@ -30,7 +30,8 @@ return [
 
             'models' => [
                 'large' => 'gemini-2.5-pro-preview-03-25',
-                'small' => 'gemini-2.0-flash',
+                'medium' => 'gemini-2.0-flash-thinking-exp-01-21',
+                'small' => 'gemini-2.0-flash-lite',
             ]
         ],
 

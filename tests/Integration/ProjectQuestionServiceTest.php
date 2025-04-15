@@ -57,7 +57,7 @@ class ProjectQuestionServiceTest extends TestCase
             $question = 'I want to enhance the use of AI in this project, where are some places I could look that could be enhanced with AI?';
             $expertConfig = [
                 'expert' => 'default',
-                'provider' => 'llama',
+                'provider' => 'gemini',
                 'model' => 'medium',
             ];
             $response = collect($service->askQuestion($copytree, $question, $expertConfig))->implode('');

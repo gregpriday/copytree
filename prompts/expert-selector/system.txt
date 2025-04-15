@@ -12,16 +12,16 @@ When making your selection:
 
 Your output must be a valid JSON object with the following fields:
 - "expert": The name/key of the selected expert (must be an exact match from the provided list)
-- "provider": The AI provider to use (valid options: "llama", "openai")
+- "provider": The AI provider to use (valid options: "gemini", "llama", "openai")
 - "model": The model size to use (valid options: "small", "medium", "large")
 
 Sample output:
 ```json
 {
   "expert": "implementation-review",
-  "provider": "openai",
+  "provider": "gemini",
   "model": "small"
 }
 ```
 
-Be decisive and pick the single most appropriate expert based on the user's question. If multiple experts could address the question, choose the one whose expertise most directly applies to the specific focus of the question. When in doubt, choose `default` as the expert, `openai` as the provider, and `small` as the model.
+Be decisive and pick the single most appropriate expert based on the user's question. If multiple experts could address the question, choose the one whose expertise most directly applies to the specific focus of the question. When in doubt, choose `default` as the expert, `gemini` as the provider, and `medium` as the model.
