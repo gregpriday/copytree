@@ -2,10 +2,10 @@
 
 namespace App\Transforms\Transformers\Images;
 
+use App\Facades\AI;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -50,7 +50,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             // Load the system prompt from the prompts directory.
             $systemPromptPath = base_path('prompts/image-description/system.txt');
             if (! File::exists($systemPromptPath)) {
-                \Illuminate\Support\Facades\Log::error('System prompt for image description not found at: ' . $systemPromptPath);
+                \Illuminate\Support\Facades\Log::error('System prompt for image description not found at: '.$systemPromptPath);
                 throw new RuntimeException('System prompt for image description not found.');
             }
             $systemPrompt = File::get($systemPromptPath);
@@ -68,10 +68,10 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
                         [
                             'type' => 'image_url',
                             'image_url' => [
-                                'url' => 'data:image/jpeg;base64,'.$base64
-                            ]
-                        ]
-                    ]]
+                                'url' => 'data:image/jpeg;base64,'.$base64,
+                            ],
+                        ],
+                    ]],
                 ],
                 'max_tokens' => 1024,
                 'temperature' => 0.2,
@@ -103,7 +103,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
         // Get the original dimensions and image type.
         $imageInfo = getimagesize($imagePath);
         if ($imageInfo === false) {
-            \Illuminate\Support\Facades\Log::error('Unable to get image size for ' . $imagePath);
+            \Illuminate\Support\Facades\Log::error('Unable to get image size for '.$imagePath);
             throw new RuntimeException("Unable to get image size for {$imagePath}");
         }
         [$width, $height, $imageType] = $imageInfo;

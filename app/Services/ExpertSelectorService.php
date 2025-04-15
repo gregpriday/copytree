@@ -2,18 +2,20 @@
 
 namespace App\Services;
 
+use App\Constants\AIModelTypes;
+use App\Constants\ExpertNames;
 use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
-use App\Constants\AIModelTypes;
-use App\Constants\ExpertNames;
 
 class ExpertSelectorService
 {
     const DEFAULT_EXPERT = ExpertNames::DEFAULT;
+
     const DEFAULT_PROVIDER = 'openai';
+
     const DEFAULT_MODEL = AIModelTypes::MEDIUM;
 
     const MAX_RETRIES = 3;
@@ -86,7 +88,7 @@ class ExpertSelectorService
                 ->create([
                     'model' => $this->model,
                     'response_format' => [
-                        'type' => "json_object",
+                        'type' => 'json_object',
                     ],
                     'messages' => [
                         [
@@ -107,13 +109,13 @@ class ExpertSelectorService
 
             // Fallback: if provider does not exist, use default provider
             $providers = config('ai.providers');
-            if (!isset($providers[$provider])) {
+            if (! isset($providers[$provider])) {
                 $provider = config('ai.default_provider', self::DEFAULT_PROVIDER);
             }
 
             // Fallback: if model key does not exist for provider, use 'medium'
             $models = $providers[$provider]['models'] ?? [];
-            if (!isset($models[$model])) {
+            if (! isset($models[$model])) {
                 $model = AIModelTypes::MEDIUM;
             }
 

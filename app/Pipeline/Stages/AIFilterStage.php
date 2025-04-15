@@ -2,8 +2,8 @@
 
 namespace App\Pipeline\Stages;
 
-use App\Pipeline\FilePipelineStageInterface;
 use App\Facades\AI;
+use App\Pipeline\FilePipelineStageInterface;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;

@@ -26,7 +26,7 @@ class ProjectQuestionServiceTest extends TestCase
         // Ensure the system prompt file exists
         $systemPromptPath = $promptsDir.'/system.txt';
         if (! File::exists($systemPromptPath)) {
-            File::put($systemPromptPath, "You are an expert at analyzing codebases and providing detailed insights about their structure and potential improvements.");
+            File::put($systemPromptPath, 'You are an expert at analyzing codebases and providing detailed insights about their structure and potential improvements.');
         }
     }
 
@@ -40,7 +40,8 @@ class ProjectQuestionServiceTest extends TestCase
             ]);
             $copytree = Artisan::output();
         } catch (\Exception $e) {
-            $this->markTestSkipped('The copy command is not available: ' . $e->getMessage());
+            $this->markTestSkipped('The copy command is not available: '.$e->getMessage());
+
             return;
         }
 
@@ -75,23 +76,23 @@ class ProjectQuestionServiceTest extends TestCase
             $message = $e->getMessage();
             if (strpos($message, '400 Bad Request') !== false) {
                 $this->markTestSkipped(
-                    "AI service returned a 400 Bad Request error. This is an integration test and requires a working AI service.\n" .
-                    "Error details: " . $message
+                    "AI service returned a 400 Bad Request error. This is an integration test and requires a working AI service.\n".
+                    'Error details: '.$message
                 );
             } elseif (strpos($message, '401 Unauthorized') !== false) {
                 $this->markTestSkipped(
-                    "AI service authentication failed (401 Unauthorized). Please check your API credentials.\n" .
-                    "Error details: " . $message
+                    "AI service authentication failed (401 Unauthorized). Please check your API credentials.\n".
+                    'Error details: '.$message
                 );
             } elseif (strpos($message, '429 Too Many Requests') !== false) {
                 $this->markTestSkipped(
-                    "AI service rate limit exceeded (429 Too Many Requests). Try again later.\n" .
-                    "Error details: " . $message
+                    "AI service rate limit exceeded (429 Too Many Requests). Try again later.\n".
+                    'Error details: '.$message
                 );
             } else {
                 $this->markTestSkipped(
-                    "AI service unavailable. This is an integration test and requires a working AI service.\n" .
-                    "Error details: " . $message
+                    "AI service unavailable. This is an integration test and requires a working AI service.\n".
+                    'Error details: '.$message
                 );
             }
         }

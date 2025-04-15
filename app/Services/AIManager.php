@@ -2,16 +2,16 @@
 
 namespace App\Services;
 
-use Illuminate\Contracts\Container\Container; // Import Container for constructor type hint
-use Illuminate\Support\Manager;
-use Illuminate\Support\Traits\Macroable; // Import the Macroable trait
-use OpenAI;
-use OpenAI\Client as OpenAIClient; // Alias OpenAI's Client for clarity
-use GuzzleHttp\Client as HttpClient;
+use GuzzleHttp\Client as HttpClient; // Import Container for constructor type hint
 use GuzzleHttp\HandlerStack;
+use Illuminate\Contracts\Container\Container; // Import the Macroable trait
+use Illuminate\Support\Manager;
+use Illuminate\Support\Traits\Macroable; // Alias OpenAI's Client for clarity
+use InvalidArgumentException;
+use OpenAI;
 // use GuzzleHttp\Middleware; // Likely unused directly here
 // use Psr\Http\Message\ResponseInterface; // Likely unused directly here
-use InvalidArgumentException; // Use specific exception type
+use OpenAI\Client as OpenAIClient; // Use specific exception type
 
 class AIManager extends Manager
 {
@@ -23,7 +23,6 @@ class AIManager extends Manager
      * We override the constructor just to ensure type hinting if needed,
      * but parent::__construct does the heavy lifting.
      *
-     * @param \Illuminate\Contracts\Container\Container $container
      * @return void
      */
     public function __construct(Container $container)
@@ -34,7 +33,6 @@ class AIManager extends Manager
     /**
      * Get the default driver name.
      *
-     * @return string
      * @throws \InvalidArgumentException If the default provider is not configured.
      */
     public function getDefaultDriver(): string
@@ -52,8 +50,9 @@ class AIManager extends Manager
     /**
      * Create an instance of the specified driver.
      *
-     * @param string $driver The name of the driver.
+     * @param  string  $driver  The name of the driver.
      * @return \OpenAI\Client The OpenAI Client instance for the driver.
+     *
      * @throws \InvalidArgumentException If the driver configuration is missing or invalid.
      */
     protected function createDriver($driver): OpenAIClient // Add return type hint
@@ -89,15 +88,15 @@ class AIManager extends Manager
             ->make(); // Returns an instance of OpenAI\Client
     }
 
-    public function models(string $driver = null): array
+    public function models(?string $driver = null): array
     {
         // If no driver is specified, return the default configuration
         if (is_null($driver)) {
-            return $this->config->get('ai.providers.' . $this->getDefaultDriver().'.models');
+            return $this->config->get('ai.providers.'.$this->getDefaultDriver().'.models');
         }
 
         // Otherwise, return the configuration for the specified driver
-        return $this->config->get('ai.providers.' . $driver . '.models');
+        return $this->config->get('ai.providers.'.$driver.'.models');
     }
 
     /**
@@ -107,8 +106,8 @@ class AIManager extends Manager
      * (like 'chat', 'embeddings', etc.) and forwards them to the client instance
      * returned by the default driver.
      *
-     * @param string $method The method name being called.
-     * @param array $parameters The arguments passed to the method.
+     * @param  string  $method  The method name being called.
+     * @param  array  $parameters  The arguments passed to the method.
      * @return mixed The result of the forwarded method call.
      */
     public function __call($method, $parameters)

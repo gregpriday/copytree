@@ -9,8 +9,6 @@ use App\Transforms\FileTransformer;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
-use OpenAI;
-use OpenAI\Client;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
             $validator = $this->app->make(ConfigValidator::class);
             $validator->validateApplicationConfig();
         } catch (InvalidArgumentException $e) {
-            Log::error('Configuration validation failed: ' . $e->getMessage());
+            Log::error('Configuration validation failed: '.$e->getMessage());
             // We don't want to halt the application, just log the error
             // In a production environment, you might want to add more robust handling
         }
@@ -37,11 +35,11 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register the config validator service
         $this->app->singleton(ConfigValidator::class, function ($app) {
-            return new ConfigValidator();
+            return new ConfigValidator;
         });
 
         // Register the AI Manager
-        $this->app->singleton('ai', function($app) {
+        $this->app->singleton('ai', function ($app) {
             return new AIManager($app);
         });
 

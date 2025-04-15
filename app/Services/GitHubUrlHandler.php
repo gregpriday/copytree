@@ -38,19 +38,19 @@ class GitHubUrlHandler
         }
 
         $this->url = $url;
-        
+
         try {
             $this->parseUrl($url);
             $this->setupCacheDirectory();
         } catch (InvalidGitHubUrlException $e) {
-            Log::error('Invalid GitHub URL: ' . $url, ['exception' => $e]);
+            Log::error('Invalid GitHub URL: '.$url, ['exception' => $e]);
             throw $e;
         } catch (\Exception $e) {
-            Log::error('Error initializing GitHubUrlHandler: ' . $e->getMessage(), [
+            Log::error('Error initializing GitHubUrlHandler: '.$e->getMessage(), [
                 'url' => $url,
-                'exception' => get_class($e)
+                'exception' => get_class($e),
             ]);
-            throw new GitOperationException('Error initializing GitHub URL handler: ' . $e->getMessage(), 0, $e);
+            throw new GitOperationException('Error initializing GitHub URL handler: '.$e->getMessage(), 0, $e);
         }
     }
 
@@ -117,10 +117,10 @@ class GitHubUrlHandler
         if ($this->subPath) {
             $targetPath .= DIRECTORY_SEPARATOR.$this->subPath;
             if (! is_dir($targetPath)) {
-                Log::error("Specified path not found in repository", [
+                Log::error('Specified path not found in repository', [
                     'subPath' => $this->subPath,
                     'repository' => $this->repoUrl,
-                    'branch' => $this->branch
+                    'branch' => $this->branch,
                 ]);
                 throw new InvalidGitHubUrlException("Specified path '{$this->subPath}' not found in repository");
             }
@@ -173,23 +173,23 @@ class GitHubUrlHandler
             if (is_dir($this->repoDir)) {
                 $this->executeCommand(['rm', '-rf', $this->repoDir]);
             }
-            
+
             // Check for specific error patterns and provide better error messages
             $message = $e->getMessage();
             if (strpos($message, 'Authentication failed') !== false) {
                 Log::error('Authentication failed while cloning repository', [
                     'repoUrl' => $this->repoUrl,
-                    'exception' => $e
+                    'exception' => $e,
                 ]);
                 throw new GitOperationException('Authentication failed for repository. Please check your credentials.', 0, $e);
             } elseif (strpos($message, 'not found') !== false || strpos($message, '404') !== false) {
                 Log::error('Repository not found', [
                     'repoUrl' => $this->repoUrl,
-                    'exception' => $e
+                    'exception' => $e,
                 ]);
                 throw new GitOperationException("Repository not found: {$this->repoUrl}. Please check the URL and make sure the repository exists and is accessible.", 0, $e);
             }
-            
+
             // Re-throw with original message for other cases
             throw $e;
         }
@@ -220,7 +220,7 @@ class GitHubUrlHandler
             Log::warning('Failed to update repository, attempting full re-clone', [
                 'repoUrl' => $this->repoUrl,
                 'branch' => $this->branch,
-                'exception' => $e
+                'exception' => $e,
             ]);
             $this->executeCommand(['rm', '-rf', $this->repoDir]);
             $this->cloneRepository();
@@ -239,7 +239,7 @@ class GitHubUrlHandler
     protected function executeCommand(array $command, ?string $cwd = null): Process
     {
         $process = new Process($command, $cwd);
-        
+
         try {
             $process->run();
 
@@ -249,9 +249,9 @@ class GitHubUrlHandler
                     'command' => implode(' ', $command),
                     'cwd' => $cwd,
                     'errorOutput' => $errorOutput,
-                    'exitCode' => $process->getExitCode()
+                    'exitCode' => $process->getExitCode(),
                 ]);
-                throw new GitOperationException('Git command failed: ' . $errorOutput);
+                throw new GitOperationException('Git command failed: '.$errorOutput);
             }
 
             return $process;
@@ -260,23 +260,23 @@ class GitHubUrlHandler
                 'command' => implode(' ', $command),
                 'cwd' => $cwd,
                 'errorOutput' => $process->getErrorOutput(),
-                'exception' => $e
+                'exception' => $e,
             ]);
-            throw new GitOperationException('Git command failed: ' . $e->getMessage(), 0, $e);
+            throw new GitOperationException('Git command failed: '.$e->getMessage(), 0, $e);
         } catch (ProcessRuntimeException $e) {
             Log::error('Process runtime error', [
                 'command' => implode(' ', $command),
                 'cwd' => $cwd,
-                'exception' => $e
+                'exception' => $e,
             ]);
-            throw new GitOperationException('Git command runtime error: ' . $e->getMessage(), 0, $e);
+            throw new GitOperationException('Git command runtime error: '.$e->getMessage(), 0, $e);
         } catch (\Exception $e) {
             Log::error('Unexpected error executing command', [
                 'command' => implode(' ', $command),
                 'cwd' => $cwd,
-                'exception' => get_class($e)
+                'exception' => get_class($e),
             ]);
-            throw new GitOperationException('Unexpected error executing Git command: ' . $e->getMessage(), 0, $e);
+            throw new GitOperationException('Unexpected error executing Git command: '.$e->getMessage(), 0, $e);
         }
     }
 
@@ -303,9 +303,9 @@ class GitHubUrlHandler
             } catch (\Exception $e) {
                 Log::error('Failed to clean cache directory', [
                     'cacheDir' => $cacheDir,
-                    'exception' => get_class($e)
+                    'exception' => get_class($e),
                 ]);
-                throw new GitOperationException('Failed to clean cache directory: ' . $e->getMessage(), 0, $e);
+                throw new GitOperationException('Failed to clean cache directory: '.$e->getMessage(), 0, $e);
             }
         }
     }
@@ -330,9 +330,9 @@ class GitHubUrlHandler
             } catch (\Exception $e) {
                 Log::error('Failed to clean repository directory', [
                     'repoDir' => $this->repoDir,
-                    'exception' => get_class($e)
+                    'exception' => get_class($e),
                 ]);
-                throw new GitOperationException('Failed to clean repository directory: ' . $e->getMessage(), 0, $e);
+                throw new GitOperationException('Failed to clean repository directory: '.$e->getMessage(), 0, $e);
             }
         }
     }

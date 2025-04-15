@@ -87,7 +87,7 @@ class ProjectQuestionService
         $additionalPromptPath = base_path('prompts/project-question/additional.txt');
         if (File::exists($additionalPromptPath)) {
             $additionalSystemMessage = File::get($additionalPromptPath);
-            $systemPrompt .= "\n\n" . $additionalSystemMessage;
+            $systemPrompt .= "\n\n".$additionalSystemMessage;
         }
 
         // --- Prepare Messages for AI API ---
@@ -96,19 +96,19 @@ class ProjectQuestionService
         // Add system message
         $messages[] = [
             'role' => 'system',
-            'content' => $systemPrompt
+            'content' => $systemPrompt,
         ];
 
         // Add the first user message containing ONLY the project code
-        if (!empty($projectCopytree)) {
+        if (! empty($projectCopytree)) {
             $messages[] = [
                 'role' => 'user',
-                'content' => $projectCopytree
+                'content' => $projectCopytree,
             ];
         }
 
         // Add history messages
-        if (!empty($history)) {
+        if (! empty($history)) {
             foreach ($history as $histItem) {
                 // Process text to remove XML tags if present
                 $messageText = $histItem['content'];
@@ -116,7 +116,7 @@ class ProjectQuestionService
 
                 $messages[] = [
                     'role' => $histItem['role'],
-                    'content' => $messageText
+                    'content' => $messageText,
                 ];
             }
         }
@@ -124,7 +124,7 @@ class ProjectQuestionService
         // Add the final user message containing ONLY the current question
         $messages[] = [
             'role' => 'user',
-            'content' => $question
+            'content' => $question,
         ];
 
         // Configure generation parameters

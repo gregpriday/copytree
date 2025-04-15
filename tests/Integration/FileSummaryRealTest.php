@@ -12,7 +12,7 @@ class FileSummaryRealTest extends TestCase
     public function test_transform_returns_summary_using_real_ai_api(): void
     {
         // Skip the test if no AI API key is set.
-        if (empty(config('ai.providers.' . config('ai.default_provider') . '.key'))) {
+        if (empty(config('ai.providers.'.config('ai.default_provider').'.key'))) {
             $this->markTestSkipped('AI API key not set. Skipping integration test.');
         }
 

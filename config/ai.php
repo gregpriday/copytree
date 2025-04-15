@@ -20,7 +20,7 @@ return [
             'models' => [
                 'medium' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
                 'small' => 'meta-llama/llama-4-scout-17b-16e-instruct',
-            ]
+            ],
         ],
 
         'gemini' => [
@@ -32,7 +32,7 @@ return [
                 'large' => 'gemini-2.5-pro-preview-03-25',
                 'medium' => 'gemini-2.0-flash-thinking-exp-01-21',
                 'small' => 'gemini-2.0-flash-lite',
-            ]
+            ],
         ],
 
         'openai' => [
@@ -44,7 +44,7 @@ return [
                 'large' => 'gpt-4.1',
                 'medium' => 'gpt-4.1-mini',
                 'small' => 'gpt-4.1-nano',
-            ]
+            ],
         ],
     ],
 
@@ -119,5 +119,5 @@ return [
         'expert_selector' => resource_path('prompts/expert_selector.md'),
         'filter' => resource_path('prompts/filter.md'),
         'filename_generator' => resource_path('prompts/filename_generator.md'),
-    ]
+    ],
 ];

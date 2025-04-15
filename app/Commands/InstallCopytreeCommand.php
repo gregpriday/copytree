@@ -2,9 +2,8 @@
 
 namespace App\Commands;
 
-use App\Services\ConversationStateService;
-use App\Services\SummarizationService;
 use App\Facades\AI;
+use App\Services\ConversationStateService;
 use Illuminate\Support\Facades\File;
 use LaravelZero\Framework\Commands\Command;
 
@@ -367,7 +366,7 @@ class InstallCopytreeCommand extends Command
         }
 
         // Create a ConversationStateService instance to ensure the table exists
-        $conversationService = new ConversationStateService();
+        $conversationService = new ConversationStateService;
         $this->info('✓ Conversation state service initialized.');
     }
 }

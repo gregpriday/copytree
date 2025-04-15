@@ -90,27 +90,27 @@ class TempFileManagerTest extends TestCase
         $mockGenerator = $this->getMockBuilder(\App\Services\AIFilenameGenerator::class)
             ->disableOriginalConstructor()
             ->getMock();
-        
+
         // Set up the mock to return a predictable filename
         $mockGenerator->method('generateFilenameFromFiles')
             ->willReturn('ai-generated-name.txt');
-        
+
         // Bind the mock to the service container
         app()->instance(\App\Services\AIFilenameGenerator::class, $mockGenerator);
-        
+
         // Test the method
         $content = 'Test content for AI-named temporary file';
         $filePath = TempFileManager::createAITempFile($content, []);
-        
+
         // Assertions
         $this->assertFileExists($filePath, 'AI-named temporary file should be created.');
         $this->assertStringContainsString('ai-generated-name', $filePath, 'Filename should contain the AI-generated name.');
         $this->assertStringStartsWith('ctree_output_', basename($filePath), 'Filename should start with "ctree_output_".');
-        
+
         // Verify file content
         $actualContent = file_get_contents($filePath);
         $this->assertEquals($content, $actualContent, 'The content of the AI-named temporary file should match the input.');
-        
+
         // Clean up
         unlink($filePath);
     }

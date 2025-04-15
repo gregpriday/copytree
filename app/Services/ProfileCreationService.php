@@ -121,7 +121,7 @@ class ProfileCreationService
                 'temperature' => 0.4,
             ]);
         } catch (\Exception $e) {
-            Log::error('AI API call failed in ProfileCreationService::createProfile: ' . $e->getMessage());
+            Log::error('AI API call failed in ProfileCreationService::createProfile: '.$e->getMessage());
             throw new RuntimeException('AI API call failed: '.$e->getMessage());
         }
 
@@ -137,7 +137,7 @@ class ProfileCreationService
         try {
             $profileData = Yaml::parse($yamlContent);
         } catch (\Exception $e) {
-            Log::error('Failed to parse generated profile YAML in ProfileCreationService::createProfile: ' . $e->getMessage());
+            Log::error('Failed to parse generated profile YAML in ProfileCreationService::createProfile: '.$e->getMessage());
             throw new RuntimeException('Failed to parse generated profile YAML: '.$e->getMessage());
         }
 

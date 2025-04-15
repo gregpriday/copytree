@@ -24,9 +24,6 @@ class ConfigValidateCommand extends Command
 
     /**
      * Execute the console command.
-     *
-     * @param ConfigValidator $validator
-     * @return int
      */
     public function handle(ConfigValidator $validator): int
     {
@@ -40,9 +37,11 @@ class ConfigValidateCommand extends Command
                 $validator->validateApplicationConfig();
                 $this->info('✓ All configuration sections are valid.');
             }
+
             return self::SUCCESS;
         } catch (InvalidArgumentException $e) {
-            $this->error('Configuration validation failed: ' . $e->getMessage());
+            $this->error('Configuration validation failed: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }
@@ -50,9 +49,6 @@ class ConfigValidateCommand extends Command
     /**
      * Validate a specific configuration section.
      *
-     * @param ConfigValidator $validator
-     * @param string $section
-     * @return void
      * @throws InvalidArgumentException If section is invalid or validation fails
      */
     private function validateSection(ConfigValidator $validator, string $section): void
@@ -63,21 +59,21 @@ class ConfigValidateCommand extends Command
                 $validator->validateAiConfig(config('ai'));
                 $this->info('✓ AI configuration is valid.');
                 break;
-            
+
             case 'logging':
                 $this->info('Validating logging configuration...');
                 $validator->validateLoggingConfig(config('logging'));
                 $this->info('✓ Logging configuration is valid.');
                 break;
-            
+
             case 'state':
                 $this->info('Validating state configuration...');
                 $validator->validateStateConfig(config('state'));
                 $this->info('✓ State configuration is valid.');
                 break;
-            
+
             default:
                 throw new InvalidArgumentException("Unknown configuration section: {$section}");
         }
     }
-} 
+}

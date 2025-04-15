@@ -68,7 +68,7 @@ class InstallCursorCommand extends Command
             try {
                 // If something exists at the destination, remove it first
                 if (file_exists($destFile) || is_link($destFile)) {
-                    if (!unlink($destFile)) {
+                    if (! unlink($destFile)) {
                         // Throw an exception if deletion fails
                         throw new \RuntimeException("Could not remove existing item at {$destFile}");
                     }
@@ -84,7 +84,8 @@ class InstallCursorCommand extends Command
                 }
             } catch (\Exception $e) {
                 // Catch any exception during delete or symlink creation
-                $this->error('Error creating symlink: ' . $e->getMessage());
+                $this->error('Error creating symlink: '.$e->getMessage());
+
                 return self::FAILURE;
             }
         } else {
