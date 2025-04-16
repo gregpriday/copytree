@@ -31,10 +31,6 @@ class InstallCopytreeCommand extends Command
             'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Latest model for complex reasoning',
             'accounts/fireworks/models/mixtral-8x7b-instruct' => 'Mixtral 8x7B - Powerful model with excellent reasoning',
         ],
-        'expert_selector' => [
-            'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Fast model for classification tasks',
-            'accounts/fireworks/models/llama3-8b-instruct' => 'LLaMa 3 8B - Cost-effective model for simple tasks',
-        ],
         'summarization' => [
             'accounts/fireworks/models/llama3-8b-instruct' => 'LLaMa 3 8B - Most cost-effective for summarization',
             'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Balanced efficiency and quality',
@@ -157,30 +153,23 @@ class InstallCopytreeCommand extends Command
         $existingAskModel = $extractValue('FIREWORKS_ASK_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic');
         $configValues['FIREWORKS_ASK_MODEL'] = $this->selectModelFromOptions('ask', $existingAskModel);
 
-        // Step 3: Model for expert selection
-        $this->line('');
-        $this->info('2. Expert Selector Model');
-        $this->line('This model selects the appropriate expert system prompt based on the user\'s question.');
-        $existingExpertSelectorModel = $extractValue('FIREWORKS_EXPERT_SELECTOR_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic');
-        $configValues['FIREWORKS_EXPERT_SELECTOR_MODEL'] = $this->selectModelFromOptions('expert_selector', $existingExpertSelectorModel);
-
         // Step 4: Model for summarization tasks
         $this->line('');
-        $this->info('3. Summarization Model');
+        $this->info('2. Summarization Model');
         $this->line('This model is used for summarizing text, code, and other content. A cost-effective model is recommended.');
         $existingSummarizationModel = $extractValue('FIREWORKS_SUMMARIZATION_MODEL', 'accounts/fireworks/models/llama3-8b-instruct');
         $configValues['FIREWORKS_SUMMARIZATION_MODEL'] = $this->selectModelFromOptions('summarization', $existingSummarizationModel);
 
         // Step 5: Model for classification tasks
         $this->line('');
-        $this->info('4. Classification Model');
+        $this->info('3. Classification Model');
         $this->line('This model is used for filtering files, classifying content, and other decision-making tasks.');
         $existingClassificationModel = $extractValue('FIREWORKS_CLASSIFICATION_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic');
         $configValues['FIREWORKS_CLASSIFICATION_MODEL'] = $this->selectModelFromOptions('classification', $existingClassificationModel);
 
         // Step 6: Default general-purpose model
         $this->line('');
-        $this->info('5. General Purpose Model');
+        $this->info('4. General Purpose Model');
         $this->line('This model is used as a fallback for any tasks not covered by the specific models above.');
         $existingGeneralModel = $extractValue('FIREWORKS_GENERAL_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic');
         $configValues['FIREWORKS_GENERAL_MODEL'] = $this->selectModelFromOptions('general', $existingGeneralModel);
@@ -320,30 +309,46 @@ class InstallCopytreeCommand extends Command
      */
     protected function saveConfigToEnv(string $envPath, string $envContent, array $configValues): void
     {
-        $newEnvContent = $envContent;
+        $lines = explode("\n", $envContent);
+        $updatedKeys = array_keys($configValues);
+        $newLines = [];
+        $addedKeys = [];
 
-        // Update or add each configuration value
-        foreach ($configValues as $key => $value) {
-            // Escape any quotes in the value
-            $value = str_replace('"', '\"', $value);
+        // Update existing lines
+        foreach ($lines as $line) {
+            $trimmedLine = trim($line);
+            if (empty($trimmedLine) || strpos($trimmedLine, '=') === false) {
+                $newLines[] = $line; // Keep empty lines and comments
+                continue;
+            }
 
-            // If the key already exists in the file, replace its value
-            if (preg_match("/{$key}=/", $newEnvContent)) {
-                $newEnvContent = preg_replace("/{$key}=([^\n]+)/", "{$key}=\"{$value}\"", $newEnvContent);
+            list($key) = explode('=', $trimmedLine, 2);
+            if (in_array($key, $updatedKeys)) {
+                $newLines[] = "{$key}={$configValues[$key]}";
+                $addedKeys[] = $key;
             } else {
-                // Otherwise, add it to the end of the file
-                $newEnvContent .= "\n{$key}=\"{$value}\"";
+                $newLines[] = $line; // Keep lines not being updated
             }
         }
 
-        // Make sure the file ends with a newline
-        if (substr($newEnvContent, -1) !== "\n") {
-            $newEnvContent .= "\n";
+        // Add new keys that weren't in the original file
+        foreach ($configValues as $key => $value) {
+            if (!in_array($key, $addedKeys)) {
+                $newLines[] = "{$key}={$value}";
+            }
         }
 
-        // Save the updated content to the .env file
-        file_put_contents($envPath, $newEnvContent);
-        $this->info('✓ Configuration saved to .env file.');
+        // Ensure no duplicate empty lines at the end
+        while (count($newLines) > 0 && empty(trim(end($newLines)))) {
+            array_pop($newLines);
+        }
+
+        // Write the updated content back to the file
+        if (file_put_contents($envPath, implode("\n", $newLines)."\n") === false) {
+            $this->error("Failed to write to {$envPath}");
+        } else {
+            $this->info("✓ Configuration saved to {$envPath}");
+        }
     }
 
     /**

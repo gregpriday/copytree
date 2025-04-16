@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 use OpenAI\Responses\Chat\CreateResponse;
+use App\Constants\AIModelTypes; // Import AIModelTypes if needed elsewhere, or remove if only used for defaults
 
 class ProjectQuestionService
 {
@@ -22,74 +23,60 @@ class ProjectQuestionService
     const RETRY_DELAY_MS = 500;
 
     /**
-     * The default AI model to use.
+     * The AI provider to use (e.g., 'openai', 'gemini').
      */
-    protected string $defaultModel;
+    protected string $provider;
 
     /**
-     * The default AI provider to use.
+     * The AI model size identifier (e.g., 'small', 'medium', 'large').
      */
-    protected string $defaultProvider;
+    protected string $modelSize;
 
     /**
-     * The path to the directory containing expert system prompts.
+     * The path to the directory containing the system prompt.
      */
     protected string $promptsBaseDir;
 
     /**
      * Create a new ProjectQuestionService instance.
+     *
+     * @param string $provider The AI provider identifier (e.g., 'openai').
+     * @param string $modelSize The AI model size identifier (e.g., 'small').
      */
-    public function __construct()
+    public function __construct(string $provider, string $modelSize)
     {
-        // Set default model and provider
-        $this->defaultProvider = config('ai.default_provider', 'openai');
-        $this->defaultModel = AI::models($this->defaultProvider)['medium'];
-
-        // Set the base directory for expert prompts
+        $this->provider = $provider;
+        $this->modelSize = $modelSize;
         $this->promptsBaseDir = base_path('prompts/project-question');
     }
 
     /**
-     * Ask a question about the project using a specified expert and return the full response object.
+     * Ask a question about the project using the configured provider/model and return the full response object.
      * Optionally includes conversation history for stateful interactions.
      *
      * @param  string  $projectCopytree  The copytree output of the project
      * @param  string  $question  The user's question about the project
-     * @param  string|array  $expertConfig  The expert to use (or config array with expert, provider, model)
      * @param  array  $history  Optional conversation history for stateful interactions
      * @return CreateResponse The full response object from the AI
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
      */
-    public function askQuestion(string $projectCopytree, string $question, string|array $expertConfig = [], array $history = []): CreateResponse
+    public function askQuestion(string $projectCopytree, string $question, array $history = []): CreateResponse
     {
-        // Handle the expertConfig parameter which can now be a string or an array
-        $expert = is_array($expertConfig) ? $expertConfig['expert'] : $expertConfig;
-        $provider = is_array($expertConfig) ? $expertConfig['provider'] : $this->defaultProvider;
-        $model = is_array($expertConfig) ? $expertConfig['model'] : $this->defaultModel;
-        $model = AI::models($provider)[$model];
-
-        // Build the path to the expert's system prompt
-        $expertPromptPath = $this->getExpertPromptPath($expert);
-
-        // Load the system prompt from the expert's directory
-        if (! File::exists($expertPromptPath)) {
-            // If expert doesn't exist, fall back to the default expert
-            if ($expert !== 'default') {
-                return $this->askQuestion($projectCopytree, $question, 'default', $history);
-            }
-
-            throw new RuntimeException("System prompt for expert '{$expert}' not found at {$expertPromptPath}.");
+        // Get the actual model name based on the CONFIGURED provider and size
+        // Ensure the config path exists and is valid before accessing
+        $modelConfigPath = "ai.providers.{$this->provider}.models.{$this->modelSize}";
+        if (!config()->has($modelConfigPath)) {
+            throw new RuntimeException("Model configuration not found for provider '{$this->provider}' and size '{$this->modelSize}' at path '{$modelConfigPath}'.");
         }
+        $modelName = config($modelConfigPath); // Use configured provider/size
 
-        $systemPrompt = File::get($expertPromptPath);
-
-        // Load the additional system message from file and append
-        $additionalPromptPath = base_path('prompts/project-question/additional.txt');
-        if (File::exists($additionalPromptPath)) {
-            $additionalSystemMessage = File::get($additionalPromptPath);
-            $systemPrompt .= "\n\n".$additionalSystemMessage;
+        // Load the single system prompt
+        $systemPromptPath = $this->promptsBaseDir.'/system.txt'; // Path to the new single prompt
+        if (! File::exists($systemPromptPath)) {
+            throw new RuntimeException("System prompt not found at {$systemPromptPath}.");
         }
+        $systemPrompt = File::get($systemPromptPath);
 
         // --- Prepare Messages for AI API ---
         $messages = [];
@@ -130,101 +117,26 @@ class ProjectQuestionService
 
         // Configure generation parameters (NO 'stream_options')
         $parameters = [
-            'model' => $model,
+            'model' => $modelName, // Use the resolved model name
             'messages' => $messages,
             'max_tokens' => 8192, // Or your preferred max
             // Add other parameters like temperature if needed
         ];
 
         try {
-            // Make the NON-STREAMING API call
-            $response = AI::driver($provider)->chat()->create($parameters);
+            // Make the NON-STREAMING API call using the CONFIGURED provider
+            $response = AI::driver($this->provider)->chat()->create($parameters); // Use $this->provider
             return $response; // Return the complete response object
         } catch (Throwable $e) {
             // Log the error
             Log::error("AI API call failed in askQuestion: {$e->getMessage()}", [
-                'provider' => $provider,
-                'model' => $model,
+                'provider' => $this->provider, // Log configured provider
+                'model' => $modelName,       // Log resolved model name
                 'exception' => get_class($e),
                 // Avoid logging full messages/context in production logs if sensitive
             ]);
             // Re-throw the exception so the command can handle it
             throw new RuntimeException("AI API call failed: {$e->getMessage()}", 0, $e);
         }
-    }
-
-    /**
-     * Get the path to the expert's system prompt.
-     *
-     * @param  string  $expert  The expert name
-     * @return string The full path to the expert's system prompt
-     */
-    protected function getExpertPromptPath(string $expert): string
-    {
-        $expertDir = $this->promptsBaseDir.'/'.$expert;
-
-        // If the expert directory doesn't exist, use the default expert
-        if (! File::isDirectory($expertDir)) {
-            return $this->getExpertPromptPath('default');
-        }
-
-        return $expertDir.'/system.txt';
-    }
-
-    /**
-     * Get a list of available experts with their descriptions.
-     *
-     * @return array An associative array where keys are expert names and values are their descriptions
-     */
-    public function getAvailableExperts(): array
-    {
-        $experts = [];
-
-        // Check if the prompts directory exists
-        if (! File::isDirectory($this->promptsBaseDir)) {
-            $experts['default'] = 'Default codebase navigation expert';
-
-            return $experts;
-        }
-
-        // Scan the directory for subdirectories (each representing an expert)
-        foreach (File::directories($this->promptsBaseDir) as $directory) {
-            $expertName = basename($directory);
-            $systemFilePath = $directory.'/system.txt';
-
-            // Only include the expert if it has a system.txt file
-            if (File::exists($systemFilePath)) {
-                // Read the first line from the system.txt file
-                $fileHandle = fopen($systemFilePath, 'r');
-                if ($fileHandle) {
-                    $firstLine = fgets($fileHandle);
-                    fclose($fileHandle);
-
-                    // Clean up the first line and use it as the description
-                    $description = trim($firstLine);
-                    // If the line starts with "You are a" or similar, keep it as is,
-                    // otherwise prepend a default description
-                    if (empty($description)) {
-                        $description = ucfirst($expertName).' expert';
-                    }
-
-                    $experts[$expertName] = $description;
-                } else {
-                    // Fallback if we can't read the file
-                    $experts[$expertName] = ucfirst($expertName).' expert';
-                }
-            }
-        }
-
-        // If no experts were found, at least include 'default'
-        if (empty($experts)) {
-            $experts['default'] = 'Default codebase navigation expert';
-        } elseif (! isset($experts['default'])) {
-            // Make sure 'default' is always included at the beginning if it exists
-            $defaultExperts = ['default' => 'Default codebase navigation expert'];
-            $experts = $defaultExperts + $experts;
-        }
-
-        return $experts;
     }
 }

@@ -21,18 +21,45 @@ return [
                 'medium' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
                 'small' => 'meta-llama/llama-4-scout-17b-16e-instruct',
             ],
+
+            'pricing' => [
+                'medium' => [
+                    'input' => 0.20,  // Price per million input tokens
+                    'output' => 0.60, // Price per million output tokens
+                ],
+                'small' => [
+                    'input' => 0.11,  // Price per million input tokens
+                    'output' => 0.34, // Price per million output tokens
+                ],
+            ],
         ],
 
         'gemini' => [
             'key' => env('GEMINI_API_KEY'),
-            'base_url' => env('GEMINI_API_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai'),
+            'base_url' => env('GEMINI_API_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'), // Standard Gemini endpoint
             'timeout' => env('GEMINI_REQUEST_TIMEOUT', 120),
 
             'models' => [
-                'large' => 'gemini-2.5-pro-preview-03-25',
-                'medium' => 'gemini-2.0-flash-thinking-exp-01-21',
-                'small' => 'gemini-2.0-flash-lite',
+                'large' => 'gemini-2.5-pro-preview-03-25', // Using gemini-2.5-pro-preview model name
+                'medium' => 'gemini-2.0-flash',           // Using gemini-2.0-flash model name
+                'small' => 'gemini-2.0-flash-lite',      // Using gemini-2.0-flash-lite model name
             ],
+
+            'pricing' => [ // Prices from Google Gemini API (Paid Tier, per million tokens)
+                'large' => [ // Corresponds to gemini-2.5-pro-preview (using <= 200k token tier)
+                    'input' => 1.25,  // Price per million input tokens
+                    'output' => 10.00, // Price per million output tokens (including thinking)
+                ],
+                'medium' => [ // Corresponds to gemini-2.0-flash (text pricing)
+                    'input' => 0.10,  // Price per million input tokens (text)
+                    'output' => 0.40, // Price per million output tokens
+                    'cached_input' => 0.025, // Price per million cached tokens (text/image/video)
+                ],
+                'small' => [ // Corresponds to gemini-2.0-flash-lite
+                    'input' => 0.075, // Price per million input tokens
+                    'output' => 0.30, // Price per million output tokens
+                ],
+            ]
         ],
 
         'openai' => [
@@ -58,9 +85,9 @@ return [
                     'cached_input' => 0.10, // Price per million cached input tokens
                 ],
                 'small' => [ // Corresponds to gpt-4.1-nano
-                    'input' => 0.10,  // Price per million tokens
-                    'output' => 0.40, // Price per million tokens
-                    'cached_input' => 0.025, // Price per million cached input tokens
+                    'input' => 0.10,
+                    'output' => 0.40,
+                    'cached_input' => 0.025,
                 ],
             ]
         ],
@@ -77,6 +104,20 @@ return [
     |
     */
     'default_provider' => env('AI_DEFAULT_PROVIDER', 'openai'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ask Command Defaults
+    |--------------------------------------------------------------------------
+    |
+    | Default provider and model size specifically for the 'ask' command.
+    | These can be overridden by command-line options.
+    |
+    */
+    'ask_defaults' => [
+        'provider' => env('ASK_PROVIDER', 'openai'),
+        'model_size' => env('ASK_MODEL_SIZE', 'small'),
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -111,10 +152,6 @@ return [
         'classification' => [
             'temperature' => env('AI_CLASSIFICATION_TEMPERATURE', 0.2),
             'max_tokens' => env('AI_CLASSIFICATION_MAX_TOKENS', 256),
-        ],
-        'expert_selection' => [
-            'temperature' => env('AI_EXPERT_SELECTION_TEMPERATURE', 0.2),
-            'max_tokens' => env('AI_EXPERT_SELECTION_MAX_TOKENS', 256),
         ],
         'filename_generation' => [
             'temperature' => env('AI_FILENAME_TEMPERATURE', 0.5),

@@ -1,2 +1,0 @@
---- MANDATORY INSTRUCTION ---
-Your primary goal is to answer the user's question based *only* on the provided project context and conversation history. You MUST NOT ask the user for clarification, more details, or further input under ANY circumstances. Make your best effort to provide a comprehensive and direct answer using the information available. If the provided context is insufficient to answer the question fully, state what information is missing but DO NOT ask the user to provide it. Your response must be a direct answer to the question asked. 
