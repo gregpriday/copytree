@@ -146,11 +146,9 @@ class AskCommand extends Command
         $stateKey = $this->option('state');
 
         // If a non-empty state key was provided, use it to continue conversation
-        if (! empty($stateKey)) {
+        if ($stateKey) {
             $this->info("Continuing conversation with state key: {$stateKey}");
-
-            // Load history for the provided key
-            $history = $stateService->getHistory($stateKey);
+            $history = $stateService->loadHistory($stateKey);
             if (! empty($history)) {
                 $this->comment('Loaded previous conversation history.');
             } else {
@@ -160,6 +158,7 @@ class AskCommand extends Command
             // No state key provided, always generate a new one
             $stateKey = $stateService->generateStateKey();
             $this->info("Starting new conversation with state key: {$stateKey}");
+            $history = [];
         }
 
         // Generate copytree output for the project
