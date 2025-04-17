@@ -2,14 +2,6 @@
 
 namespace App\Services;
 
-// Remove Gemini imports
-// use Gemini\Data\Content;
-// use Gemini\Data\GenerationConfig;
-// use Gemini\Data\Schema;
-// use Gemini\Enums\DataType;
-// use Gemini\Enums\ResponseMimeType;
-// use Gemini\Laravel\Facades\Gemini;
-// Add AI import
 use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;

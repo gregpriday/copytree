@@ -319,10 +319,11 @@ class InstallCopytreeCommand extends Command
             $trimmedLine = trim($line);
             if (empty($trimmedLine) || strpos($trimmedLine, '=') === false) {
                 $newLines[] = $line; // Keep empty lines and comments
+
                 continue;
             }
 
-            list($key) = explode('=', $trimmedLine, 2);
+            [$key] = explode('=', $trimmedLine, 2);
             if (in_array($key, $updatedKeys)) {
                 $newLines[] = "{$key}={$configValues[$key]}";
                 $addedKeys[] = $key;
@@ -333,7 +334,7 @@ class InstallCopytreeCommand extends Command
 
         // Add new keys that weren't in the original file
         foreach ($configValues as $key => $value) {
-            if (!in_array($key, $addedKeys)) {
+            if (! in_array($key, $addedKeys)) {
                 $newLines[] = "{$key}={$value}";
             }
         }

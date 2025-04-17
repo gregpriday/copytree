@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use App\Facades\AI; // Add AI Facade
+use App\Constants\AIModelTypes; // Add AI Facade
+use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
-use Throwable;
 use OpenAI\Responses\Chat\CreateResponse;
-use App\Constants\AIModelTypes; // Import AIModelTypes if needed elsewhere, or remove if only used for defaults
+use RuntimeException;
+use Throwable; // Import AIModelTypes if needed elsewhere, or remove if only used for defaults
 
 class ProjectQuestionService
 {
@@ -40,8 +40,8 @@ class ProjectQuestionService
     /**
      * Create a new ProjectQuestionService instance.
      *
-     * @param string $provider The AI provider identifier (e.g., 'openai').
-     * @param string $modelSize The AI model size identifier (e.g., 'small').
+     * @param  string  $provider  The AI provider identifier (e.g., 'openai').
+     * @param  string  $modelSize  The AI model size identifier (e.g., 'small').
      */
     public function __construct(string $provider, string $modelSize)
     {
@@ -66,7 +66,7 @@ class ProjectQuestionService
         // Get the actual model name based on the CONFIGURED provider and size
         // Ensure the config path exists and is valid before accessing
         $modelConfigPath = "ai.providers.{$this->provider}.models.{$this->modelSize}";
-        if (!config()->has($modelConfigPath)) {
+        if (! config()->has($modelConfigPath)) {
             throw new RuntimeException("Model configuration not found for provider '{$this->provider}' and size '{$this->modelSize}' at path '{$modelConfigPath}'.");
         }
         $modelName = config($modelConfigPath); // Use configured provider/size
@@ -126,6 +126,7 @@ class ProjectQuestionService
         try {
             // Make the NON-STREAMING API call using the CONFIGURED provider
             $response = AI::driver($this->provider)->chat()->create($parameters); // Use $this->provider
+
             return $response; // Return the complete response object
         } catch (Throwable $e) {
             // Log the error

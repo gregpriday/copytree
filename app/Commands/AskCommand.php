@@ -6,10 +6,9 @@ use App\Constants\AIModelTypes;
 use App\Services\ConversationStateService;
 use App\Services\ProjectQuestionService;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
-use Illuminate\Support\Facades\Config;
-use InvalidArgumentException;
 
 class AskCommand extends Command
 {
@@ -62,22 +61,25 @@ class AskCommand extends Command
 
         // --- Start: Validation ---
         // Validate Provider
-        if (!Config::has("ai.providers.{$provider}")) {
+        if (! Config::has("ai.providers.{$provider}")) {
             $this->error("Error: AI provider '{$provider}' is not configured in config/ai.php.");
+
             return self::FAILURE;
         }
 
         // Validate Model Size
         $validModelSizes = [AIModelTypes::SMALL, AIModelTypes::MEDIUM, AIModelTypes::LARGE];
-        if (!in_array($modelSize, $validModelSizes)) {
-            $this->error("Error: Invalid model size '{$modelSize}'. Valid options are: " . implode(', ', $validModelSizes));
+        if (! in_array($modelSize, $validModelSizes)) {
+            $this->error("Error: Invalid model size '{$modelSize}'. Valid options are: ".implode(', ', $validModelSizes));
+
             return self::FAILURE;
         }
 
         // Validate Model exists for Provider/Size combination
         $modelConfigPath = "ai.providers.{$provider}.models.{$modelSize}";
-        if (!Config::has($modelConfigPath)) {
+        if (! Config::has($modelConfigPath)) {
             $this->error("Error: Model size '{$modelSize}' is not configured for provider '{$provider}' in config/ai.php.");
+
             return self::FAILURE;
         }
         // --- End: Validation ---
@@ -86,7 +88,8 @@ class AskCommand extends Command
         try {
             $questionService = new ProjectQuestionService($provider, $modelSize);
         } catch (\Exception $e) {
-            $this->error("Failed to initialize ProjectQuestionService: " . $e->getMessage());
+            $this->error('Failed to initialize ProjectQuestionService: '.$e->getMessage());
+
             return self::FAILURE;
         }
         // --- End: Determine Provider and Model ---
@@ -207,7 +210,7 @@ class AskCommand extends Command
                 $promptDetails = $usage->promptTokensDetails ?? null;
                 $cachedInputTokens = $promptDetails->cachedTokens ?? 0;
             } else {
-                 Log::warning('Token usage data missing from API response.', ['response_id' => $apiResponse->id ?? 'N/A']);
+                Log::warning('Token usage data missing from API response.', ['response_id' => $apiResponse->id ?? 'N/A']);
             }
 
             // Calculate Cost (Use the determined provider and model size)
@@ -245,10 +248,10 @@ class AskCommand extends Command
 
             // Display Response
             $this->output->newLine();
-            if (!empty($fullResponseText)) {
+            if (! empty($fullResponseText)) {
                 $this->line($fullResponseText);
             } else {
-                 $this->warning('Received an empty response from the AI.');
+                $this->warning('Received an empty response from the AI.');
             }
 
             // Save State (No Tokens)
@@ -263,14 +266,14 @@ class AskCommand extends Command
                 $costString = '';
                 if ($totalCost > 0) {
                     $formattedCost = number_format($totalCost, 6);
-                    $costString = sprintf(", Cost: $%s", $formattedCost);
+                    $costString = sprintf(', Cost: $%s', $formattedCost);
                 } elseif ($pricingFound && $totalCost == 0) {
-                    $costString = ", Cost: $0.00";
+                    $costString = ', Cost: $0.00';
                 } else {
-                    $costString = " (Cost N/A)";
+                    $costString = ' (Cost N/A)';
                 }
                 $tokenInfo = sprintf(
-                    "Token Usage: %s input (%s%% cached), %s output%s",
+                    'Token Usage: %s input (%s%% cached), %s output%s',
                     number_format($inputTokens),
                     $cachedPercentage,
                     number_format($outputTokens),
@@ -291,9 +294,10 @@ class AskCommand extends Command
 
         } catch (\Exception $e) {
             $this->output->newLine();
-            $this->error('Error: '. $e->getMessage());
+            $this->error('Error: '.$e->getMessage());
             Log::error("Error during question processing: {$e->getMessage()}", ['exception' => $e]);
             $this->runGarbageCollection($stateService);
+
             return self::FAILURE;
         }
     }

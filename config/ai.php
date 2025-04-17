@@ -59,7 +59,7 @@ return [
                     'input' => 0.075, // Price per million input tokens
                     'output' => 0.30, // Price per million output tokens
                 ],
-            ]
+            ],
         ],
 
         'openai' => [
@@ -89,7 +89,7 @@ return [
                     'output' => 0.40,
                     'cached_input' => 0.025,
                 ],
-            ]
+            ],
         ],
     ],
 
