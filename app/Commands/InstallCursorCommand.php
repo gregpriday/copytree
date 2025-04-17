@@ -77,11 +77,39 @@ class InstallCursorCommand extends Command
                  return self::FAILURE;
              }
              // Ensure the default config has the expected structure
-             if (!isset($defaultConfig['mcpServers']['copytree-server'])) {
-                  $this->error('Default configuration in ' . $sourceFile . ' is missing the mcpServers.copytree-server key.');
+             if (!isset($defaultConfig['mcpServers']['copytree'])) {
+                  $this->error('Default configuration in ' . $sourceFile . ' is missing the mcpServers.copytree key.');
                   return self::FAILURE;
              }
-             $copytreeServerConfig = $defaultConfig['mcpServers']['copytree-server'];
+             $copytreeServerConfig = $defaultConfig['mcpServers']['copytree'];
+
+             // --- Start: Modify copytree arguments ---
+             // Ensure 'args' key exists and is an array. Initialize if needed.
+             if (!isset($copytreeServerConfig['args']) || !is_array($copytreeServerConfig['args'])) {
+                  $copytreeServerConfig['args'] = [];
+                  // Optional: Log a warning if the default structure was unexpected
+                  // Log::channel('mcp')->warning("Initialized missing or invalid 'args' array for copytree in default config.");
+             }
+
+             // Ensure the first argument (command for the server, e.g., 'mcp') exists.
+             // If the default 'args' array is empty, add the expected first argument.
+             // We assume 'mcp' based on the context, adjust if the default changes.
+             if (empty($copytreeServerConfig['args'])) {
+                 $copytreeServerConfig['args'][0] = 'mcp';
+                 // Optional: Log this assumption
+                 // Log::channel('mcp')->debug("Default 'args' was empty, setting first arg to 'mcp'.");
+             }
+
+             // Set the current working directory ($cwd) as the second argument.
+             // This will overwrite any existing second argument or add it if missing.
+             $copytreeServerConfig['args'][1] = $cwd;
+
+             // Optional: Slice the array to ensure only the first two arguments are present
+             // $copytreeServerConfig['args'] = array_slice($copytreeServerConfig['args'], 0, 2);
+
+             // Log the arguments being set (for debugging)
+             Log::channel('mcp')->debug("Setting copytree args to: " . json_encode($copytreeServerConfig['args']));
+             // --- End: Modify copytree arguments ---
 
         } catch (\Exception $e) {
              $this->error('Error reading default configuration file ' . $sourceFile . ': ' . $e->getMessage());
@@ -110,13 +138,13 @@ class InstallCursorCommand extends Command
                   $mcpConfig = ['mcpServers' => []]; // Reset on read error
              }
 
-             // Add/Update the copytree-server configuration
-             $mcpConfig['mcpServers']['copytree-server'] = $copytreeServerConfig;
+             // Add/Update the copytree configuration
+             $mcpConfig['mcpServers']['copytree'] = $copytreeServerConfig;
              $actionMessage = 'Updated CopyTree MCP server configuration in: ';
 
         } else {
              // File doesn't exist, use the default structure directly
-             $mcpConfig = ['mcpServers' => ['copytree-server' => $copytreeServerConfig]];
+             $mcpConfig = ['mcpServers' => ['copytree' => $copytreeServerConfig]];
              $actionMessage = 'Created MCP configuration file with CopyTree server definition at: ';
         }
 

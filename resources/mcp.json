@@ -1,6 +1,6 @@
 {
     "mcpServers": {
-        "copytree-server": {
+        "copytree": {
             "command": "copytree",
             "args": [
                 "mcp"

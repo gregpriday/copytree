@@ -89,7 +89,7 @@ class MCPService
         $fullResponseText = $this->processQuestionWithAI($questionService, $copytreeOutput, $question, $history, $stateKey);
 
         // Construct response payload
-        return $this->buildResponsePayload($fullResponseText, $isNewConversation, $stateKey);
+        return $this->buildResponsePayload($fullResponseText, $stateKey);
     }
 
     /**
@@ -103,7 +103,7 @@ class MCPService
     {
         Log::channel('mcp')->debug("Gathering project context using 'copy' command...");
         Log::channel('mcp')->debug("Using path for 'copy' command: '" . $projectPath . "'");
-        
+
         try {
             $copyOptions = [
                 'path' => $projectPath,
@@ -149,11 +149,11 @@ class MCPService
         try {
             $apiResponse = $questionService->askQuestion($copytreeOutput, $question, $history);
             $fullResponseText = $apiResponse->choices[0]->message->content ?? '';
-            
+
             // Save conversation history
             $this->stateService->saveMessage($stateKey, 'user', $question);
             $this->stateService->saveMessage($stateKey, 'assistant', $fullResponseText);
-            
+
             return $fullResponseText;
         } catch (\Exception $e) {
             Log::channel('mcp')->error("Error during question processing: {$e->getMessage()}");
@@ -163,36 +163,58 @@ class MCPService
 
     /**
      * Builds the response payload for the JSON-RPC response.
+     * Always includes the state_key and a follow-up hint in _meta if a stateKey exists.
+     * Also appends a follow-up hint to the text content.
      *
      * @param string $fullResponseText The full response text from the AI.
-     * @param bool $isNewConversation Whether this is a new conversation.
-     * @param string $stateKey The state key for the conversation.
+     * @param string|null $stateKey The state key for the conversation (null if stateless).
      * @return array The formatted response payload.
      */
-    protected function buildResponsePayload(string $fullResponseText, bool $isNewConversation, string $stateKey): array
+    protected function buildResponsePayload(string $fullResponseText, ?string $stateKey): array
     {
-        // Create the TextContent object containing the AI's answer
+        $finalTextContent = $fullResponseText; // Start with the original AI response
+
+        // Append the follow-up hint to the text content if a state key exists
+        if ($stateKey) {
+            $followUpHintText = sprintf(
+                "\n\n---\nAsk follow-up questions with: %s",
+                json_encode([
+                    'question' => '{your_follow_up_question}',
+                    'state' => $stateKey,
+                ])
+            );
+            $finalTextContent .= $followUpHintText; // Append the hint
+            Log::channel('mcp')->debug("Appended follow-up hint to text content.");
+        }
+
+        // Create the TextContent object using the potentially modified text
         $textContent = [
             'type' => 'text',
-            'text' => $fullResponseText
+            'text' => $finalTextContent // Use the text including the hint
         ];
 
         // Create the main result structure required by MCP
         $responsePayload = [
-            // 'content' MUST be an array containing one or more content objects
-            'content' => [$textContent],
-            'isError' => false // Indicate success
+            'content' => [$textContent], // Use the content object with the appended hint
+            'isError' => false
         ];
 
-        // Add state_key to metadata if this is a new conversation
-        if ($isNewConversation && $stateKey) {
-            if (!isset($responsePayload['_meta'])) {
-                $responsePayload['_meta'] = [];
-            }
-            $responsePayload['_meta']['state_key'] = $stateKey;
-            Log::channel('mcp')->debug("Included new state_key '{$stateKey}' in response _meta");
+        // Always include the state_key and follow-up hint arguments in metadata if a stateKey exists
+        if ($stateKey) {
+            $responsePayload['_meta'] = [
+                'state_key' => $stateKey,
+                'follow_up_hint' => [ // Keep the structured hint in _meta
+                    'arguments' => [
+                        'question' => '{your_follow_up_question}',
+                        'state' => $stateKey
+                    ]
+                ]
+            ];
+            Log::channel('mcp')->debug("Included state_key '{$stateKey}' and follow_up_hint in response _meta");
+        } else {
+            Log::channel('mcp')->debug("No state_key provided; _meta field omitted.");
         }
 
         return $responsePayload;
     }
-} 
+}
