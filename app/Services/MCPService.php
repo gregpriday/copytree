@@ -35,9 +35,10 @@ class MCPService
     /**
      * Handles a 'project_ask' tool call.
      *
-     * @param array $arguments The arguments from the 'tools/call' request ('question', 'state', etc.).
+     * @param array $arguments The arguments from the 'tools/call' request.
      * @param string $projectPath The root path of the project being queried.
-     * @return array The result payload for the JSON-RPC response (e.g., ['content' => [...], '_meta' => [...] ]).
+     * @return array An array suitable for constructing CallToolResult:
+     * ['content' => [['type' => 'text', 'text' => ...]], 'isError' => bool, '_meta' => ['state_key' => ...]?]
      * @throws InvalidArgumentException For invalid arguments.
      * @throws RuntimeException For context gathering failures, AI errors, etc.
      */
