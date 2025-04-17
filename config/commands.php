@@ -1,7 +1,7 @@
 <?php
 
-use App\Commands\CopyTreeCommand;
 use App\Commands\AskCommand;
+use App\Commands\CopyTreeCommand;
 use App\Commands\McpCommand;
 use LaravelZero\Framework\Commands\Command;
 

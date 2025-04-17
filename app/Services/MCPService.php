@@ -5,8 +5,8 @@ namespace App\Services;
 use Illuminate\Contracts\Config\Repository as ConfigContract;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 use InvalidArgumentException;
+use RuntimeException;
 
 class MCPService
 {
@@ -22,9 +22,6 @@ class MCPService
 
     /**
      * Create a new MCPService instance.
-     *
-     * @param ConfigContract $config
-     * @param ConversationStateService $stateService
      */
     public function __construct(ConfigContract $config, ConversationStateService $stateService)
     {
@@ -35,10 +32,11 @@ class MCPService
     /**
      * Handles a 'project_ask' tool call.
      *
-     * @param array $arguments The arguments from the 'tools/call' request.
-     * @param string $projectPath The root path of the project being queried.
+     * @param  array  $arguments  The arguments from the 'tools/call' request.
+     * @param  string  $projectPath  The root path of the project being queried.
      * @return array An array suitable for constructing CallToolResult:
-     * ['content' => [['type' => 'text', 'text' => ...]], 'isError' => bool, '_meta' => ['state_key' => ...]?]
+     *               ['content' => [['type' => 'text', 'text' => ...]], 'isError' => bool, '_meta' => ['state_key' => ...]?]
+     *
      * @throws InvalidArgumentException For invalid arguments.
      * @throws RuntimeException For context gathering failures, AI errors, etc.
      */
@@ -46,7 +44,7 @@ class MCPService
     {
         // Validate required arguments
         $question = $arguments['question'] ?? null;
-        if (!$question) {
+        if (! $question) {
             Log::channel('mcp')->error("Missing 'question' argument in project_ask request");
             throw new InvalidArgumentException("'question' is required.");
         }
@@ -77,8 +75,8 @@ class MCPService
             $stateKey = $stateKeyInput; // Use the valid string key
             Log::channel('mcp')->info("Attempting to continue conversation with state key: {$stateKey}");
             $history = $this->stateService->loadHistory($stateKey); // Load history ONLY if key is a valid string
-            if (!empty($history)) {
-                Log::channel('mcp')->debug("Loaded " . count($history) . " messages for state key: {$stateKey}");
+            if (! empty($history)) {
+                Log::channel('mcp')->debug('Loaded '.count($history)." messages for state key: {$stateKey}");
                 $isNewConversation = false;
             } else {
                 // If history is empty for a valid key, it might be expired or invalid
@@ -90,7 +88,7 @@ class MCPService
             }
         } elseif ($stateKeyInput !== null) {
             // Log a warning if a non-null, non-string value was provided (e.g., true, false, number)
-            Log::channel('mcp')->warning("Invalid type provided for 'state' argument: " . gettype($stateKeyInput) . ". Ignoring invalid state and starting a new conversation.");
+            Log::channel('mcp')->warning("Invalid type provided for 'state' argument: ".gettype($stateKeyInput).'. Ignoring invalid state and starting a new conversation.');
             // Fall through to generate a new key below
         }
 
@@ -131,14 +129,15 @@ class MCPService
     /**
      * Gathers the project context using the 'copy' command.
      *
-     * @param string $projectPath The root path of the project to analyze.
+     * @param  string  $projectPath  The root path of the project to analyze.
      * @return string The generated copytree output.
+     *
      * @throws RuntimeException If context gathering fails.
      */
     protected function gatherProjectContext(string $projectPath): string
     {
         Log::channel('mcp')->debug("Gathering project context using 'copy' command...");
-        Log::channel('mcp')->debug("Using path for 'copy' command: '" . $projectPath . "'");
+        Log::channel('mcp')->debug("Using path for 'copy' command: '".$projectPath."'");
 
         try {
             $copyOptions = [
@@ -146,7 +145,7 @@ class MCPService
                 '--display' => true,
                 '--no-interaction' => true,
             ];
-            Log::channel('mcp')->debug("Options passed to Artisan::call('copy'): " . json_encode($copyOptions));
+            Log::channel('mcp')->debug("Options passed to Artisan::call('copy'): ".json_encode($copyOptions));
 
             Artisan::call('copy', $copyOptions);
             $copytreeOutput = Artisan::output();
@@ -155,26 +154,27 @@ class MCPService
                 Log::channel('mcp')->error("'copy' command returned empty output when gathering context.");
                 throw new RuntimeException("Failed to gather project context: 'copy' command returned empty output.");
             }
-            Log::channel('mcp')->debug("Generated copytree output length: " . strlen($copytreeOutput));
+            Log::channel('mcp')->debug('Generated copytree output length: '.strlen($copytreeOutput));
 
             return $copytreeOutput;
         } catch (\Exception $e) {
-            Log::channel('mcp')->error("Failed to run 'copy' command to get context: " . $e->getMessage());
-            throw new RuntimeException("Failed to gather project context via copy command: " . $e->getMessage(), 0, $e);
+            Log::channel('mcp')->error("Failed to run 'copy' command to get context: ".$e->getMessage());
+            throw new RuntimeException('Failed to gather project context via copy command: '.$e->getMessage(), 0, $e);
         }
     }
 
     /**
      * Processes the question with the AI service, calculates token usage and cost.
      *
-     * @param ProjectQuestionService $questionService The service for AI interactions.
-     * @param string $copytreeOutput The project context.
-     * @param string $question The user's question.
-     * @param array $history Conversation history.
-     * @param string $stateKey The state key for the conversation.
-     * @param string $provider The AI provider used.
-     * @param string $modelSize The AI model size used.
+     * @param  ProjectQuestionService  $questionService  The service for AI interactions.
+     * @param  string  $copytreeOutput  The project context.
+     * @param  string  $question  The user's question.
+     * @param  array  $history  Conversation history.
+     * @param  string  $stateKey  The state key for the conversation.
+     * @param  string  $provider  The AI provider used.
+     * @param  string  $modelSize  The AI model size used.
      * @return array An array containing response text, token counts, cost, and pricing status.
+     *
      * @throws RuntimeException If the AI request fails.
      */
     protected function processQuestionWithAI(
@@ -263,14 +263,10 @@ class MCPService
      * Builds the response payload for the JSON-RPC response.
      * Includes token usage, cost, state_key, and follow-up hints.
      *
-     * @param string $fullResponseText The full response text from the AI.
-     * @param string|null $stateKey The state key for the conversation (null if stateless).
-     * @param int $inputTokens
-     * @param int $outputTokens
-     * @param int $cachedInputTokens
-     * @param float $totalCost
-     * @param bool $pricingFound Indicates if pricing config key was found.
-     * @param bool $pricesAvailable Indicates if valid prices were found in config.
+     * @param  string  $fullResponseText  The full response text from the AI.
+     * @param  string|null  $stateKey  The state key for the conversation (null if stateless).
+     * @param  bool  $pricingFound  Indicates if pricing config key was found.
+     * @param  bool  $pricesAvailable  Indicates if valid prices were found in config.
      * @return array The formatted response payload.
      */
     protected function buildResponsePayload(
@@ -291,47 +287,47 @@ class MCPService
                 $formattedCost = number_format($totalCost, 6);
                 $costString = sprintf(', Cost: $%s', $formattedCost);
             } elseif ($pricingFound && $pricesAvailable && $totalCost == 0) {
-                 $costString = ', Cost: $0.000000'; // Explicitly show $0 cost if pricing was found and valid
+                $costString = ', Cost: $0.000000'; // Explicitly show $0 cost if pricing was found and valid
             } else {
-                 $costString = ' (Cost N/A)'; // Indicate if cost couldn't be calculated
+                $costString = ' (Cost N/A)'; // Indicate if cost couldn't be calculated
             }
 
             $tokenInfoString = sprintf(
-                "Tokens: %s input (%s%% cached), %s output%s",
+                'Tokens: %s input (%s%% cached), %s output%s',
                 number_format($inputTokens),
                 $cachedPercentage,
                 number_format($outputTokens),
                 $costString
             );
-            Log::channel('mcp')->debug("Formatted token string: " . $tokenInfoString);
+            Log::channel('mcp')->debug('Formatted token string: '.$tokenInfoString);
         } else {
-            Log::channel('mcp')->debug("No token usage information available to display.");
+            Log::channel('mcp')->debug('No token usage information available to display.');
             // Optional: $tokenInfoString = "\n\nToken Usage: Not Available";
         }
 
         $followUpHintText = '';
         if ($stateKey) {
-             $followUpArgsJson = json_encode(['question' => '{your_follow_up_question}', 'state' => $stateKey]);
-             $followUpHintText = sprintf(
-                  "Ask follow-up questions with: %s",
-                  $followUpArgsJson
-             );
-             Log::channel('mcp')->debug("Formatted follow-up hint: " . $followUpHintText);
+            $followUpArgsJson = json_encode(['question' => '{your_follow_up_question}', 'state' => $stateKey]);
+            $followUpHintText = sprintf(
+                'Ask follow-up questions with: %s',
+                $followUpArgsJson
+            );
+            Log::channel('mcp')->debug('Formatted follow-up hint: '.$followUpHintText);
         }
 
         // Append token info AND follow-up hint to the main response text
-        $finalTextContent = $fullResponseText . "\n\n---\n" . $tokenInfoString . "\n" . $followUpHintText;
+        $finalTextContent = $fullResponseText."\n\n---\n".$tokenInfoString."\n".$followUpHintText;
 
         // Create the TextContent object
         $textContent = [
             'type' => 'text',
-            'text' => $finalTextContent
+            'text' => $finalTextContent,
         ];
 
         // Create the main result structure
         $responsePayload = [
             'content' => [$textContent],
-            'isError' => false
+            'isError' => false,
         ];
 
         // Include metadata if a stateKey exists
@@ -344,31 +340,31 @@ class MCPService
                     'output_tokens' => $outputTokens,
                     'cached_input_tokens' => $cachedInputTokens,
                     'total_cost' => $totalCost,
-                    'cost_calculated' => ($pricingFound && $pricesAvailable) // Indicate if cost calc was possible
+                    'cost_calculated' => ($pricingFound && $pricesAvailable), // Indicate if cost calc was possible
                 ],
                 'follow_up_hint' => [ // Keep existing structured hint
                     'arguments' => [
                         'question' => '{your_follow_up_question}',
-                        'state' => $stateKey
-                    ]
-                ]
+                        'state' => $stateKey,
+                    ],
+                ],
             ];
-            Log::channel('mcp')->debug("Included state_key, token_usage, and follow_up_hint in response _meta");
+            Log::channel('mcp')->debug('Included state_key, token_usage, and follow_up_hint in response _meta');
         } else {
             // Include token usage even if stateless, if available
             if ($inputTokens > 0 || $outputTokens > 0) {
-                 $responsePayload['_meta'] = [
+                $responsePayload['_meta'] = [
                     'token_usage' => [
                         'input_tokens' => $inputTokens,
                         'output_tokens' => $outputTokens,
                         'cached_input_tokens' => $cachedInputTokens,
                         'total_cost' => $totalCost,
-                        'cost_calculated' => ($pricingFound && $pricesAvailable)
-                    ]
+                        'cost_calculated' => ($pricingFound && $pricesAvailable),
+                    ],
                 ];
-                Log::channel('mcp')->debug("Included token_usage in response _meta for stateless request.");
+                Log::channel('mcp')->debug('Included token_usage in response _meta for stateless request.');
             } else {
-                 Log::channel('mcp')->debug("No state_key provided and no token usage; _meta field omitted.");
+                Log::channel('mcp')->debug('No state_key provided and no token usage; _meta field omitted.');
             }
         }
 

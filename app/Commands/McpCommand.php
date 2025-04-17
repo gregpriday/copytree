@@ -2,70 +2,64 @@
 
 namespace App\Commands;
 
-use LaravelZero\Framework\Commands\Command;
 use App\Services\MCPService;
+use Illuminate\Contracts\Config\Repository as ConfigContract;
 // Remove ProjectQuestionService and ConversationStateService if MCPService handles them
 // use App\Services\ProjectQuestionService;
 // use App\Services\ConversationStateService;
-use Illuminate\Contracts\Config\Repository as ConfigContract;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-
+use LaravelZero\Framework\Commands\Command;
 // --- MCP SDK Imports ---
+use Mcp\Server\InitializationOptions;
 use Mcp\Server\Server;
 use Mcp\Server\ServerRunner;
-use Mcp\Server\InitializationOptions;
-use Mcp\Types\ServerCapabilities;
-use Mcp\Types\ServerToolsCapability;
-use Mcp\Types\InitializeResult;
-use Mcp\Types\Implementation;
-use Mcp\Types\PingRequest; // Although PingRequest is used client-side, we check the method name 'ping'
-use Mcp\Types\EmptyResult;
-use Mcp\Types\ListToolsResult;
-use Mcp\Types\Tool;
-use Mcp\Types\ToolInputSchema;
-use Mcp\Types\ToolInputProperties;
-use Mcp\Types\CallToolRequestParams;
-use Mcp\Types\CallToolResult;
-use Mcp\Types\TextContent;
-use Mcp\Types\PaginatedRequestParams;
 use Mcp\Shared\ErrorData as McpErrorData;
 use Mcp\Shared\McpError;
+use Mcp\Types\CallToolRequestParams; // Although PingRequest is used client-side, we check the method name 'ping'
+use Mcp\Types\CallToolResult;
+use Mcp\Types\EmptyResult;
+use Mcp\Types\ListToolsResult;
+use Mcp\Types\PaginatedRequestParams;
+use Mcp\Types\PingRequest;
+use Mcp\Types\ServerCapabilities;
+use Mcp\Types\ServerToolsCapability;
+use Mcp\Types\TextContent;
+use Mcp\Types\Tool;
+use Mcp\Types\ToolInputProperties;
+use Mcp\Types\ToolInputSchema;
+
 // --- End MCP SDK Imports ---
 
 class McpCommand extends Command
 {
     /**
      * The signature of the command.
+     *
      * @var string
      */
     protected $signature = 'mcp {directory?}';
 
     /**
      * The description of the command.
+     *
      * @var string
      */
     protected $description = 'Starts the CopyTree MCP server using the MCP SDK library.';
 
     /**
      * The configuration repository instance.
-     *
-     * @var ConfigContract
      */
     protected ConfigContract $config;
 
     /**
      * The MCP service instance.
-     *
-     * @var MCPService
      */
     protected MCPService $mcpService;
 
     /**
      * Create a new McpCommand instance.
      *
-     * @param ConfigContract $config
-     * @param MCPService $mcpService
      * @return void
      */
     public function __construct(ConfigContract $config, MCPService $mcpService)
@@ -77,16 +71,15 @@ class McpCommand extends Command
 
     /**
      * Execute the console command using the MCP SDK ServerRunner.
-     *
-     * @return int
      */
     public function handle(): int
     {
         // --- Determine Project Directory ---
         $serverWorkingDirectory = $this->argument('directory') ?? getcwd();
-        if (!$serverWorkingDirectory || !is_dir($serverWorkingDirectory)) {
-            Log::channel('mcp')->error("Invalid directory provided: " . ($serverWorkingDirectory ?: 'null'));
-            $this->error("Invalid directory provided: " . ($serverWorkingDirectory ?: 'null'));
+        if (! $serverWorkingDirectory || ! is_dir($serverWorkingDirectory)) {
+            Log::channel('mcp')->error('Invalid directory provided: '.($serverWorkingDirectory ?: 'null'));
+            $this->error('Invalid directory provided: '.($serverWorkingDirectory ?: 'null'));
+
             return self::FAILURE;
         }
 
@@ -95,7 +88,7 @@ class McpCommand extends Command
         // but we can pass Laravel's logger for consistent logging.
         $logger = Log::channel('mcp'); // Get the PSR-3 compliant logger instance
 
-        $logger->info("Starting CopyTree MCP SDK Server for directory: " . $serverWorkingDirectory);
+        $logger->info('Starting CopyTree MCP SDK Server for directory: '.$serverWorkingDirectory);
 
         try {
             // --- Configure MCP Server ---
@@ -106,8 +99,8 @@ class McpCommand extends Command
             $server->registerHandler('ping', [$this, 'handlePing']);
             $server->registerHandler('tools/list', [$this, 'handleToolsList']);
             // Pass the working directory context to the handler
-            $server->registerHandler('tools/call', function(CallToolRequestParams $params) use ($serverWorkingDirectory, $logger) {
-                 return $this->handleToolsCall($params, $serverWorkingDirectory, $logger);
+            $server->registerHandler('tools/call', function (CallToolRequestParams $params) use ($serverWorkingDirectory, $logger) {
+                return $this->handleToolsCall($params, $serverWorkingDirectory, $logger);
             });
             // Add handlers for other methods if needed (e.g., resources/list)
 
@@ -135,20 +128,22 @@ class McpCommand extends Command
             // ServerRunner uses StdioServerTransport by default
             $runner = new ServerRunner($server, $initOptions, $logger);
 
-            $logger->info("MCP Server Runner starting. Listening on STDIO...");
+            $logger->info('MCP Server Runner starting. Listening on STDIO...');
             $runner->run(); // This enters the main loop handled by the SDK
 
-            $logger->info("MCP Server Runner finished.");
+            $logger->info('MCP Server Runner finished.');
+
             return self::SUCCESS;
 
         } catch (\Throwable $e) {
-            $logger->error("MCP Server crashed: " . $e->getMessage(), [
+            $logger->error('MCP Server crashed: '.$e->getMessage(), [
                 'exception' => $e::class,
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString() // Be cautious logging full traces in production
+                'trace' => $e->getTraceAsString(), // Be cautious logging full traces in production
             ]);
-            $this->error("Server error: " . $e->getMessage());
+            $this->error('Server error: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }
@@ -159,20 +154,19 @@ class McpCommand extends Command
      * Handles the 'ping' request.
      * The SDK automatically uses this handler if registered.
      *
-     * @param array|null $params Request parameters (should be null for ping).
-     * @return EmptyResult
+     * @param  array|null  $params  Request parameters (should be null for ping).
      */
     public function handlePing(?array $params): EmptyResult
     {
         Log::channel('mcp')->debug("Handling 'ping' request.");
-        return new EmptyResult(); // Return the specific EmptyResult type
+
+        return new EmptyResult; // Return the specific EmptyResult type
     }
 
     /**
      * Handles the 'tools/list' request.
      *
-     * @param PaginatedRequestParams|null $params Request parameters (e.g., pagination cursor, unused here).
-     * @return ListToolsResult
+     * @param  PaginatedRequestParams|null  $params  Request parameters (e.g., pagination cursor, unused here).
      */
     public function handleToolsList(?PaginatedRequestParams $params): ListToolsResult
     {
@@ -183,14 +177,14 @@ class McpCommand extends Command
             try {
                 $detailedDescription = File::get($descriptionFilePath);
             } catch (\Exception $e) {
-                Log::channel('mcp')->warning("Failed to load tool description from {$descriptionFilePath}: " . $e->getMessage());
+                Log::channel('mcp')->warning("Failed to load tool description from {$descriptionFilePath}: ".$e->getMessage());
             }
         } else {
             Log::channel('mcp')->warning("Tool description file not found: {$descriptionFilePath}");
         }
 
         // Define properties using ToolInputProperties
-        $properties = new ToolInputProperties();
+        $properties = new ToolInputProperties;
         $properties->question = ['description' => 'The question to ask about the project.', 'type' => 'string'];
         $properties->state = ['description' => 'Optional *string* key to continue a previous conversation. Must be the exact key provided by a previous response. Omit or pass null/empty to start a new conversation.', 'type' => 'string'];
         $properties->{'ask-provider'} = ['description' => 'Override AI provider (e.g., openai). Defaults to config.', 'type' => 'string'];
@@ -216,26 +210,26 @@ class McpCommand extends Command
     /**
      * Handles the 'tools/call' request for 'project_ask'.
      *
-     * @param CallToolRequestParams $params Typed parameters from the SDK.
-     * @param string $serverWorkingDirectory The project directory context.
-     * @param \Psr\Log\LoggerInterface $logger Logger instance.
-     * @return CallToolResult
+     * @param  CallToolRequestParams  $params  Typed parameters from the SDK.
+     * @param  string  $serverWorkingDirectory  The project directory context.
+     * @param  \Psr\Log\LoggerInterface  $logger  Logger instance.
+     *
      * @throws McpError For user-facing errors during tool execution.
      */
     public function handleToolsCall(CallToolRequestParams $params, string $serverWorkingDirectory, \Psr\Log\LoggerInterface $logger): CallToolResult
     {
         $toolName = $params->name;
-        $args = (array)($params->arguments ?? []); // Cast arguments (which are stdClass) to array
+        $args = (array) ($params->arguments ?? []); // Cast arguments (which are stdClass) to array
 
         $logger->info("Handling 'tools/call' request for tool: {$toolName}");
-        $logger->debug("Arguments received: " . json_encode($args));
+        $logger->debug('Arguments received: '.json_encode($args));
 
         if ($toolName !== 'project_ask') {
             $logger->error("Unsupported tool called: {$toolName}");
             // Throw an McpError for standard JSON-RPC error response
             throw new McpError(new McpErrorData(
                 code: -32601, // Method not found / Invalid method
-                message: "Unsupported tool: " . $toolName
+                message: 'Unsupported tool: '.$toolName
             ));
         }
 
@@ -251,7 +245,7 @@ class McpCommand extends Command
             //   '_meta' => ['state_key' => '...'] // Optional
             // ]
 
-             // Create Content objects (e.g., TextContent) from service result
+            // Create Content objects (e.g., TextContent) from service result
             $contentObjects = [];
             if (isset($serviceResult['content']) && is_array($serviceResult['content'])) {
                 foreach ($serviceResult['content'] as $contentData) {
@@ -265,13 +259,14 @@ class McpCommand extends Command
             // Extract metadata if present
             $meta = null;
             if (isset($serviceResult['_meta']) && is_array($serviceResult['_meta'])) {
-                $meta = new \Mcp\Types\Meta();
+                $meta = new \Mcp\Types\Meta;
                 foreach ($serviceResult['_meta'] as $key => $value) {
                     $meta->$key = $value;
                 }
             }
 
             $logger->info("Successfully processed 'project_ask' tool call.");
+
             return new CallToolResult(
                 content: $contentObjects,
                 isError: $serviceResult['isError'] ?? false,
@@ -279,16 +274,17 @@ class McpCommand extends Command
             );
 
         } catch (\InvalidArgumentException $e) {
-             $logger->error("Invalid arguments for tool '{$toolName}': " . $e->getMessage());
-             throw new McpError(new McpErrorData(code: -32602, message: "Invalid arguments: " . $e->getMessage()), $e); // Invalid Params
+            $logger->error("Invalid arguments for tool '{$toolName}': ".$e->getMessage());
+            throw new McpError(new McpErrorData(code: -32602, message: 'Invalid arguments: '.$e->getMessage()), $e); // Invalid Params
         } catch (\Throwable $e) {
             // Catch any other exception from the service
-            $logger->error("Error executing tool '{$toolName}': " . $e->getMessage());
+            $logger->error("Error executing tool '{$toolName}': ".$e->getMessage());
+
             // Return CallToolResult with error flag and message
-             return new CallToolResult(
-                 content: [new TextContent(text: "Error processing tool: " . $e->getMessage())],
-                 isError: true
-             );
+            return new CallToolResult(
+                content: [new TextContent(text: 'Error processing tool: '.$e->getMessage())],
+                isError: true
+            );
             // OR: Rethrow as an McpError for a standard JSON-RPC error response
             // throw new McpError(new McpErrorData(code: -32000, message: "Internal server error during tool execution: " . $e->getMessage()), $e);
         }
@@ -300,23 +296,23 @@ class McpCommand extends Command
      * Handles the 'initialized' notification from the client.
      * The SDK automatically manages initialization state but allows custom handling.
      *
-     * @param Mcp\Types\InitializedNotification $notification Typed notification object.
+     * @param  Mcp\Types\InitializedNotification  $notification  Typed notification object.
      */
     public function handleNotificationInitialized(\Mcp\Types\InitializedNotification $notification): void
     {
-        Log::channel('mcp')->info("Client acknowledged initialization.");
+        Log::channel('mcp')->info('Client acknowledged initialization.');
         // Perform any actions needed after client confirms initialization
     }
 
-     /**
+    /**
      * Handles the '$/cancelRequest' notification.
      *
-     * @param Mcp\Types\CancelledNotification $notification Typed notification object.
+     * @param  Mcp\Types\CancelledNotification  $notification  Typed notification object.
      */
     public function handleNotificationCancel(\Mcp\Types\CancelledNotification $notification): void
     {
         $cancelledRequestId = $notification->requestId->getValue();
-        Log::channel('mcp')->info("Received request cancellation for ID: " . ($cancelledRequestId ?? 'null'));
+        Log::channel('mcp')->info('Received request cancellation for ID: '.($cancelledRequestId ?? 'null'));
         // Implement logic to cancel the corresponding server-side operation if possible/needed.
     }
 

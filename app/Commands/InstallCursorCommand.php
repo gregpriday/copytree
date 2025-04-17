@@ -30,27 +30,28 @@ class InstallCursorCommand extends Command
         // Get the current working directory (project root)
         $cwd = getcwd();
         if ($cwd === false) {
-             $this->error('Could not determine the current working directory.');
-             return self::FAILURE;
+            $this->error('Could not determine the current working directory.');
+
+            return self::FAILURE;
         }
-        $cursorDir = $cwd . DIRECTORY_SEPARATOR . '.cursor';
-        $targetFile = $cursorDir . DIRECTORY_SEPARATOR . 'mcp.json';
-        $oldRuleFileDir = $cursorDir . DIRECTORY_SEPARATOR . 'rules';
-        $oldRuleFile = $oldRuleFileDir . DIRECTORY_SEPARATOR . 'copytree.mdc';
-        $oldRuleFileDirect = $cursorDir . DIRECTORY_SEPARATOR . 'copytree.mdc'; // Check direct location too
+        $cursorDir = $cwd.DIRECTORY_SEPARATOR.'.cursor';
+        $targetFile = $cursorDir.DIRECTORY_SEPARATOR.'mcp.json';
+        $oldRuleFileDir = $cursorDir.DIRECTORY_SEPARATOR.'rules';
+        $oldRuleFile = $oldRuleFileDir.DIRECTORY_SEPARATOR.'copytree.mdc';
+        $oldRuleFileDirect = $cursorDir.DIRECTORY_SEPARATOR.'copytree.mdc'; // Check direct location too
 
         // Step 1: Ensure the target .cursor directory exists
-        if (!File::isDirectory($cursorDir)) {
+        if (! File::isDirectory($cursorDir)) {
             if (File::makeDirectory($cursorDir, 0755, true)) {
-                $this->info('Created directory: ' . $cursorDir);
+                $this->info('Created directory: '.$cursorDir);
             } else {
-                $this->error('Failed to create directory: ' . $cursorDir);
+                $this->error('Failed to create directory: '.$cursorDir);
+
                 return self::FAILURE;
             }
         } else {
-             $this->comment('Directory already exists: ' . $cursorDir);
+            $this->comment('Directory already exists: '.$cursorDir);
         }
-
 
         // Step 2: Delete the old copytree.mdc file if it exists
         $this->deleteOldRuleFile($oldRuleFile);
@@ -60,130 +61,132 @@ class InstallCursorCommand extends Command
             @rmdir($oldRuleFileDir);
         }
 
-
         // Step 3: Load the default configuration from resources/mcp.json
         $sourceFile = base_path('resources/mcp.json');
-        if (!File::exists($sourceFile)) {
-            $this->error('Source configuration file does not exist: ' . $sourceFile);
+        if (! File::exists($sourceFile)) {
+            $this->error('Source configuration file does not exist: '.$sourceFile);
             $this->error('Please ensure resources/mcp.json is created with the default server definition.');
+
             return self::FAILURE;
         }
 
         try {
-             $defaultJsonContent = File::get($sourceFile);
-             $defaultConfig = json_decode($defaultJsonContent, true);
-             if (json_last_error() !== JSON_ERROR_NONE) {
-                 $this->error('Failed to decode default configuration from ' . $sourceFile . ': ' . json_last_error_msg());
-                 return self::FAILURE;
-             }
-             // Ensure the default config has the expected structure
-             if (!isset($defaultConfig['mcpServers']['copytree'])) {
-                  $this->error('Default configuration in ' . $sourceFile . ' is missing the mcpServers.copytree key.');
-                  return self::FAILURE;
-             }
-             $copytreeServerConfig = $defaultConfig['mcpServers']['copytree'];
+            $defaultJsonContent = File::get($sourceFile);
+            $defaultConfig = json_decode($defaultJsonContent, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->error('Failed to decode default configuration from '.$sourceFile.': '.json_last_error_msg());
 
-             // --- Start: Modify copytree arguments ---
-             // Ensure 'args' key exists and is an array. Initialize if needed.
-             if (!isset($copytreeServerConfig['args']) || !is_array($copytreeServerConfig['args'])) {
-                  $copytreeServerConfig['args'] = [];
-                  // Optional: Log a warning if the default structure was unexpected
-                  // Log::channel('mcp')->warning("Initialized missing or invalid 'args' array for copytree in default config.");
-             }
+                return self::FAILURE;
+            }
+            // Ensure the default config has the expected structure
+            if (! isset($defaultConfig['mcpServers']['copytree'])) {
+                $this->error('Default configuration in '.$sourceFile.' is missing the mcpServers.copytree key.');
 
-             // Ensure the first argument (command for the server, e.g., 'mcp') exists.
-             // If the default 'args' array is empty, add the expected first argument.
-             // We assume 'mcp' based on the context, adjust if the default changes.
-             if (empty($copytreeServerConfig['args'])) {
-                 $copytreeServerConfig['args'][0] = 'mcp';
-                 // Optional: Log this assumption
-                 // Log::channel('mcp')->debug("Default 'args' was empty, setting first arg to 'mcp'.");
-             }
+                return self::FAILURE;
+            }
+            $copytreeServerConfig = $defaultConfig['mcpServers']['copytree'];
 
-             // Set the current working directory ($cwd) as the second argument.
-             // This will overwrite any existing second argument or add it if missing.
-             $copytreeServerConfig['args'][1] = $cwd;
+            // --- Start: Modify copytree arguments ---
+            // Ensure 'args' key exists and is an array. Initialize if needed.
+            if (! isset($copytreeServerConfig['args']) || ! is_array($copytreeServerConfig['args'])) {
+                $copytreeServerConfig['args'] = [];
+                // Optional: Log a warning if the default structure was unexpected
+                // Log::channel('mcp')->warning("Initialized missing or invalid 'args' array for copytree in default config.");
+            }
 
-             // Optional: Slice the array to ensure only the first two arguments are present
-             // $copytreeServerConfig['args'] = array_slice($copytreeServerConfig['args'], 0, 2);
+            // Ensure the first argument (command for the server, e.g., 'mcp') exists.
+            // If the default 'args' array is empty, add the expected first argument.
+            // We assume 'mcp' based on the context, adjust if the default changes.
+            if (empty($copytreeServerConfig['args'])) {
+                $copytreeServerConfig['args'][0] = 'mcp';
+                // Optional: Log this assumption
+                // Log::channel('mcp')->debug("Default 'args' was empty, setting first arg to 'mcp'.");
+            }
 
-             // Log the arguments being set (for debugging)
-             Log::channel('mcp')->debug("Setting copytree args to: " . json_encode($copytreeServerConfig['args']));
-             // --- End: Modify copytree arguments ---
+            // Set the current working directory ($cwd) as the second argument.
+            // This will overwrite any existing second argument or add it if missing.
+            $copytreeServerConfig['args'][1] = $cwd;
+
+            // Optional: Slice the array to ensure only the first two arguments are present
+            // $copytreeServerConfig['args'] = array_slice($copytreeServerConfig['args'], 0, 2);
+
+            // Log the arguments being set (for debugging)
+            Log::channel('mcp')->debug('Setting copytree args to: '.json_encode($copytreeServerConfig['args']));
+            // --- End: Modify copytree arguments ---
 
         } catch (\Exception $e) {
-             $this->error('Error reading default configuration file ' . $sourceFile . ': ' . $e->getMessage());
-             return self::FAILURE;
-        }
+            $this->error('Error reading default configuration file '.$sourceFile.': '.$e->getMessage());
 
+            return self::FAILURE;
+        }
 
         // Step 4: Handle existing or new mcp.json
         $mcpConfig = [];
         if (File::exists($targetFile)) {
-            $this->comment('Existing configuration file found: ' . $targetFile);
-             try {
-                 $existingJsonContent = File::get($targetFile);
-                 $mcpConfig = json_decode($existingJsonContent, true);
-                 if (json_last_error() !== JSON_ERROR_NONE) {
-                     $this->warn('Could not decode existing JSON file ' . $targetFile . '. It might be corrupted. Will overwrite with default CopyTree config. Error: ' . json_last_error_msg());
-                     $mcpConfig = ['mcpServers' => []]; // Reset to ensure structure
-                 }
-                 // Ensure mcpServers key exists and is an array/object
-                 if (!isset($mcpConfig['mcpServers']) || !is_array($mcpConfig['mcpServers'])) {
-                      $this->warn('Existing ' . $targetFile . ' does not have a valid "mcpServers" array/object. Adding/overwriting CopyTree server config.');
-                      $mcpConfig['mcpServers'] = []; // Ensure the key exists as an array
-                 }
-             } catch (\Exception $e) {
-                  $this->warn('Error reading existing configuration file ' . $targetFile . ': ' . $e->getMessage() . '. Will overwrite with default CopyTree config.');
-                  $mcpConfig = ['mcpServers' => []]; // Reset on read error
-             }
+            $this->comment('Existing configuration file found: '.$targetFile);
+            try {
+                $existingJsonContent = File::get($targetFile);
+                $mcpConfig = json_decode($existingJsonContent, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    $this->warn('Could not decode existing JSON file '.$targetFile.'. It might be corrupted. Will overwrite with default CopyTree config. Error: '.json_last_error_msg());
+                    $mcpConfig = ['mcpServers' => []]; // Reset to ensure structure
+                }
+                // Ensure mcpServers key exists and is an array/object
+                if (! isset($mcpConfig['mcpServers']) || ! is_array($mcpConfig['mcpServers'])) {
+                    $this->warn('Existing '.$targetFile.' does not have a valid "mcpServers" array/object. Adding/overwriting CopyTree server config.');
+                    $mcpConfig['mcpServers'] = []; // Ensure the key exists as an array
+                }
+            } catch (\Exception $e) {
+                $this->warn('Error reading existing configuration file '.$targetFile.': '.$e->getMessage().'. Will overwrite with default CopyTree config.');
+                $mcpConfig = ['mcpServers' => []]; // Reset on read error
+            }
 
-             // Add/Update the copytree configuration
-             $mcpConfig['mcpServers']['copytree'] = $copytreeServerConfig;
-             $actionMessage = 'Updated CopyTree MCP server configuration in: ';
+            // Add/Update the copytree configuration
+            $mcpConfig['mcpServers']['copytree'] = $copytreeServerConfig;
+            $actionMessage = 'Updated CopyTree MCP server configuration in: ';
 
         } else {
-             // File doesn't exist, use the default structure directly
-             $mcpConfig = ['mcpServers' => ['copytree' => $copytreeServerConfig]];
-             $actionMessage = 'Created MCP configuration file with CopyTree server definition at: ';
+            // File doesn't exist, use the default structure directly
+            $mcpConfig = ['mcpServers' => ['copytree' => $copytreeServerConfig]];
+            $actionMessage = 'Created MCP configuration file with CopyTree server definition at: ';
         }
-
 
         // Step 5: Write the final configuration back to mcp.json
         try {
-             $finalJson = json_encode($mcpConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-             if ($finalJson === false) {
-                  throw new \RuntimeException('Failed to encode final JSON configuration: ' . json_last_error_msg());
-             }
-             if (File::put($targetFile, $finalJson) === false) {
-                  throw new \RuntimeException('Failed to write configuration to ' . $targetFile);
-             }
-             $this->info($actionMessage . $targetFile);
-             return self::SUCCESS;
+            $finalJson = json_encode($mcpConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            if ($finalJson === false) {
+                throw new \RuntimeException('Failed to encode final JSON configuration: '.json_last_error_msg());
+            }
+            if (File::put($targetFile, $finalJson) === false) {
+                throw new \RuntimeException('Failed to write configuration to '.$targetFile);
+            }
+            $this->info($actionMessage.$targetFile);
 
-         } catch (\Exception $e) {
-             $this->error('Error writing configuration file: ' . $e->getMessage());
-             Log::error("Failed to write to {$targetFile}: " . $e->getMessage());
-             return self::FAILURE;
-         }
+            return self::SUCCESS;
+
+        } catch (\Exception $e) {
+            $this->error('Error writing configuration file: '.$e->getMessage());
+            Log::error("Failed to write to {$targetFile}: ".$e->getMessage());
+
+            return self::FAILURE;
+        }
     }
 
     /**
      * Safely attempts to delete an old rule file and logs warnings.
-     * @param string $filePath
      */
     private function deleteOldRuleFile(string $filePath): void
     {
-         if (File::exists($filePath)) {
-             try {
-                 if (File::delete($filePath)) {
-                     $this->info('Removed old rule file: ' . $filePath);
-                 } else {
-                     $this->warn('Could not remove old rule file: ' . $filePath);
-                 }
-             } catch (\Exception $e) {
-                 $this->warn('Error removing old rule file ' . $filePath . ': ' . $e->getMessage());
-             }
-         }
+        if (File::exists($filePath)) {
+            try {
+                if (File::delete($filePath)) {
+                    $this->info('Removed old rule file: '.$filePath);
+                } else {
+                    $this->warn('Could not remove old rule file: '.$filePath);
+                }
+            } catch (\Exception $e) {
+                $this->warn('Error removing old rule file '.$filePath.': '.$e->getMessage());
+            }
+        }
     }
 }
