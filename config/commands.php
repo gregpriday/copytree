@@ -1,5 +1,10 @@
 <?php
 
+use App\Commands\CopyTreeCommand;
+use App\Commands\AskCommand;
+use App\Commands\McpCommand;
+use LaravelZero\Framework\Commands\Command;
+
 return [
 
     /*
@@ -13,7 +18,7 @@ return [
     |
     */
 
-    'default' => \App\Commands\CopyTreeCommand::class,
+    'default' => CopyTreeCommand::class,
 
     /*
     |--------------------------------------------------------------------------
@@ -40,6 +45,8 @@ return [
     */
 
     'add' => [
+        AskCommand::class,
+        McpCommand::class,
     ],
 
     /*
@@ -62,6 +69,7 @@ return [
         Illuminate\Console\Scheduling\ScheduleFinishCommand::class,
         Illuminate\Foundation\Console\VendorPublishCommand::class,
         LaravelZero\Framework\Commands\StubPublishCommand::class,
+        CopyTreeCommand::class,
     ],
 
     /*
@@ -77,6 +85,21 @@ return [
 
     'remove' => [
         //
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Commands Classes
+    |--------------------------------------------------------------------------
+    |
+    | Here you can list the commands classes you wish to register. Laravel
+    | Zero will automatically map the commands classes in the container
+    | so you don't need to manually bind the command class.
+    |
+    */
+
+    'classes' => [
+        McpCommand::class,
     ],
 
 ];

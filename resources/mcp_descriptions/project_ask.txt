@@ -1,0 +1,49 @@
+Asks a question about the codebase to understand project structure, functionality, implementation details, and how different parts interact. Analyzes the project based on the provided context (using copytree) and provides AI-powered answers.
+
+Use this tool for tasks requiring a broad view of the codebase, such as:
+* Discovering how different components interact.
+* Searching for where and how specific implementations or functionalities are done.
+* Understanding the flow of data or control.
+* Getting context for debugging errors or diagnosing test failures.
+* Getting an overview after major changes or when working with unfamiliar code.
+* Finding where to add debugging code for stubborn issues.
+* Performing a quick sanity check after implementing significant changes.
+
+It helps establish a baseline understanding, making it easier to work with complex systems or unfamiliar code. Leave more advanced strategizing or implementation planning to the main AI or your own prompts.
+
+State Management:
+* By default, each call is stateless, meaning each question is analyzed independently.
+* Use the optional 'state' argument (provide a state_key returned from a previous call) to maintain conversation history and context across multiple questions. This is useful for follow-up questions or related commands.
+* If you provide a state key that doesn't exist, or omit it for the first question in a conversation, a new conversation starts.
+* The 'state_key' for a new conversation will be included in the result. Use this key for subsequent follow-up questions in the same conversation.
+* It's generally recommended to use stateful mode unless asking isolated questions where no follow-up is needed.
+
+Usage Notes:
+* Provide the question clearly using the 'question' argument.
+* Context is automatically gathered from the current working directory where the server was started, using default copytree settings.
+
+Example Questions:
+* Error Troubleshooting: "When running the test FileOutputRendererTest::test_render_file_with_max_lines_truncation I am seeing the error Undefined index: mime-type. What might be causing this error?"
+* Understanding Code Flow: "How does the pipeline process files from initial loading to final output?"
+* Finding Implementations: "Where is the GitHubUrlHandler class implemented and what does it do?"
+* Architecture Questions: "What is the relationship between the Transformer classes and the Pipeline stages?"
+* Debugging Issues: "The AIFilterStage is throwing an exception with message Invalid JSON response. What could be causing this?"
+* Feature Understanding: "How does this project handle the transformation of different file types?"
+* Project Overview: "What is the main purpose of this project and how is it structured?"
+* Locating Debug Points: "I am getting the error Undefined index: mime-type in the FileOutputRendererTest::test_render_file_with_max_lines_truncation test. Where should I add debugging code to investigate this issue?"
+* Change Verification: "I have just implemented the new GitHubUrlHandler class. Can you confirm that it has been correctly added and integrated into the project?"
+
+When to Use:
+* Understanding code behavior and interactions between components.
+* Discovering how different parts of the codebase connect.
+* Finding relevant files, classes, or functions for specific functionality.
+* Getting context for troubleshooting errors or debugging issues.
+* Diagnosing errors in tests or runtime issues.
+* Obtaining a broad overview of the codebase structure or a specific feature.
+* Asking follow-up questions requiring context from previous interactions (using the 'state' argument).
+
+When NOT to Use:
+* Generating complex implementation strategies or step-by-step plans (use the main AI or other tools).
+* Finding specific text snippets or identifiers (use grep, find, or IDE search instead).
+* Locating files solely by name (use find or IDE file navigation).
+* Simple questions about syntax or language features (use documentation instead).

@@ -16,6 +16,12 @@
             "role": "Developer"
         }
     ],
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/gregpriday/mcp-sdk-php.git"
+        }
+    ],
     "require": {
         "php": "^8.2.0",
         "ext-fileinfo": "*",
@@ -28,6 +34,7 @@
         "illuminate/support": "^11.15",
         "laravel-zero/framework": "^11",
         "league/commonmark": "^2.6",
+        "logiscape/mcp-sdk-php": "dev-main",
         "openai-php/client": "dev-main",
         "spatie/pdf-to-text": "^1.54",
         "symfony/console": "^6.0|^7.0",

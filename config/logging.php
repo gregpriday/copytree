@@ -62,6 +62,15 @@ return [
             'permission' => 0644,
         ],
 
+        'mcp' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/mcp.log'),
+            'level' => env('LOG_MCP_LEVEL', 'debug'),
+            'days' => 3,
+            'replace_placeholders' => true,
+            'permission' => 0664,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
