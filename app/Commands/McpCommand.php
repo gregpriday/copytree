@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use LaravelZero\Framework\Commands\Command;
+use App\Services\MCPService;
 use App\Services\ProjectQuestionService;
 use App\Services\ConversationStateService;
 use Illuminate\Contracts\Config\Repository as ConfigContract;
@@ -28,12 +29,39 @@ class McpCommand extends Command
     protected $description = 'Starts the CopyTree MCP server using STDIO to handle project questions.';
 
     /**
+     * The configuration repository instance.
+     * 
+     * @var ConfigContract
+     */
+    protected ConfigContract $config;
+
+    /**
+     * The MCP service instance.
+     * 
+     * @var MCPService
+     */
+    protected MCPService $mcpService;
+
+    /**
+     * Create a new McpCommand instance.
+     *
+     * @param ConfigContract $config
+     * @param MCPService $mcpService
+     * @return void
+     */
+    public function __construct(ConfigContract $config, MCPService $mcpService)
+    {
+        parent::__construct();
+        $this->config = $config;
+        $this->mcpService = $mcpService;
+    }
+
+    /**
      * Execute the console command.
      *
-     * @param ConversationStateService $stateService
-     * @return int
+     * @return int Command exit code (SUCCESS=0, FAILURE=1, INVALID=2)
      */
-    public function handle(ConversationStateService $stateService): int
+    public function handle(): int
     {
         // --- Determine the Correct Project Directory ---
         $projectRootEnv = $this->argument('directory');
@@ -51,9 +79,6 @@ class McpCommand extends Command
 
         Log::channel('mcp')->info("Starting CopyTree STDIO Server for directory: " . $serverWorkingDirectory);
         Log::channel('mcp')->info("Listening for JSON-RPC requests on STDIN...");
-
-        // --- Resolve Services Needed ---
-        $config = resolve(ConfigContract::class);
 
         // --- Main STDIN Read Loop ---
         while (($line = fgets(STDIN)) !== false) {
@@ -166,101 +191,14 @@ class McpCommand extends Command
 
                         Log::channel('mcp')->debug("Tool name matched 'project_ask'. Proceeding...");
 
-                        $question = $args['question'] ?? null;
-                        if (!$question) {
-                            Log::channel('mcp')->error("Missing 'question' argument in tools/call request ID: {$requestId}");
-                            throw new \InvalidArgumentException("'question' is required.");
-                        }
-                        $stateKey = $args['state'] ?? null;
-                        $providerOption = $args['ask-provider'] ?? null;
-                        $modelSizeOption = $args['ask-model-size'] ?? null;
-
-                        $provider = $providerOption ?: $config->get('ai.ask_defaults.provider', 'openai');
-                        $modelSize = $modelSizeOption ?: $config->get('ai.ask_defaults.model_size', 'small');
-                        Log::channel('mcp')->debug("Using Provider='{$provider}', ModelSize='{$modelSize}' for project_ask.");
-
-                        $questionService = resolve(ProjectQuestionService::class, [
-                            'provider' => $provider,
-                            'modelSize' => $modelSize,
-                        ]);
-
-                        $history = [];
-                        $isNewConversation = false;
-                        if ($stateKey) {
-                            Log::channel('mcp')->info("Continuing conversation with state key: {$stateKey}");
-                            $history = $stateService->loadHistory($stateKey);
-                            if (empty($history)) {
-                                Log::channel('mcp')->warning("State key '{$stateKey}' provided, but no history found. Starting fresh.");
-                            }
-                        } else {
-                            $stateKey = $stateService->generateStateKey();
-                            Log::channel('mcp')->info("Starting new conversation with state key: {$stateKey}");
-                            $isNewConversation = true;
-                        }
-
-                        // --- Get Project Context using Artisan 'copy' Command ---
-                        Log::channel('mcp')->debug("Gathering project context using 'copy' command...");
-                        Log::channel('mcp')->debug("Using path for 'copy' command: '" . $serverWorkingDirectory . "'");
-                        $copytreeOutput = null;
                         try {
-                            $copyOptions = [
-                                'path' => $serverWorkingDirectory,
-                                '--display' => true,
-                                '--no-interaction' => true,
-                            ];
-                            Log::channel('mcp')->debug("Options passed to Artisan::call('copy'): " . json_encode($copyOptions));
-
-                            Artisan::call('copy', $copyOptions);
-                            $copytreeOutput = Artisan::output();
-
-                            if (empty(trim($copytreeOutput))) {
-                                Log::channel('mcp')->error("'copy' command returned empty output when gathering context.");
-                                throw new \RuntimeException("Failed to gather project context: 'copy' command returned empty output.");
-                            }
-                            Log::channel('mcp')->debug("Generated copytree output length: " . strlen($copytreeOutput));
-
+                            // Delegate the project_ask handling to MCPService
+                            $responsePayload = $this->mcpService->handleProjectAsk($args, $serverWorkingDirectory);
+                            Log::channel('mcp')->info("Successfully processed 'project_ask' for request ID: {$requestId}");
                         } catch (\Exception $e) {
-                            Log::channel('mcp')->error("Failed to run 'copy' command to get context: " . $e->getMessage());
-                            throw new \RuntimeException("Failed to gather project context via copy command: " . $e->getMessage(), 0, $e);
-                        }
-
-                        $fullResponseText = '';
-                        try {
-                            $apiResponse = $questionService->askQuestion($copytreeOutput, $question, $history);
-                            $fullResponseText = $apiResponse->choices[0]->message->content ?? '';
-                            $stateService->saveMessage($stateKey, 'user', $question);
-                            $stateService->saveMessage($stateKey, 'assistant', $fullResponseText);
-                        } catch (\Exception $e) {
-                            Log::channel('mcp')->error("Error during question processing: {$e->getMessage()}");
+                            Log::channel('mcp')->error("Error during MCPService->handleProjectAsk: {$e->getMessage()}");
                             throw new \RuntimeException("Error answering question: {$e->getMessage()}", 0, $e);
                         }
-                        Log::channel('mcp')->info("Successfully processed 'project_ask' for request ID: {$requestId}");
-
-                        // --- Construct Correct CallToolResult Payload ---
-
-                        // 1. Create the TextContent object containing the AI's answer
-                        $textContent = [
-                            'type' => 'text',
-                            'text' => $fullResponseText
-                        ];
-
-                        // 2. Create the main result structure required by MCP
-                        $responsePayload = [
-                            // 'content' MUST be an array containing one or more content objects
-                            'content' => [$textContent],
-                            'isError' => false // Indicate success
-                        ];
-
-                        // 3. (Optional but Recommended) Add state_key to metadata if needed
-                        if ($isNewConversation && $stateKey) {
-                            // The spec doesn't define state_key, so _meta is a safer place
-                             if (!isset($responsePayload['_meta'])) { // Ensure _meta exists
-                                 $responsePayload['_meta'] = [];
-                             }
-                             $responsePayload['_meta']['state_key'] = $stateKey;
-                             Log::channel('mcp')->debug("Included new state_key '{$stateKey}' in response _meta");
-                        }
-                        // --- End Payload Construction ---
 
                         // This line encodes the final JSON-RPC response - KEEP AS IS
                         $finalResponse = json_encode(['jsonrpc' => '2.0', 'result' => $responsePayload, 'id' => $requestId]);
