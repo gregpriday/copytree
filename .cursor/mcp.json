@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "copytree": {
+            "command": "copytree",
+            "args": [
+                "mcp",
+                "/Users/gpriday/Dropbox/PHP/copytree"
+            ],
+            "env": [],
+            "workingDirectory": "{project_root}"
+        }
+    }
+}
