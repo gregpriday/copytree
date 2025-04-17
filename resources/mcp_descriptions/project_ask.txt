@@ -1,0 +1,32 @@
+Asks a question about the codebase to understand project structure, functionality, implementation details, and how different parts interact. Analyzes the project based on the provided context (using copytree) and provides AI-powered answers.
+
+Use this tool for tasks requiring a broad view of the codebase, such as:
+* Discovering how different components interact.
+* Searching for where and how specific implementations or functionalities are done.
+* Understanding the flow of data or control.
+* Getting context for debugging errors or diagnosing test failures.
+* Getting an overview after major changes or when working with unfamiliar code.
+
+State Management:
+* By default, each call is stateless.
+* Use the optional 'state' argument (provide a state_key returned from a previous call) to maintain conversation history and context across multiple questions.
+* If you provide a state key that doesn't exist, or omit it, a new conversation starts.
+* The 'state' key for a new conversation will be included in the result.
+
+Usage Notes:
+* Provide the question clearly using the 'question' argument.
+* Context is automatically gathered from the current working directory where the server was started, using default copytree settings.
+* Avoid special characters like apostrophes ('), dollar signs ($), backslashes (\) in the question argument for best results.
+
+When to Use:
+* Understanding code behavior and interactions.
+* Finding relevant files/classes/functions.
+* Getting context for troubleshooting errors.
+* Obtaining a broad overview of the codebase.
+* Asking follow-up questions (use the 'state' argument).
+
+When NOT to Use:
+* Generating complex implementation strategies (use main AI).
+* Finding specific text snippets (use grep/IDE search).
+* Locating files solely by name (use find/IDE).
+* Simple syntax/language questions (use documentation).

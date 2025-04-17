@@ -1,0 +1,13 @@
+{
+    "mcpServers": {
+        "copytree-server": {
+            "command": "copytree",
+            "args": [
+                "mcp"
+            ],
+            "env": {
+            },
+            "workingDirectory": "{project_root}"
+        }
+    }
+}
