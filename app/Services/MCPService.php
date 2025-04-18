@@ -73,40 +73,48 @@ class MCPService
             'modelSize' => $modelSize,
         ]);
 
-        // --- Start: Improved State Key Handling ---
-        $stateKey = null; // Default to null (new conversation)
-        $history = [];
-        $isNewConversation = true;
+        // --- Start: Refactored State Key Handling ---
+        $stateKey = null; // This will hold the final state key to use (either existing or new)
+        $history = [];    // Initialize empty history
+        $attemptedStateKey = $arguments['state'] ?? null; // Get the raw input from the arguments
 
-        // Check if the provided state key input is a non-empty string
-        if (is_string($stateKeyInput) && $stateKeyInput !== '') {
-            $stateKey = $stateKeyInput; // Use the valid string key
-            Log::channel('mcp')->info("Attempting to continue conversation with state key: {$stateKey}");
-            $history = $this->stateService->loadHistory($stateKey); // Load history ONLY if key is a valid string
-            if (! empty($history)) {
-                Log::channel('mcp')->debug('Loaded '.count($history)." messages for state key: {$stateKey}");
-                $isNewConversation = false;
-            } else {
-                // If history is empty for a valid key, it might be expired or invalid
-                Log::channel('mcp')->warning("State key '{$stateKey}' provided, but no history found. Starting fresh.");
-                // Keep stateKey as is, but signal it's effectively a new conversation start
-                $stateKey = $this->stateService->generateStateKey(); // Generate a new key for this session
-                Log::channel('mcp')->info("Generated new state key for this session: {$stateKey}");
-                $isNewConversation = true; // Treat as new
+        // Check if a potentially valid key (non-empty string) was provided
+        if (is_string($attemptedStateKey) && $attemptedStateKey !== '') {
+            Log::channel('mcp')->info("Attempting to continue conversation with provided state key: {$attemptedStateKey}");
+            try {
+                $history = $this->stateService->loadHistory($attemptedStateKey);
+            } catch (\Exception $e) {
+                // Log error if loading history fails, but proceed to create a new state
+                Log::channel('mcp')->error("Error loading history for state key '{$attemptedStateKey}': ".$e->getMessage());
+                $history = []; // Ensure history is empty
             }
-        } elseif ($stateKeyInput !== null) { // This block now primarily catches empty strings if schema allowed them, or handles unexpected edge cases.
-            $receivedType = gettype($stateKeyInput); // Get type for logging
-            // Log a warning if a non-null, but also non-valid-string value was provided (e.g., empty string)
-            Log::channel('mcp')->warning("Invalid or empty value provided for 'state' argument (type: {$receivedType}). Ignoring invalid state and starting a new conversation.");
-            // Fall through to generate a new key below
-        }
 
-        // Generate a new state key if no valid one was provided or found
-        if ($isNewConversation && $stateKey === null) {
+            if (!empty($history)) {
+                // History loaded successfully, use the provided key
+                $stateKey = $attemptedStateKey;
+                Log::channel('mcp')->debug('Loaded '.count($history)." messages for state key: {$stateKey}");
+            } else {
+                // Valid string key provided, but no history found (e.g., invalid key, expired, DB error)
+                Log::channel('mcp')->warning("State key '{$attemptedStateKey}' provided, but no history found or error loading. Starting a new conversation.");
+                // Generate a new key, history remains empty
+                $stateKey = $this->stateService->generateStateKey();
+                Log::channel('mcp')->info("Generated new state key for this session: {$stateKey}");
+            }
+        } else {
+            // Handle cases where state is null, empty string, or any other invalid type (boolean, int, array, object)
+            if ($attemptedStateKey !== null) {
+                 // Log a warning if the provided value was invalid (not null and not a non-empty string)
+                 $invalidType = gettype($attemptedStateKey);
+                 Log::channel('mcp')->warning("Invalid type or empty value received for 'state' argument (type: {$invalidType}). Starting a new conversation.");
+            } else {
+                 // Standard case: No state provided, starting fresh.
+                 Log::channel('mcp')->info("No valid state key provided. Starting a new conversation.");
+            }
+            // Generate a new key, history remains empty
             $stateKey = $this->stateService->generateStateKey();
-            Log::channel('mcp')->info("Starting new conversation with state key: {$stateKey}");
+            Log::channel('mcp')->info("Generated new state key: {$stateKey}");
         }
-        // --- End: Improved State Key Handling ---
+        // --- End: Refactored State Key Handling ---
 
         // Gather project context
         $copytreeOutput = $this->gatherProjectContext($projectPath);
@@ -316,12 +324,11 @@ class MCPService
 
         $followUpHintText = '';
         if ($stateKey) {
-            $followUpArgsJson = json_encode(['question' => '{your_follow_up_question}', 'state' => $stateKey]);
             $followUpHintText = sprintf(
-                'Ask follow-up questions with: %s',
-                $followUpArgsJson
+                'Ask follow-up questions with `state`: %s',
+                $stateKey
             );
-            Log::channel('mcp')->debug('Formatted follow-up hint: '.$followUpHintText);
+            Log::channel('mcp')->debug('State: '.$stateKey);
         }
 
         // Append token info AND follow-up hint to the main response text
