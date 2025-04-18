@@ -54,6 +54,14 @@ class MCPService
         $providerOption = $arguments['ask-provider'] ?? null;
         $modelSizeOption = $arguments['ask-model-size'] ?? null;
 
+        // --- Add this validation block ---
+        if ($stateKeyInput !== null && ! is_string($stateKeyInput)) {
+            $invalidType = gettype($stateKeyInput);
+            Log::channel('mcp')->error("Invalid type received for 'state' argument: expected string or null, got {$invalidType}");
+            throw new \InvalidArgumentException("Invalid type for 'state' argument: expected string or null, received {$invalidType}.");
+        }
+        // --- End of addition ---
+
         // Determine AI provider and model size
         $provider = $providerOption ?: $this->config->get('ai.ask_defaults.provider', 'openai');
         $modelSize = $modelSizeOption ?: $this->config->get('ai.ask_defaults.model_size', 'small');
@@ -86,9 +94,10 @@ class MCPService
                 Log::channel('mcp')->info("Generated new state key for this session: {$stateKey}");
                 $isNewConversation = true; // Treat as new
             }
-        } elseif ($stateKeyInput !== null) {
-            // Log a warning if a non-null, non-string value was provided (e.g., true, false, number)
-            Log::channel('mcp')->warning("Invalid type provided for 'state' argument: ".gettype($stateKeyInput).'. Ignoring invalid state and starting a new conversation.');
+        } elseif ($stateKeyInput !== null) { // This block now primarily catches empty strings if schema allowed them, or handles unexpected edge cases.
+            $receivedType = gettype($stateKeyInput); // Get type for logging
+            // Log a warning if a non-null, but also non-valid-string value was provided (e.g., empty string)
+            Log::channel('mcp')->warning("Invalid or empty value provided for 'state' argument (type: {$receivedType}). Ignoring invalid state and starting a new conversation.");
             // Fall through to generate a new key below
         }
 

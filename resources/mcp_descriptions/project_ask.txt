@@ -1,4 +1,4 @@
-Asks a question about the codebase to understand project structure, functionality, implementation details, and how different parts interact. Analyzes the project based on the provided context (using copytree) and provides AI-powered answers.
+Asks a question about the codebase to understand project structure, functionality, implementation details, and how different parts interact.
 
 Use this tool for tasks requiring a broad view of the codebase, such as:
 * Discovering how different components interact.
@@ -11,16 +11,76 @@ Use this tool for tasks requiring a broad view of the codebase, such as:
 
 It helps establish a baseline understanding, making it easier to work with complex systems or unfamiliar code. Leave more advanced strategizing or implementation planning to the main AI or your own prompts.
 
-State Management:
-* By default, each call is stateless, meaning each question is analyzed independently.
-* Use the optional 'state' argument (provide a state_key returned from a previous call) to maintain conversation history and context across multiple questions. This is useful for follow-up questions or related commands.
-* If you provide a state key that doesn't exist, or omit it for the first question in a conversation, a new conversation starts.
-* The 'state_key' for a new conversation will be included in the result. Use this key for subsequent follow-up questions in the same conversation.
-* It's generally recommended to use stateful mode unless asking isolated questions where no follow-up is needed.
+State Management and Workflow Example:
+* By default, each call is stateless. Use the optional 'state' argument to maintain conversation history. This is useful for follow-up questions.
+* If you provide a state key that doesn't exist, or omit it for the first question, a new conversation starts. The 'state_key' for a new conversation will be included in the result metadata (`_meta`). Use this key for subsequent follow-up questions.
+* It's generally recommended to use stateful mode unless asking isolated questions.
+
+**JSON Workflow Example:**
+
+1.  **Initial Question (Starting a New Conversation):**
+    Send a JSON request like this. The `state` argument can be omitted, `null`, `false`, or an empty string to start fresh. The server will generate a new `state_key`.
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "method": "tools/call",
+      "params": {
+        "name": "project_ask",
+        "arguments": {
+          "question": "What is the main purpose of the McpCommand class?"
+        }
+      },
+      "id": "request-1"
+    }
+    ```
+
+2.  **Receiving the Response with State Key:**
+    The server's JSON response will include the answer and metadata containing the new state key.
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "request-1",
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "The McpCommand class starts the CopyTree MCP server... \n\n---\nTokens: ...\nAsk follow-up questions with: {\"question\":\"{your_follow_up_question}\",\"state\":\"a1b2c3d4\"}"
+          }
+        ],
+        "isError": false,
+        "_meta": {
+          "state_key": "a1b2c3d4",
+          "token_usage": { ... },
+          "follow_up_hint": { ... }
+        }
+      }
+    }
+    ```
+    *(Note: Actual response text and metadata will vary)*
+
+3.  **Follow-up Question (Continuing the Conversation):**
+    Use the `state_key` received ("a1b2c3d4" in this example) in the `state` argument for your next request.
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "method": "tools/call",
+      "params": {
+        "name": "project_ask",
+        "arguments": {
+          "question": "How does it register the tool handlers?",
+          "state": "a1b2c3d4"
+        }
+      },
+      "id": "request-2"
+    }
+    ```
 
 Usage Notes:
 * Provide the question clearly using the 'question' argument.
-* Context is automatically gathered from the current working directory where the server was started, using default copytree settings.
+* Context is automatically gathered from the current working directory where the server was started.
 
 Example Questions:
 * Error Troubleshooting: "When running the test FileOutputRendererTest::test_render_file_with_max_lines_truncation I am seeing the error Undefined index: mime-type. What might be causing this error?"

@@ -187,8 +187,8 @@ class McpCommand extends Command
         $properties = new ToolInputProperties;
         $properties->question = ['description' => 'The question to ask about the project.', 'type' => 'string'];
         $properties->state = [
-            'description' => 'Optional *string* key to continue a previous conversation. Must be the exact key provided by a previous response. Omit or pass null/empty/boolean to start a new conversation.',
-            'type' => ['string', 'null', 'boolean'] // Explicitly allow string, null, or boolean
+            'description' => 'Optional *string* key to continue a previous conversation. Must be the exact key provided by a previous response. Omit or pass null/empty to start a new conversation.',
+            'type' => ['string', 'null'],
         ];
         $properties->{'ask-provider'} = ['description' => 'Override AI provider (e.g., openai). Defaults to config.', 'type' => 'string'];
         $properties->{'ask-model-size'} = ['description' => 'Override AI model size (small, medium, large). Defaults to config.', 'type' => 'string'];
