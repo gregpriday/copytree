@@ -40,7 +40,7 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
     {
         $this->basePath = rtrim($basePath, DIRECTORY_SEPARATOR);
         $this->alwaysInclude = $alwaysInclude;
-        $this->patternConverter = new PatternConverter();
+        $this->patternConverter = new PatternConverter;
     }
 
     /**
@@ -73,12 +73,12 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
                     // Convert gitignore glob to regex for Finder's path()
                     $regexPattern = $this->patternConverter->patternToRegex($alwaysItem);
 
-                    $finder = new Finder();
+                    $finder = new Finder;
                     $finder->files()
-                           ->in($this->basePath)
-                           ->path($regexPattern)
-                           ->ignoreDotFiles(false)
-                           ->ignoreVCS(true);
+                        ->in($this->basePath)
+                        ->path($regexPattern)
+                        ->ignoreDotFiles(false)
+                        ->ignoreVCS(true);
 
                     foreach ($finder as $foundFile) {
                         /** @var SplFileInfo $foundFile */
@@ -87,7 +87,7 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
 
                         // Add only if not already in the list passed to this stage
                         // and not already queued to be added by another pattern/exact match
-                        if (!isset($existingFiles[$relativePath]) && !isset($filesToAdd[$relativePath])) {
+                        if (! isset($existingFiles[$relativePath]) && ! isset($filesToAdd[$relativePath])) {
                             // Use relative path as key to prevent duplicates from overlapping patterns
                             $filesToAdd[$relativePath] = $foundFile;
                         }
@@ -95,7 +95,7 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
                 } catch (\Exception $e) {
                     // Log error if Finder fails for a pattern
                     Log::warning(
-                        "Error processing 'always' pattern '{$alwaysItem}' in AlwaysIncludeStage: " . $e->getMessage()
+                        "Error processing 'always' pattern '{$alwaysItem}' in AlwaysIncludeStage: ".$e->getMessage()
                     );
                 }
             } else {
@@ -108,7 +108,7 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
                 }
 
                 // Check if the exact file exists on disk relative to the base path
-                $fullPath = $this->basePath . DIRECTORY_SEPARATOR . $alwaysItem;
+                $fullPath = $this->basePath.DIRECTORY_SEPARATOR.$alwaysItem;
                 if (file_exists($fullPath) && is_file($fullPath)) {
                     // Create SplFileInfo relative to basePath
                     // dirname('.') returns '.', handle this case for root files
@@ -122,7 +122,7 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
                     );
                     $filesToAdd[$normalizedPath] = $newFile;
                 } else {
-                     Log::debug("Exact path '{$alwaysItem}' specified in 'always' not found or is not a file at: {$fullPath}");
+                    Log::debug("Exact path '{$alwaysItem}' specified in 'always' not found or is not a file at: {$fullPath}");
                 }
             }
         }
@@ -138,14 +138,14 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
             // Use realpath to get a canonical absolute path for uniqueness check
             $realPath = $file->getRealPath();
             if ($realPath !== false) { // Ensure realpath() didn't fail
-                 $uniqueFiles[$realPath] = $file;
+                $uniqueFiles[$realPath] = $file;
             } else {
                 // Handle cases where realpath might fail (e.g., broken symlinks, though less likely with is_file check)
                 // Use relative path as fallback key, less robust but better than discarding
                 $fallbackPath = str_replace('\\', '/', $file->getRelativePathname());
-                if (!isset($uniqueFiles[$fallbackPath])) {
+                if (! isset($uniqueFiles[$fallbackPath])) {
                     $uniqueFiles[$fallbackPath] = $file;
-                     Log::debug("Could not get real path for {$fallbackPath}, using relative path for uniqueness check.");
+                    Log::debug("Could not get real path for {$fallbackPath}, using relative path for uniqueness check.");
                 }
             }
         }
@@ -158,7 +158,7 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
      * Basic check to see if a string looks like a common glob pattern character.
      * More complex patterns involving ranges [] or groups {} are also included.
      *
-     * @param string $item The string to check.
+     * @param  string  $item  The string to check.
      * @return bool True if it contains glob characters, false otherwise.
      */
     private function isGlobPattern(string $item): bool
