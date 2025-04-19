@@ -29,6 +29,7 @@ use CzProject\GitPhp\GitException;
 use Exception;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
 use Symfony\Component\Process\Process;
 
@@ -56,7 +57,8 @@ class CopyTreeCommand extends Command
         {--r|as-reference : Copy a reference to a temporary file instead of copying the content directly.}
         {--no-cache : Do not use or keep cached GitHub repositories.}
         {--s|size-report : Display a report of files sorted by size after transformation.}
-        {--order-by=default : Specify the file ordering (default|modified).}';
+        {--order-by=default : Specify the file ordering (default|modified).}
+        {--debug : Route ALL logs to console and set level to debug for this run.}';
 
     /**
      * The description of the command.
@@ -70,31 +72,55 @@ class CopyTreeCommand extends Command
      */
     public function handle(): int
     {
-        // Clean up old temporary files before processing the command
+        // --- Start: Debug logging setup ---
+        if ($this->option('debug')) {
+            // Set the default driver to our console channel FOR THIS REQUEST
+            Log::setDefaultDriver('console_debug');
+            $this->line('<fg=yellow;options=bold>Debug mode enabled. All logs routed to console.</>');
+            Log::debug('Debug mode activated via setDefaultDriver.'); // Confirmation
+        } else {
+            // Ensure the default driver is the standard one (e.g., 'stack')
+            // This might be redundant if 'stack' is already the framework default,
+            // but it makes the logic explicit.
+            Log::setDefaultDriver(config('logging.default')); // Use the configured default
+        }
+        // --- End: Debug logging setup ---
+
         TempFileManager::cleanOldFiles();
+        Log::debug('Old temporary files cleaned up');
 
         // Display warning if this is not macOS
         if (PHP_OS_FAMILY !== 'Darwin') {
             $this->warn('This command is designed for macOS and may not work as expected on other operating systems.');
+            Log::debug('Non-macOS OS detected', ['os' => PHP_OS_FAMILY]);
         }
 
         // Use the provided path argument or fallback to the current working directory.
         $projectPath = $this->argument('path') ?: getcwd();
+        Log::debug('Project path resolved', ['path' => $projectPath]);
 
         // If the provided project path is a GitHub URL, clone the repository and use the local path.
         if (str_starts_with($projectPath, 'https://github.com/')) {
+            Log::debug('GitHub URL detected', ['url' => $projectPath]);
             $handler = new GitHubUrlHandler($projectPath);
             $projectPath = $handler->getFiles();
+            Log::debug('GitHub repository cloned', ['local_path' => $projectPath]);
         }
 
         try {
             // Load the profile configuration.
             $profileGuesser = new ProfileGuesser($projectPath);
+            Log::debug('Profile guesser initialized', ['project_path' => $projectPath]);
+
             $profileName = $this->option('profile') === 'auto'
                 ? $profileGuesser->guess()
                 : $this->option('profile');
+            Log::debug('Profile name determined', ['profile' => $profileName, 'auto_guessed' => $this->option('profile') === 'auto']);
+
             $profilePath = $profileGuesser->getProfilePath($profileName);
+            Log::debug('Profile path resolved', ['profile_path' => $profilePath]);
         } catch (Exception $e) {
+            Log::error('Profile error', ['message' => $e->getMessage(), 'exception' => $e]);
             $this->error('Profile error: '.$e->getMessage());
 
             return self::FAILURE;
@@ -110,11 +136,17 @@ class CopyTreeCommand extends Command
             'depth' => (int) $this->option('depth'),
             'max_lines' => (int) $this->option('max-lines'),
         ]);
+        Log::debug('Profile loaded', [
+            'profile' => $this->option('profile'),
+            'filters' => (array) $this->option('filter'),
+            'ai_filters' => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
+        ]);
 
         // Load the initial file set.
         $depth = (int) $this->option('depth');
         $fileLoader = new FileLoader($projectPath);
         $files = $fileLoader->loadFiles($depth);
+        Log::debug('Initial files loaded', ['count' => count($files), 'depth' => $depth]);
 
         // Track duplicate files for verbose output
         $duplicates = [];
@@ -274,11 +306,13 @@ class CopyTreeCommand extends Command
         // Handle output options.
         if ($this->input->hasParameterOption(['--output', '-o'])) {
             $outputOption = $this->option('output') ?? '';
+            Log::debug('Output file option detected', ['output_path' => $outputOption]);
 
             if ($outputOption === '') {
                 // No filename provided, use TempFileManager to store in temporary folder
                 // with AI-generated descriptive filename
                 $fullPath = TempFileManager::createAITempFile($combinedOutput, $finalFiles);
+                Log::debug('Created AI temp file', ['path' => $fullPath]);
                 $this->info("Saved output to temporary file: {$fullPath}");
                 $this->revealInFinder($fullPath);
             } else {
@@ -287,24 +321,32 @@ class CopyTreeCommand extends Command
                 $outputDir = copytree_path('outputs');
                 if (! is_dir($outputDir)) {
                     mkdir($outputDir, 0755, true);
+                    Log::debug('Created outputs directory', ['path' => $outputDir]);
                 }
 
                 $fullPath = $outputDir.DIRECTORY_SEPARATOR.$outputOption;
                 file_put_contents($fullPath, $combinedOutput);
+                Log::debug('Saved output to file', ['path' => $fullPath, 'size' => strlen($combinedOutput)]);
                 $this->info("Saved output to file: {$fullPath}");
                 $this->revealInFinder($fullPath);
             }
         } elseif ($this->option('display')) {
             // Display the output in the console.
+            Log::debug('Displaying output in console', ['size' => strlen($combinedOutput)]);
             $this->line($combinedOutput);
         } elseif ($this->option('as-reference')) {
             // Create a temporary file and copy its reference to the clipboard.
             $tempFile = TempFileManager::createTempFile($combinedOutput);
             (new Clipboard)->copy($tempFile, true);
+            Log::debug('Copied reference to clipboard', ['temp_file' => $tempFile]);
             $this->info("Copied reference to temporary file: {$tempFile}");
         } else {
             // Copy the output directly to the clipboard.
             (new Clipboard)->copy($combinedOutput);
+            Log::debug('Copied output to clipboard', [
+                'file_count' => count($finalFiles),
+                'total_size' => ByteCounter::getFormattedTotal(),
+            ]);
             $this->info('Copied '.count($finalFiles).' files ['.ByteCounter::getFormattedTotal().'] to clipboard.');
         }
 
@@ -315,6 +357,9 @@ class CopyTreeCommand extends Command
                 $this->line("  - {$duplicate}");
             }
         }
+
+        // End of handle method
+        Log::debug('Command execution completed successfully');
 
         return self::SUCCESS;
     }
@@ -330,5 +375,9 @@ class CopyTreeCommand extends Command
 
         $process = new Process(['osascript', '-e', $script]);
         $process->run();
+
+        if ($this->option('debug')) {
+            Log::debug('Revealed file in Finder', ['path' => $filePath]);
+        }
     }
 }

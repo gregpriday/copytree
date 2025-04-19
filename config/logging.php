@@ -1,6 +1,12 @@
 <?php
 
+use Monolog\Handler\NullHandler;
+use Monolog\Handler\StreamHandler;
+
+// Removed unused: SyslogUdpHandler, PsrLogMessageProcessor
+
 return [
+
     /*
     |--------------------------------------------------------------------------
     | Default Log Channel
@@ -11,7 +17,8 @@ return [
     | one of the channels defined in the "channels" configuration array.
     |
     */
-    'default' => env('LOG_CHANNEL', 'stack'),
+    // Updated default channel to 'daily'
+    'default' => env('LOG_CHANNEL', 'daily'),
 
     /*
     |--------------------------------------------------------------------------
@@ -20,11 +27,12 @@ return [
     |
     | This option controls the log channel that should be used to log warnings
     | regarding deprecated PHP and library features. This allows you to get
-    | your application ready for upcoming major versions of dependencies.
+    | granular control over managing depreciation warnings in your logs.
     |
     */
     'deprecations' => [
-        'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'deprecations'),
+        // Kept pointing to 'null' by default
+        'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
         'trace' => env('LOG_DEPRECATIONS_TRACE', false),
     ],
 
@@ -33,110 +41,49 @@ return [
     | Log Channels
     |--------------------------------------------------------------------------
     |
-    | Here you may configure the log channels for your application. Laravel uses
-    | the Monolog PHP logging library. This gives you a variety of powerful log
-    | handlers / formatters to utilize.
+    | Here you may configure the log channels for your application. Out of
+    | the box, Laravel uses the Monolog PHP logging library. This gives
+    | you a variety of powerful log handlers / formatters to utilize.
     |
     | Available Drivers: "single", "daily", "slack", "syslog",
-    |                    "errorlog", "monolog", "custom", "stack"
+    |                    "errorlog", "monolog",
+    |                    "custom", "stack"
     |
     */
     'channels' => [
-        'stack' => [
-            'driver' => 'stack',
-            'channels' => ['daily', 'stderr'],
-            'ignore_exceptions' => false,
-        ],
 
-        'single' => [
-            'driver' => 'single',
-            'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-        ],
-
+        // Kept 'daily' channel
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/copytree.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
+            'level' => env('LOG_LEVEL', 'info'), // Default level set to 'info'
             'days' => env('LOG_RETENTION_DAYS', 14),
             'permission' => 0644,
-        ],
-
-        'mcp' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/mcp.log'),
-            'level' => env('LOG_MCP_LEVEL', 'debug'),
-            'days' => 3,
             'replace_placeholders' => true,
-            'permission' => 0664,
         ],
 
-        'slack' => [
-            'driver' => 'slack',
-            'url' => env('LOG_SLACK_WEBHOOK_URL'),
-            'username' => 'Copytree Log',
-            'emoji' => ':boom:',
-            'level' => env('LOG_SLACK_LEVEL', 'critical'),
-        ],
-
-        'papertrail' => [
+        // Kept 'console_debug' channel for --debug flag functionality
+        'console_debug' => [
             'driver' => 'monolog',
-            'level' => env('LOG_LEVEL', 'debug'),
-            'handler' => env('LOG_PAPERTRAIL_HANDLER', \Monolog\Handler\SyslogUdpHandler::class),
-            'handler_with' => [
-                'host' => env('PAPERTRAIL_URL'),
-                'port' => env('PAPERTRAIL_PORT'),
-                'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
+            'handler' => StreamHandler::class,
+            'formatter' => Monolog\Formatter\LineFormatter::class,
+            'formatter_with' => [
+                'format' => "[%datetime%] %level_name%: %message% %context% %extra%\n",
+                'dateFormat' => 'H:i:s.u',
+                'allowInlineLineBreaks' => true,
+                'includeStacktraces' => false, // Keep false for CLI tool clarity
             ],
-        ],
-
-        'stderr' => [
-            'driver' => 'monolog',
-            'level' => env('LOG_LEVEL', 'debug'),
-            'handler' => \Monolog\Handler\StreamHandler::class,
-            'formatter' => env('LOG_STDERR_FORMATTER'),
             'with' => [
                 'stream' => 'php://stderr',
             ],
+            'level' => 'debug', // Explicitly set to debug
         ],
 
-        'syslog' => [
-            'driver' => 'syslog',
-            'level' => env('LOG_LEVEL', 'debug'),
-            'facility' => LOG_USER,
-        ],
-
-        'errorlog' => [
-            'driver' => 'errorlog',
-            'level' => env('LOG_LEVEL', 'debug'),
-        ],
-
-        'deprecations' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/deprecations.log'),
-            'level' => 'warning',
-            'days' => env('LOG_RETENTION_DAYS', 14),
-        ],
-
-        'git' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/git.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'days' => env('LOG_RETENTION_DAYS', 14),
-        ],
-
-        'profile' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/profile.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'days' => env('LOG_RETENTION_DAYS', 14),
-        ],
-
-        'api' => [
-            'driver' => 'daily',
-            'path' => storage_path('logs/api.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'days' => env('LOG_RETENTION_DAYS', 14),
+        // Kept minimal 'null' channel for deprecations default
+        'null' => [
+            'driver' => 'monolog',
+            'handler' => NullHandler::class,
         ],
     ],
+
 ];
