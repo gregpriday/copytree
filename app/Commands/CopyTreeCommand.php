@@ -104,7 +104,6 @@ class CopyTreeCommand extends Command
             Log::debug('GitHub URL detected', ['url' => $projectPath]);
             $handler = new GitHubUrlHandler($projectPath);
             $projectPath = $handler->getFiles();
-            Log::debug('GitHub repository cloned', ['local_path' => $projectPath]);
         }
 
         try {
