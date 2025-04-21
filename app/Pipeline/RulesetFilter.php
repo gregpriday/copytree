@@ -72,6 +72,10 @@ class RulesetFilter
     protected function compilePatterns(): void
     {
         foreach ($this->include as $pattern) {
+            // If an include pattern ends with '/', treat it as matching everything inside that directory.
+            if (str_ends_with($pattern, '/')) {
+                $pattern .= '**';
+            }
             $this->includeRegex[] = $this->patternConverter->patternToRegex($pattern);
         }
         foreach ($this->exclude as $pattern) {
