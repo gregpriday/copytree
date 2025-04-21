@@ -39,6 +39,13 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             return (new FileLoader)->transform($input);
         }
 
+        // Add this check
+        $supportedMimeTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        if (! in_array($mimeType, $supportedMimeTypes)) {
+            // If the MIME type is not supported, return a note and skip the API call.
+            return "[Unsupported image type: {$mimeType}]";
+        }
+
         // Use the caching helper to cache the expensive transformation.
         return $this->cacheTransformResult($input, function () use ($input) {
             // Resize the image if necessary.
