@@ -3,9 +3,16 @@ include:
     - "app/**/*.blade.php"
     - "database/{migrations,factories}/**/*.php"
     - "routes/**/*.php"
-    - "tests/**/*.php"
+    - "tests/"
     - "docs/**/*.md"
+    - "config/*.php"
+    - "prompts/"
+    - "resources/"
+    - "profiles/"
+    - "bootstrap/*.php"
     - "*.{js,json,md}"
+    - "phpunit.xml.dist"
+    - "application"
 
 exclude: []
 
@@ -13,4 +20,4 @@ always:
     - "composer.json"
     - "README.md"
     - ".env.example"
-    - ".cursor/**"
+    - ".cursor/**/*"

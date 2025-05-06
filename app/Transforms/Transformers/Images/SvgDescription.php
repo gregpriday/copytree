@@ -14,7 +14,7 @@ use Symfony\Component\Finder\SplFileInfo;
  * (which does not work for SVGs), it loads the SVG via SimpleXML to extract key attributes
  * such as width, height, and (optionally) a title. It then returns a concise text description.
  *
- * The result is cached based on the file’s MD5 hash to avoid redundant processing.
+ * The result is cached based on the file's MD5 hash to avoid redundant processing.
  */
 class SvgDescription extends BaseTransformer implements FileTransformerInterface
 {
@@ -42,11 +42,20 @@ class SvgDescription extends BaseTransformer implements FileTransformerInterface
         }
 
         // Use caching to avoid redundant SVG parsing.
-        return $this->cacheTransformResult($input, function () use ($filePath) {
+        return $this->cacheTransformResult($input, function () use ($input, $filePath) {
             // Load the SVG file using SimpleXML.
             $svg = @simplexml_load_file($filePath);
             if ($svg === false) {
-                throw new RuntimeException("Unable to parse SVG file at {$filePath}");
+                // Log a warning instead of throwing an exception
+                if (class_exists('\Illuminate\Support\Facades\Log')) {
+                    \Illuminate\Support\Facades\Log::warning("Unable to parse SVG file, skipping: {$filePath}");
+                } else {
+                    // Fallback to standard PHP error log if Log facade isn't available
+                    error_log("Warning: Unable to parse SVG file, skipping: {$filePath}");
+                }
+
+                // Return a placeholder string to indicate failure for this file
+                return "[SVG parsing failed: {$input->getRelativePathname()}]";
             }
 
             // Retrieve attributes from the root <svg> element.

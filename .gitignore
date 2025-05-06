@@ -9,3 +9,5 @@
 /.env
 /phpunit.xml
 /.env.testing
+
+**/.claude/settings.local.json
