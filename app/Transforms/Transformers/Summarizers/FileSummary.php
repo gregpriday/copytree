@@ -6,9 +6,9 @@ use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
+use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
-use Prism\Prism\Prism;
 use Prism\Prism\ValueObjects\Messages\UserMessage;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -69,8 +69,7 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
                 $temperature = Config::get('ai.task_parameters.summarization.temperature', 0.2);
                 $maxTokens = Config::get('ai.task_parameters.summarization.max_tokens', 512);
 
-                $response = Prism::text()
-                    ->using($provider, $model)
+                $response = PrismHelper::text($provider, $model)
                     ->withSystemPrompt($systemPrompt)
                     ->withMessages([new UserMessage($prompt)])
                     ->withMaxTokens($maxTokens)

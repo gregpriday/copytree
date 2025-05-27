@@ -2,10 +2,10 @@
 
 namespace App\Pipeline\Stages;
 
+use App\Helpers\PrismHelper;
 use App\Pipeline\FilePipelineStageInterface;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
-use Prism\Prism\Prism;
 use Prism\Prism\ValueObjects\Messages\UserMessage;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -77,9 +77,8 @@ class AIFilterStage implements FilePipelineStageInterface
             $temperature = Config::get('ai.task_parameters.classification.temperature', 0.1);
             $maxTokens = Config::get('ai.task_parameters.classification.max_tokens', 1024);
 
-            // Generate content using Prism
-            $response = Prism::text()
-                ->using($provider, $model)
+            // Generate content using PrismHelper to handle Fireworks provider
+            $response = PrismHelper::text($provider, $model)
                 ->withSystemPrompt($systemPrompt)
                 ->withMessages([new UserMessage($promptText)])
                 ->usingTemperature($temperature)

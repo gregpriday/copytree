@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Prism\Prism\Prism;
 use RuntimeException;
 use Throwable;
 
@@ -40,6 +40,7 @@ class AIFilenameGenerator
         $this->model = config("ai.providers.{$this->provider}.models.medium");
     }
 
+
     /**
      * Generates a file name based on content.
      *
@@ -59,8 +60,7 @@ class AIFilenameGenerator
 
         try {
             // Make a request to AI for filename generation using Prism
-            $response = Prism::text()
-                ->using($this->provider, $this->model)
+            $response = PrismHelper::text($this->provider, $this->model)
                 ->withPrompt($prompt)
                 ->withMaxTokens(60)
                 ->usingTemperature(0.2)
@@ -138,8 +138,7 @@ class AIFilenameGenerator
             $maxTokens = config('ai.task_parameters.filename_generation.max_tokens', 50);
 
             // Generate content using AI with JSON response format
-            $response = Prism::text()
-                ->using($this->provider, $this->model)
+            $response = PrismHelper::text($this->provider, $this->model)
                 ->withSystemPrompt($systemPrompt)
                 ->withPrompt($prompt)
                 ->withMaxTokens($maxTokens)
@@ -151,6 +150,12 @@ class AIFilenameGenerator
 
         // Retrieve the structured JSON response.
         $content = $response->text;
+        
+        // Extract JSON from code fences if present
+        if (preg_match('/```json\s*\n(.*?)\n```/s', $content, $matches)) {
+            $content = $matches[1];
+        }
+        
         $data = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['filename'])) {

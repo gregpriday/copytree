@@ -39,8 +39,8 @@ return [
 
             'models' => [
                 'large' => env('FIREWORKS_ASK_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-                'medium' => env('FIREWORKS_CLASSIFICATION_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
-                'small' => env('FIREWORKS_SUMMARIZATION_MODEL', 'accounts/fireworks/models/llama3-8b-instruct'),
+                'medium' => env('FIREWORKS_CLASSIFICATION_MODEL', 'accounts/fireworks/models/llama-v3p1-8b-instruct'),
+                'small' => env('FIREWORKS_SUMMARIZATION_MODEL', 'accounts/fireworks/models/llama-v3p1-8b-instruct'),
                 'general' => env('FIREWORKS_GENERAL_MODEL', 'accounts/fireworks/models/llama4-maverick-instruct-basic'),
             ],
 

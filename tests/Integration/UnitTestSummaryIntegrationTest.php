@@ -16,12 +16,12 @@ class UnitTestSummaryIntegrationTest extends TestCase
         }
 
         // Use a complex unit test file that tests intricate functionality:
-        // Here we use the GitIgnoreManagerTest which covers many edge cases.
-        $filePath = base_path('tests/Unit/Utilities/Git/GitIgnoreManagerTest.php');
-        $this->assertFileExists($filePath, 'The GitIgnoreManagerTest.php file must exist.');
+        // Here we use the FileUtilsTest which covers many edge cases.
+        $filePath = base_path('tests/Unit/Utilities/FileUtilsTest.php');
+        $this->assertFileExists($filePath, 'The FileUtilsTest.php file must exist.');
 
         // Wrap the file in a SplFileInfo instance.
-        $fileInfo = new SplFileInfo($filePath, 'tests/Unit/Utilities/Git', 'GitIgnoreManagerTest.php');
+        $fileInfo = new SplFileInfo($filePath, 'tests/Unit/Utilities', 'FileUtilsTest.php');
 
         // Instantiate the UnitTestSummary transformer.
         $transformer = new UnitTestSummary;

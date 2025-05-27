@@ -5,9 +5,9 @@ namespace App\Transforms\Transformers\Images;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Loaders\FileLoader;
+use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
-use Prism\Prism\Prism;
 use Prism\Prism\ValueObjects\Messages\UserMessage;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
@@ -77,8 +77,7 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             $temperature = Config::get('ai.task_parameters.image_description.temperature', 0.2);
 
             // Call Prism with the base64-encoded image
-            $response = Prism::text()
-                ->using($provider, $model)
+            $response = PrismHelper::text($provider, $model)
                 ->withSystemPrompt($systemPrompt)
                 ->withMessages([
                     new UserMessage(

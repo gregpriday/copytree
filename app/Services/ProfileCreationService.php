@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
-use Prism\Prism\Prism;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -116,8 +116,7 @@ class ProfileCreationService
             $temperature = config('ai.task_parameters.profile_creation.temperature', 0.3);
             $maxTokens = config('ai.task_parameters.profile_creation.max_tokens', 2048);
 
-            $response = Prism::text()
-                ->using($provider, $model)
+            $response = PrismHelper::text($provider, $model)
                 ->withSystemPrompt($systemPrompt)
                 ->withPrompt($prompt)
                 ->withMaxTokens($maxTokens)

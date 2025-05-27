@@ -83,7 +83,7 @@ When using the interactive installer, you'll be prompted to configure these sett
 ### AI Models
 - Ask Model: `accounts/fireworks/models/llama4-maverick-instruct-basic`
 - Expert Selector: `accounts/fireworks/models/llama4-maverick-instruct-basic`
-- Summarization: `accounts/fireworks/models/llama3-8b-instruct`
+- Summarization: `accounts/fireworks/models/llama-v3p1-8b-instruct`
 - Classification: `accounts/fireworks/models/llama4-maverick-instruct-basic`
 - General Purpose: `accounts/fireworks/models/llama4-maverick-instruct-basic`
 

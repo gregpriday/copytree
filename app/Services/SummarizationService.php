@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Prism\Prism\Prism;
 use Prism\Prism\ValueObjects\Messages\UserMessage;
 
 class SummarizationService
@@ -63,8 +63,7 @@ class SummarizationService
             $temperatureForSummarization = config('ai.task_parameters.summarization.temperature', 0.2);
 
             // Use Prism for summarization
-            $response = Prism::text()
-                ->using($provider, $model)
+            $response = PrismHelper::text($provider, $model)
                 ->withMessages([new UserMessage($prompt)])
                 ->withMaxTokens($maxTokensForSummarization)
                 ->usingTemperature($temperatureForSummarization)

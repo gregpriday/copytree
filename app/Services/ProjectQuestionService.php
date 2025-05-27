@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
+use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Prism\Prism\Prism;
 use Prism\Prism\Text\Response as PrismTextResponse;
 use Prism\Prism\ValueObjects\Messages\AssistantMessage;
 use Prism\Prism\ValueObjects\Messages\UserMessage;
@@ -89,8 +89,7 @@ class ProjectQuestionService
         try {
             Log::debug("Requesting AI response via Prism. Provider: [{$providerName}], Model: [{$modelNameString}]");
 
-            $requestBuilder = Prism::text()
-                ->using($providerName, $modelNameString)
+            $requestBuilder = PrismHelper::text($providerName, $modelNameString)
                 ->withSystemPrompt($systemPromptContent);
 
             // Get task-specific parameters from config

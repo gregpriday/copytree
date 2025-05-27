@@ -61,7 +61,13 @@ class ProjectQuestionServiceTest extends TestCase
                 'provider' => 'gemini',
                 'model' => 'medium',
             ];
-            $response = collect($service->askQuestion($copytree, $question, $expertConfig))->implode('');
+            $response = $service->askQuestion(
+                $copytree,
+                $question,
+                [], // empty history
+                'fireworks', // provider
+                'medium' // model
+            )->text;
 
             // Check that we got a valid response
             $this->assertNotEmpty($response);
