@@ -78,3 +78,8 @@ The application can merge files from external GitHub repositories into output, w
 - **Dependencies:** Requires Pandoc and Poppler for document conversion
 - **Caching:** External sources and AI responses are cached
 - **Database:** SQLite database for conversation history (auto-created)
+
+## Commit Message Guidelines
+- Do not mention Claude or Claude Code in commit messages
+- Do not include "Generated with Claude Code" or similar attributions
+- Do not add Claude as a co-author
