@@ -14,6 +14,8 @@ class ExternalSourceStageTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
+        
         // Create a unique temporary directory for the tests.
         $this->tempDir = sys_get_temp_dir().'/external_source_test_'.uniqid();
         mkdir($this->tempDir, 0777, true);

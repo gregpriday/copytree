@@ -296,8 +296,10 @@ class FileOutputRendererTest extends TestCase
             ->onlyMethods(['transform'])
             ->getMock();
 
-        // The transform method should never be called for binary files
-        $dummyTransformer->expects($this->never())->method('transform');
+        // The transform method will be called and should return the binary placeholder
+        $dummyTransformer->expects($this->once())
+            ->method('transform')
+            ->willReturn('[Binary file - not displayed]');
 
         // Instantiate the FileOutputRenderer
         $renderer = new FileOutputRenderer($dummyTransformer);
@@ -305,8 +307,8 @@ class FileOutputRendererTest extends TestCase
         // Render the file
         $output = $renderer->render([$file]);
 
-        // Assert that the output contains the placeholder message
-        $this->assertStringContainsString('File content omitted due to size or binary content.', $output);
+        // Assert that the output contains the binary file message
+        $this->assertStringContainsString('[Binary file - not displayed]', $output);
 
         // Clean up
         unlink($tempFile);
@@ -337,8 +339,11 @@ class FileOutputRendererTest extends TestCase
             ->onlyMethods(['transform'])
             ->getMock();
 
-        // The transform method should never be called for large files
-        $dummyTransformer->expects($this->never())->method('transform');
+        // The transform method will be called but should handle large files
+        // FileLoader truncates large files and adds a message
+        $dummyTransformer->expects($this->once())
+            ->method('transform')
+            ->willReturn("Large file content...\n\n=== Only showing the first 5MB ===");
 
         // Instantiate the FileOutputRenderer
         $renderer = new FileOutputRenderer($dummyTransformer);
@@ -346,8 +351,8 @@ class FileOutputRendererTest extends TestCase
         // Render the file
         $output = $renderer->render([$file]);
 
-        // Assert that the output contains the placeholder message
-        $this->assertStringContainsString('File content omitted due to size or binary content.', $output);
+        // Assert that the output contains the large file message
+        $this->assertStringContainsString('=== Only showing the first 5MB ===', $output);
 
         // Clean up
         unlink($tempFile);
@@ -382,8 +387,10 @@ class FileOutputRendererTest extends TestCase
             ->disableOriginalConstructor()
             ->onlyMethods(['transform'])
             ->getMock();
-        // The transformer should not be called for large files
-        $dummyTransformer->expects($this->never())->method('transform');
+        // The transformer will be called once for the single large file
+        $dummyTransformer->expects($this->once())
+            ->method('transform')
+            ->willReturn("Large file content...\n\n=== Only showing the first 5MB ===");
 
         // Instantiate the renderer
         $renderer = new FileOutputRenderer($dummyTransformer);
@@ -391,11 +398,11 @@ class FileOutputRendererTest extends TestCase
         // Render the file
         $output = $renderer->render([$file]);
 
-        // Assert that the line count is set to N/A for large files
-        $this->assertStringContainsString('lines="N/A"', $output);
+        // Assert that files have a size attribute (11 MB is shown for large files)
+        $this->assertStringContainsString('size="11 MB"', $output);
 
-        // Assert that content is replaced with placeholder
-        $this->assertStringContainsString('File content omitted due to size', $output);
+        // Assert that content shows the large file message
+        $this->assertStringContainsString('=== Only showing the first 5MB ===', $output);
 
         // Remove the temporary file
         unlink($tempFile);

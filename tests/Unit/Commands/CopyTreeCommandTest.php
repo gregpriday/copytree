@@ -130,6 +130,8 @@ class CopyTreeCommandTest extends TestCase
 
         // Assert that the output message indicates that files were copied to the clipboard.
         $this->assertStringContainsString('Copied', $output);
-        $this->assertStringContainsString('files to clipboard.', $output);
+        $this->assertStringContainsString('to clipboard.', $output);
+        // The output format is now "Copied X files [SIZE] to clipboard."
+        $this->assertMatchesRegularExpression('/Copied \d+ files \[.*\] to clipboard\./', $output);
     }
 }
