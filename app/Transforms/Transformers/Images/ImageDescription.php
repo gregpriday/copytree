@@ -2,11 +2,13 @@
 
 namespace App\Transforms\Transformers\Images;
 
-use App\Facades\AI;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Loaders\FileLoader;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
+use Prism\Prism\Prism;
+use Prism\Prism\ValueObjects\Messages\UserMessage;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -65,27 +67,38 @@ class ImageDescription extends BaseTransformer implements FileTransformerInterfa
             // Create a combined prompt by appending the user instruction.
             $userInstruction = 'Please describe the image with the filename: '.$input->getPath();
 
-            // Call the AI API with the base64-encoded image
-            $response = AI::driver('openai')->chat()->create([
-                'model' => AI::models('openai')['medium'],
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => [
-                        ['type' => 'text', 'text' => $userInstruction],
-                        [
-                            'type' => 'image_url',
-                            'image_url' => [
-                                'url' => 'data:image/jpeg;base64,'.$base64,
+            // Get provider and model from config
+            $provider = Config::get('ai.default_provider', 'openai');
+            $modelSize = Config::get('ai.defaults.model_size_for_image_description', 'medium');
+            $model = Config::get("ai.providers.{$provider}.models.{$modelSize}", 'gpt-4o');
+
+            // Get task-specific parameters from config
+            $maxTokens = Config::get('ai.task_parameters.image_description.max_tokens', 1024);
+            $temperature = Config::get('ai.task_parameters.image_description.temperature', 0.2);
+
+            // Call Prism with the base64-encoded image
+            $response = Prism::text()
+                ->using($provider, $model)
+                ->withSystemPrompt($systemPrompt)
+                ->withMessages([
+                    new UserMessage(
+                        content: $userInstruction,
+                        additionalContent: [
+                            [
+                                'type' => 'image_url',
+                                'image_url' => [
+                                    'url' => 'data:image/jpeg;base64,'.$base64,
+                                ],
                             ],
-                        ],
-                    ]],
-                ],
-                'max_tokens' => 1024,
-                'temperature' => 0.2,
-            ]);
+                        ]
+                    ),
+                ])
+                ->withMaxTokens($maxTokens)
+                ->usingTemperature($temperature)
+                ->asText();
 
             // Extract the response content
-            $description = $response->choices[0]->message->content ?? '';
+            $description = $response->text;
 
             if (empty($description)) {
                 throw new RuntimeException('No description returned from AI.');

@@ -2,10 +2,10 @@
 
 namespace App\Commands;
 
-use App\Facades\AI;
 use App\Services\ConversationStateService;
 use Illuminate\Support\Facades\File;
 use LaravelZero\Framework\Commands\Command;
+use Prism\Prism\Prism;
 
 class InstallCopytreeCommand extends Command
 {
@@ -287,16 +287,18 @@ class InstallCopytreeCommand extends Command
         $this->info('Testing API key...');
 
         try {
-            // Use a simple prompt to test the API key
-            $response = AI::chat()->create([
-                'model' => AI::models()['medium'],
-                'messages' => [
-                    ['role' => 'user', 'content' => 'Say hello'],
-                ],
-                'max_tokens' => 10,
-            ]);
+            // Temporarily set the API key in config for testing
+            config(['prism.providers.fireworks.api_key' => $apiKey]);
 
-            return ! empty($response->choices);
+            // Use a simple prompt to test the API key with Prism
+            // Using Fireworks provider with a basic model
+            $response = Prism::text()
+                ->using('fireworks', 'accounts/fireworks/models/llama3-8b-instruct')
+                ->withPrompt('Say hello')
+                ->withMaxTokens(10)
+                ->asText();
+
+            return ! empty($response->text);
         } catch (\Exception $e) {
             $this->error('Error testing API key: '.$e->getMessage());
 

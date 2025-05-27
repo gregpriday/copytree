@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
-use App\Facades\AI;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Prism\Prism\Prism;
+use Prism\Prism\ValueObjects\Messages\UserMessage;
 
 class SummarizationService
 {
@@ -14,18 +16,21 @@ class SummarizationService
     protected int $defaultMaxLength = 1000;
 
     /**
-     * The AI model to use for summarization.
-     * Preferably a fast, efficient model like Llama4-Maverick.
+     * Default provider and model for summarization.
      */
-    protected string $model;
+    protected string $defaultProvider;
+
+    protected string $defaultModel;
 
     /**
      * Create a new SummarizationService instance.
      */
     public function __construct()
     {
-        // Use the model specifically configured for summarization tasks
-        $this->model = AI::models()['small'];
+        // Get defaults from config
+        $this->defaultProvider = Config::get('ai.default_provider', 'openai');
+        $modelSize = Config::get('ai.defaults.model_size_for_summarization', 'small');
+        $this->defaultModel = Config::get("ai.providers.{$this->defaultProvider}.models.{$modelSize}", 'gpt-4o-mini');
     }
 
     /**
@@ -33,9 +38,11 @@ class SummarizationService
      *
      * @param  string  $text  The text to summarize
      * @param  int|null  $maxLength  Maximum summary length (defaults to $defaultMaxLength)
+     * @param  string|null  $provider  Optional AI provider (defaults to configured provider)
+     * @param  string|null  $model  Optional AI model (defaults to configured model)
      * @return string The summarized text, or the original if it's already shorter than the max length
      */
-    public function summarizeText(string $text, ?int $maxLength = null): string
+    public function summarizeText(string $text, ?int $maxLength = null, ?string $provider = null, ?string $model = null): string
     {
         $maxChars = $maxLength ?? $this->defaultMaxLength;
 
@@ -44,21 +51,26 @@ class SummarizationService
             return $text;
         }
 
+        $provider = $provider ?? $this->defaultProvider;
+        $model = $model ?? $this->defaultModel;
+
         try {
             // Simple summarization prompt
             $prompt = "Summarize the following text concisely, capturing the main points, in under {$maxChars} characters:\n\n{$text}";
 
-            // Use AI for summarization
-            $response = AI::chat()->create([
-                'model' => $this->model,
-                'messages' => [
-                    ['role' => 'user', 'content' => $prompt],
-                ],
-                'max_tokens' => 512,
-                'temperature' => 0.2,
-            ]);
+            // Get task-specific parameters from config
+            $maxTokensForSummarization = config('ai.task_parameters.summarization.max_tokens', 512);
+            $temperatureForSummarization = config('ai.task_parameters.summarization.temperature', 0.2);
 
-            $summary = trim($response->choices[0]->message->content ?? '');
+            // Use Prism for summarization
+            $response = Prism::text()
+                ->using($provider, $model)
+                ->withMessages([new UserMessage($prompt)])
+                ->withMaxTokens($maxTokensForSummarization)
+                ->usingTemperature($temperatureForSummarization)
+                ->asText();
+
+            $summary = trim($response->text);
 
             // Fallback if summary is empty or longer than requested
             if (empty($summary)) {
@@ -69,9 +81,12 @@ class SummarizationService
             return Str::length($summary) <= $maxChars
                 ? $summary
                 : Str::limit($summary, $maxChars, '...');
-        } catch (\Exception $e) {
-            // Log the error and return a truncated version of the original
-            Log::warning('Failed to summarize text: '.$e->getMessage());
+        } catch (\Prism\Prism\Exceptions\PrismException $e) {
+            Log::warning("Prism failed to summarize text for Provider [{$provider}], Model [{$model}]: {$e->getMessage()}");
+
+            return Str::limit($text, $maxChars, '...');
+        } catch (\Throwable $e) {
+            Log::warning("Generic error summarizing text: {$e->getMessage()}");
 
             return Str::limit($text, $maxChars, '...');
         }

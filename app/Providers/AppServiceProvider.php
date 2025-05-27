@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Renderer\SizeReportRenderer;
-use App\Services\AIManager;
 use App\Services\ConfigValidator;
 use App\Transforms\FileTransformer;
 use Illuminate\Support\Facades\Log;
@@ -36,11 +35,6 @@ class AppServiceProvider extends ServiceProvider
         // Register the config validator service
         $this->app->singleton(ConfigValidator::class, function ($app) {
             return new ConfigValidator;
-        });
-
-        // Register the AI Manager
-        $this->app->singleton('ai', function ($app) {
-            return new AIManager($app);
         });
 
         $this->app->singleton(FileTransformer::class, function ($app) {

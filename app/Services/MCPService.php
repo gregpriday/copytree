@@ -63,15 +63,25 @@ class MCPService
         // --- End of addition ---
 
         // Determine AI provider and model size
-        $provider = $providerOption ?: $this->config->get('ai.ask_defaults.provider', 'openai');
+        $providerName = $providerOption ?: $this->config->get('ai.ask_defaults.provider', 'openai');
         $modelSize = $modelSizeOption ?: $this->config->get('ai.ask_defaults.model_size', 'small');
-        Log::channel('mcp')->debug("Using Provider='{$provider}', ModelSize='{$modelSize}' for project_ask.");
 
-        // Create question service with determined provider and model
-        $questionService = resolve(ProjectQuestionService::class, [
-            'provider' => $provider,
-            'modelSize' => $modelSize,
-        ]);
+        // Get the actual model string from config
+        $modelIdentifierPath = "ai.providers.{$providerName}.models.{$modelSize}";
+        if (! $this->config->has($modelIdentifierPath)) {
+            Log::channel('mcp')->error("Model size '{$modelSize}' is not configured for provider '{$providerName}'");
+            throw new InvalidArgumentException("Model size '{$modelSize}' is not configured for provider '{$providerName}'");
+        }
+        $modelNameString = $this->config->get($modelIdentifierPath);
+        if (empty($modelNameString)) {
+            Log::channel('mcp')->error("Model identifier string is empty for provider '{$providerName}', size '{$modelSize}'");
+            throw new InvalidArgumentException("Model identifier string is empty for provider '{$providerName}', size '{$modelSize}'");
+        }
+
+        Log::channel('mcp')->debug("Using Provider='{$providerName}', Model='{$modelNameString}' for project_ask.");
+
+        // Create question service - constructor now has no parameters
+        $questionService = resolve(ProjectQuestionService::class);
 
         // --- Start: Refactored State Key Handling ---
         $stateKey = null; // This will hold the final state key to use (either existing or new)
@@ -126,8 +136,8 @@ class MCPService
             $question,
             $history,
             $stateKey,
-            $provider,
-            $modelSize
+            $providerName,
+            $modelNameString
         );
 
         // Construct response payload using the structured data
@@ -188,8 +198,8 @@ class MCPService
      * @param  string  $question  The user's question.
      * @param  array  $history  Conversation history.
      * @param  string  $stateKey  The state key for the conversation.
-     * @param  string  $provider  The AI provider used.
-     * @param  string  $modelSize  The AI model size used.
+     * @param  string  $providerName  The AI provider name.
+     * @param  string  $modelNameString  The AI model identifier string.
      * @return array An array containing response text, token counts, cost, and pricing status.
      *
      * @throws RuntimeException If the AI request fails.
@@ -200,32 +210,47 @@ class MCPService
         string $question,
         array $history,
         string $stateKey, // Ensure stateKey is always a string here
-        string $provider,
-        string $modelSize
+        string $providerName,
+        string $modelNameString
     ): array {
         try {
-            $apiResponse = $questionService->askQuestion($copytreeOutput, $question, $history);
-            $fullResponseText = $apiResponse->choices[0]->message->content ?? '';
+            // Call askQuestion with the new signature
+            $apiResponse = $questionService->askQuestion(
+                $copytreeOutput,
+                $question,
+                $history,
+                $providerName,
+                $modelNameString
+            );
 
-            // Extract token usage
-            $usage = $apiResponse->usage ?? null;
-            $inputTokens = 0;
-            $outputTokens = 0;
-            $cachedInputTokens = 0;
+            // Extract content from Prism response
+            $fullResponseText = $apiResponse->text;
 
-            if ($usage) {
-                $inputTokens = $usage->promptTokens ?? 0;
-                $outputTokens = $usage->completionTokens ?? 0;
-                // Check for cached token details (adjust based on actual API response structure if needed)
-                $promptDetails = $usage->promptTokensDetails ?? null;
-                $cachedInputTokens = $promptDetails->cachedTokens ?? 0;
-            } else {
-                Log::channel('mcp')->warning('Token usage data missing from API response.', ['response_id' => $apiResponse->id ?? 'N/A']);
+            // Extract token usage from Prism response
+            $usage = $apiResponse->usage;
+            $inputTokens = $usage->promptTokens ?? 0;
+            $outputTokens = $usage->completionTokens ?? 0;
+            $cachedInputTokens = 0; // Default to 0
+
+            // Check for provider-specific cached token information
+            if ($providerName === 'anthropic' && ! empty($apiResponse->additionalContent)) {
+                $additionalContent = $apiResponse->additionalContent;
+
+                // Try different possible locations where Anthropic might report cached tokens
+                if (isset($additionalContent['usage']['cache_read_input_tokens'])) {
+                    $cachedInputTokens = (int) $additionalContent['usage']['cache_read_input_tokens'];
+                    Log::channel('mcp')->debug("Anthropic cached input tokens: {$cachedInputTokens}");
+                } elseif (isset($additionalContent['cached_tokens'])) {
+                    $cachedInputTokens = (int) $additionalContent['cached_tokens'];
+                    Log::channel('mcp')->debug("Anthropic cached input tokens (alternative key): {$cachedInputTokens}");
+                }
             }
 
             // Calculate cost
             $totalCost = 0.0;
-            $pricingConfigKey = "ai.providers.{$provider}.pricing.{$modelSize}";
+            // Need to determine model size from model string for pricing lookup
+            $modelSize = $this->getModelSizeFromString($providerName, $modelNameString);
+            $pricingConfigKey = "ai.providers.{$providerName}.pricing.{$modelSize}";
             $pricingFound = $this->config->has($pricingConfigKey);
             $pricesAvailable = false;
 
@@ -385,5 +410,25 @@ class MCPService
         }
 
         return $responsePayload;
+    }
+
+    /**
+     * Determines the model size from the provider and model string.
+     * This is a reverse lookup from the config.
+     */
+    protected function getModelSizeFromString(string $providerName, string $modelNameString): string
+    {
+        $models = $this->config->get("ai.providers.{$providerName}.models", []);
+
+        foreach ($models as $size => $model) {
+            if ($model === $modelNameString) {
+                return $size;
+            }
+        }
+
+        // Default to 'small' if not found
+        Log::channel('mcp')->warning("Could not determine model size for {$providerName}:{$modelNameString}, defaulting to 'small'");
+
+        return 'small';
     }
 }

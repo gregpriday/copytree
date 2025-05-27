@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
+use Prism\Prism\Text\Response as PrismTextResponse;
 
 class AskCommand extends Command
 {
@@ -51,42 +52,36 @@ class AskCommand extends Command
         $providerOption = $this->option('ask-provider');
         $modelSizeOption = $this->option('ask-model-size');
 
-        // Get defaults from the new config section
-        $defaultProvider = Config::get('ai.ask_defaults.provider', 'openai');
+        $defaultProviderName = Config::get('ai.ask_defaults.provider', 'openai');
         $defaultModelSize = Config::get('ai.ask_defaults.model_size', AIModelTypes::SMALL);
 
-        // Use option if provided, otherwise use default
-        $provider = $providerOption ?: $defaultProvider;
-        $modelSize = $modelSizeOption ?: $defaultModelSize;
+        $providerName = $providerOption ?: $defaultProviderName; // e.g., 'openai', 'fireworks'
+        $modelSize = $modelSizeOption ?: $defaultModelSize; // e.g., 'small', 'medium', 'large'
 
         // --- Start: Validation ---
-        // Validate Provider
-        if (! Config::has("ai.providers.{$provider}")) {
-            $this->error("Error: AI provider '{$provider}' is not configured in config/ai.php.");
+        if (! Config::has("ai.providers.{$providerName}")) {
+            $this->error("Error: AI provider '{$providerName}' is not configured in your config/ai.php.");
 
             return self::FAILURE;
         }
 
-        // Validate Model Size
-        $validModelSizes = [AIModelTypes::SMALL, AIModelTypes::MEDIUM, AIModelTypes::LARGE];
-        if (! in_array($modelSize, $validModelSizes)) {
-            $this->error("Error: Invalid model size '{$modelSize}'. Valid options are: ".implode(', ', $validModelSizes));
+        $modelIdentifierPath = "ai.providers.{$providerName}.models.{$modelSize}";
+        if (! Config::has($modelIdentifierPath)) {
+            $this->error("Error: Model size '{$modelSize}' is not configured for provider '{$providerName}' in config/ai.php at path '{$modelIdentifierPath}'.");
 
             return self::FAILURE;
         }
-
-        // Validate Model exists for Provider/Size combination
-        $modelConfigPath = "ai.providers.{$provider}.models.{$modelSize}";
-        if (! Config::has($modelConfigPath)) {
-            $this->error("Error: Model size '{$modelSize}' is not configured for provider '{$provider}' in config/ai.php.");
+        $modelNameString = Config::get($modelIdentifierPath); // This is the actual model string like 'gpt-4o'
+        if (empty($modelNameString)) {
+            $this->error("Error: Model identifier string is empty for provider '{$providerName}', size '{$modelSize}' in config/ai.php.");
 
             return self::FAILURE;
         }
         // --- End: Validation ---
 
-        // Manually instantiate ProjectQuestionService with the determined provider and model size
         try {
-            $questionService = new ProjectQuestionService($provider, $modelSize);
+            // ProjectQuestionService constructor is now empty
+            $questionService = new ProjectQuestionService;
         } catch (\Exception $e) {
             $this->error('Failed to initialize ProjectQuestionService: '.$e->getMessage());
 
@@ -187,8 +182,7 @@ class AskCommand extends Command
         Artisan::call('copy', $options);
         $copytree = Artisan::output();
 
-        // Use a simpler output message
-        $this->output->write("<info>Answering your question using [{$provider}:{$modelSize}]...</info> ");
+        $this->output->write("<info>Answering your question using Prism with [{$providerName}:{$modelNameString}]...</info> ");
 
         $fullResponseText = '';
         $inputTokens = 0;
@@ -196,62 +190,98 @@ class AskCommand extends Command
         $cachedInputTokens = 0;
 
         try {
-            // Call the NON-STREAMING service method
-            $apiResponse = $questionService->askQuestion($copytree, $question, $history);
+            /** @var PrismTextResponse $apiResponse */
+            $apiResponse = $questionService->askQuestion(
+                $copytree,
+                $question,
+                $history,
+                $providerName,      // Pass the resolved provider name
+                $modelNameString    // Pass the resolved model string
+            );
 
-            // Extract Content
-            $fullResponseText = $apiResponse->choices[0]->message->content ?? '';
+            // Extract Content from Prism's Response
+            $fullResponseText = $apiResponse->text;
 
-            // Extract Accurate Token Usage
-            $usage = $apiResponse->usage ?? null;
-            if ($usage) {
-                $inputTokens = $usage->promptTokens ?? 0;
-                $outputTokens = $usage->completionTokens ?? 0;
-                $promptDetails = $usage->promptTokensDetails ?? null;
-                $cachedInputTokens = $promptDetails->cachedTokens ?? 0;
-            } else {
-                Log::warning('Token usage data missing from API response.', ['response_id' => $apiResponse->id ?? 'N/A']);
+            // Extract Token Usage from Prism's Response
+            $usage = $apiResponse->usage;
+            $inputTokens = $usage->promptTokens ?? 0;
+            $outputTokens = $usage->completionTokens ?? 0;
+            $cachedInputTokens = 0; // Default to 0
+
+            // Check meta property for provider-specific cached token information
+            try {
+                // Meta is a property, not a method
+                $metaObject = $apiResponse->meta;
+
+                // Convert Meta object to array if needed
+                $meta = $metaObject instanceof \Prism\Prism\ValueObjects\Meta ?
+                    ['id' => $metaObject->id, 'model' => $metaObject->model] : [];
+
+                // For Anthropic, check if cached tokens are reported in additionalContent
+                if ($providerName === 'anthropic' && ! empty($apiResponse->additionalContent)) {
+                    $additionalContent = $apiResponse->additionalContent;
+
+                    // Try different possible locations where Anthropic might report cached tokens
+                    // Note: The exact key structure needs to be verified with actual Anthropic responses
+                    if (isset($additionalContent['usage']['cache_read_input_tokens'])) {
+                        $cachedInputTokens = (int) $additionalContent['usage']['cache_read_input_tokens'];
+                        Log::debug("Anthropic cached input tokens from additionalContent: {$cachedInputTokens}");
+                    } elseif (isset($additionalContent['cached_tokens'])) {
+                        $cachedInputTokens = (int) $additionalContent['cached_tokens'];
+                        Log::debug("Anthropic cached input tokens from additionalContent (alternative key): {$cachedInputTokens}");
+                    }
+                }
+            } catch (\Exception $e) {
+                // If accessing meta doesn't work as expected, continue with default
+                Log::debug('Could not extract meta information: '.$e->getMessage());
             }
 
-            // Calculate Cost (Use the determined provider and model size)
+            Log::debug("Prism Response Usage. Input: {$inputTokens}, Output: {$outputTokens}, Cached Input: {$cachedInputTokens}");
+
+            // --- Calculate Cost ---
+            // This logic uses your existing config/ai.php for pricing, which is fine.
+            // It relies on the token counts obtained from Prism.
             $totalCost = 0.0;
-            $pricingConfigKey = "ai.providers.{$provider}.pricing.{$modelSize}";
+            $pricingConfigKey = "ai.providers.{$providerName}.pricing.{$modelSize}";
             $pricingFound = Config::has($pricingConfigKey);
+
+            $pricesAvailable = false;
 
             if ($pricingFound) {
                 $pricing = Config::get($pricingConfigKey);
-
                 $inputPrice = $pricing['input'] ?? null;
                 $outputPrice = $pricing['output'] ?? null;
                 $cachedInputPrice = $pricing['cached_input'] ?? $inputPrice;
 
-                $pricesAvailable = is_numeric($inputPrice) && is_numeric($outputPrice) && is_numeric($cachedInputPrice);
+                $pricesAvailable = is_numeric($inputPrice) && is_numeric($outputPrice) && (is_numeric($cachedInputPrice) || $cachedInputTokens === 0);
+
                 if ($pricesAvailable) {
                     $nonCachedInputTokens = $inputTokens - $cachedInputTokens;
                     if ($nonCachedInputTokens > 0) {
                         $totalCost += ($nonCachedInputTokens / 1000000) * $inputPrice;
                     }
-                    if ($cachedInputTokens > 0 && $cachedInputPrice > 0) {
+                    if ($cachedInputTokens > 0 && is_numeric($cachedInputPrice) && $cachedInputPrice > 0) {
                         $totalCost += ($cachedInputTokens / 1000000) * $cachedInputPrice;
                     }
                     if ($outputTokens > 0) {
                         $totalCost += ($outputTokens / 1000000) * $outputPrice;
                     }
                 } else {
-                    $totalCost = 0.0;
-                    $pricingFound = false;
-                    Log::warning("One or more pricing values (input, output) missing or invalid for provider '{$provider}', model size '{$modelSize}'. Cost will not be calculated.");
+                    // This log was already good
+                    Log::warning("One or more pricing values (input, output, cached_input) missing or invalid for provider '{$providerName}', model size '{$modelSize}'. Cost will not be calculated.");
+                    $pricingFound = false; // Correctly mark as not found if prices are invalid for calculation
                 }
             } else {
                 Log::warning("Pricing configuration key '{$pricingConfigKey}' not found. Cost will not be calculated.");
             }
+            // --- End Calculate Cost ---
 
             // Display Response
             $this->output->newLine();
             if (! empty($fullResponseText)) {
                 $this->line($fullResponseText);
             } else {
-                $this->warning('Received an empty response from the AI.');
+                $this->warn('Received an empty response from the AI.');
             }
 
             // Save State (No Tokens)
@@ -262,13 +292,13 @@ class AskCommand extends Command
             $this->newLine();
 
             if ($inputTokens > 0 || $outputTokens > 0) {
-                $cachedPercentage = $inputTokens > 0 ? round(($cachedInputTokens / $inputTokens) * 100, 1) : 0;
+                $cachedPercentage = ($inputTokens > 0 && $cachedInputTokens > 0) ? round(($cachedInputTokens / $inputTokens) * 100, 1) : 0;
                 $costString = '';
                 if ($totalCost > 0) {
                     $formattedCost = number_format($totalCost, 6);
                     $costString = sprintf(', Cost: $%s', $formattedCost);
-                } elseif ($pricingFound && $totalCost == 0) {
-                    $costString = ', Cost: $0.00';
+                } elseif ($pricingFound && $pricesAvailable && $totalCost == 0.0) { // Check pricesAvailable
+                    $costString = ', Cost: $0.000000';
                 } else {
                     $costString = ' (Cost N/A)';
                 }
@@ -292,10 +322,21 @@ class AskCommand extends Command
 
             return self::SUCCESS;
 
-        } catch (\Exception $e) {
+        } catch (\Prism\Prism\Exceptions\PrismException $e) { // Catch Prism's specific exception first
             $this->output->newLine();
-            $this->error('Error: '.$e->getMessage());
-            Log::error("Error during question processing: {$e->getMessage()}", ['exception' => $e]);
+            $this->error('Prism API Error: '.$e->getMessage());
+            Log::error("Prism error during 'ask' command: {$e->getMessage()}", [
+                'provider' => $providerName,
+                'model' => $modelNameString,
+                'exception_type' => get_class($e),
+            ]);
+            $this->runGarbageCollection($stateService);
+
+            return self::FAILURE;
+        } catch (\Exception $e) { // General fallback
+            $this->output->newLine();
+            $this->error('An unexpected error occurred: '.$e->getMessage());
+            Log::error("Unexpected error during 'ask' command: {$e->getMessage()}", ['exception' => $e]);
             $this->runGarbageCollection($stateService);
 
             return self::FAILURE;

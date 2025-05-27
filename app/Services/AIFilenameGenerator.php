@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
-use App\Facades\AI;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Prism\Prism\Prism;
 use RuntimeException;
 use Throwable;
 
@@ -21,6 +21,11 @@ class AIFilenameGenerator
     protected int $maxFilenameLength = 90;
 
     /**
+     * The AI provider to use.
+     */
+    protected string $provider;
+
+    /**
      * The AI model to use.
      */
     protected string $model;
@@ -30,8 +35,9 @@ class AIFilenameGenerator
      */
     public function __construct()
     {
-        // Use the model specifically configured for classification tasks
-        $this->model = AI::models()['medium'];
+        // Use the provider and model from configuration
+        $this->provider = config('ai.default_provider', 'fireworks');
+        $this->model = config("ai.providers.{$this->provider}.models.medium");
     }
 
     /**
@@ -52,20 +58,16 @@ class AIFilenameGenerator
         $prompt = "Generate a concise, descriptive filename for the following content. The filename should be lowercase, use dashes or underscores instead of spaces, and be no more than 50 characters long. Do not include the file extension in your response.\n\nContent:\n{$trimmedContent}";
 
         try {
-            // Make a request to AI for filename generation
-            $response = AI::chat()->create([
-                'model' => AI::models()['medium'],
-                'messages' => [
-                    ['role' => 'user', 'content' => $prompt],
-                ],
-                'max_tokens' => 60,
-                'temperature' => 0.2,
-                'top_p' => 0.95,
-            ]);
+            // Make a request to AI for filename generation using Prism
+            $response = Prism::text()
+                ->using($this->provider, $this->model)
+                ->withPrompt($prompt)
+                ->withMaxTokens(60)
+                ->usingTemperature(0.2)
+                ->asText();
 
             // Get the generated filename
-            $filename = $response->choices[0]->message->content ?? '';
-            $filename = trim($filename);
+            $filename = trim($response->text);
 
             // Clean up the filename
             $filename = preg_replace('/[^\w\-]/', '', $filename);
@@ -131,23 +133,24 @@ class AIFilenameGenerator
         $systemPrompt = file_get_contents($systemPromptPath);
 
         try {
+            // Get task-specific parameters from config
+            $temperature = config('ai.task_parameters.filename_generation.temperature', 0.3);
+            $maxTokens = config('ai.task_parameters.filename_generation.max_tokens', 50);
+
             // Generate content using AI with JSON response format
-            $response = AI::chat()->create([
-                'model' => $this->model,
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $prompt],
-                ],
-                'max_tokens' => 256,
-                'temperature' => 0.2,
-                'response_format' => ['type' => 'json_object'],
-            ]);
+            $response = Prism::text()
+                ->using($this->provider, $this->model)
+                ->withSystemPrompt($systemPrompt)
+                ->withPrompt($prompt)
+                ->withMaxTokens($maxTokens)
+                ->usingTemperature($temperature)
+                ->asText();
         } catch (\Exception $e) {
             throw new RuntimeException('AI API call failed: '.$e->getMessage());
         }
 
         // Retrieve the structured JSON response.
-        $content = $response->choices[0]->message->content ?? '';
+        $content = $response->text;
         $data = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['filename'])) {

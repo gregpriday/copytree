@@ -29,6 +29,7 @@
         "league/commonmark": "^2.6",
         "logiscape/mcp-sdk-php": "^1.1",
         "openai-php/client": "^0.10.3",
+        "prism-php/prism": "^0.68.0",
         "spatie/pdf-to-text": "^1.54",
         "symfony/console": "^7.0",
         "symfony/finder": "^7.1",

@@ -2,9 +2,11 @@
 
 namespace App\Pipeline\Stages;
 
-use App\Facades\AI;
 use App\Pipeline\FilePipelineStageInterface;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
+use Prism\Prism\Prism;
+use Prism\Prism\ValueObjects\Messages\UserMessage;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
@@ -66,24 +68,35 @@ class AIFilterStage implements FilePipelineStageInterface
         }
 
         try {
-            // Generate content using AI with the model optimized for classification tasks
-            $response = AI::chat()->create([
-                'model' => AI::models()['medium'],
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $promptText],
-                ],
-                'temperature' => 0.1,
-                'max_tokens' => 1024,
-            ]);
+            // Get provider and model from config
+            $provider = Config::get('ai.default_provider', 'openai');
+            $modelSize = Config::get('ai.defaults.model_size_for_classification', 'medium');
+            $model = Config::get("ai.providers.{$provider}.models.{$modelSize}", 'gpt-4o');
+
+            // Get task-specific parameters from config
+            $temperature = Config::get('ai.task_parameters.classification.temperature', 0.1);
+            $maxTokens = Config::get('ai.task_parameters.classification.max_tokens', 1024);
+
+            // Generate content using Prism
+            $response = Prism::text()
+                ->using($provider, $model)
+                ->withSystemPrompt($systemPrompt)
+                ->withMessages([new UserMessage($promptText)])
+                ->usingTemperature($temperature)
+                ->withMaxTokens($maxTokens)
+                ->asText();
+
+            // Retrieve the response text.
+            $content = $response->text;
         } catch (\Exception $e) {
             throw new RuntimeException('AI filtering failed: '.$e->getMessage());
         }
-
-        // Retrieve the response text.
-        $content = $response->choices[0]->message->content ?? '';
-        // Remove code fences if present.
-        $content = preg_replace('/^```json(.*)```$/s', '$1', $content);
+        // Remove code fences if present (handle various fence formats)
+        $content = trim($content);
+        // Handle ```json, ```JSON, or just ```
+        if (preg_match('/^```(?:json|JSON)?\s*\n(.*)\n```$/s', $content, $matches)) {
+            $content = $matches[1];
+        }
 
         $result = json_decode($content, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
@@ -133,17 +146,23 @@ class AIFilterStage implements FilePipelineStageInterface
         $userPrompt = $this->buildUserPrompt($content, $options);
 
         try {
-            // Make the API call to AI
-            $response = AI::chat()->create([
-                'model' => AI::models()['medium'],
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $userPrompt],
-                ],
-                'temperature' => 0.1,
-                'top_p' => 0.95,
-                'max_tokens' => 300,
-            ]);
+            // Get provider and model from config
+            $provider = Config::get('ai.default_provider', 'openai');
+            $modelSize = Config::get('ai.defaults.model_size_for_classification', 'medium');
+            $model = Config::get("ai.providers.{$provider}.models.{$modelSize}", 'gpt-4o');
+
+            // Get task-specific parameters from config
+            $temperature = Config::get('ai.task_parameters.classification.temperature', 0.1);
+            $maxTokens = Config::get('ai.task_parameters.classification.max_tokens', 300);
+
+            // Make the API call using Prism
+            $response = Prism::text()
+                ->using($provider, $model)
+                ->withSystemPrompt($systemPrompt)
+                ->withMessages([new UserMessage($userPrompt)])
+                ->usingTemperature($temperature)
+                ->withMaxTokens($maxTokens)
+                ->asText();
 
             // Process the response
             $result = $this->processResponse($response, $options);
@@ -155,5 +174,32 @@ class AIFilterStage implements FilePipelineStageInterface
 
             return true; // Include by default if the filter fails
         }
+    }
+
+    /**
+     * Build the system prompt for the AI filter.
+     */
+    protected function buildSystemPrompt(array $options = []): string
+    {
+        return 'You are a file content analyzer. Analyze the given content and determine if it should be included based on the criteria provided.';
+    }
+
+    /**
+     * Build the user prompt for the AI filter.
+     */
+    protected function buildUserPrompt(string $content, array $options = []): string
+    {
+        return "Analyze this content and determine if it should be included:\n\n".$content;
+    }
+
+    /**
+     * Process the AI response.
+     */
+    protected function processResponse($response, array $options = []): bool
+    {
+        $responseText = $response->text;
+
+        // Simple logic: if response contains "yes" or "include", return true
+        return stripos($responseText, 'yes') !== false || stripos($responseText, 'include') !== false;
     }
 }

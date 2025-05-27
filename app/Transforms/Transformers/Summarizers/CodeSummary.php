@@ -2,13 +2,15 @@
 
 namespace App\Transforms\Transformers\Summarizers;
 
-use App\Facades\AI;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Prism\Prism\Prism;
+use Prism\Prism\ValueObjects\Messages\UserMessage;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
@@ -72,15 +74,19 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
             $prompt = "Please provide a concise summary for the following source code:\n\n".$wrappedCode;
 
             try {
-                $response = AI::chat()->create([
-                    'model' => AI::models()['medium'],
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => $prompt],
-                    ],
-                    'max_tokens' => 512,
-                    'temperature' => 0.2,
-                ]);
+                $provider = Config::get('ai.default_provider', 'openai');
+                $modelSize = Config::get('ai.defaults.model_size_for_summarization', 'medium');
+                $model = Config::get("ai.providers.{$provider}.models.{$modelSize}");
+                $temperature = Config::get('ai.task_parameters.summarization.temperature', 0.2);
+                $maxTokens = Config::get('ai.task_parameters.summarization.max_tokens', 512);
+
+                $response = Prism::text()
+                    ->using($provider, $model)
+                    ->withSystemPrompt($systemPrompt)
+                    ->withMessages([new UserMessage($prompt)])
+                    ->withMaxTokens($maxTokens)
+                    ->usingTemperature($temperature)
+                    ->asText();
             } catch (Throwable $e) {
                 // Log the exception
                 Log::error('Failed to summarize code: '.$e->getMessage(), [
@@ -92,7 +98,7 @@ class CodeSummary extends BaseTransformer implements FileTransformerInterface
                 return '[Summary generation failed: The AI model encountered an error while summarizing this code.]';
             }
 
-            $summary = $response->choices[0]->message->content ?? '';
+            $summary = $response->text ?? '';
 
             // Remove code fences if present.
             $cleanOutput = preg_replace('/^```(?:[a-zA-Z]*\n)?(.*?)```$/s', '$1', trim($summary));

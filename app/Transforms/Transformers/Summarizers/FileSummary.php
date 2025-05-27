@@ -2,12 +2,14 @@
 
 namespace App\Transforms\Transformers\Summarizers;
 
-use App\Facades\AI;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
+use Prism\Prism\Prism;
+use Prism\Prism\ValueObjects\Messages\UserMessage;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -61,21 +63,25 @@ class FileSummary extends BaseTransformer implements FileTransformerInterface
 
             // Call AI API to generate a summary
             try {
-                $response = AI::chat()->create([
-                    'model' => AI::models()['medium'],
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => $prompt],
-                    ],
-                    'max_tokens' => 512,
-                    'temperature' => 0.2,
-                ]);
+                $provider = Config::get('ai.default_provider', 'openai');
+                $modelSize = Config::get('ai.defaults.model_size_for_summarization', 'medium');
+                $model = Config::get("ai.providers.{$provider}.models.{$modelSize}");
+                $temperature = Config::get('ai.task_parameters.summarization.temperature', 0.2);
+                $maxTokens = Config::get('ai.task_parameters.summarization.max_tokens', 512);
+
+                $response = Prism::text()
+                    ->using($provider, $model)
+                    ->withSystemPrompt($systemPrompt)
+                    ->withMessages([new UserMessage($prompt)])
+                    ->withMaxTokens($maxTokens)
+                    ->usingTemperature($temperature)
+                    ->asText();
             } catch (\Exception $e) {
                 throw new RuntimeException('AI API call failed: '.$e->getMessage());
             }
 
             // Get the content from the response
-            $summary = $response->choices[0]->message->content ?? '';
+            $summary = $response->text ?? '';
 
             // Verify we got something back
             if (empty($summary)) {
