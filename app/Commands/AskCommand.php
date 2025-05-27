@@ -206,34 +206,23 @@ class AskCommand extends Command
             $usage = $apiResponse->usage;
             $inputTokens = $usage->promptTokens ?? 0;
             $outputTokens = $usage->completionTokens ?? 0;
-            $cachedInputTokens = 0; // Default to 0
+            
+            // Prism now properly handles cached tokens for all providers
+            // For OpenAI: usage.prompt_tokens_details.cached_tokens -> cacheReadInputTokens
+            // For Anthropic: usage.cache_read_input_tokens -> cacheReadInputTokens
+            $cachedInputTokens = $usage->cacheReadInputTokens ?? 0;
 
-            // Check meta property for provider-specific cached token information
-            try {
-                // Meta is a property, not a method
-                $metaObject = $apiResponse->meta;
+            // OpenAI's Prism handler subtracts cached tokens from promptTokens
+            // So for OpenAI, we need to calculate the total input tokens
+            if ($providerName === 'openai' && $cachedInputTokens > 0) {
+                $totalInputTokens = $inputTokens + $cachedInputTokens;
+                Log::debug("OpenAI token adjustment - Non-cached: {$inputTokens}, Cached: {$cachedInputTokens}, Total: {$totalInputTokens}");
+                $inputTokens = $totalInputTokens;
+            }
 
-                // Convert Meta object to array if needed
-                $meta = $metaObject instanceof \Prism\Prism\ValueObjects\Meta ?
-                    ['id' => $metaObject->id, 'model' => $metaObject->model] : [];
-
-                // For Anthropic, check if cached tokens are reported in additionalContent
-                if ($providerName === 'anthropic' && ! empty($apiResponse->additionalContent)) {
-                    $additionalContent = $apiResponse->additionalContent;
-
-                    // Try different possible locations where Anthropic might report cached tokens
-                    // Note: The exact key structure needs to be verified with actual Anthropic responses
-                    if (isset($additionalContent['usage']['cache_read_input_tokens'])) {
-                        $cachedInputTokens = (int) $additionalContent['usage']['cache_read_input_tokens'];
-                        Log::debug("Anthropic cached input tokens from additionalContent: {$cachedInputTokens}");
-                    } elseif (isset($additionalContent['cached_tokens'])) {
-                        $cachedInputTokens = (int) $additionalContent['cached_tokens'];
-                        Log::debug("Anthropic cached input tokens from additionalContent (alternative key): {$cachedInputTokens}");
-                    }
-                }
-            } catch (\Exception $e) {
-                // If accessing meta doesn't work as expected, continue with default
-                Log::debug('Could not extract meta information: '.$e->getMessage());
+            // Log cached tokens if present
+            if ($cachedInputTokens > 0) {
+                Log::debug("Cached input tokens from {$providerName}: {$cachedInputTokens}");
             }
 
             Log::debug("Prism Response Usage. Input: {$inputTokens}, Output: {$outputTokens}, Cached Input: {$cachedInputTokens}");
