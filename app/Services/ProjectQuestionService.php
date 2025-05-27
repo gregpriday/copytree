@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Prism\Prism\Text\Response as PrismTextResponse;
 use Prism\Prism\ValueObjects\Messages\AssistantMessage;
 use Prism\Prism\ValueObjects\Messages\UserMessage;
@@ -102,6 +103,12 @@ class ProjectQuestionService
             // Pass the messages to Prism
             if (! empty($prismMessages)) {
                 $requestBuilder = $requestBuilder->withMessages($prismMessages);
+            }
+
+            // For Gemini 2.5 Flash models, set zero thinking budget
+            if ($providerName === 'gemini' && Str::startsWith($modelNameString, 'gemini-2.5-flash')) {
+                $requestBuilder = $requestBuilder->withProviderOptions(['thinkingBudget' => 0]);
+                Log::debug("Using Gemini 2.5 Flash ({$modelNameString}) with zero thinking budget");
             }
 
             $response = $requestBuilder->asText();

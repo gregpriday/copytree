@@ -89,7 +89,7 @@ return [
 
             'models' => [
                 'large' => 'gemini-2.5-pro-preview-03-25', // Using gemini-2.5-pro-preview model name
-                'medium' => 'gemini-2.0-flash',           // Using gemini-2.0-flash model name
+                'medium' => 'gemini-2.5-flash-preview-05-20',           // Using gemini-2.5-flash-preview model name
                 'small' => 'gemini-2.0-flash-lite',      // Using gemini-2.0-flash-lite model name
             ],
 
@@ -98,10 +98,10 @@ return [
                     'input' => 1.25,  // Price per million input tokens
                     'output' => 10.00, // Price per million output tokens (including thinking)
                 ],
-                'medium' => [ // Corresponds to gemini-2.0-flash (text pricing)
-                    'input' => 0.10,  // Price per million input tokens (text)
-                    'output' => 0.40, // Price per million output tokens
-                    'cached_input' => 0.025, // Price per million cached tokens (text/image/video)
+                'medium' => [ // Corresponds to gemini-2.5-flash (text pricing)
+                    'input' => 0.15,  // Price per million input tokens (text)
+                    'output' => 0.60, // Price per million output tokens
+                    'cached_input' => 0.0375, // Price per million cached tokens (text/image/video)
                 ],
                 'small' => [ // Corresponds to gemini-2.0-flash-lite
                     'input' => 0.075, // Price per million input tokens
@@ -179,8 +179,8 @@ return [
     |
     */
     'ask_defaults' => [
-        'provider' => env('ASK_PROVIDER', 'fireworks'),
-        'model_size' => env('ASK_MODEL_SIZE', 'small'),
+        'provider' => env('ASK_PROVIDER', 'gemini'),
+        'model_size' => env('ASK_MODEL_SIZE', 'medium'),
     ],
 
     /*
