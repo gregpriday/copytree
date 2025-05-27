@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\ConversationStateService;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Prism\Prism\Prism;
 use Prism\Prism\Testing\TextResponseFake;
@@ -11,6 +12,32 @@ use Tests\TestCase;
 
 class AskCommandTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        
+        // Create a minimal profile.yaml for tests
+        $profileContent = "include:\n  - '*.php'\nexclude:\n  - 'vendor/**'";
+        file_put_contents(base_path('profile.yaml'), $profileContent);
+        
+        // Create system prompt file
+        $promptDir = base_path('prompts/project-question');
+        if (!is_dir($promptDir)) {
+            mkdir($promptDir, 0777, true);
+        }
+        file_put_contents($promptDir . '/system.txt', 'System prompt content');
+    }
+    
+    protected function tearDown(): void
+    {
+        // Clean up test files
+        if (file_exists(base_path('profile.yaml'))) {
+            unlink(base_path('profile.yaml'));
+        }
+        
+        parent::tearDown();
+    }
+    
     public function test_ask_command_uses_prism_and_outputs_response()
     {
         // Mock config for provider and model resolution
@@ -24,17 +51,13 @@ class AskCommandTest extends TestCase
             TextResponseFake::make()->withText($fakeText)->withUsage(new Usage(10, 20)),
         ]);
 
-        // Mock the system prompt file
-        \Illuminate\Support\Facades\File::shouldReceive('exists')
-            ->with(base_path('prompts/project-question/system.txt'))
-            ->andReturn(true);
-        \Illuminate\Support\Facades\File::shouldReceive('get')
-            ->with(base_path('prompts/project-question/system.txt'))
-            ->andReturn('System prompt content');
-
-        $this->artisan('ask "What is Copytree?" --ask-provider=openai --ask-model-size=small')
+        $this->artisan('ask', [
+            'question' => 'What is Copytree?',
+            '--ask-provider' => 'openai',
+            '--ask-model-size' => 'small'
+        ])
             ->expectsOutputToContain($fakeText)
-            ->expectsOutputToContain('Token Usage: 10 input (0% cached), 20 output') // Cached will be 0 for now
+            ->expectsOutputToContain('Token Usage: 10 input (0% cached), 20 output')
             ->assertSuccessful();
 
         // Verify Prism was called successfully
@@ -57,7 +80,10 @@ class AskCommandTest extends TestCase
         $stateService = $this->app->make(ConversationStateService::class);
         $stateKey = $stateService->generateStateKey();
 
-        $this->artisan("ask 'Test question' --state={$stateKey}")
+        $this->artisan('ask', [
+            'question' => 'Test question',
+            '--state' => $stateKey
+        ])
             ->expectsOutputToContain($fakeText)
             ->expectsOutputToContain("Continuing conversation with state key: {$stateKey}")
             ->assertSuccessful();
@@ -75,7 +101,10 @@ class AskCommandTest extends TestCase
     {
         Config::set('ai.ask_defaults.provider', 'openai');
 
-        $this->artisan('ask "Test question" --ask-provider=invalid_provider')
+        $this->artisan('ask', [
+            'question' => 'Test question',
+            '--ask-provider' => 'invalid_provider'
+        ])
             ->expectsOutput("Error: AI provider 'invalid_provider' is not configured in your config/ai.php.")
             ->assertFailed();
     }
@@ -85,7 +114,11 @@ class AskCommandTest extends TestCase
         Config::set('ai.ask_defaults.provider', 'openai');
         Config::set('ai.providers.openai', ['models' => []]);
 
-        $this->artisan('ask "Test question" --ask-provider=openai --ask-model-size=invalid_size')
+        $this->artisan('ask', [
+            'question' => 'Test question',
+            '--ask-provider' => 'openai',
+            '--ask-model-size' => 'invalid_size'
+        ])
             ->expectsOutputToContain("Error: Model size 'invalid_size' is not configured for provider 'openai'")
             ->assertFailed();
     }
@@ -118,7 +151,9 @@ class AskCommandTest extends TestCase
                 ->withUsage(new Usage(1000, 500)), // 1000 input, 500 output tokens
         ]);
 
-        $this->artisan('ask "Test question"')
+        $this->artisan('ask', [
+            'question' => 'Test question'
+        ])
             ->expectsOutputToContain($fakeText)
             ->expectsOutputToContain('Token Usage: 1,000 input (0% cached), 500 output, Cost: $0.001250')
             ->assertSuccessful();
@@ -140,7 +175,9 @@ class AskCommandTest extends TestCase
             TextResponseFake::make()->withText($fakeText),
         ]);
 
-        $this->artisan("ask --question-file={$questionFile}")
+        $this->artisan('ask', [
+            '--question-file' => $questionFile
+        ])
             ->expectsOutputToContain("Reading question from file: {$questionFile}")
             ->expectsOutputToContain($fakeText)
             ->assertSuccessful();
