@@ -16,6 +16,11 @@ State Management and Workflow Example:
 * If you provide a state key that doesn't exist, or omit it for the first question, a new conversation starts. The 'state_key' for a new conversation will be included in the result metadata (`_meta`). Use this key for subsequent follow-up questions.
 * It's generally recommended to use stateful mode unless asking isolated questions.
 
+Streaming Support:
+* Set the optional 'stream' argument to true to request a streaming response. This enables real-time response generation.
+* When streaming is enabled, the response is generated incrementally, though the final result structure remains the same.
+* Streaming is useful for long responses or when you want to provide a more responsive user experience.
+
 **JSON Workflow Example:**
 
 1.  **Initial Question (Starting a New Conversation):**
@@ -78,9 +83,29 @@ State Management and Workflow Example:
     }
     ```
 
+4.  **Streaming Response Example:**
+    To enable streaming, add `"stream": true` to your arguments:
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "method": "tools/call",
+      "params": {
+        "name": "project_ask",
+        "arguments": {
+          "question": "Explain the entire pipeline architecture in detail",
+          "stream": true,
+          "state": "a1b2c3d4"
+        }
+      },
+      "id": "request-3"
+    }
+    ```
+
 Usage Notes:
 * Provide the question clearly using the 'question' argument.
 * Context is automatically gathered from the current working directory where the server was started.
+* The 'stream' parameter is optional and defaults to false if not provided.
 
 Example Questions:
 * Error Troubleshooting: "When running the test FileOutputRendererTest::test_render_file_with_max_lines_truncation I am seeing the error Undefined index: mime-type. What might be causing this error?"

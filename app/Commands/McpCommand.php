@@ -2,11 +2,10 @@
 
 namespace App\Commands;
 
+use App\Services\ConversationStateService;
 use App\Services\MCPService;
+use App\Services\ProjectQuestionService;
 use Illuminate\Contracts\Config\Repository as ConfigContract;
-// Remove ProjectQuestionService and ConversationStateService if MCPService handles them
-// use App\Services\ProjectQuestionService;
-// use App\Services\ConversationStateService;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
@@ -190,6 +189,10 @@ class McpCommand extends Command
             'description' => 'Optional *string* key to continue a previous conversation. Must be the exact key provided by a previous response. Omit to start a new conversation.',
             'type' => 'string',
         ];
+        $properties->stream = [
+            'description' => 'Optional boolean to request a streaming response. Defaults to false.',
+            'type' => 'boolean',
+        ];
 
         // Define the schema using ToolInputSchema
         $inputSchema = new ToolInputSchema(
@@ -238,6 +241,12 @@ class McpCommand extends Command
             // Delegate to the MCPService
             // The service should return the structure needed for CallToolResult
             $serviceResult = $this->mcpService->handleProjectAsk($args, $serverWorkingDirectory);
+
+            // Check if this is a streaming request
+            if (isset($serviceResult['streaming_request']) && $serviceResult['streaming_request'] === true) {
+                // Handle streaming
+                return $this->handleStreamingResponse($serviceResult, $logger);
+            }
 
             // $serviceResult should look like:
             // [
@@ -326,4 +335,107 @@ class McpCommand extends Command
         // Note: The ServerRunner might stop automatically on STDIN close.
     }
     */
+
+    /**
+     * Handles streaming response for the project_ask tool.
+     *
+     * @param  array  $streamingData  The streaming request data from MCPService.
+     * @param  \Psr\Log\LoggerInterface  $logger  Logger instance.
+     */
+    protected function handleStreamingResponse(array $streamingData, \Psr\Log\LoggerInterface $logger): CallToolResult
+    {
+        $questionService = resolve(ProjectQuestionService::class);
+        $stateService = resolve(ConversationStateService::class);
+
+        try {
+            // Get the stream generator
+            $stream = $questionService->askQuestionStream(
+                $streamingData['copytreeOutput'],
+                $streamingData['question'],
+                $streamingData['history'],
+                $streamingData['providerName'],
+                $streamingData['modelNameString']
+            );
+
+            // Process the stream and accumulate the response
+            $fullResponseText = '';
+            $inputTokens = 0;
+            $outputTokens = 0;
+            $cachedInputTokens = 0;
+
+            foreach ($stream as $chunk) {
+                $fullResponseText .= $chunk->text;
+
+                // Note: Token usage information is typically available only at the end of streaming
+                // Some providers might include it in the meta of the last chunk
+                if ($chunk->meta && $chunk->meta->usage) {
+                    $inputTokens = $chunk->meta->usage->promptTokens ?? $inputTokens;
+                    $outputTokens = $chunk->meta->usage->completionTokens ?? $outputTokens;
+                    $cachedInputTokens = $chunk->meta->usage->cacheReadInputTokens ?? $cachedInputTokens;
+                }
+            }
+
+            // Save to conversation history
+            $stateKey = $streamingData['stateKey'];
+            $stateService->saveMessage($stateKey, 'user', $streamingData['question']);
+            $stateService->saveMessage($stateKey, 'assistant', $fullResponseText);
+
+            // Calculate cost
+            $modelSize = $this->mcpService->getModelSizeFromString($streamingData['providerName'], $streamingData['modelNameString']);
+            $costResult = $this->mcpService->calculateCost(
+                $streamingData['providerName'],
+                $streamingData['modelNameString'],
+                $inputTokens,
+                $outputTokens,
+                $cachedInputTokens
+            );
+
+            // Build the response payload
+            $responsePayload = $this->mcpService->buildResponsePayload(
+                $fullResponseText,
+                $stateKey,
+                $inputTokens,
+                $outputTokens,
+                $cachedInputTokens,
+                $costResult['totalCost'],
+                $costResult['pricingFound'],
+                $costResult['pricesAvailable']
+            );
+
+            // Create Content objects from service result
+            $contentObjects = [];
+            if (isset($responsePayload['content']) && is_array($responsePayload['content'])) {
+                foreach ($responsePayload['content'] as $contentData) {
+                    if (isset($contentData['type']) && $contentData['type'] === 'text' && isset($contentData['text'])) {
+                        $contentObjects[] = new TextContent(text: $contentData['text']);
+                    }
+                }
+            }
+
+            // Extract metadata if present
+            $meta = null;
+            if (isset($responsePayload['_meta']) && is_array($responsePayload['_meta'])) {
+                $meta = new \Mcp\Types\Meta;
+                foreach ($responsePayload['_meta'] as $key => $value) {
+                    $meta->$key = $value;
+                }
+            }
+
+            $logger->info("Successfully processed 'project_ask' tool call with streaming.");
+
+            return new CallToolResult(
+                content: $contentObjects,
+                isError: false,
+                _meta: $meta
+            );
+
+        } catch (\Exception $e) {
+            $logger->error("Error during streaming response: {$e->getMessage()}");
+
+            return new CallToolResult(
+                content: [new TextContent(text: 'Error processing streaming response: '.$e->getMessage())],
+                isError: true
+            );
+        }
+    }
 }

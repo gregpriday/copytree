@@ -40,7 +40,6 @@ class AIFilenameGenerator
         $this->model = config("ai.providers.{$this->provider}.models.medium");
     }
 
-
     /**
      * Generates a file name based on content.
      *
@@ -150,12 +149,12 @@ class AIFilenameGenerator
 
         // Retrieve the structured JSON response.
         $content = $response->text;
-        
+
         // Extract JSON from code fences if present
         if (preg_match('/```json\s*\n(.*?)\n```/s', $content, $matches)) {
             $content = $matches[1];
         }
-        
+
         $data = json_decode($content, true);
 
         if (json_last_error() !== JSON_ERROR_NONE || ! isset($data['filename'])) {

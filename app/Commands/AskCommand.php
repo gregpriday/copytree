@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 use LaravelZero\Framework\Commands\Command;
-use Prism\Prism\Text\Response as PrismTextResponse;
 
 class AskCommand extends Command
 {
@@ -190,42 +189,79 @@ class AskCommand extends Command
         $cachedInputTokens = 0;
 
         try {
-            /** @var PrismTextResponse $apiResponse */
-            $apiResponse = $questionService->askQuestion(
+            // Always use streaming mode - it will work with both real providers and tests
+            $stream = $questionService->askQuestionStream(
                 $copytree,
                 $question,
                 $history,
-                $providerName,      // Pass the resolved provider name
-                $modelNameString    // Pass the resolved model string
+                $providerName,
+                $modelNameString
             );
 
-            // Extract Content from Prism's Response
-            $fullResponseText = $apiResponse->text;
+            // Start a new line for the response
+            $this->output->newLine();
 
-            // Extract Token Usage from Prism's Response
-            $usage = $apiResponse->usage;
-            $inputTokens = $usage->promptTokens ?? 0;
-            $outputTokens = $usage->completionTokens ?? 0;
-            
-            // Prism now properly handles cached tokens for all providers
-            // For OpenAI: usage.prompt_tokens_details.cached_tokens -> cacheReadInputTokens
-            // For Anthropic: usage.cache_read_input_tokens -> cacheReadInputTokens
-            $cachedInputTokens = $usage->cacheReadInputTokens ?? 0;
+            // Stream the response tokens as they arrive
+            $lastChunk = null;
+            foreach ($stream as $chunk) {
+                $text = $chunk->text ?? '';
+                if (! empty($text)) {
+                    $this->output->write($text);
+                    $fullResponseText .= $text;
+                }
+                $lastChunk = $chunk;
 
-            // OpenAI's Prism handler subtracts cached tokens from promptTokens
-            // So for OpenAI, we need to calculate the total input tokens
-            if ($providerName === 'openai' && $cachedInputTokens > 0) {
-                $totalInputTokens = $inputTokens + $cachedInputTokens;
-                Log::debug("OpenAI token adjustment - Non-cached: {$inputTokens}, Cached: {$cachedInputTokens}, Total: {$totalInputTokens}");
-                $inputTokens = $totalInputTokens;
+                // In test mode with PrismFake, check if this chunk has usage data
+                // This allows tests to pass usage data in the final chunk
+                if (isset($chunk->additionalContent['usage'])) {
+                    $usage = $chunk->additionalContent['usage'];
+                    if (is_object($usage)) {
+                        $inputTokens = $usage->promptTokens ?? $inputTokens;
+                        $outputTokens = $usage->completionTokens ?? $outputTokens;
+                        $cachedInputTokens = $usage->cacheReadInputTokens ?? $cachedInputTokens;
+                    }
+                }
             }
 
-            // Log cached tokens if present
-            if ($cachedInputTokens > 0) {
-                Log::debug("Cached input tokens from {$providerName}: {$cachedInputTokens}");
+            // Ensure we end with a newline
+            if (! empty($fullResponseText) && ! str_ends_with($fullResponseText, "\n")) {
+                $this->output->newLine();
             }
 
-            Log::debug("Prism Response Usage. Input: {$inputTokens}, Output: {$outputTokens}, Cached Input: {$cachedInputTokens}");
+            // Handle additional usage data from streaming mode if we didn't get it from chunks
+            if ($inputTokens === 0 && $outputTokens === 0 && isset($lastChunk) && ! empty($lastChunk->additionalContent)) {
+                // Check for usage in additionalContent (some providers may put it here)
+                if (isset($lastChunk->additionalContent['usage']) && is_object($lastChunk->additionalContent['usage'])) {
+                    $usage = $lastChunk->additionalContent['usage'];
+                    $inputTokens = $usage->promptTokens ?? 0;
+                    $outputTokens = $usage->completionTokens ?? 0;
+                    $cachedInputTokens = $usage->cacheReadInputTokens ?? 0;
+                }
+                // Some providers might include raw usage data
+                elseif (isset($lastChunk->additionalContent['promptTokens'])) {
+                    $inputTokens = $lastChunk->additionalContent['promptTokens'] ?? 0;
+                    $outputTokens = $lastChunk->additionalContent['completionTokens'] ?? 0;
+                    $cachedInputTokens = $lastChunk->additionalContent['cacheReadInputTokens'] ?? 0;
+                }
+            }
+
+            // Handle OpenAI's cached token adjustment if we got usage data
+            if ($inputTokens > 0 || $outputTokens > 0) {
+                // OpenAI's Prism handler subtracts cached tokens from promptTokens
+                // So for OpenAI, we need to calculate the total input tokens
+                if ($providerName === 'openai' && $cachedInputTokens > 0) {
+                    $totalInputTokens = $inputTokens + $cachedInputTokens;
+                    Log::debug("OpenAI token adjustment - Non-cached: {$inputTokens}, Cached: {$cachedInputTokens}, Total: {$totalInputTokens}");
+                    $inputTokens = $totalInputTokens;
+                }
+
+                // Log cached tokens if present
+                if ($cachedInputTokens > 0) {
+                    Log::debug("Cached input tokens from {$providerName}: {$cachedInputTokens}");
+                }
+
+                Log::debug("Prism Response Usage. Input: {$inputTokens}, Output: {$outputTokens}, Cached Input: {$cachedInputTokens}");
+            }
 
             // --- Calculate Cost ---
             // This logic uses your existing config/ai.php for pricing, which is fine.
@@ -265,11 +301,8 @@ class AskCommand extends Command
             }
             // --- End Calculate Cost ---
 
-            // Display Response
-            $this->output->newLine();
-            if (! empty($fullResponseText)) {
-                $this->line($fullResponseText);
-            } else {
+            // Check if we received an empty response
+            if (empty($fullResponseText)) {
                 $this->warn('Received an empty response from the AI.');
             }
 
@@ -325,7 +358,12 @@ class AskCommand extends Command
         } catch (\Exception $e) { // General fallback
             $this->output->newLine();
             $this->error('An unexpected error occurred: '.$e->getMessage());
-            Log::error("Unexpected error during 'ask' command: {$e->getMessage()}", ['exception' => $e]);
+            Log::error("Unexpected error during 'ask' command: {$e->getMessage()}", [
+                'exception' => $e,
+                'provider' => $providerName ?? 'unknown',
+                'model' => $modelNameString ?? 'unknown',
+                'trace' => $e->getTraceAsString(),
+            ]);
             $this->runGarbageCollection($stateService);
 
             return self::FAILURE;

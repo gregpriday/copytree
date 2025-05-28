@@ -104,25 +104,25 @@ class ProfileLoaderTest extends TestCase
         // The actual result shows that rules are replaced, not merged
         // and the always.include arrays are merged
         $result = Config::get('profile');
-        
+
         // Check that we have rules from the extended profile
         $this->assertArrayHasKey('rules', $result);
         $this->assertCount(1, $result['rules']);
         $this->assertEquals([['extension', '=', 'js']], $result['rules'][0]);
-        
+
         // Check that globalExcludeRules are inherited from base if present
         if (isset($result['globalExcludeRules'])) {
             $this->assertEquals([[['basename', 'startsWith', '.']]], $result['globalExcludeRules']);
         }
-        
+
         // Check that always arrays exist
         $this->assertArrayHasKey('always', $result);
         $this->assertArrayHasKey('include', $result['always']);
         $this->assertArrayHasKey('exclude', $result['always']);
-        
+
         // The extended profile's always.include should be present
         $this->assertContains('package.json', $result['always']['include']);
-        
+
         // The base profile's always.exclude should be present
         $this->assertEquals(['.env'], $result['always']['exclude']);
     }

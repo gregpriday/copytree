@@ -49,7 +49,7 @@ class AIFilenameGeneratorTest extends TestCase
             // Debug: check what provider/model is being used
             $provider = config('ai.default_provider');
             $model = config("ai.providers.{$provider}.models.medium");
-            $this->fail("AI call failed. Provider: {$provider}, Model: {$model}, Error: " . $e->getMessage());
+            $this->fail("AI call failed. Provider: {$provider}, Model: {$model}, Error: ".$e->getMessage());
         }
 
         // Assert that a filename is generated.

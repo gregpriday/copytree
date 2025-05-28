@@ -2,8 +2,8 @@
 
 namespace App\Commands;
 
-use App\Services\ConversationStateService;
 use App\Helpers\PrismHelper;
+use App\Services\ConversationStateService;
 use Illuminate\Support\Facades\File;
 use LaravelZero\Framework\Commands\Command;
 

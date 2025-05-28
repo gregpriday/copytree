@@ -2,10 +2,10 @@
 
 namespace App\Transforms\Transformers\Images;
 
+use App\Helpers\PrismHelper;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\Transformers\Loaders\FileLoader;
-use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Prism\Prism\ValueObjects\Messages\UserMessage;

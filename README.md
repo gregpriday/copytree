@@ -17,6 +17,9 @@ Copytree is a command‑line utility for macOS that copies a directory's structu
     - [Filtering Options](#filtering-options)
 - [Profiles](#profiles)
     - [Profile Creation](#profile-creation)
+- [Editor Integrations](#editor-integrations)
+    - [Claude Code Integration](#claude-code-integration)
+    - [Cursor Integration](#cursor-integration)
 - [Advanced Usage](#advanced-usage)
     - [GitHub URL Handling](#github-url-handling)
     - [Conversation History Management](#conversation-history-management)
@@ -187,6 +190,40 @@ This command:
 3.  **Prompts for Profile Goals:** Enter your goals for the profile (one per line, press Enter with no input to finish).
 4.  **Prompts for a Profile Name:** Provide a name for the profile (defaults to "default" if no name is provided).
 5.  **Generates and Saves the Profile:** Copytree uses the Gemini API to generate a profile based on the project files and your goals.  The profile is saved as a JSON file in the project's `.ctree` directory (e.g., `.ctree/my-profile.json`).  If no profile name is specified it will save the profile as `default.json`.
+
+-----
+
+## Editor Integrations
+
+### Claude Code Integration
+
+Copytree includes an MCP (Model Context Protocol) server that integrates seamlessly with Claude Code:
+
+```bash
+copytree install:claude
+```
+
+This command:
+- Creates or updates `mcp.json` in your project root
+- Configures the CopyTree MCP server for automatic loading in Claude Code
+- Optionally appends usage instructions to your `CLAUDE.md` file
+
+Once installed, the `project_ask` tool becomes available in Claude Code, allowing you to query your codebase with features like:
+- Stateful conversations for follow-up questions
+- Streaming responses for real-time generation
+- Automatic project context gathering
+
+For detailed setup instructions, see the [Claude Code Integration Guide](docs/installation/claude-integration.md).
+
+### Cursor Integration
+
+For Cursor editor users, Copytree provides a custom rule file that enables the `@copytree` command:
+
+```bash
+copytree install:cursor
+```
+
+This allows you to use `@copytree ask` directly within Cursor's AI chat interface. See the [Cursor Integration Guide](docs/installation/cursor-integration.md) for more details.
 
 -----
 

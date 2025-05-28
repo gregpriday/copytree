@@ -53,6 +53,7 @@ class MCPService
         $stateKeyInput = $arguments['state'] ?? null; // Get the raw input
         $providerOption = $arguments['ask-provider'] ?? null;
         $modelSizeOption = $arguments['ask-model-size'] ?? null;
+        $streamRequested = isset($arguments['stream']) && filter_var($arguments['stream'], FILTER_VALIDATE_BOOLEAN);
 
         // --- Add this validation block ---
         if ($stateKeyInput !== null && ! is_string($stateKeyInput)) {
@@ -137,8 +138,15 @@ class MCPService
             $history,
             $stateKey,
             $providerName,
-            $modelNameString
+            $modelNameString,
+            $streamRequested
         );
+
+        // Check if streaming was requested
+        if (isset($processedData['streaming_request']) && $processedData['streaming_request'] === true) {
+            // Return the streaming request data for handling by McpCommand
+            return $processedData;
+        }
 
         // Construct response payload using the structured data
         return $this->buildResponsePayload(
@@ -211,10 +219,27 @@ class MCPService
         array $history,
         string $stateKey, // Ensure stateKey is always a string here
         string $providerName,
-        string $modelNameString
+        string $modelNameString,
+        bool $streamRequested = false
     ): array {
         try {
-            // Call askQuestion with the new signature
+            if ($streamRequested) {
+                Log::channel('mcp')->info("Streaming response requested for question, Provider: [{$providerName}], Model: [{$modelNameString}]");
+
+                // For streaming, we'll return a special structure that indicates
+                // streaming should be handled by the caller (McpCommand)
+                return [
+                    'streaming_request' => true,
+                    'copytreeOutput' => $copytreeOutput,
+                    'question' => $question,
+                    'history' => $history,
+                    'stateKey' => $stateKey,
+                    'providerName' => $providerName,
+                    'modelNameString' => $modelNameString,
+                ];
+            }
+
+            // Non-streaming path: Call askQuestion with the new signature
             $apiResponse = $questionService->askQuestion(
                 $copytreeOutput,
                 $question,
@@ -274,7 +299,7 @@ class MCPService
                         $totalCost += ($outputTokens / 1000000) * $outputPrice;
                     }
                 } else {
-                    Log::channel('mcp')->warning("One or more pricing values missing/invalid for {$provider}:{$modelSize}. Cost not calculated.");
+                    Log::channel('mcp')->warning("One or more pricing values missing/invalid for {$providerName}:{$modelSize}. Cost not calculated.");
                     $pricingFound = false; // Mark as not found if prices invalid
                 }
             } else {
@@ -430,5 +455,59 @@ class MCPService
         Log::channel('mcp')->warning("Could not determine model size for {$providerName}:{$modelNameString}, defaulting to 'small'");
 
         return 'small';
+    }
+
+    /**
+     * Calculate the cost for AI usage.
+     *
+     * @param  string  $providerName  The AI provider name.
+     * @param  string  $modelNameString  The AI model identifier.
+     * @param  int  $inputTokens  Number of input tokens.
+     * @param  int  $outputTokens  Number of output tokens.
+     * @param  int  $cachedInputTokens  Number of cached input tokens.
+     * @return array Cost calculation results.
+     */
+    public function calculateCost(
+        string $providerName,
+        string $modelNameString,
+        int $inputTokens,
+        int $outputTokens,
+        int $cachedInputTokens
+    ): array {
+        $totalCost = 0.0;
+        $modelSize = $this->getModelSizeFromString($providerName, $modelNameString);
+        $pricingConfigKey = "ai.providers.{$providerName}.pricing.{$modelSize}";
+        $pricingFound = $this->config->has($pricingConfigKey);
+        $pricesAvailable = false;
+
+        if ($pricingFound) {
+            $pricing = $this->config->get($pricingConfigKey);
+            $inputPrice = $pricing['input'] ?? null;
+            $outputPrice = $pricing['output'] ?? null;
+            $cachedInputPrice = $pricing['cached_input'] ?? $inputPrice;
+
+            $pricesAvailable = is_numeric($inputPrice) && is_numeric($outputPrice) &&
+                              (is_numeric($cachedInputPrice) || $cachedInputTokens === 0);
+
+            if ($pricesAvailable) {
+                $nonCachedInputTokens = $inputTokens - $cachedInputTokens;
+                if ($nonCachedInputTokens > 0) {
+                    $totalCost += ($nonCachedInputTokens / 1000000) * $inputPrice;
+                }
+                if ($cachedInputTokens > 0 && is_numeric($cachedInputPrice) && $cachedInputPrice > 0) {
+                    $totalCost += ($cachedInputTokens / 1000000) * $cachedInputPrice;
+                }
+                if ($outputTokens > 0) {
+                    $totalCost += ($outputTokens / 1000000) * $outputPrice;
+                }
+            } else {
+                Log::channel('mcp')->warning("One or more pricing values missing/invalid for {$providerName}:{$modelSize}. Cost not calculated.");
+                $pricingFound = false;
+            }
+        } else {
+            Log::channel('mcp')->warning("Pricing configuration key '{$pricingConfigKey}' not found. Cost not calculated.");
+        }
+
+        return compact('totalCost', 'pricingFound', 'pricesAvailable');
     }
 }

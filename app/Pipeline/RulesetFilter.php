@@ -65,17 +65,17 @@ class RulesetFilter
         ?PatternConverter $patternConverter = null
     ) {
         // Check if first argument is an array of rules (advanced format)
-        if (!empty($includeOrRules) && is_array($includeOrRules[0]) && is_array($includeOrRules[0][0] ?? null)) {
+        if (! empty($includeOrRules) && is_array($includeOrRules[0]) && is_array($includeOrRules[0][0] ?? null)) {
             $this->rules = $includeOrRules;
-        } 
+        }
         // Check if exclude parameter contains advanced rules
-        elseif (!empty($exclude) && is_array($exclude[0]) && is_array($exclude[0][0] ?? null)) {
+        elseif (! empty($exclude) && is_array($exclude[0]) && is_array($exclude[0][0] ?? null)) {
             // Store exclude rules separately, they'll be handled differently in evaluateRules
             $this->rules = ['exclude' => $exclude];
         } else {
             $this->include = $includeOrRules;
             $this->exclude = $exclude;
-            
+
             // Handle always array - can be simple array or associative with 'include'/'exclude' keys
             if (isset($always['include']) || isset($always['exclude'])) {
                 if (isset($always['include'])) {
@@ -92,7 +92,7 @@ class RulesetFilter
         $this->patternConverter = $patternConverter ?? new PatternConverter;
         $this->compilePatterns();
     }
-    
+
     /**
      * Negate an operator for exclude rules.
      */
@@ -125,16 +125,16 @@ class RulesetFilter
     protected function compilePatterns(): void
     {
         // Skip pattern compilation if using advanced rules
-        if (!empty($this->rules)) {
+        if (! empty($this->rules)) {
             return;
         }
-        
+
         foreach ($this->include as $pattern) {
             // Skip if pattern is not a string (shouldn't happen with proper constructor logic)
-            if (!is_string($pattern)) {
+            if (! is_string($pattern)) {
                 continue;
             }
-            
+
             // If an include pattern ends with '/', treat it as matching everything inside that directory.
             if (str_ends_with($pattern, '/')) {
                 $pattern .= '**';
@@ -142,7 +142,7 @@ class RulesetFilter
             $this->includeRegex[] = $this->patternConverter->patternToRegex($pattern);
         }
         foreach ($this->exclude as $pattern) {
-            if (!is_string($pattern)) {
+            if (! is_string($pattern)) {
                 continue;
             }
             $this->excludeRegex[] = $this->patternConverter->patternToRegex($pattern);
@@ -165,10 +165,10 @@ class RulesetFilter
     public function accept(SplFileInfo $file): bool
     {
         // Use advanced rules if available
-        if (!empty($this->rules)) {
+        if (! empty($this->rules)) {
             return $this->evaluateRules($file);
         }
-        
+
         // Normalize the file's relative path to use forward slashes.
         $relativePath = str_replace('\\', '/', $file->getRelativePathname());
 
@@ -198,7 +198,7 @@ class RulesetFilter
         // If no include patterns are defined, accept the file.
         return true;
     }
-    
+
     /**
      * Evaluate advanced rules for a file.
      */
@@ -208,62 +208,63 @@ class RulesetFilter
         if (isset($this->rules['exclude'])) {
             foreach ($this->rules['exclude'] as $ruleGroup) {
                 $groupResult = true;
-                
+
                 foreach ($ruleGroup as $rule) {
-                    if (!is_array($rule) || count($rule) < 3) {
+                    if (! is_array($rule) || count($rule) < 3) {
                         continue;
                     }
-                    
+
                     [$field, $operator, $value] = $rule;
-                    
+
                     $fieldValue = $this->getFieldValue($file, $field);
                     $ruleResult = $this->evaluateRule($fieldValue, $operator, $value);
-                    
+
                     // Within a group, all rules must match (AND logic)
-                    if (!$ruleResult) {
+                    if (! $ruleResult) {
                         $groupResult = false;
                         break;
                     }
                 }
-                
+
                 // If any exclude group matches, reject the file
                 if ($groupResult) {
                     return false;
                 }
             }
+
             return true;
         }
-        
+
         // Regular include rules
         foreach ($this->rules as $ruleGroup) {
             $groupResult = true;
-            
+
             foreach ($ruleGroup as $rule) {
-                if (!is_array($rule) || count($rule) < 3) {
+                if (! is_array($rule) || count($rule) < 3) {
                     continue;
                 }
-                
+
                 [$field, $operator, $value] = $rule;
-                
+
                 $fieldValue = $this->getFieldValue($file, $field);
                 $ruleResult = $this->evaluateRule($fieldValue, $operator, $value);
-                
+
                 // Within a group, all rules must match (AND logic)
-                if (!$ruleResult) {
+                if (! $ruleResult) {
                     $groupResult = false;
                     break;
                 }
             }
-            
+
             // All groups must be true (AND logic between groups)
-            if (!$groupResult) {
+            if (! $groupResult) {
                 return false;
             }
         }
-        
+
         return true;
     }
-    
+
     /**
      * Get the value of a field from the file.
      */
@@ -279,7 +280,7 @@ class RulesetFilter
             default => '',
         };
     }
-    
+
     /**
      * Evaluate a single rule.
      */
@@ -289,25 +290,25 @@ class RulesetFilter
             '=', 'is' => $fieldValue === $value,
             '!=', 'isNot' => $fieldValue !== $value,
             'contains' => str_contains($fieldValue, $value),
-            'notContains' => !str_contains($fieldValue, $value),
+            'notContains' => ! str_contains($fieldValue, $value),
             'startsWith' => str_starts_with($fieldValue, $value),
-            'notStartsWith' => !str_starts_with($fieldValue, $value),
+            'notStartsWith' => ! str_starts_with($fieldValue, $value),
             'endsWith' => str_ends_with($fieldValue, $value),
-            'notEndsWith' => !str_ends_with($fieldValue, $value),
+            'notEndsWith' => ! str_ends_with($fieldValue, $value),
             'startsWithAny' => $this->startsWithAny($fieldValue, $value),
-            'notStartsWithAny' => !$this->startsWithAny($fieldValue, $value),
+            'notStartsWithAny' => ! $this->startsWithAny($fieldValue, $value),
             'startsWithAll' => $this->startsWithAll($fieldValue, $value),
             'endsWithAny' => $this->endsWithAny($fieldValue, $value),
-            'notEndsWithAny' => !$this->endsWithAny($fieldValue, $value),
+            'notEndsWithAny' => ! $this->endsWithAny($fieldValue, $value),
             'containsAny' => $this->containsAny($fieldValue, $value),
-            'notContainsAny' => !$this->containsAny($fieldValue, $value),
+            'notContainsAny' => ! $this->containsAny($fieldValue, $value),
             'containsAll' => $this->containsAll($fieldValue, $value),
             'regex', 'matches' => (bool) preg_match($value, $fieldValue),
-            'notMatches' => !preg_match($value, $fieldValue),
+            'notMatches' => ! preg_match($value, $fieldValue),
             default => false,
         };
     }
-    
+
     /**
      * Check if string starts with any of the given prefixes.
      */
@@ -318,22 +319,24 @@ class RulesetFilter
                 return true;
             }
         }
+
         return false;
     }
-    
+
     /**
      * Check if string starts with all of the given prefixes.
      */
     protected function startsWithAll(string $string, array $prefixes): bool
     {
         foreach ($prefixes as $prefix) {
-            if (!str_starts_with($string, $prefix)) {
+            if (! str_starts_with($string, $prefix)) {
                 return false;
             }
         }
+
         return true;
     }
-    
+
     /**
      * Check if string ends with any of the given suffixes.
      */
@@ -344,9 +347,10 @@ class RulesetFilter
                 return true;
             }
         }
+
         return false;
     }
-    
+
     /**
      * Check if string contains any of the given substrings.
      */
@@ -357,19 +361,21 @@ class RulesetFilter
                 return true;
             }
         }
+
         return false;
     }
-    
+
     /**
      * Check if string contains all of the given substrings.
      */
     protected function containsAll(string $string, array $substrings): bool
     {
         foreach ($substrings as $substring) {
-            if (!str_contains($string, $substring)) {
+            if (! str_contains($string, $substring)) {
                 return false;
             }
         }
+
         return true;
     }
 }
