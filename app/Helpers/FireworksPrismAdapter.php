@@ -46,7 +46,7 @@ class FireworksPrismAdapter
             $result = call_user_func_array([$this->pendingRequest, $method], $args);
 
             // If this is a terminal method that returns a response, restore config
-            if (in_array($method, ['asText', 'asStructured', 'asJson', 'stream'])) {
+            if (in_array($method, ['asText', 'asStructured', 'asJson', 'asStream', 'stream'])) {
                 config(['prism.providers.openai' => $this->originalConfig]);
             }
 

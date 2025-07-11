@@ -363,15 +363,39 @@ class McpCommand extends Command
             $outputTokens = 0;
             $cachedInputTokens = 0;
 
+            $lastChunk = null;
             foreach ($stream as $chunk) {
-                $fullResponseText .= $chunk->text;
+                $text = $chunk->text ?? '';
+                if (!empty($text)) {
+                    $fullResponseText .= $text;
+                }
+                $lastChunk = $chunk;
 
-                // Note: Token usage information is typically available only at the end of streaming
-                // Some providers might include it in the meta of the last chunk
-                if ($chunk->meta && $chunk->meta->usage) {
-                    $inputTokens = $chunk->meta->usage->promptTokens ?? $inputTokens;
-                    $outputTokens = $chunk->meta->usage->completionTokens ?? $outputTokens;
-                    $cachedInputTokens = $chunk->meta->usage->cacheReadInputTokens ?? $cachedInputTokens;
+                // Check if this chunk has usage data in additionalContent
+                if (isset($chunk->additionalContent['usage'])) {
+                    $usage = $chunk->additionalContent['usage'];
+                    if (is_object($usage)) {
+                        $inputTokens = $usage->promptTokens ?? $inputTokens;
+                        $outputTokens = $usage->completionTokens ?? $outputTokens;
+                        $cachedInputTokens = $usage->cacheReadInputTokens ?? $cachedInputTokens;
+                    }
+                }
+            }
+            
+            // Handle additional usage data from streaming mode if we didn't get it from chunks
+            if ($inputTokens === 0 && $outputTokens === 0 && isset($lastChunk) && !empty($lastChunk->additionalContent)) {
+                // Check for usage in additionalContent (some providers may put it here)
+                if (isset($lastChunk->additionalContent['usage']) && is_object($lastChunk->additionalContent['usage'])) {
+                    $usage = $lastChunk->additionalContent['usage'];
+                    $inputTokens = $usage->promptTokens ?? 0;
+                    $outputTokens = $usage->completionTokens ?? 0;
+                    $cachedInputTokens = $usage->cacheReadInputTokens ?? 0;
+                }
+                // Some providers might include raw usage data
+                elseif (isset($lastChunk->additionalContent['promptTokens'])) {
+                    $inputTokens = $lastChunk->additionalContent['promptTokens'] ?? 0;
+                    $outputTokens = $lastChunk->additionalContent['completionTokens'] ?? 0;
+                    $cachedInputTokens = $lastChunk->additionalContent['cacheReadInputTokens'] ?? 0;
                 }
             }
 

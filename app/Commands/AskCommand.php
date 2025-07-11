@@ -30,7 +30,8 @@ class AskCommand extends Command
         {--s|state= : Optional state key to continue a previous conversation.}
         {--order-by=modified : Specify the file ordering for the context (default|modified).}
         {--ask-provider= : Specify the AI provider for asking questions (e.g., openai, gemini).}
-        {--ask-model-size= : Specify the AI model size (small, medium, large).}';
+        {--ask-model-size= : Specify the AI model size (small, medium, large).}
+        {--no-stream : Use non-streaming mode (provides token counts for Gemini).}';
 
     /**
      * The description of the command.
@@ -189,21 +190,53 @@ class AskCommand extends Command
         $cachedInputTokens = 0;
 
         try {
-            // Always use streaming mode - it will work with both real providers and tests
-            $stream = $questionService->askQuestionStream(
-                $copytree,
-                $question,
-                $history,
-                $providerName,
-                $modelNameString
-            );
+            // Check if we should use non-streaming mode
+            $useStreaming = !$this->option('no-stream');
+            
+            if (!$useStreaming) {
+                // Non-streaming mode - better for token counts with Gemini
+                $response = $questionService->askQuestion(
+                    $copytree,
+                    $question,
+                    $history,
+                    $providerName,
+                    $modelNameString
+                );
+                
+                // Start a new line for the response
+                $this->output->newLine();
+                
+                // Output the full response
+                $fullResponseText = $response->text ?? '';
+                $this->output->write($fullResponseText);
+                
+                // Get usage data from response
+                if (isset($response->usage) && is_object($response->usage)) {
+                    $inputTokens = $response->usage->promptTokens ?? 0;
+                    $outputTokens = $response->usage->completionTokens ?? 0;
+                    $cachedInputTokens = $response->usage->cacheReadInputTokens ?? 0;
+                }
+                
+                // Ensure we end with a newline
+                if (!empty($fullResponseText) && !str_ends_with($fullResponseText, "\n")) {
+                    $this->output->newLine();
+                }
+            } else {
+                // Streaming mode (default)
+                $stream = $questionService->askQuestionStream(
+                    $copytree,
+                    $question,
+                    $history,
+                    $providerName,
+                    $modelNameString
+                );
 
-            // Start a new line for the response
-            $this->output->newLine();
+                // Start a new line for the response
+                $this->output->newLine();
 
-            // Stream the response tokens as they arrive
-            $lastChunk = null;
-            foreach ($stream as $chunk) {
+                // Stream the response tokens as they arrive
+                $lastChunk = null;
+                foreach ($stream as $chunk) {
                 $text = $chunk->text ?? '';
                 if (! empty($text)) {
                     $this->output->write($text);
@@ -244,6 +277,7 @@ class AskCommand extends Command
                     $cachedInputTokens = $lastChunk->additionalContent['cacheReadInputTokens'] ?? 0;
                 }
             }
+            } // End of streaming mode block
 
             // Handle OpenAI's cached token adjustment if we got usage data
             if ($inputTokens > 0 || $outputTokens > 0) {
@@ -333,7 +367,12 @@ class AskCommand extends Command
                 );
                 $this->info($tokenInfo);
             } else {
-                $this->comment('Token usage information not available in API response.');
+                // Provider-specific messaging
+                if ($providerName === 'gemini') {
+                    $this->comment('Token usage not available (Prism library limitation with Gemini streaming). Use --no-stream for token counts.');
+                } else {
+                    $this->comment('Token usage information not available in API response.');
+                }
             }
 
             // Display Follow-up Info
