@@ -140,4 +140,51 @@ class FileTransformer implements FileTransformerInterface
 
         return $count;
     }
+
+    /**
+     * Get the transformer that would be applied to a file.
+     *
+     * @param  SplFileInfo  $file  The file to check.
+     * @return string|null The transformer class name or null if no transformer applies.
+     */
+    public function getTransformerForFile(SplFileInfo $file): ?string
+    {
+        $relativePath = $file->getRelativePathname();
+
+        foreach ($this->transformerMappings as [$regex, $transformer]) {
+            if (preg_match($regex, $relativePath)) {
+                // Return a short name for the transformer
+                $className = get_class($transformer);
+                
+                // Remove namespace prefix for brevity
+                if (str_starts_with($className, 'App\\Transforms\\Transformers\\')) {
+                    $shortName = str_replace('App\\Transforms\\Transformers\\', '', $className);
+                    // Further simplify common transformer names
+                    $shortName = str_replace('\\', '.', $shortName);
+                    
+                    // Make names even shorter and clearer
+                    $transformerAliases = [
+                        'Images.ImageDescription' => 'image→text',
+                        'Images.SvgDescription' => 'svg→text',
+                        'Converters.PDFToText' => 'pdf→text',
+                        'Converters.DocumentToText' => 'doc→text',
+                        'Markdown.MarkdownLinkStripper' => 'md→strip-links',
+                        'Markdown.MarkdownStripper' => 'md→strip',
+                        'HTML.HTMLStripper' => 'html→text',
+                        'Generic.FirstLinesTransformer' => 'first-lines',
+                        'CSV.CSVFirstLinesTransformer' => 'csv-preview',
+                        'Summarizers.CodeSummary' => 'code→summary',
+                        'Summarizers.FileSummary' => 'file→summary',
+                        'Summarizers.UnitTestSummary' => 'test→summary',
+                    ];
+                    
+                    return $transformerAliases[$shortName] ?? $shortName;
+                }
+                
+                return $className;
+            }
+        }
+
+        return null;
+    }
 }

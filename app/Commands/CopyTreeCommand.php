@@ -21,6 +21,7 @@ use App\Renderer\FileOutputRenderer;
 use App\Renderer\SizeReportRenderer;
 use App\Renderer\TreeRenderer;
 use App\Services\ByteCounter;
+use App\Transforms\FileTransformer;
 use App\Services\GitHubUrlHandler;
 use App\Utilities\Clipboard;
 use App\Utilities\TempFileManager;
@@ -47,6 +48,7 @@ class CopyTreeCommand extends Command
         {--C|max-characters=0 : Maximum number of characters to show per file. Use 0 for unlimited.}
         {--t|only-tree : Include only the directory tree in the output, not the file contents.}
         {--p|profile=auto : Profile to apply.}
+        {--no-profile : Skip profile loading entirely (useful for creating new profiles).}
         {--f|filter=* : Filter files using glob patterns.}
         {--a|ai-filter=* : Filter files using AI based on a natural language description.}
         {--m|modified : Only include files that have been modified since the last commit.}
@@ -58,7 +60,9 @@ class CopyTreeCommand extends Command
         {--no-cache : Do not use or keep cached GitHub repositories.}
         {--s|size-report : Display a report of files sorted by size after transformation.}
         {--order-by=default : Specify the file ordering (default|modified).}
-        {--debug : Route ALL logs to console and set level to debug for this run.}';
+        {--debug : Route ALL logs to console and set level to debug for this run.}
+        {--dry-run : Simulate the copy process and list files without full output.}
+        {--validate : Validate the profile and exit without copying.}';
 
     /**
      * The description of the command.
@@ -89,6 +93,55 @@ class CopyTreeCommand extends Command
         TempFileManager::cleanOldFiles();
         Log::debug('Old temporary files cleaned up');
 
+        // Check for --validate flag early
+        if ($this->option('validate')) {
+            // Check for conflicting options
+            $conflictingOptions = [];
+            if ($this->option('dry-run')) $conflictingOptions[] = '--dry-run';
+            if ($this->option('ai-filter')) $conflictingOptions[] = '--ai-filter';
+            if ($this->option('changes')) $conflictingOptions[] = '--changes';
+            if ($this->option('modified')) $conflictingOptions[] = '--modified';
+            if ($this->option('output')) $conflictingOptions[] = '--output';
+            if ($this->option('as-reference')) $conflictingOptions[] = '--as-reference';
+            if ($this->option('display')) $conflictingOptions[] = '--display';
+            if ($this->option('stream')) $conflictingOptions[] = '--stream';
+            
+            if (!empty($conflictingOptions)) {
+                $this->error('--validate may not be used with ' . implode(', ', $conflictingOptions) . '.');
+                return 2; // INVALID exit code
+            }
+            
+            // Use the provided path argument or fallback to the current working directory.
+            $projectPath = $this->argument('path') ?: getcwd();
+            
+            // Determine profile name
+            $profileName = null;
+            if (!$this->option('no-profile')) {
+                try {
+                    $profileGuesser = new ProfileGuesser($projectPath);
+                    $profileName = $this->option('profile') === 'auto'
+                        ? $profileGuesser->guess()
+                        : $this->option('profile');
+                } catch (Exception $e) {
+                    $this->error('Profile error: '.$e->getMessage());
+                    return self::FAILURE;
+                }
+            }
+            
+            // Call the profile:validate command
+            if ($profileName) {
+                // Change to project directory for validation
+                $originalDir = getcwd();
+                chdir($projectPath);
+                $result = $this->call('profile:validate', ['name' => $profileName]);
+                chdir($originalDir);
+                return $result;
+            } else {
+                $this->error('No profile specified or found. Use --profile to specify a profile.');
+                return self::FAILURE;
+            }
+        }
+
         // Display warning if this is not macOS
         if (PHP_OS_FAMILY !== 'Darwin') {
             $this->warn('This command is designed for macOS and may not work as expected on other operating systems.');
@@ -106,40 +159,58 @@ class CopyTreeCommand extends Command
             $projectPath = $handler->getFiles();
         }
 
-        try {
-            // Load the profile configuration.
-            $profileGuesser = new ProfileGuesser($projectPath);
-            Log::debug('Profile guesser initialized', ['project_path' => $projectPath]);
+        // Only load profile if --no-profile is not set
+        if (!$this->option('no-profile')) {
+            try {
+                // Load the profile configuration.
+                $profileGuesser = new ProfileGuesser($projectPath);
+                Log::debug('Profile guesser initialized', ['project_path' => $projectPath]);
 
-            $profileName = $this->option('profile') === 'auto'
-                ? $profileGuesser->guess()
-                : $this->option('profile');
-            Log::debug('Profile name determined', ['profile' => $profileName, 'auto_guessed' => $this->option('profile') === 'auto']);
+                $profileName = $this->option('profile') === 'auto'
+                    ? $profileGuesser->guess()
+                    : $this->option('profile');
+                Log::debug('Profile name determined', ['profile' => $profileName, 'auto_guessed' => $this->option('profile') === 'auto']);
 
-            $profilePath = $profileGuesser->getProfilePath($profileName);
-            Log::debug('Profile path resolved', ['profile_path' => $profilePath]);
-        } catch (Exception $e) {
-            Log::error('Profile error', ['message' => $e->getMessage(), 'exception' => $e]);
-            $this->error('Profile error: '.$e->getMessage());
+                $profilePath = $profileGuesser->getProfilePath($profileName);
+                Log::debug('Profile path resolved', ['profile_path' => $profilePath]);
+            } catch (Exception $e) {
+                Log::error('Profile error', ['message' => $e->getMessage(), 'exception' => $e]);
+                $this->error('Profile error: '.$e->getMessage());
 
-            return self::FAILURE;
+                return self::FAILURE;
+            }
+
+            $profileLoader = new ProfileLoader($projectPath);
+            $profileLoader->load($profilePath, [
+                'profile' => $this->option('profile'),
+                'filter' => (array) $this->option('filter'),
+                'ai_filter' => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
+                'modified' => $this->option('modified'),
+                'changes' => $this->option('changes'),
+                'depth' => (int) $this->option('depth'),
+                'max_lines' => (int) $this->option('max-lines'),
+            ]);
+            Log::debug('Profile loaded', [
+                'profile' => $this->option('profile'),
+                'filters' => (array) $this->option('filter'),
+                'ai_filters' => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
+            ]);
+        } else {
+            // When --no-profile is used, we still need to apply command-line options
+            $profileLoader = new ProfileLoader($projectPath);
+            $profileLoader->load(null, [
+                'filter' => (array) $this->option('filter'),
+                'ai_filter' => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
+                'modified' => $this->option('modified'),
+                'changes' => $this->option('changes'),
+                'depth' => (int) $this->option('depth'),
+                'max_lines' => (int) $this->option('max-lines'),
+            ]);
+            Log::debug('No profile loaded (--no-profile option used)', [
+                'filters' => (array) $this->option('filter'),
+                'ai_filters' => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
+            ]);
         }
-
-        $profileLoader = new ProfileLoader($projectPath);
-        $profileLoader->load($profilePath, [
-            'profile' => $this->option('profile'),
-            'filter' => (array) $this->option('filter'),
-            'ai_filter' => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
-            'modified' => $this->option('modified'),
-            'changes' => $this->option('changes'),
-            'depth' => (int) $this->option('depth'),
-            'max_lines' => (int) $this->option('max-lines'),
-        ]);
-        Log::debug('Profile loaded', [
-            'profile' => $this->option('profile'),
-            'filters' => (array) $this->option('filter'),
-            'ai_filters' => $this->option('ai-filter') !== false ? $this->option('ai-filter') : null,
-        ]);
 
         // Load the initial file set.
         $depth = (int) $this->option('depth');
@@ -156,6 +227,8 @@ class CopyTreeCommand extends Command
         // Build the pipeline using a Laravel Pipeline.
         $pipeline = app(Pipeline::class)->send($files);
 
+        $isDryRun = $this->option('dry-run');  // Check the flag once
+
         // Add Git filtering if requested.
         if ($this->option('modified') || $this->option('changes')) {
             $pipeline->pipe([
@@ -163,12 +236,17 @@ class CopyTreeCommand extends Command
             ]);
         }
 
-        // Add AI filtering if requested.
+        // Add AI filtering if requested, but skip in dry-run to avoid API calls.
         $aiFilters = (array) $this->option('ai-filter');
-        foreach ($aiFilters as $filterDescription) {
-            $pipeline->pipe([
-                new AIFilterStage($filterDescription),
-            ]);
+        if (!$isDryRun) {
+            foreach ($aiFilters as $filterDescription) {
+                $pipeline->pipe([
+                    new AIFilterStage($filterDescription),
+                ]);
+            }
+        } else if (!empty($aiFilters)) {
+            Log::debug('Skipping AI filtering in dry-run mode to avoid heavy processing.');
+            $this->warn('AI filters are skipped in --dry-run mode.');
         }
 
         // Add external sources if configured in the profile.
@@ -179,11 +257,20 @@ class CopyTreeCommand extends Command
         }
 
         // Apply ruleset filtering if configured.
-        if (config('profile.include') || config('profile.exclude')) {
+        // Check for include/exclude rules or filter option
+        $includeRules = config('profile.include', []);
+        $filterRules = config('profile.filter', []);
+        
+        // If filter option is provided, use it as include rules
+        if (!empty($filterRules) && empty($includeRules)) {
+            $includeRules = $filterRules;
+        }
+        
+        if ($includeRules || config('profile.exclude')) {
             $pipeline->pipe([
                 new RulesetFilterStage(
                     new RulesetFilter(
-                        config('profile.include', []),
+                        $includeRules,
                         config('profile.exclude', []),
                         config('profile.always', [])
                     )
@@ -227,6 +314,79 @@ class CopyTreeCommand extends Command
         $finalFiles = $pipeline->then(function ($files) {
             return $files;
         });
+
+        // If dry-run, output the file list and exit early.
+        if ($isDryRun) {
+            if (empty($finalFiles)) {
+                $this->info('No files would be included based on the current filters and profile.');
+            } else {
+                $this->info('Files that would be included:');
+                
+                // Get FileTransformer instance to check transformations
+                $fileTransformer = null;
+                $transforms = config('profile.transforms', []);
+                
+                if (!empty($transforms)) {
+                    try {
+                        // Create a new FileTransformer instance with current transforms
+                        $fileTransformer = new FileTransformer($transforms);
+                    } catch (\Exception $e) {
+                        // If we can't get the transformer, continue without transformation info
+                        Log::debug('Could not instantiate FileTransformer in dry-run mode', ['error' => $e->getMessage()]);
+                    }
+                }
+                
+                // Prepare file information and check for transformers
+                $fileInfos = [];
+                $transformerMap = [];
+                
+                foreach ($finalFiles as $file) {
+                    $path = $file->getRelativePathname();
+                    $size = $this->formatFileSize($file->getSize());
+                    
+                    $fileInfos[] = [
+                        'path' => $path,
+                        'size' => $size,
+                    ];
+                    
+                    // Check if file would be transformed
+                    if ($fileTransformer) {
+                        $transformer = $fileTransformer->getTransformerForFile($file);
+                        if ($transformer) {
+                            if (!isset($transformerMap[$transformer])) {
+                                $transformerMap[$transformer] = [];
+                            }
+                            $transformerMap[$transformer][] = $path;
+                        }
+                    }
+                }
+                
+                // Sort by path for consistent output
+                usort($fileInfos, function ($a, $b) {
+                    return strcmp($a['path'], $b['path']);
+                });
+                
+                // Output file information
+                foreach ($fileInfos as $info) {
+                    $line = $info['path'] . ' [' . $info['size'] . ']';
+                    $this->line($line);
+                }
+                
+                $this->info("\nTotal files: " . count($finalFiles));
+                
+                // Show transformer information if any
+                if (!empty($transformerMap)) {
+                    $this->info("\nTransformations that would be applied:");
+                    foreach ($transformerMap as $transformer => $files) {
+                        $this->info("  " . $transformer . ":");
+                        foreach ($files as $file) {
+                            $this->line("    - " . $file);
+                        }
+                    }
+                }
+            }
+            return self::SUCCESS;  // Exit early
+        }
 
         // If the size-report option is selected, render the size report and exit
         if ($this->option('size-report')) {
@@ -337,8 +497,13 @@ class CopyTreeCommand extends Command
             // Create a temporary file and copy its reference to the clipboard.
             $tempFile = TempFileManager::createTempFile($combinedOutput);
             (new Clipboard)->copy($tempFile, true);
+            
+            // Get just the filename and file size
+            $filename = basename($tempFile);
+            $fileSize = $this->formatFileSize(filesize($tempFile));
+            
             Log::debug('Copied reference to clipboard', ['temp_file' => $tempFile]);
-            $this->info("Copied reference to temporary file: {$tempFile}");
+            $this->info("Copied reference to temporary file: {$filename} [{$fileSize}]");
         } else {
             // Copy the output directly to the clipboard.
             (new Clipboard)->copy($combinedOutput);
@@ -377,6 +542,25 @@ class CopyTreeCommand extends Command
 
         if ($this->option('debug')) {
             Log::debug('Revealed file in Finder', ['path' => $filePath]);
+        }
+    }
+
+    /**
+     * Format file size in human-readable format.
+     *
+     * @param  int  $bytes  The file size in bytes.
+     * @return string The formatted file size.
+     */
+    private function formatFileSize(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes . ' B';
+        } elseif ($bytes < 1048576) {
+            return round($bytes / 1024, 1) . ' KB';
+        } elseif ($bytes < 1073741824) {
+            return round($bytes / 1048576, 1) . ' MB';
+        } else {
+            return round($bytes / 1073741824, 1) . ' GB';
         }
     }
 }

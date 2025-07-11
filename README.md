@@ -6,8 +6,40 @@ Copytree is a command‑line utility for macOS that copies a directory's structu
 
 -----
 
+## ⚡ Quick-start: Generate Copytree assets with Claude Code
+
+```bash
+# Create a project profile in one conversation
+claude -p "Please create a *Copytree profile* for this project.  
+Start by running \`copytree copy:docs --display\` to read the profile docs,  
+then walk through an iterative process to ship a default profile."
+
+# ...or build a .ctreeignore file instead
+claude -p "Please create a *.ctreeignore* file for this project.  
+Start by running \`copytree copy:docs --display\` to review ignore-file rules,  
+then iteratively refine the defaults."
+```
+
+> **Why the `copytree copy:docs --display` step?**  
+> It streams Copytree's own profile/ignore documentation into Claude's context so the assistant can
+> propose rules that match the officially supported schema instead of hallucinating keys.
+
+Need background first?  
+📄 [Profile docs](docs/profiles/profile-overview.md) │  
+📑 [Creating & Refining Profiles](docs/profiles/profile-creation-guide.md) │  
+🚫 [.ctreeignore explained](docs/profiles/ctreeignore.md) │  
+🤖 [Claude Code integration](docs/installation/claude-integration.md)
+
+```bash
+# Validate the YAML without running a full copy
+copytree copy . --profile myprofile --validate        # 0 = valid
+```
+
+-----
+
 ## Table of Contents
 
+- [⚡ Quick-start: Generate Copytree assets with Claude Code](#-quick-start-generate-copytree-assets-with-claude-code)
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -162,6 +194,33 @@ Then update the `.env` file with your Gemini API credentials (if using AI featur
   copytree --changes commit1:commit2
   ```
 
+### Debugging with --dry-run
+
+Use the `--dry-run` flag with the `copy` command to simulate file selection without generating full output or performing heavy operations (e.g., AI filtering or transformations). This lists the files that would be included based on filters, profiles, and pipeline stages.
+
+Example:
+
+```bash
+copytree copy /path/to/project --dry-run --filter="*.php" --profile=laravel
+```
+
+Output:
+
+```
+Files that would be included:
+app/Models/User.php
+app/Http/Controllers/HomeController.php
+...
+Total files: 42
+```
+
+Note: AI filters (--ai-filter) are skipped in dry-run mode to avoid API calls.
+
+👉 See [Creating & Refining Profiles](./docs/profiles/profile-creation-guide.md) for a full step-by-step workflow.
+
+**Need a fast profile lint?**  
+`copytree copy . --profile api --validate` validates the YAML and exits, saving you a full run.
+
 -----
 
 ## Profiles
@@ -173,7 +232,9 @@ Profiles offer granular control over which files are included, how they are proc
 - **Specify Profile:** Use the `--profile <profile_name>` option to specify a profile.  For example, `copytree --profile frontend`.
 - **Multiple Profiles** It is possible to define multiple profiles for the same project.
 
-For full details on creating and using profiles, see the [Profile Documentation](./docs/profiles/profiles.md).
+> **Need to iterate on profiles?** Run `copytree --dry-run` to preview file selection without generating output. See the full workflow guide: [Creating & Refining Profiles](./docs/profiles/profile-creation-guide.md)
+
+For full details on creating and using profiles, see the [Profile Documentation](./docs/profiles/profile-overview.md). Use [`--validate`](./docs/cli/copytree-reference.md#--validate) to quickly check profile syntax.
 
 ### Profile Creation
 
@@ -209,7 +270,7 @@ This command:
 - Optionally appends usage instructions to your `CLAUDE.md` file
 
 Once installed, the `project_ask` tool becomes available in Claude Code, allowing you to query your codebase with features like:
-- Stateful conversations for follow-up questions
+- Stateful conversations for follow-up questions (using the `state` parameter)
 - Streaming responses for real-time generation
 - Automatic project context gathering
 

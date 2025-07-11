@@ -54,6 +54,33 @@ A profile in Copytree is defined in a YAML file (e.g. `.ctree.yaml`) with the fo
         - "**/*.md"
   ```
 
+## Optional Keys
+
+In addition to the core configuration keys, profiles support these optional metadata and inheritance features:
+
+- **name**  
+  A human-readable name for the profile (metadata only).  
+  Example:
+  ```yaml
+  name: "Laravel API Project"
+  ```
+
+- **description**  
+  A longer description explaining the profile's purpose (metadata only).  
+  Example:
+  ```yaml
+  description: "Profile for Laravel projects focusing on API endpoints and models"
+  ```
+
+- **extends**  
+  Inherit configuration from another profile. The child profile's rules will be merged with the parent, with child rules taking precedence.  
+  Example:
+  ```yaml
+  extends: "base.yaml"
+  include:
+    - "app/Http/Resources/**/*.php"  # Added to parent's includes
+  ```
+
 ## Order of Execution
 
 When processing files, Copytree applies the filtering rules in the following order:
@@ -69,16 +96,7 @@ When processing files, Copytree applies the filtering rules in the following ord
 
 This filtering mechanism is based on standard gitignore behavior, ensuring intuitive and familiar file selection using gitignore-style syntax.
 
-## How Profiles Work
-
-1. **File Selection**  
-   The system applies the **include** and **exclude** patterns based on the order described above. The **always** list then forces the inclusion of specified files regardless of the filtering outcome.
-
-2. **Transformations**  
-   Once the files are selected, any file matching a transform rule (specified in the **transforms** section) will have the corresponding transformation applied. The transformer identifier (e.g. `Summarizers.FileSummary`) is converted into a fully qualified class name and executed on the matching files.
-
-3. **External Sources**  
-   Files from external sources are merged into the final output using their own **include** patterns and are remapped under the defined destination prefix.
+For detailed information on advanced glob patterns, complex transformations, and external source configuration, see [Advanced Profiles](profile-advanced.md).
 
 ## Best Practices
 

@@ -1,4 +1,6 @@
-# Advanced YAML Profiles for Copytree
+# Advanced YAML Profiles & Pattern Power
+
+If you're new to profiles, read [Profiles – Overview](profile-overview.md) first.
 
 This document focuses on advanced file selection techniques using the new simplified YAML format. These advanced techniques help you fine‑tune which files are copied, even when your project structure is complex or when multiple conditions must be considered.
 
