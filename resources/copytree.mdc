@@ -28,7 +28,7 @@ To ask a question about the codebase, use the `copytree ask` command with the qu
 copytree ask "Your question here"
 ```
 
-**Important:** To avoid issues with escaping special characters, do not use apostrophes (`'`), dollar signs (`$`), backslashes (`\`), or other special characters in your questions. The `copytree ask` command uses an advanced language model that can understand questions without these characters, so keep them simple and clear. For example, write "Let us proceed" instead of "Let’s proceed" and avoid symbols like `$variable`.
+**Important:** To avoid issues with escaping special characters, do not use apostrophes (`'`), dollar signs (`$`), backslashes (`\`), or other special characters in your questions. The `copytree ask` command uses an advanced language model that can understand questions without these characters, so keep them simple and clear. For example, write "Let us proceed" instead of "Let's proceed" and avoid symbols like `$variable`.
 
 For example:
 
@@ -36,31 +36,42 @@ For example:
 copytree ask "How does the User model interact with the Authentication service?"
 ```
 
-This command must be executed from the project directory. It will analyze the codebase and provide intelligent responses about the code’s structure, functionality, and specific implementation details.
+This command must be executed from the project directory. It will analyze the codebase and provide intelligent responses about the code's structure, functionality, and specific implementation details.
 
 ## State Management
 
 By default, `copytree ask` is stateless, meaning each question is analyzed independently without knowledge of previous interactions.
-
-You can optionally maintain conversation history using the `--state` flag. This is useful when you need to ask follow-up questions or perform a series of related commands where context is important. Start a state whenever you expect to ask follow-up questions or need to maintain context across multiple queries.
-
-Generally, it is safer to use stateful mode for most interactions, as it allows you to build on previous context and maintain a coherent conversation. Only use stateless mode for isolated questions where you know you won’t need follow-up questions.
+You can optionally maintain conversation history using the `--state` flag (when using the CLI) or the `state` argument (when using the MCP tool).
+This is useful when you need to ask follow-up questions or perform a series of related commands where context is important.
+Start a state whenever you expect to ask follow-up questions or need to maintain context across multiple queries.
+Generally, it is safer to use stateful mode for most interactions, as it allows you to build on previous context and maintain a coherent conversation.
+Only use stateless mode for isolated questions where you know you won't need follow-up questions.
 
 -   **Starting a New Stateful Conversation:**
-    To begin a new conversation and generate a state key, use the flag without a value:
+    To begin a new conversation and generate a state key, omit the `state` argument or pass it without a value (the server handles this):
     ```bash
+    # CLI Example:
     copytree ask "Initial question about the project" --state
+    # MCP / Cursor Example (@copytree ask):
+    # Simply ask the first question. The server generates the key.
+    # The returned result will contain the new 'state_key'.
     ```
-    After the command completes, it will output the new state key like this: `Saved interaction to state: <state_key>`. Note this key for future use.
+    After the command completes, the MCP result will contain the new `state_key`. Note this key for future use.
 
 -   **Continuing an Existing Conversation:**
-    To continue a conversation using a previously generated key, provide the key as the value for the flag:
+    To continue a conversation using a previously generated key, provide the key as the value for the `state` argument:
     ```bash
+    # CLI Example:
     copytree ask "Follow-up question based on previous context" --state=<state_key>
+    # MCP / Cursor Example (@copytree ask):
+    # Add the state argument with the key.
+    @copytree ask "Follow-up question" state=<state_key>
     ```
-    Replace `<state_key>` with the key you noted earlier. The command will load the previous history associated with that key.
+    Replace `<state_key>` with the key you noted earlier.
+    The command will load the previous history associated with that key.
 
-**When to use state:** Only maintain state when you anticipate a multi-step workflow where subsequent commands build upon the context established by earlier ones. For isolated questions, running in stateless mode (without the `--state` flag) is sufficient.
+**When to use state:** Only maintain state when you anticipate a multi-step workflow where subsequent commands build upon the context established by earlier ones.
+For isolated questions, running in stateless mode (without the `state` argument) is sufficient.
 
 ## Examples
 
@@ -111,14 +122,15 @@ Here are examples of the types of questions you can ask using the `copytree ask`
     copytree ask "I have just implemented the new GitHubUrlHandler class. Can you confirm that it has been correctly added and integrated into the project?"
     ```
 
--   **Using State for Follow-up:**
-    ```bash
-    # First command, starting a new state
-    copytree ask "Where is the main entry point for processing user requests?" --state
-    # Note the output: Saved interaction to state: abc123xyz
+-   **Using State for Follow-up (MCP / Cursor):**
+    ```
+    # First query (no state argument needed to start)
+    @copytree ask "Where is the main entry point for processing user requests?"
 
-    # Second command, continuing the conversation
-    copytree ask "Based on that entry point how is authentication handled?" --state=abc123xyz
+    # Assume the result includes "state_key": "abc123xyz"
+
+    # Second query, continuing the conversation
+    @copytree ask "Based on that entry point how is authentication handled?" state=abc123xyz
     ```
 
 ## When to Use

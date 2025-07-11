@@ -3,6 +3,9 @@
 namespace App\Pipeline\Stages;
 
 use App\Pipeline\FilePipelineStageInterface;
+use GregPriday\GitIgnore\PatternConverter;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
 
 /**
@@ -25,6 +28,8 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
      */
     protected array $alwaysInclude;
 
+    protected PatternConverter $patternConverter;
+
     /**
      * Create a new AlwaysIncludeStage.
      *
@@ -35,6 +40,7 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
     {
         $this->basePath = rtrim($basePath, DIRECTORY_SEPARATOR);
         $this->alwaysInclude = $alwaysInclude;
+        $this->patternConverter = new PatternConverter;
     }
 
     /**
@@ -57,31 +63,108 @@ class AlwaysIncludeStage implements FilePipelineStageInterface
             $existingFiles[$normalizedPath] = $file;
         }
 
-        // Add any missing "always include" files
-        foreach ($this->alwaysInclude as $alwaysFile) {
-            // Normalize the path
-            $normalizedPath = str_replace('\\', '/', $alwaysFile);
+        $filesToAdd = [];
 
-            // Skip if the file is already included
-            if (isset($existingFiles[$normalizedPath])) {
-                continue;
-            }
+        foreach ($this->alwaysInclude as $alwaysItem) {
+            // Check if the item is likely a glob pattern
+            if ($this->isGlobPattern($alwaysItem)) {
+                // --- Handle Glob Pattern ---
+                try {
+                    // Convert gitignore glob to regex for Finder's path()
+                    $regexPattern = $this->patternConverter->patternToRegex($alwaysItem);
 
-            // Check if the file exists
-            $fullPath = $this->basePath.DIRECTORY_SEPARATOR.$alwaysFile;
-            if (file_exists($fullPath) && is_file($fullPath)) {
-                // Create a new SplFileInfo and add it to the files array
-                $dirname = dirname($alwaysFile);
-                $dirname = $dirname === '.' ? '' : $dirname;
-                $newFile = new SplFileInfo(
-                    $fullPath,
-                    $dirname,
-                    $alwaysFile
-                );
-                $files[] = $newFile;
+                    $finder = new Finder;
+                    $finder->files()
+                        ->in($this->basePath)
+                        ->path($regexPattern)
+                        ->ignoreDotFiles(false)
+                        ->ignoreVCS(true);
+
+                    foreach ($finder as $foundFile) {
+                        /** @var SplFileInfo $foundFile */
+                        // Ensure we have a relative path for lookup consistency
+                        $relativePath = str_replace('\\', '/', $foundFile->getRelativePathname());
+
+                        // Add only if not already in the list passed to this stage
+                        // and not already queued to be added by another pattern/exact match
+                        if (! isset($existingFiles[$relativePath]) && ! isset($filesToAdd[$relativePath])) {
+                            // Use relative path as key to prevent duplicates from overlapping patterns
+                            $filesToAdd[$relativePath] = $foundFile;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Log error if Finder fails for a pattern
+                    Log::warning(
+                        "Error processing 'always' pattern '{$alwaysItem}' in AlwaysIncludeStage: ".$e->getMessage()
+                    );
+                }
+            } else {
+                // --- Handle Exact Path ---
+                $normalizedPath = str_replace('\\', '/', $alwaysItem);
+
+                // Skip if the exact file is already included or queued to be added
+                if (isset($existingFiles[$normalizedPath]) || isset($filesToAdd[$normalizedPath])) {
+                    continue;
+                }
+
+                // Check if the exact file exists on disk relative to the base path
+                $fullPath = $this->basePath.DIRECTORY_SEPARATOR.$alwaysItem;
+                if (file_exists($fullPath) && is_file($fullPath)) {
+                    // Create SplFileInfo relative to basePath
+                    // dirname('.') returns '.', handle this case for root files
+                    $relativeDir = dirname($normalizedPath);
+                    $relativeDir = ($relativeDir === '.') ? '' : $relativeDir;
+
+                    $newFile = new SplFileInfo(
+                        $fullPath,
+                        $relativeDir,
+                        $normalizedPath
+                    );
+                    $filesToAdd[$normalizedPath] = $newFile;
+                } else {
+                    Log::debug("Exact path '{$alwaysItem}' specified in 'always' not found or is not a file at: {$fullPath}");
+                }
             }
         }
 
-        return $next($files);
+        // Merge the newly found files with the original list
+        // array_values ensures we have a simple indexed array for the next stage
+        $finalFiles = array_merge($files, array_values($filesToAdd));
+
+        // Ensure uniqueness again based on real path just in case Finder found duplicates
+        // or if the same file was passed in and also matched an 'always' rule.
+        $uniqueFiles = [];
+        foreach ($finalFiles as $file) {
+            // Use realpath to get a canonical absolute path for uniqueness check
+            $realPath = $file->getRealPath();
+            if ($realPath !== false) { // Ensure realpath() didn't fail
+                $uniqueFiles[$realPath] = $file;
+            } else {
+                // Handle cases where realpath might fail (e.g., broken symlinks, though less likely with is_file check)
+                // Use relative path as fallback key, less robust but better than discarding
+                $fallbackPath = str_replace('\\', '/', $file->getRelativePathname());
+                if (! isset($uniqueFiles[$fallbackPath])) {
+                    $uniqueFiles[$fallbackPath] = $file;
+                    Log::debug("Could not get real path for {$fallbackPath}, using relative path for uniqueness check.");
+                }
+            }
+        }
+
+        // Pass the unique list (re-indexed) to the next stage
+        return $next(array_values($uniqueFiles));
+    }
+
+    /**
+     * Basic check to see if a string looks like a common glob pattern character.
+     * More complex patterns involving ranges [] or groups {} are also included.
+     *
+     * @param  string  $item  The string to check.
+     * @return bool True if it contains glob characters, false otherwise.
+     */
+    private function isGlobPattern(string $item): bool
+    {
+        // Check for common glob characters: *, ?, [, {
+        // No need to check for '**' specifically, '*' covers it.
+        return str_contains($item, '*') || str_contains($item, '?') || str_contains($item, '[') || str_contains($item, '{');
     }
 }

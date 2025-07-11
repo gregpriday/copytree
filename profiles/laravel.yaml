@@ -13,3 +13,4 @@ always:
     - "composer.json"
     - "README.md"
     - ".env.example"
+    - ".cursor/**"

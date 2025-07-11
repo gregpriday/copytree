@@ -130,6 +130,88 @@ class CopyTreeCommandTest extends TestCase
 
         // Assert that the output message indicates that files were copied to the clipboard.
         $this->assertStringContainsString('Copied', $output);
-        $this->assertStringContainsString('files to clipboard.', $output);
+        $this->assertStringContainsString('to clipboard.', $output);
+        // The output format is now "Copied X files [SIZE] to clipboard."
+        $this->assertMatchesRegularExpression('/Copied \d+ files \[.*\] to clipboard\./', $output);
+    }
+
+    public function test_dry_run_flag_is_recognized_and_lists_files()
+    {
+        // Create additional files for better testing
+        file_put_contents($this->tempDir.'/file1.php', '<?php echo "Hello";');
+        file_put_contents($this->tempDir.'/file2.txt', 'Text content');
+
+        // Run the command with dry-run and filter
+        Artisan::call('copy', [
+            'path' => $this->tempDir,
+            '--dry-run' => true,
+            '--filter' => '*.php',
+        ]);
+        
+        $output = Artisan::output();
+        
+        // Assert the expected output structure
+        $this->assertStringContainsString('Files that would be included:', $output);
+        $this->assertStringContainsString('file1.php [', $output);  // File with size bracket
+        $this->assertStringNotContainsString('file2.txt [', $output);  // Verify filter applied
+        $this->assertStringNotContainsString('a.txt [', $output);  // Verify filter applied
+        $this->assertStringContainsString('Total files: 1', $output);
+        
+        // Ensure no XML output is generated
+        $this->assertStringNotContainsString('<ct:project>', $output);
+        $this->assertStringNotContainsString('<ct:tree>', $output);
+    }
+
+    public function test_dry_run_with_no_matching_files()
+    {
+        // Run with filter that matches no files
+        Artisan::call('copy', [
+            'path' => $this->tempDir,
+            '--dry-run' => true,
+            '--filter' => '*.nonexistent',
+        ]);
+        
+        $output = Artisan::output();
+        
+        $this->assertStringContainsString('No files would be included based on the current filters and profile.', $output);
+    }
+
+    public function test_dry_run_skips_ai_filter()
+    {
+        // Run with --ai-filter; expect warning and no AI call
+        Artisan::call('copy', [
+            'path' => $this->tempDir,
+            '--dry-run' => true,
+            '--ai-filter' => 'include PHP files',
+        ]);
+        
+        $output = Artisan::output();
+        
+        $this->assertStringContainsString('AI filters are skipped in --dry-run mode.', $output);
+        // Should still list files without AI filtering
+        $this->assertStringContainsString('Files that would be included:', $output);
+    }
+
+    public function test_dry_run_with_multiple_filters()
+    {
+        // Create files to test multiple filters
+        file_put_contents($this->tempDir.'/script.php', '<?php echo "script";');
+        file_put_contents($this->tempDir.'/test.php', '<?php echo "test";');
+        file_put_contents($this->tempDir.'/readme.md', '# README');
+        
+        // Run with multiple glob filters
+        Artisan::call('copy', [
+            'path' => $this->tempDir,
+            '--dry-run' => true,
+            '--filter' => ['*.php', '*.md'],
+        ]);
+        
+        $output = Artisan::output();
+        
+        // All PHP and MD files should be listed (with size brackets)
+        $this->assertStringContainsString('script.php [', $output);
+        $this->assertStringContainsString('test.php [', $output);
+        $this->assertStringContainsString('readme.md [', $output);
+        $this->assertStringContainsString('Total files: 3', $output);
     }
 }

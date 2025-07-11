@@ -41,7 +41,7 @@ class TempFileManager
         $tempDir = self::getTempDir();
         $timestamp = date('Y-m-d_H-i-s');
         $hash = substr(hash('sha256', $content.uniqid()), 0, 16);
-        $filename = $hash.'_'.$timestamp.'.txt';
+        $filename = self::PREFIX.$hash.'_'.$timestamp.'.txt';
         $filepath = $tempDir.DIRECTORY_SEPARATOR.$filename;
 
         try {
@@ -167,7 +167,7 @@ class TempFileManager
             $timestamp = date('Y-m-d_H-i-s');
             // Modified to place AI-generated name first, followed by timestamp
             // Note: descriptiveFilename already includes .txt extension from AIFilenameGenerator
-            $filename = str_replace('.txt', '', $descriptiveFilename).'_'.$timestamp.'.txt';
+            $filename = self::PREFIX.str_replace('.txt', '', $descriptiveFilename).'_'.$timestamp.'.txt';
             $filepath = $tempDir.DIRECTORY_SEPARATOR.$filename;
 
             file_put_contents($filepath, $content);

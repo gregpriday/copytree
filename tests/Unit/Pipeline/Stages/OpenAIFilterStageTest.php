@@ -3,8 +3,8 @@
 namespace Tests\Unit\Pipeline\Stages;
 
 use App\Pipeline\Stages\AIFilterStage;
-use OpenAI\Laravel\Facades\OpenAI;
-use OpenAI\Responses\Chat\CreateResponse as ChatCreateResponse;
+use Prism\Prism\Prism;
+use Prism\Prism\Testing\TextResponseFake;
 use Symfony\Component\Finder\SplFileInfo;
 use Tests\TestCase;
 
@@ -28,18 +28,10 @@ class OpenAIFilterStageTest extends TestCase
         $fileC = new SplFileInfo($tempDir.'/c.txt', '', 'c.txt');
         $files = [$fileA, $fileB, $fileC];
 
-        // Fake the OpenAI chat API response.
+        // Fake the Prism response.
         // The fake response returns JSON that indicates only "a.txt" and "c.txt" should be accepted.
-        OpenAI::fake([
-            ChatCreateResponse::fake([
-                'choices' => [
-                    [
-                        'message' => [
-                            'content' => json_encode(['files' => ['a.txt', 'c.txt']]),
-                        ],
-                    ],
-                ],
-            ]),
+        Prism::fake([
+            TextResponseFake::make()->withText(json_encode(['files' => ['a.txt', 'c.txt']])),
         ]);
 
         // Instantiate the OpenAIFilterStage with a description.

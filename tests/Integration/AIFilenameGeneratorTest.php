@@ -42,8 +42,15 @@ class AIFilenameGeneratorTest extends TestCase
 
         $generator = new AIFilenameGenerator;
 
-        // Generate the filename using the Gemini API.
-        $filename = $generator->generateFilename($files);
+        try {
+            // Generate the filename using the AI API.
+            $filename = $generator->generateFilenameFromFiles($files);
+        } catch (\Exception $e) {
+            // Debug: check what provider/model is being used
+            $provider = config('ai.default_provider');
+            $model = config("ai.providers.{$provider}.models.medium");
+            $this->fail("AI call failed. Provider: {$provider}, Model: {$model}, Error: ".$e->getMessage());
+        }
 
         // Assert that a filename is generated.
         $this->assertNotEmpty($filename, 'Generated filename should not be empty.');

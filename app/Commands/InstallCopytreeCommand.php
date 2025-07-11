@@ -2,7 +2,7 @@
 
 namespace App\Commands;
 
-use App\Facades\AI;
+use App\Helpers\PrismHelper;
 use App\Services\ConversationStateService;
 use Illuminate\Support\Facades\File;
 use LaravelZero\Framework\Commands\Command;
@@ -32,16 +32,16 @@ class InstallCopytreeCommand extends Command
             'accounts/fireworks/models/mixtral-8x7b-instruct' => 'Mixtral 8x7B - Powerful model with excellent reasoning',
         ],
         'summarization' => [
-            'accounts/fireworks/models/llama3-8b-instruct' => 'LLaMa 3 8B - Most cost-effective for summarization',
+            'accounts/fireworks/models/llama-v3p1-8b-instruct' => 'LLaMa 3.1 8B - Most cost-effective for summarization',
             'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Balanced efficiency and quality',
         ],
         'classification' => [
             'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Balanced performance for classification/filtering',
-            'accounts/fireworks/models/llama3-8b-instruct' => 'LLaMa 3 8B - Cost-effective for simple classification',
+            'accounts/fireworks/models/llama-v3p1-8b-instruct' => 'LLaMa 3.1 8B - Cost-effective for simple classification',
         ],
         'general' => [
             'accounts/fireworks/models/llama4-maverick-instruct-basic' => 'LLaMa 4 Maverick - Balanced model for general tasks',
-            'accounts/fireworks/models/llama3-8b-instruct' => 'LLaMa 3 8B - Cost-effective for general tasks',
+            'accounts/fireworks/models/llama-v3p1-8b-instruct' => 'LLaMa 3.1 8B - Cost-effective for general tasks',
         ],
     ];
 
@@ -157,7 +157,7 @@ class InstallCopytreeCommand extends Command
         $this->line('');
         $this->info('2. Summarization Model');
         $this->line('This model is used for summarizing text, code, and other content. A cost-effective model is recommended.');
-        $existingSummarizationModel = $extractValue('FIREWORKS_SUMMARIZATION_MODEL', 'accounts/fireworks/models/llama3-8b-instruct');
+        $existingSummarizationModel = $extractValue('FIREWORKS_SUMMARIZATION_MODEL', 'accounts/fireworks/models/llama-v3p1-8b-instruct');
         $configValues['FIREWORKS_SUMMARIZATION_MODEL'] = $this->selectModelFromOptions('summarization', $existingSummarizationModel);
 
         // Step 5: Model for classification tasks
@@ -287,16 +287,17 @@ class InstallCopytreeCommand extends Command
         $this->info('Testing API key...');
 
         try {
-            // Use a simple prompt to test the API key
-            $response = AI::chat()->create([
-                'model' => AI::models()['medium'],
-                'messages' => [
-                    ['role' => 'user', 'content' => 'Say hello'],
-                ],
-                'max_tokens' => 10,
-            ]);
+            // Temporarily set the API key in config for testing
+            config(['prism.providers.fireworks.api_key' => $apiKey]);
 
-            return ! empty($response->choices);
+            // Use a simple prompt to test the API key with Prism
+            // Using Fireworks provider with a basic model
+            $response = PrismHelper::text('fireworks', 'accounts/fireworks/models/llama-v3p1-8b-instruct')
+                ->withPrompt('Say hello')
+                ->withMaxTokens(10)
+                ->asText();
+
+            return ! empty($response->text);
         } catch (\Exception $e) {
             $this->error('Error testing API key: '.$e->getMessage());
 

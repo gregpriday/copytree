@@ -2,36 +2,18 @@
 
 namespace App\Services;
 
-use App\Constants\AIModelTypes; // Add AI Facade
-use App\Facades\AI;
+use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use OpenAI\Responses\Chat\CreateResponse;
+use Illuminate\Support\Str;
+use Prism\Prism\Text\Response as PrismTextResponse;
+use Prism\Prism\ValueObjects\Messages\AssistantMessage;
+use Prism\Prism\ValueObjects\Messages\UserMessage;
 use RuntimeException;
-use Throwable; // Import AIModelTypes if needed elsewhere, or remove if only used for defaults
+use Throwable;
 
 class ProjectQuestionService
 {
-    /**
-     * Maximum number of retries for API calls.
-     */
-    const MAX_RETRIES = 3;
-
-    /**
-     * Delay between retries in milliseconds.
-     */
-    const RETRY_DELAY_MS = 500;
-
-    /**
-     * The AI provider to use (e.g., 'openai', 'gemini').
-     */
-    protected string $provider;
-
-    /**
-     * The AI model size identifier (e.g., 'small', 'medium', 'large').
-     */
-    protected string $modelSize;
-
     /**
      * The path to the directory containing the system prompt.
      */
@@ -39,105 +21,216 @@ class ProjectQuestionService
 
     /**
      * Create a new ProjectQuestionService instance.
-     *
-     * @param  string  $provider  The AI provider identifier (e.g., 'openai').
-     * @param  string  $modelSize  The AI model size identifier (e.g., 'small').
      */
-    public function __construct(string $provider, string $modelSize)
+    public function __construct()
     {
-        $this->provider = $provider;
-        $this->modelSize = $modelSize;
         $this->promptsBaseDir = base_path('prompts/project-question');
     }
 
     /**
-     * Ask a question about the project using the configured provider/model and return the full response object.
+     * Ask a question about the project using Prism and return the full Prism response object.
      * Optionally includes conversation history for stateful interactions.
      *
      * @param  string  $projectCopytree  The copytree output of the project
      * @param  string  $question  The user's question about the project
-     * @param  array  $history  Optional conversation history for stateful interactions
-     * @return CreateResponse The full response object from the AI
+     * @param  array  $history  Optional conversation history
+     * @param  string  $providerName  The Prism-compatible provider name (e.g., 'openai', 'anthropic')
+     * @param  string  $modelNameString  The specific model identifier (e.g., 'gpt-4o', 'claude-3-sonnet-20240229')
+     * @return PrismTextResponse The response object from Prism
      *
      * @throws RuntimeException When the system prompt cannot be found or the API call fails
      */
-    public function askQuestion(string $projectCopytree, string $question, array $history = []): CreateResponse
-    {
-        // Get the actual model name based on the CONFIGURED provider and size
-        // Ensure the config path exists and is valid before accessing
-        $modelConfigPath = "ai.providers.{$this->provider}.models.{$this->modelSize}";
-        if (! config()->has($modelConfigPath)) {
-            throw new RuntimeException("Model configuration not found for provider '{$this->provider}' and size '{$this->modelSize}' at path '{$modelConfigPath}'.");
-        }
-        $modelName = config($modelConfigPath); // Use configured provider/size
-
-        // Load the single system prompt
-        $systemPromptPath = $this->promptsBaseDir.'/system.txt'; // Path to the new single prompt
+    public function askQuestion(
+        string $projectCopytree,
+        string $question,
+        array $history,
+        string $providerName,
+        string $modelNameString
+    ): PrismTextResponse {
+        // 1. Load System Prompt
+        $systemPromptPath = $this->promptsBaseDir.'/system.txt';
         if (! File::exists($systemPromptPath)) {
+            Log::error("System prompt not found at {$systemPromptPath}.");
             throw new RuntimeException("System prompt not found at {$systemPromptPath}.");
         }
-        $systemPrompt = File::get($systemPromptPath);
+        $systemPromptContent = File::get($systemPromptPath);
 
-        // --- Prepare Messages for AI API ---
-        $messages = [];
+        // 2. Prepare Messages for Prism
+        $prismMessages = [];
 
-        // Add system message
-        $messages[] = [
-            'role' => 'system',
-            'content' => $systemPrompt,
-        ];
-
-        // Add the first user message containing ONLY the project code
+        // Add the project copytree output as the first user message
+        // This sets the main context for the AI.
         if (! empty($projectCopytree)) {
-            $messages[] = [
-                'role' => 'user',
-                'content' => $projectCopytree,
-            ];
+            $prismMessages[] = new UserMessage($projectCopytree);
         }
 
-        // Add history messages
+        // Add conversation history
+        // Convert your existing history format to Prism's Message objects
         if (! empty($history)) {
             foreach ($history as $histItem) {
-                // Process text to remove XML tags if present
-                $messageText = $histItem['content'];
-                $messageText = preg_replace('/<ct:(summary|truncated)>(.*?)<\/ct:\1>/s', '$2', $messageText);
+                // Remove XML tags from stored summarized/truncated content
+                $messageText = preg_replace('/<ct:(summary|truncated)>(.*?)<\/ct:\1>/s', '$2', $histItem['content']);
+                if (! isset($histItem['role']) || ! isset($histItem['content'])) {
+                    Log::warning('Malformed history item skipped.', ['item' => $histItem]);
 
-                $messages[] = [
-                    'role' => $histItem['role'],
-                    'content' => $messageText,
-                ];
+                    continue;
+                }
+                if (strtolower($histItem['role']) === 'user') {
+                    $prismMessages[] = new UserMessage($messageText);
+                } elseif (strtolower($histItem['role']) === 'assistant') {
+                    $prismMessages[] = new AssistantMessage($messageText);
+                }
             }
         }
 
-        // Add the final user message containing ONLY the current question
-        $messages[] = [
-            'role' => 'user',
-            'content' => $question,
-        ];
+        // Add the current user question as the last message
+        $prismMessages[] = new UserMessage($question);
 
-        // Configure generation parameters (NO 'stream_options')
-        $parameters = [
-            'model' => $modelName, // Use the resolved model name
-            'messages' => $messages,
-            'max_tokens' => 8192, // Or your preferred max
-            // Add other parameters like temperature if needed
-        ];
-
+        // 3. Make the AI Call using Prism
         try {
-            // Make the NON-STREAMING API call using the CONFIGURED provider
-            $response = AI::driver($this->provider)->chat()->create($parameters); // Use $this->provider
+            Log::debug("Requesting AI response via Prism. Provider: [{$providerName}], Model: [{$modelNameString}]");
 
-            return $response; // Return the complete response object
-        } catch (Throwable $e) {
-            // Log the error
-            Log::error("AI API call failed in askQuestion: {$e->getMessage()}", [
-                'provider' => $this->provider, // Log configured provider
-                'model' => $modelName,       // Log resolved model name
-                'exception' => get_class($e),
-                // Avoid logging full messages/context in production logs if sensitive
+            $requestBuilder = PrismHelper::text($providerName, $modelNameString)
+                ->withSystemPrompt($systemPromptContent);
+
+            // Get task-specific parameters from config
+            $temperature = config('ai.task_parameters.question_answering.temperature', 0.7);
+            $maxTokens = config('ai.task_parameters.question_answering.max_tokens', 8192);
+
+            $requestBuilder = $requestBuilder->withMaxTokens($maxTokens);
+            $requestBuilder = $requestBuilder->usingTemperature($temperature);
+
+            // Pass the messages to Prism
+            if (! empty($prismMessages)) {
+                $requestBuilder = $requestBuilder->withMessages($prismMessages);
+            }
+
+            // For Gemini 2.5 Flash models, set zero thinking budget
+            if ($providerName === 'gemini' && Str::startsWith($modelNameString, 'gemini-2.5-flash')) {
+                $requestBuilder = $requestBuilder->withProviderOptions(['thinkingBudget' => 0]);
+                Log::debug("Using Gemini 2.5 Flash ({$modelNameString}) with zero thinking budget");
+            }
+
+            $response = $requestBuilder->asText();
+
+            Log::debug('Prism AI call successful.');
+
+            return $response;
+
+        } catch (\Prism\Prism\Exceptions\PrismException $e) {
+            Log::error("Prism API call failed for Provider [{$providerName}], Model [{$modelNameString}]: {$e->getMessage()}", [
+                'exception_type' => get_class($e),
+                'trace' => $e->getTraceAsString(),
             ]);
-            // Re-throw the exception so the command can handle it
-            throw new RuntimeException("AI API call failed: {$e->getMessage()}", 0, $e);
+            throw new RuntimeException("Prism API call failed: {$e->getMessage()}", 0, $e);
+        } catch (Throwable $e) {
+            Log::error("Generic error during Prism AI call for Provider [{$providerName}], Model [{$modelNameString}]: {$e->getMessage()}", [
+                'exception_type' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw new RuntimeException("Error processing AI request: {$e->getMessage()}", 0, $e);
+        }
+    }
+
+    /**
+     * Ask a question about the project using Prism and return a streaming response.
+     * Optionally includes conversation history for stateful interactions.
+     *
+     * @param  string  $projectCopytree  The copytree output of the project
+     * @param  string  $question  The user's question about the project
+     * @param  array  $history  Optional conversation history
+     * @param  string  $providerName  The Prism-compatible provider name (e.g., 'openai', 'anthropic')
+     * @param  string  $modelNameString  The specific model identifier (e.g., 'gpt-4o', 'claude-3-sonnet-20240229')
+     * @return \Generator The streaming response from Prism
+     *
+     * @throws RuntimeException When the system prompt cannot be found or the API call fails
+     */
+    public function askQuestionStream(
+        string $projectCopytree,
+        string $question,
+        array $history,
+        string $providerName,
+        string $modelNameString
+    ): \Generator {
+        // 1. Load System Prompt
+        $systemPromptPath = $this->promptsBaseDir.'/system.txt';
+        if (! File::exists($systemPromptPath)) {
+            Log::error("System prompt not found at {$systemPromptPath}.");
+            throw new RuntimeException("System prompt not found at {$systemPromptPath}.");
+        }
+        $systemPromptContent = File::get($systemPromptPath);
+
+        // 2. Prepare Messages for Prism
+        $prismMessages = [];
+
+        // Add the project copytree output as the first user message
+        // This sets the main context for the AI.
+        if (! empty($projectCopytree)) {
+            $prismMessages[] = new UserMessage($projectCopytree);
+        }
+
+        // Add conversation history
+        // Convert your existing history format to Prism's Message objects
+        if (! empty($history)) {
+            foreach ($history as $histItem) {
+                // Remove XML tags from stored summarized/truncated content
+                $messageText = preg_replace('/<ct:(summary|truncated)>(.*?)<\/ct:\1>/s', '$2', $histItem['content']);
+                if (! isset($histItem['role']) || ! isset($histItem['content'])) {
+                    Log::warning('Malformed history item skipped.', ['item' => $histItem]);
+
+                    continue;
+                }
+                if (strtolower($histItem['role']) === 'user') {
+                    $prismMessages[] = new UserMessage($messageText);
+                } elseif (strtolower($histItem['role']) === 'assistant') {
+                    $prismMessages[] = new AssistantMessage($messageText);
+                }
+            }
+        }
+
+        // Add the current user question as the last message
+        $prismMessages[] = new UserMessage($question);
+
+        // 3. Make the AI Call using Prism streaming
+        try {
+            Log::debug("Requesting AI stream response via Prism. Provider: [{$providerName}], Model: [{$modelNameString}]");
+
+            $requestBuilder = PrismHelper::text($providerName, $modelNameString)
+                ->withSystemPrompt($systemPromptContent);
+
+            // Get task-specific parameters from config
+            $temperature = config('ai.task_parameters.question_answering.temperature', 0.7);
+            $maxTokens = config('ai.task_parameters.question_answering.max_tokens', 8192);
+
+            $requestBuilder = $requestBuilder->withMaxTokens($maxTokens);
+            $requestBuilder = $requestBuilder->usingTemperature($temperature);
+
+            // Pass the messages to Prism
+            if (! empty($prismMessages)) {
+                $requestBuilder = $requestBuilder->withMessages($prismMessages);
+            }
+
+            // For Gemini 2.5 Flash models, set zero thinking budget
+            if ($providerName === 'gemini' && Str::startsWith($modelNameString, 'gemini-2.5-flash')) {
+                $requestBuilder = $requestBuilder->withProviderOptions(['thinkingBudget' => 0]);
+                Log::debug("Using Gemini 2.5 Flash ({$modelNameString}) with zero thinking budget");
+            }
+
+            // Return the stream generator
+            return $requestBuilder->asStream();
+
+        } catch (\Prism\Prism\Exceptions\PrismException $e) {
+            Log::error("Prism API stream call failed for Provider [{$providerName}], Model [{$modelNameString}]: {$e->getMessage()}", [
+                'exception_type' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw new RuntimeException("Prism API stream call failed: {$e->getMessage()}", 0, $e);
+        } catch (Throwable $e) {
+            Log::error("Generic error during Prism AI stream call for Provider [{$providerName}], Model [{$modelNameString}]: {$e->getMessage()}", [
+                'exception_type' => get_class($e),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw new RuntimeException("Error processing AI stream request: {$e->getMessage()}", 0, $e);
         }
     }
 }

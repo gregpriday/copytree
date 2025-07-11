@@ -9,15 +9,11 @@ use Symfony\Component\Finder\SplFileInfo;
 
 class GitFilterStage implements FilePipelineStageInterface
 {
-    protected string $basePath;
-
     protected bool $modified;
 
     protected ?string $changes;
 
     protected ?GitStatusChecker $gitStatusChecker = null;
-
-    protected array $relevantFiles = [];
 
     /**
      * Create a new GitFilterStage.
@@ -25,12 +21,16 @@ class GitFilterStage implements FilePipelineStageInterface
      * @param  string  $basePath  The repository root path.
      * @param  bool  $modified  Whether to filter for files modified since the last commit.
      * @param  string|null  $changes  A string in the format "commit1:commit2" to filter for files changed between two commits.
+     * @param  GitStatusChecker|null  $gitStatusChecker  Optional GitStatusChecker instance for testing.
      *
      * @throws RuntimeException If both modified and changes options are provided.
      */
-    public function __construct(string $basePath, bool $modified = false, ?string $changes = null)
-    {
-        $this->basePath = $basePath;
+    public function __construct(
+        string $basePath,
+        bool $modified = false,
+        ?string $changes = null,
+        ?GitStatusChecker $gitStatusChecker = null
+    ) {
         $this->modified = $modified;
         $this->changes = $changes;
 
@@ -38,9 +38,8 @@ class GitFilterStage implements FilePipelineStageInterface
             throw new RuntimeException('The "modified" and "changes" options cannot be used together.');
         }
 
-        // Only initialize the Git status checker if filtering is requested.
-        if ($this->modified || $this->changes !== null) {
-            $this->gitStatusChecker = new GitStatusChecker;
+        if ($this->shouldFilter()) {
+            $this->gitStatusChecker = $gitStatusChecker ?? new GitStatusChecker();
             $this->gitStatusChecker->initRepository($basePath);
         }
     }
@@ -58,34 +57,72 @@ class GitFilterStage implements FilePipelineStageInterface
      */
     public function handle(array $files, \Closure $next): array
     {
-        // If no Git filtering is requested, simply pass along the files.
-        if (! $this->modified && $this->changes === null) {
+        if (! $this->shouldFilter()) {
             return $next($files);
         }
 
-        // Retrieve relevant file paths from Git.
-        if ($this->modified) {
-            // Get files modified since the last commit.
-            $this->relevantFiles = $this->gitStatusChecker->getModifiedFiles();
-        } elseif ($this->changes !== null) {
-            // Expect the changes option to be in the format "commit1:commit2"
-            $parts = explode(':', $this->changes);
-            if (count($parts) < 1) {
-                throw new RuntimeException('Invalid "changes" option format. Expected "commit1:commit2".');
-            }
-            $fromCommit = $parts[0];
-            $toCommit = $parts[1] ?? 'HEAD';
-            $this->relevantFiles = $this->gitStatusChecker->getChangedFilesBetweenCommits($fromCommit, $toCommit);
+        $relevantFiles = $this->getRelevantFiles();
+
+        if (empty($relevantFiles)) {
+            return $next([]);
         }
 
-        // Filter the files: we assume each file's relative path (via getRelativePathname())
-        // is relative to the repository root.
-        $filteredFiles = array_filter($files, function (SplFileInfo $file) {
-            $relativePath = $file->getRelativePathname();
+        $relevantFilesLookup = array_flip($relevantFiles);
 
-            return in_array($relativePath, $this->relevantFiles);
+        $filteredFiles = array_filter($files, function (SplFileInfo $file) use ($relevantFilesLookup) {
+            return isset($relevantFilesLookup[$file->getRelativePathname()]);
         });
 
         return $next(array_values($filteredFiles));
+    }
+
+    /**
+     * Determines if Git filtering should be applied.
+     *
+     * @return bool
+     */
+    protected function shouldFilter(): bool
+    {
+        return $this->modified || $this->changes !== null;
+    }
+
+    /**
+     * Retrieves the list of relevant files based on the configured options.
+     *
+     * @return array
+     */
+    protected function getRelevantFiles(): array
+    {
+        if ($this->modified) {
+            return $this->gitStatusChecker->getModifiedFiles();
+        }
+
+        if ($this->changes !== null) {
+            [$fromCommit, $toCommit] = $this->parseChangesOption();
+
+            return $this->gitStatusChecker->getChangedFilesBetweenCommits($fromCommit, $toCommit);
+        }
+
+        return [];
+    }
+
+    /**
+     * Parses the "changes" option string into from and to commits.
+     *
+     * @return array An array containing the from and to commit references.
+     *
+     * @throws RuntimeException If the format is invalid.
+     */
+    protected function parseChangesOption(): array
+    {
+        $parts = explode(':', $this->changes, 2);
+        $fromCommit = $parts[0];
+        $toCommit = $parts[1] ?? 'HEAD';
+
+        if (empty($fromCommit)) {
+            throw new RuntimeException('Invalid "changes" option format. "commit1" cannot be empty. Expected "commit1:commit2".');
+        }
+
+        return [$fromCommit, $toCommit];
     }
 }

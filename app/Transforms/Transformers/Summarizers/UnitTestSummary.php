@@ -2,13 +2,15 @@
 
 namespace App\Transforms\Transformers\Summarizers;
 
-use App\Facades\AI;
+use App\Helpers\PrismHelper;
 use App\Transforms\BaseTransformer;
 use App\Transforms\FileTransformerInterface;
 use App\Transforms\SlowTransformerTrait;
 use App\Transforms\Transformers\Loaders\FileLoader;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Prism\Prism\ValueObjects\Messages\UserMessage;
 use RuntimeException;
 use Symfony\Component\Finder\SplFileInfo;
 use Throwable;
@@ -89,21 +91,24 @@ class UnitTestSummary extends BaseTransformer implements FileTransformerInterfac
             $prompt = "File: `{$relativePath}`\n\nPlease provide a detailed summary of the key insights from the following test file:\n\n".$wrappedContent;
 
             try {
-                $response = AI::chat()->create([
-                    'model' => AI::models()['medium'],
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => $prompt],
-                    ],
-                    'max_tokens' => 512,
-                    'temperature' => 0.2,
-                ]);
+                $provider = Config::get('ai.default_provider', 'openai');
+                $modelSize = Config::get('ai.defaults.model_size_for_summarization', 'medium');
+                $model = Config::get("ai.providers.{$provider}.models.{$modelSize}");
+                $temperature = Config::get('ai.task_parameters.summarization.temperature', 0.2);
+                $maxTokens = Config::get('ai.task_parameters.summarization.max_tokens', 512);
+
+                $response = PrismHelper::text($provider, $model)
+                    ->withSystemPrompt($systemPrompt)
+                    ->withMessages([new UserMessage($prompt)])
+                    ->withMaxTokens($maxTokens)
+                    ->usingTemperature($temperature)
+                    ->asText();
             } catch (Throwable $e) {
                 Log::error('Failed to generate unit test summary: '.$e->getMessage());
                 throw new RuntimeException('AI API call failed: '.$e->getMessage());
             }
 
-            $summary = $response->choices[0]->message->content ?? '';
+            $summary = $response->text ?? '';
             $summary = trim($summary);
             if (empty($summary)) {
                 throw new RuntimeException('No test summary returned from AI.');

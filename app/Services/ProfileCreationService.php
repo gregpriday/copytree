@@ -2,13 +2,11 @@
 
 namespace App\Services;
 
-use App\Facades\AI;
-use Illuminate\Support\Collection;
+use App\Helpers\PrismHelper;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
-use Throwable;
 
 class ProfileCreationService
 {
@@ -111,21 +109,25 @@ class ProfileCreationService
 
         // 4. Call AI to generate the profile.
         try {
-            $response = AI::chat()->create([
-                'model' => AI::models()['medium'],
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
-                    ['role' => 'user', 'content' => $prompt],
-                ],
-                'max_tokens' => 4096,
-                'temperature' => 0.4,
-            ]);
+            $provider = config('ai.default_provider', 'fireworks');
+            $model = config("ai.providers.{$provider}.models.medium");
+
+            // Get task-specific parameters from config
+            $temperature = config('ai.task_parameters.profile_creation.temperature', 0.3);
+            $maxTokens = config('ai.task_parameters.profile_creation.max_tokens', 2048);
+
+            $response = PrismHelper::text($provider, $model)
+                ->withSystemPrompt($systemPrompt)
+                ->withPrompt($prompt)
+                ->withMaxTokens($maxTokens)
+                ->usingTemperature($temperature)
+                ->asText();
         } catch (\Exception $e) {
             Log::error('AI API call failed in ProfileCreationService::createProfile: '.$e->getMessage());
             throw new RuntimeException('AI API call failed: '.$e->getMessage());
         }
 
-        $yamlResponse = $response->choices[0]->message->content ?? '';
+        $yamlResponse = $response->text;
         if (empty($yamlResponse)) {
             throw new RuntimeException('Received empty profile YAML from AI.');
         }
@@ -174,45 +176,5 @@ class ProfileCreationService
         }
 
         return $profilePath;
-    }
-
-    /**
-     * Generate a user profile from a conversation history.
-     *
-     * @param  Collection  $messages  Collection of chat messages
-     * @return string Generated profile or null if unable to generate
-     */
-    public function generateProfile(Collection $messages): ?string
-    {
-        try {
-            // Build the prompt for profile generation
-            $prompt = $this->buildProfilePrompt($messages);
-
-            // Make a request to AI for profile generation
-            $response = AI::chat()->create([
-                'model' => AI::models()['medium'],
-                'messages' => [
-                    ['role' => 'user', 'content' => $prompt],
-                ],
-                'max_tokens' => 4096,
-                'temperature' => 0.4,
-                'top_p' => 0.8,
-            ]);
-
-            // Store and return the generated profile
-            $profile = $response->choices[0]->message->content ?? '';
-            if (! empty($profile)) {
-                // Save the profile to the database
-                $this->saveProfile($profile);
-
-                return $profile;
-            }
-
-            return null;
-        } catch (Throwable $e) {
-            Log::error('Profile generation failed: '.$e->getMessage());
-
-            return null;
-        }
     }
 }

@@ -25,23 +25,24 @@
         "civicrm/gitignore": "^1.2",
         "czproject/git-php": "^4.3",
         "gregpriday/gitignore-php": "^1.0",
-        "illuminate/support": "^11.15",
-        "laravel-zero/framework": "^11",
+        "laravel-zero/framework": "dev-feature/laravel-12",
         "league/commonmark": "^2.6",
-        "openai-php/client": "dev-main",
+        "logiscape/mcp-sdk-php": "^1.1",
+        "openai-php/client": "^0.10.3",
+        "prism-php/prism": "^0.68.0",
         "spatie/pdf-to-text": "^1.54",
-        "symfony/console": "^6.0|^7.0",
+        "symfony/console": "^7.0",
         "symfony/finder": "^7.1",
-        "symfony/process": "^6.0|^7.0",
+        "symfony/process": "^7.0",
         "symfony/yaml": "^7.2"
     },
     "require-dev": {
-        "laravel/laravel": "^11.6",
+        "laravel/laravel": "^12.0",
         "laravel/pint": "^1.18.3",
         "mockery/mockery": "^1.6.12",
-        "phpunit/phpunit": "^10.5",
+        "phpunit/phpunit": "^11.5.15",
         "spatie/ray": "^1.28",
-        "symfony/phpunit-bridge": "^6.0|^7.0"
+        "symfony/phpunit-bridge": "^7.0"
     },
     "autoload": {
         "psr-4": {
@@ -72,7 +73,7 @@
             "php-http/discovery": true
         }
     },
-    "minimum-stability": "beta",
+    "minimum-stability": "dev",
     "prefer-stable": true,
     "bin": ["copytree"]
 }

@@ -55,15 +55,7 @@ class ByteCounter
         // Convert to the appropriate unit
         $value = $bytes / pow(1024, $pow);
 
-        // Determine precision based on the number's magnitude
-        if ($value >= 100) {
-            $precision = 0; // No decimal places for 3+ digits
-        } elseif ($value >= 10) {
-            $precision = 1; // 1 decimal place for 2 digits
-        } else {
-            $precision = 2; // 2 decimal places for 1 digit
-        }
-
-        return round($value, $precision).' '.$units[$pow];
+        // Always use 1 decimal place for consistency
+        return round($value, 1).' '.$units[$pow];
     }
 }
