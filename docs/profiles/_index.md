@@ -34,6 +34,9 @@ Profiles in Copytree provide powerful control over file selection, processing, a
 7. **[Profile Commands](../cli/profile-commands.md)**  
    CLI commands for listing, validating, and creating profiles.
 
+8. **[Transformer Reference](transformer-reference.md)**  
+   Complete list of available transformers for file processing.
+
 ## Quick Start
 
 ```bash

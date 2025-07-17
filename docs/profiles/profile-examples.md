@@ -127,9 +127,9 @@ always:
 # Tenant-specific transformations
 transforms:
   - files: "app/Tenant/**/Contracts/**/*.php"
-    type: Summarizers.InterfaceDoc     # Document tenant interfaces
+    type: Summarizers.CodeSummary       # Document tenant interfaces
   - files: "database/migrations/tenant/**/*.php"
-    type: Summarizers.MigrationSummary  # Summarize tenant migrations
+    type: Summarizers.FileSummary       # Summarize tenant migrations
 ```
 
 This inheritance example shows how to:
