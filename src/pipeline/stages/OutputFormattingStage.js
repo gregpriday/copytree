@@ -53,6 +53,25 @@ class OutputFormattingStage extends Stage {
     if (input.profile) {
       metadata.ele('profile').txt(input.profile.name || 'default');
     }
+    
+    // Add git metadata if present
+    if (input.gitMetadata) {
+      const gitElement = metadata.ele('git');
+      if (input.gitMetadata.branch) {
+        gitElement.ele('branch').txt(input.gitMetadata.branch);
+      }
+      if (input.gitMetadata.lastCommit) {
+        gitElement.ele('lastCommit', {
+          hash: input.gitMetadata.lastCommit.hash
+        }).txt(input.gitMetadata.lastCommit.message);
+      }
+      if (input.gitMetadata.filterType) {
+        gitElement.ele('filterType').txt(input.gitMetadata.filterType);
+      }
+      gitElement.ele('hasUncommittedChanges').txt(
+        input.gitMetadata.hasUncommittedChanges ? 'true' : 'false'
+      );
+    }
 
     // Add files
     const filesElement = root.ele('files');
@@ -74,6 +93,10 @@ class OutputFormattingStage extends Stage {
         if (file.encoding) {
           fileElement.att('encoding', file.encoding);
         }
+      }
+      
+      if (file.gitStatus) {
+        fileElement.att('gitStatus', file.gitStatus);
       }
       
       // Add content

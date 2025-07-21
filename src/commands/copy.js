@@ -137,14 +137,25 @@ async function setupPipelineStages(basePath, profile, options) {
     maxFileCount: profile.options?.maxFileCount
   }));
   
-  // 2. Profile Filter Stage (applies exclude patterns)
+  // 2. Git Filter Stage (if --modified or --changed is used)
+  if (options.modified || options.changed) {
+    const GitFilterStage = require('../pipeline/stages/GitFilterStage');
+    stages.push(new GitFilterStage({
+      basePath,
+      modified: options.modified,
+      changed: options.changed,
+      withGitStatus: options.withGitStatus
+    }));
+  }
+  
+  // 3. Profile Filter Stage (applies exclude patterns)
   const ProfileFilterStage = require('../pipeline/stages/ProfileFilterStage');
   stages.push(new ProfileFilterStage({
     exclude: profile.exclude || [],
     filter: profile.filter || []
   }));
   
-  // 3. Limit Stage (if --head option is used)
+  // 4. Limit Stage (if --head option is used)
   if (options.head) {
     const LimitStage = require('../pipeline/stages/LimitStage');
     stages.push(new LimitStage({
@@ -152,13 +163,13 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 4. File Loading Stage
+  // 5. File Loading Stage
   const FileLoadingStage = require('../pipeline/stages/FileLoadingStage');
   stages.push(new FileLoadingStage({
     encoding: 'utf8'
   }));
   
-  // 5. Transformer Stage
+  // 6. Transformer Stage
   const TransformStage = require('../pipeline/stages/TransformStage');
   const registry = TransformerRegistry.createDefault();
   stages.push(new TransformStage({
@@ -166,7 +177,7 @@ async function setupPipelineStages(basePath, profile, options) {
     transformers: profile.transformers || {}
   }));
   
-  // 6. Character Limit Stage (if --char-limit option is used)
+  // 7. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
     const CharLimitStage = require('../pipeline/stages/CharLimitStage');
     stages.push(new CharLimitStage({
@@ -174,15 +185,33 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 7. Output Formatting Stage
-  const OutputFormattingStage = require('../pipeline/stages/OutputFormattingStage');
-  stages.push(new OutputFormattingStage({
-    format: profile.output?.format || 'xml',
-    addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
-    prettyPrint: profile.output?.prettyPrint ?? true,
-    includeMetadata: profile.output?.includeMetadata ?? true,
-    showSize: options.showSize
-  }));
+  // 8. Output Formatting Stage
+  // Use streaming stage for stream option or large outputs
+  if (options.stream || (profile.options?.streaming ?? false)) {
+    const StreamingOutputStage = require('../pipeline/stages/StreamingOutputStage');
+    const fs = require('fs');
+    
+    let outputStream = process.stdout;
+    if (options.output) {
+      outputStream = fs.createWriteStream(options.output);
+    }
+    
+    stages.push(new StreamingOutputStage({
+      format: options.format || profile.output?.format || 'xml',
+      addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
+      prettyPrint: profile.output?.prettyPrint ?? true,
+      outputStream
+    }));
+  } else {
+    const OutputFormattingStage = require('../pipeline/stages/OutputFormattingStage');
+    stages.push(new OutputFormattingStage({
+      format: options.format || profile.output?.format || 'xml',
+      addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
+      prettyPrint: profile.output?.prettyPrint ?? true,
+      includeMetadata: profile.output?.includeMetadata ?? true,
+      showSize: options.showSize
+    }));
+  }
   
   return stages;
 }
@@ -194,7 +223,8 @@ function setupProgressTracking(pipeline) {
   let stageIndex = 0;
   const stageNames = [
     'Discovering files',
-    'Applying filters',
+    'Applying git filters',
+    'Applying profile filters',
     'Limiting files',
     'Loading content',
     'Transforming files',
@@ -216,6 +246,14 @@ function setupProgressTracking(pipeline) {
  * Handle output based on options
  */
 async function handleOutput(result, options) {
+  // If streaming was used, output has already been handled
+  if (result.streamed) {
+    if (options.output) {
+      logger.success(`Output streamed to: ${path.resolve(options.output)}`);
+    }
+    return;
+  }
+  
   const output = result.output;
   
   if (!output) {
@@ -235,7 +273,7 @@ async function handleOutput(result, options) {
     console.log('\n' + output);
     
   } else if (options.stream) {
-    // Stream to stdout
+    // Stream to stdout (shouldn't reach here if streaming was properly used)
     process.stdout.write(output);
     
   } else {

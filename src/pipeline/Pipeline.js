@@ -193,8 +193,10 @@ class Pipeline extends EventEmitter {
   getStats() {
     return {
       ...this.stats,
-      duration: this.stats.endTime ? this.stats.endTime - this.stats.startTime : null,
-      successRate: this.stats.stagesCompleted / (this.stats.stagesCompleted + this.stats.stagesFailed)
+      duration: this.stats.endTime ? this.stats.endTime - this.stats.startTime : (Date.now() - this.stats.startTime),
+      successRate: (this.stats.stagesCompleted + this.stats.stagesFailed) > 0 
+        ? this.stats.stagesCompleted / (this.stats.stagesCompleted + this.stats.stagesFailed)
+        : 1
     };
   }
 

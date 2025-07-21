@@ -19,6 +19,7 @@ program
   .option('--modified', 'Only include git modified files')
   .option('--changed <ref>', 'Only include files changed since git ref')
   .option('--output <file>', 'Save output to file')
+  .option('--format <format>', 'Output format: xml, json, tree (default: xml)')
   .option('--display', 'Display output to console')
   .option('--stream', 'Stream output')
   .option('--dry-run', 'Show what would be copied without doing it')
@@ -128,6 +129,10 @@ program
   .option('--transformations', 'Clear only transformation cache')
   .option('--ai', 'Clear only AI cache')
   .option('--git', 'Clear only git cache')
+  .option('--profiles', 'Clear only profile detection cache')
+  .option('--gc', 'Run garbage collection on expired entries')
+  .option('--status', 'Show cache status after clearing')
+  .option('-v, --verbose', 'Show verbose output')
   .action(async (options) => {
     const cacheClearCommand = require('../src/commands/cacheClear');
     await cacheClearCommand(options);

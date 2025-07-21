@@ -5,7 +5,7 @@ This document tracks the progress of migrating CopyTree from PHP/Laravel Zero to
 
 **Start Date**: 2025-07-21
 **Target Completion**: 6-8 weeks
-**Current Phase**: Phase 1 - Foundation & Architecture
+**Current Phase**: Phase 3 - Advanced Features
 
 ## Phase 1: Foundation & Architecture ✅ COMPLETED
 
@@ -118,25 +118,37 @@ This document tracks the progress of migrating CopyTree from PHP/Laravel Zero to
 - [x] Profile inheritance with extends functionality
 - [x] YAML and JSON profile format support
 
-## Phase 3: Advanced Features (Week 3) 🚧 NOT STARTED
+## Phase 3: Advanced Features (Week 3) ✅ COMPLETED
 
-### 3.1 Git Integration
-- [ ] Implement GitUtils with simple-git
-- [ ] Add --modified flag support
-- [ ] Add --changed flag support
-- [ ] Implement git status in output
+### 3.1 Git Integration ✅
+- [x] Implement GitUtils with simple-git
+- [x] Add --modified flag support for git modified files
+- [x] Add --changed flag support for git diff
+- [x] Implement git status in output
+- [x] GitFilterStage for pipeline integration
+- [x] Git metadata in XML/JSON output
 
-### 3.2 Advanced Transformers
-- [ ] Implement PDFTransformer
-- [ ] Add ImageTransformer with OCR
-- [ ] Create BinaryTransformer
-- [ ] Add transform caching
+### 3.2 Advanced Transformers ✅
+- [x] Implement PDFTransformer using pdf-parse
+- [x] Add ImageTransformer with OCR using tesseract.js
+- [x] BinaryTransformer already implemented in Phase 2
+- [x] Add transform caching mechanism with CacheService
+- [x] Cache integration in BaseTransformer
+- [x] File-based cache with TTL and garbage collection
 
-### 3.3 Output Options
-- [ ] Implement file output
-- [ ] Add streaming support
-- [ ] Create tree view renderer
-- [ ] Add size reporting
+### 3.3 Output Options ✅
+- [x] File output support via --output flag
+- [x] Add streaming support with StreamingOutputStage
+- [x] Create tree view renderer in OutputFormattingStage
+- [x] Add size reporting with --show-size flag
+- [x] Support for XML, JSON, and tree formats
+- [x] Memory-efficient streaming for large outputs
+
+### 3.4 Additional Features ✅
+- [x] Implement cache:clear command with options
+- [x] Add --format flag for output format selection
+- [x] Cache status reporting
+- [x] Transformer-specific cache configuration
 
 ## Phase 4: AI Integration (Week 4-5) 🚧 NOT STARTED
 
@@ -202,25 +214,44 @@ This document tracks the progress of migrating CopyTree from PHP/Laravel Zero to
 
 ## Key Metrics
 
-- **Total Commands**: 12/12 defined (1/12 fully implemented - copy command)
-- **Core Features**: Configuration ✅, Pipeline ✅, CLI ✅, Transformers ✅, Profiles ✅
-- **Transformers Implemented**: 4/13 (FileLoader, Markdown, CSV, Binary)
+- **Total Commands**: 12/12 defined (2/12 fully implemented - copy, cache:clear)
+- **Core Features**: Configuration ✅, Pipeline ✅, CLI ✅, Transformers ✅, Profiles ✅, Git ✅, Cache ✅
+- **Transformers Implemented**: 6/13 (FileLoader, Markdown, CSV, Binary, PDF, Image)
 - **Built-in Profiles**: 3 (default, laravel, sveltekit)
+- **Output Formats**: 3 (XML, JSON, Tree)
+- **Cache System**: File-based with TTL, GC, and transformer-specific settings
+- **Git Integration**: Modified files, changed files, git status metadata
 - **Test Coverage**: Basic structure with pipeline tests
 - **Documentation**: Migration guides complete, user docs pending
 
 ## Next Steps
 
-1. **Phase 3**: Implement Git integration (--modified, --changed flags)
-2. **Phase 3**: Add advanced transformers (PDF, Image/OCR)
-3. **Phase 3**: Implement additional output options (tree view, streaming)
-4. **Phase 4**: Begin AI provider integration
+1. **Phase 4**: Begin AI provider integration
+2. **Phase 4**: Implement AI filtering and summarization
+3. **Phase 4**: Create ask command with conversational interface
+4. **Phase 5**: Implement remaining commands
 
 ## Notes
 
-- Phase 1 & 2 completed successfully ahead of schedule
-- Basic copy command is fully functional with profile support
-- File discovery respects .gitignore and supports complex filtering
-- Transformer system is extensible and ready for additional transformers
-- Profile system supports inheritance and multiple formats (YAML/JSON)
-- Output supports XML format with metadata and multiple destinations
+- Phase 1, 2, and 3 completed successfully ahead of schedule
+- Copy command is fully functional with all major features:
+  - Profile support with inheritance
+  - Git integration (--modified, --changed)
+  - Multiple output formats (XML, JSON, tree)
+  - Streaming support for large outputs
+  - Transform caching for performance
+  - Advanced transformers (PDF, OCR)
+- Cache system implemented with:
+  - File-based storage
+  - TTL and garbage collection
+  - Transformer-specific configuration
+  - Cache clear command with options
+- Git integration complete with:
+  - Modified file filtering
+  - Changed file filtering (git diff)
+  - Git status in output metadata
+- All output options implemented:
+  - Clipboard (default)
+  - File output
+  - Console display
+  - Streaming to stdout

@@ -172,6 +172,8 @@ class TransformerRegistry {
     const MarkdownTransformer = require('./transformers/MarkdownTransformer');
     const CSVTransformer = require('./transformers/CSVTransformer');
     const BinaryTransformer = require('./transformers/BinaryTransformer');
+    const PDFTransformer = require('./transformers/PDFTransformer');
+    const ImageTransformer = require('./transformers/ImageTransformer');
     
     registry.register('file-loader', new FileLoaderTransformer(), {
       isDefault: true,
@@ -189,10 +191,21 @@ class TransformerRegistry {
       priority: 10
     });
 
+    registry.register('pdf', new PDFTransformer(), {
+      extensions: ['.pdf'],
+      mimeTypes: ['application/pdf'],
+      priority: 15
+    });
+
+    registry.register('image', new ImageTransformer(), {
+      extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp'],
+      mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff', 'image/webp'],
+      priority: 15
+    });
+
     registry.register('binary', new BinaryTransformer(), {
       extensions: [
-        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp',
-        '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+        '.doc', '.docx', '.xls', '.xlsx',
         '.zip', '.tar', '.gz', '.rar', '.7z',
         '.exe', '.dll', '.so', '.dylib'
       ],

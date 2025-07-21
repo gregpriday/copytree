@@ -1,6 +1,7 @@
 const { TransformError } = require('../utils/errors');
 const { config } = require('../config/ConfigManager');
 const { logger } = require('../utils/logger');
+const { CacheService } = require('../services/CacheService');
 const crypto = require('crypto');
 const path = require('path');
 
@@ -14,6 +15,17 @@ class BaseTransformer {
     this.logger = options.logger || logger.child(this.constructor.name);
     this.cacheEnabled = options.cache ?? this.config.get('cache.transformations.enabled', true);
     this.cacheTTL = options.cacheTTL ?? this.config.get('cache.transformations.ttl', 86400);
+    
+    // Initialize cache service for transformations
+    if (this.cacheEnabled) {
+      const transformerName = this.constructor.name.toLowerCase().replace('transformer', '');
+      const specificConfig = `cache.transformations.${transformerName}`;
+      
+      this.cache = CacheService.create('transform', {
+        enabled: this.config.get(`${specificConfig}.enabled`, this.cacheEnabled),
+        defaultTtl: this.config.get(`${specificConfig}.ttl`, this.cacheTTL)
+      });
+    }
   }
 
   /**
@@ -127,8 +139,20 @@ class BaseTransformer {
    * @returns {Promise<Object|null>} Cached result or null
    */
   async getFromCache(file) {
-    // This is a placeholder - actual cache implementation would be injected
-    // or use a caching service
+    if (!this.cache) return null;
+    
+    const cacheKey = this.getCacheKey(file);
+    const cached = await this.cache.get(cacheKey);
+    
+    if (cached) {
+      // Merge cached content back into file object
+      return {
+        ...file,
+        ...cached,
+        fromCache: true
+      };
+    }
+    
     return null;
   }
 
@@ -139,8 +163,23 @@ class BaseTransformer {
    * @returns {Promise<void>}
    */
   async saveToCache(file, result) {
-    // This is a placeholder - actual cache implementation would be injected
-    // or use a caching service
+    if (!this.cache) return;
+    
+    const cacheKey = this.getCacheKey(file);
+    
+    // Only cache successful transformations
+    if (result.transformed) {
+      // Don't cache the entire file object, just the transformation results
+      const cacheData = {
+        content: result.content,
+        transformed: result.transformed,
+        transformedBy: result.transformedBy,
+        metadata: result.metadata,
+        error: result.error
+      };
+      
+      await this.cache.set(cacheKey, cacheData, this.cacheTTL);
+    }
   }
 
   /**

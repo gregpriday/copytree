@@ -74,17 +74,25 @@ describe('Pipeline', () => {
     
     const result = await pipeline.process(1);
     
-    // Should process first stage but skip after error
-    expect(result).toBe(2); // 1 + 1
+    // Should process first stage (1 + 1 = 2), skip error stage, then multiply (2 * 2 = 4)
+    expect(result).toBe(4); // (1 + 1) * 2
   });
 
   test('should track statistics', async () => {
-    pipeline.through([AddOneStage, MultiplyByTwoStage]);
+    // Add a small delay stage to ensure duration is measurable
+    class DelayStage extends Stage {
+      async process(input) {
+        await new Promise(resolve => setTimeout(resolve, 1));
+        return input;
+      }
+    }
+    
+    pipeline.through([AddOneStage, DelayStage, MultiplyByTwoStage]);
     await pipeline.process(1);
     
     const stats = pipeline.getStats();
     
-    expect(stats.stagesCompleted).toBe(2);
+    expect(stats.stagesCompleted).toBe(3);
     expect(stats.stagesFailed).toBe(0);
     expect(stats.duration).toBeGreaterThan(0);
     expect(stats.successRate).toBe(1);
