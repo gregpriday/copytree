@@ -163,6 +163,9 @@ function handleError(error, options = {}) {
   return error;
 }
 
+// Alias for consistency with BaseProvider
+const ProviderError = AIProviderError;
+
 module.exports = {
   CopyTreeError,
   CommandError,
@@ -171,6 +174,7 @@ module.exports = {
   ValidationError,
   PipelineError,
   AIProviderError,
+  ProviderError,
   TransformError,
   GitError,
   ProfileError,

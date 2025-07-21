@@ -174,6 +174,7 @@ class TransformerRegistry {
     const BinaryTransformer = require('./transformers/BinaryTransformer');
     const PDFTransformer = require('./transformers/PDFTransformer');
     const ImageTransformer = require('./transformers/ImageTransformer');
+    const AISummaryTransformer = require('./transformers/AISummaryTransformer');
     
     registry.register('file-loader', new FileLoaderTransformer(), {
       isDefault: true,
@@ -210,6 +211,12 @@ class TransformerRegistry {
         '.exe', '.dll', '.so', '.dylib'
       ],
       priority: 5
+    });
+    
+    // AI Summary transformer (optional, not enabled by default)
+    registry.register('ai-summary', new AISummaryTransformer(), {
+      extensions: [], // Must be explicitly enabled
+      priority: 20
     });
 
     return registry;

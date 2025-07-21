@@ -148,14 +148,22 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 3. Profile Filter Stage (applies exclude patterns)
+  // 3. AI Filter Stage (if --ai-filter is used)
+  if (options.aiFilter) {
+    const AIFilterStage = require('../pipeline/stages/AIFilterStage');
+    stages.push(new AIFilterStage({
+      query: options.aiFilter
+    }));
+  }
+  
+  // 4. Profile Filter Stage (applies exclude patterns)
   const ProfileFilterStage = require('../pipeline/stages/ProfileFilterStage');
   stages.push(new ProfileFilterStage({
     exclude: profile.exclude || [],
     filter: profile.filter || []
   }));
   
-  // 4. Limit Stage (if --head option is used)
+  // 5. Limit Stage (if --head option is used)
   if (options.head) {
     const LimitStage = require('../pipeline/stages/LimitStage');
     stages.push(new LimitStage({
@@ -163,13 +171,13 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 5. File Loading Stage
+  // 6. File Loading Stage
   const FileLoadingStage = require('../pipeline/stages/FileLoadingStage');
   stages.push(new FileLoadingStage({
     encoding: 'utf8'
   }));
   
-  // 6. Transformer Stage
+  // 7. Transformer Stage
   const TransformStage = require('../pipeline/stages/TransformStage');
   const registry = TransformerRegistry.createDefault();
   stages.push(new TransformStage({
@@ -177,7 +185,7 @@ async function setupPipelineStages(basePath, profile, options) {
     transformers: profile.transformers || {}
   }));
   
-  // 7. Character Limit Stage (if --char-limit option is used)
+  // 8. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
     const CharLimitStage = require('../pipeline/stages/CharLimitStage');
     stages.push(new CharLimitStage({
@@ -185,7 +193,7 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 8. Output Formatting Stage
+  // 9. Output Formatting Stage
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
     const StreamingOutputStage = require('../pipeline/stages/StreamingOutputStage');

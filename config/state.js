@@ -1,6 +1,13 @@
 const { env } = require('../src/config/ConfigManager');
 
 module.exports = {
+  // State directory
+  path: env('STATE_PATH', '.copytree-state'),
+  
+  // Conversation management
+  maxMessages: env('STATE_MAX_MESSAGES', 50),
+  ttl: env('STATE_TTL', 86400), // 24 hours in seconds
+  
   // Conversation state management
   conversation: {
     // History settings
