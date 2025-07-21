@@ -8,7 +8,13 @@
   },
   "scripts": {
     "start": "node bin/copytree.js",
-    "test": "jest"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/ bin/ --ext .js",
+    "lint:fix": "eslint src/ bin/ --ext .js --fix",
+    "format": "prettier --write \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\""
   },
   "keywords": [
     "cli",
@@ -27,9 +33,14 @@
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
     "dotenv": "^17.2.0",
+    "fast-glob": "^3.3.2",
     "fs-extra": "^11.3.0",
     "glob": "^11.0.3",
     "ignore": "^7.0.5",
+    "inquirer": "^12.2.0",
+    "joi": "^17.13.3",
+    "js-yaml": "^4.1.0",
+    "lodash": "^4.17.21",
     "marked": "^16.1.1",
     "ora": "^8.2.0",
     "pdf-parse": "^1.1.1",
@@ -38,6 +49,12 @@
     "xmlbuilder2": "^3.1.1"
   },
   "devDependencies": {
-    "jest": "^30.0.4"
+    "@babel/preset-env": "^7.28.0",
+    "@types/node": "^22.12.0",
+    "babel-jest": "^30.0.4",
+    "eslint": "^9.18.0",
+    "jest": "^30.0.4",
+    "prettier": "^3.5.0",
+    "typescript": "^5.8.3"
   }
 }
