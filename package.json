@@ -1,0 +1,43 @@
+{
+  "name": "copytree",
+  "version": "1.0.0",
+  "description": "A Node.js CLI tool that copies directory structures and file contents into structured XML format",
+  "main": "index.js",
+  "bin": {
+    "copytree": "./bin/copytree.js"
+  },
+  "scripts": {
+    "start": "node bin/copytree.js",
+    "test": "jest"
+  },
+  "keywords": [
+    "cli",
+    "directory",
+    "xml",
+    "copy",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.10.0",
+    "braces": "^3.0.3",
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "dotenv": "^17.2.0",
+    "fs-extra": "^11.3.0",
+    "glob": "^11.0.3",
+    "ignore": "^7.0.5",
+    "marked": "^16.1.1",
+    "ora": "^8.2.0",
+    "pdf-parse": "^1.1.1",
+    "simple-git": "^3.28.0",
+    "tesseract.js": "^6.0.1",
+    "xmlbuilder2": "^3.1.1"
+  },
+  "devDependencies": {
+    "jest": "^30.0.4"
+  }
+}
