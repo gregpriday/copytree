@@ -54,21 +54,8 @@ class FileLoadingStage extends Stage {
   }
 
   async isBinaryFile(filePath) {
-    const buffer = Buffer.alloc(512);
-    let fd;
-    
     try {
-      fd = await fs.open(filePath, 'r');
-      const { bytesRead } = await fd.read(buffer, 0, 512, 0);
-      
-      // Check for null bytes (common in binary files)
-      for (let i = 0; i < bytesRead; i++) {
-        if (buffer[i] === 0) {
-          return true;
-        }
-      }
-      
-      // Check by extension
+      // First check by extension
       const ext = path.extname(filePath).toLowerCase();
       const binaryExtensions = [
         '.exe', '.dll', '.so', '.dylib', '.bin',
@@ -77,13 +64,24 @@ class FileLoadingStage extends Stage {
         '.zip', '.tar', '.gz', '.rar', '.7z'
       ];
       
-      return binaryExtensions.includes(ext);
+      if (binaryExtensions.includes(ext)) {
+        return true;
+      }
+
+      // Then check content for null bytes
+      const buffer = await fs.readFile(filePath);
+      const sampleSize = Math.min(512, buffer.length);
+      
+      // Check for null bytes (common in binary files)
+      for (let i = 0; i < sampleSize; i++) {
+        if (buffer[i] === 0) {
+          return true;
+        }
+      }
+      
+      return false;
     } catch (error) {
       return false;
-    } finally {
-      if (fd) {
-        await fd.close();
-      }
     }
   }
 

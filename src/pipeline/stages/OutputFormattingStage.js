@@ -51,7 +51,7 @@ class OutputFormattingStage extends Stage {
     metadata.ele('totalSize').txt(this.calculateTotalSize(input.files).toString());
     
     if (input.profile) {
-      metadata.ele('profile').txt(input.profile);
+      metadata.ele('profile').txt(input.profile.name || 'default');
     }
 
     // Add files

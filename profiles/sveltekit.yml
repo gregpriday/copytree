@@ -1,0 +1,86 @@
+name: sveltekit
+description: Tailored profile for SvelteKit JavaScript framework projects
+version: 1.0.0
+extends: default
+
+# SvelteKit-specific includes
+include:
+  # Source files
+  - "src/**/*.{js,ts,svelte,css,html,json}"
+  
+  # Static assets
+  - "static/**/*.{js,ts,css,html,json,svg,ico}"
+  
+  # Tests
+  - "tests/**/*.{js,ts,svelte}"
+  - "e2e/**/*.{js,ts}"
+  
+  # Documentation
+  - "docs/**/*.md"
+  - "*.md"
+  
+  # Root configuration files
+  - "*.{json,js,ts,cjs,mjs}"
+  - ".*rc"
+  - ".*rc.{json,js,ts,cjs,mjs}"
+
+# Always include these files
+filter:
+  - package.json
+  - README.md
+  - svelte.config.js
+  - vite.config.js
+  - vite.config.ts
+  - app.html
+  - tsconfig.json
+  - .env.example
+
+# Additional excludes for SvelteKit
+exclude:
+  # SvelteKit specific
+  - .svelte-kit/**
+  - build/**
+  - .vercel/**
+  - .netlify/**
+  
+  # Dependencies
+  - node_modules/**
+  - .pnpm/**
+  - .yarn/**
+  
+  # Build artifacts
+  - "*.log"
+  - .turbo/**
+  - coverage/**
+  - .nyc_output/**
+  
+  # Environment
+  - .env
+  - .env.local
+  - .env.*.local
+
+options:
+  respectGitignore: true
+  includeHidden: false
+  followSymlinks: false
+  maxFileSize: 5242880  # 5MB
+  maxTotalSize: 52428800  # 50MB
+  maxFileCount: 5000
+
+transformers:
+  file-loader:
+    enabled: true
+  markdown:
+    enabled: true
+    options:
+      mode: strip
+  csv:
+    enabled: true
+    options:
+      maxRows: 10
+
+output:
+  format: xml
+  includeMetadata: true
+  addLineNumbers: false
+  prettyPrint: true
