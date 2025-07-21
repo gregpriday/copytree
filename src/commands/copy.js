@@ -163,7 +163,13 @@ async function setupPipelineStages(basePath, profile, options) {
     filter: profile.filter || []
   }));
   
-  // 5. Limit Stage (if --head option is used)
+  // 5. External Source Stage (if external sources are configured)
+  if (profile.external && profile.external.length > 0) {
+    const ExternalSourceStage = require('../pipeline/stages/ExternalSourceStage');
+    stages.push(new ExternalSourceStage(profile.external));
+  }
+  
+  // 6. Limit Stage (if --head option is used)
   if (options.head) {
     const LimitStage = require('../pipeline/stages/LimitStage');
     stages.push(new LimitStage({
@@ -171,13 +177,13 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 6. File Loading Stage
+  // 7. File Loading Stage
   const FileLoadingStage = require('../pipeline/stages/FileLoadingStage');
   stages.push(new FileLoadingStage({
     encoding: 'utf8'
   }));
   
-  // 7. Transformer Stage
+  // 8. Transformer Stage
   const TransformStage = require('../pipeline/stages/TransformStage');
   const registry = TransformerRegistry.createDefault();
   stages.push(new TransformStage({
@@ -185,7 +191,7 @@ async function setupPipelineStages(basePath, profile, options) {
     transformers: profile.transformers || {}
   }));
   
-  // 8. Character Limit Stage (if --char-limit option is used)
+  // 9. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
     const CharLimitStage = require('../pipeline/stages/CharLimitStage');
     stages.push(new CharLimitStage({
@@ -193,7 +199,7 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 9. Output Formatting Stage
+  // 10. Output Formatting Stage
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
     const StreamingOutputStage = require('../pipeline/stages/StreamingOutputStage');
@@ -233,6 +239,7 @@ function setupProgressTracking(pipeline) {
     'Discovering files',
     'Applying git filters',
     'Applying profile filters',
+    'Processing external sources',
     'Limiting files',
     'Loading content',
     'Transforming files',

@@ -46,6 +46,11 @@ module.exports = {
     '^.+\\.js$': 'babel-jest'
   },
   
+  // Transform ignore patterns to handle ES modules
+  transformIgnorePatterns: [
+    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3)/)'
+  ],
+  
   // Ignore patterns
   testPathIgnorePatterns: [
     '/node_modules/',

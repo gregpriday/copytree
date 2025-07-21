@@ -54,7 +54,7 @@ class GitHubUrlHandler {
    * Set up cache directory for cloned repositories
    */
   setupCacheDirectory() {
-    this.cacheDir = path.join(os.homedir(), '.copytree', 'external-sources');
+    this.cacheDir = path.join(os.homedir(), '.copytree', 'repos');
     fs.ensureDirSync(this.cacheDir);
     this.repoDir = path.join(this.cacheDir, this.cacheKey);
   }
@@ -64,10 +64,18 @@ class GitHubUrlHandler {
    */
   async getFiles() {
     try {
-      if (!fs.existsSync(this.repoDir)) {
-        await this.cloneRepository();
-      } else {
+      // Check if repository already exists with .git folder
+      if (fs.existsSync(this.repoDir) && fs.existsSync(path.join(this.repoDir, '.git'))) {
         await this.updateRepository();
+      } else {
+        // Clean up any partial directory if it exists without .git
+        if (fs.existsSync(this.repoDir)) {
+          logger.warn('Found incomplete repository cache, removing...', { 
+            cacheDir: this.repoDir 
+          });
+          fs.rmSync(this.repoDir, { recursive: true, force: true });
+        }
+        await this.cloneRepository();
       }
 
       const targetPath = this.subPath 

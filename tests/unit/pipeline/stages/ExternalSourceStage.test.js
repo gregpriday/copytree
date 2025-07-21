@@ -1,151 +1,166 @@
+// Mock dependencies before any imports
+jest.mock('../../../../src/services/GitHubUrlHandler');
+jest.mock('../../../../src/utils/fileLoader');
+jest.mock('fs-extra');
+jest.mock('globby', () => ({
+  globby: jest.fn()
+}));
+
 const ExternalSourceStage = require('../../../../src/pipeline/stages/ExternalSourceStage');
 const GitHubUrlHandler = require('../../../../src/services/GitHubUrlHandler');
-const FileLoader = require('../../../../src/services/FileLoader');
+const FileLoader = require('../../../../src/utils/fileLoader');
 const fs = require('fs-extra');
 const path = require('path');
 
-// Mock dependencies
-jest.mock('../../../../src/services/GitHubUrlHandler');
-jest.mock('../../../../src/services/FileLoader');
-jest.mock('fs-extra');
-
 describe('ExternalSourceStage', () => {
   let stage;
-  let mockContext;
+  let mockInput;
+  let mockFileLoader;
+  let mockGitHubHandler;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    stage = new ExternalSourceStage();
-    mockContext = {
-      emit: jest.fn(),
-      basePath: '/test/project',
-      profile: {
-        external: [
-          'https://github.com/user/repo',
-          '/local/path'
-        ]
-      }
+    
+    // Mock FileLoader
+    mockFileLoader = {
+      loadFiles: jest.fn().mockResolvedValue([
+        { relativePath: 'file1.js', path: 'file1.js', content: 'content1' },
+        { relativePath: 'file2.js', path: 'file2.js', content: 'content2' }
+      ])
+    };
+    FileLoader.mockImplementation(() => mockFileLoader);
+    
+    // Mock GitHubUrlHandler
+    mockGitHubHandler = {
+      getFiles: jest.fn().mockResolvedValue('/cached/repo/path')
+    };
+    GitHubUrlHandler.mockImplementation(() => mockGitHubHandler);
+    GitHubUrlHandler.isGitHubUrl = jest.fn();
+    
+    // Mock fs operations
+    fs.pathExists = jest.fn();
+    
+    mockInput = {
+      files: [{ path: 'existing.js', content: 'existing' }]
     };
   });
 
   describe('process', () => {
     it('should return files unchanged when no external sources', async () => {
-      const files = [{ path: 'test.js' }];
-      mockContext.profile = {};
+      stage = new ExternalSourceStage([]);
       
-      const result = await stage.process(files, mockContext);
+      const result = await stage.process(mockInput);
       
-      expect(result).toBe(files);
+      expect(result).toBe(mockInput);
       expect(GitHubUrlHandler.isGitHubUrl).not.toHaveBeenCalled();
     });
 
     it('should process GitHub URLs', async () => {
-      const files = [{ path: 'test.js' }];
-      const externalFiles = [
-        { path: 'external/file1.js', content: 'content1' },
-        { path: 'external/file2.js', content: 'content2' }
-      ];
+      const externalItems = [{
+        source: 'https://github.com/user/repo',
+        destination: 'external'
+      }];
+      stage = new ExternalSourceStage(externalItems);
       
       GitHubUrlHandler.isGitHubUrl.mockReturnValue(true);
-      GitHubUrlHandler.prototype.getFiles = jest.fn().mockResolvedValue('/cached/repo');
-      FileLoader.prototype.loadFromDirectory = jest.fn().mockResolvedValue(externalFiles);
       
-      const result = await stage.process(files, mockContext);
+      const result = await stage.process(mockInput);
       
       expect(GitHubUrlHandler.isGitHubUrl).toHaveBeenCalledWith('https://github.com/user/repo');
       expect(GitHubUrlHandler).toHaveBeenCalledWith('https://github.com/user/repo');
-      expect(result).toHaveLength(3);
-      expect(result).toContain(files[0]);
-      expect(result).toContainEqual(expect.objectContaining({
+      expect(mockGitHubHandler.getFiles).toHaveBeenCalled();
+      expect(result.files).toHaveLength(3); // 1 existing + 2 external
+      expect(result.files[0]).toBe(mockInput.files[0]);
+      expect(result.files[1]).toMatchObject({
         path: 'external/file1.js',
+        isExternal: true,
         externalSource: 'https://github.com/user/repo'
-      }));
+      });
     });
 
     it('should process local directories', async () => {
-      const files = [{ path: 'test.js' }];
-      const externalFiles = [
-        { path: 'local/file1.js', content: 'content1' }
-      ];
+      const externalItems = [{
+        source: '/local/path',
+        destination: 'local'
+      }];
+      stage = new ExternalSourceStage(externalItems);
       
       GitHubUrlHandler.isGitHubUrl.mockReturnValue(false);
-      fs.existsSync.mockReturnValue(true);
-      fs.statSync.mockReturnValue({ isDirectory: () => true });
-      FileLoader.prototype.loadFromDirectory = jest.fn().mockResolvedValue(externalFiles);
+      fs.pathExists.mockResolvedValue(true);
       
-      const result = await stage.process(files, mockContext);
+      const result = await stage.process(mockInput);
       
-      expect(fs.existsSync).toHaveBeenCalledWith('/local/path');
-      expect(result).toHaveLength(2);
-      expect(result[1]).toMatchObject({
+      expect(fs.pathExists).toHaveBeenCalledWith(path.resolve('/local/path'));
+      expect(result.files).toHaveLength(3); // 1 existing + 2 external
+      expect(result.files[1]).toMatchObject({
         path: 'local/file1.js',
+        isExternal: true,
         externalSource: '/local/path'
       });
     });
 
-    it('should handle errors gracefully', async () => {
-      const files = [{ path: 'test.js' }];
+    it('should handle errors gracefully for optional sources', async () => {
+      const externalItems = [{
+        source: 'https://github.com/user/repo',
+        optional: true
+      }];
+      stage = new ExternalSourceStage(externalItems);
       
       GitHubUrlHandler.isGitHubUrl.mockReturnValue(true);
-      GitHubUrlHandler.prototype.getFiles = jest.fn()
-        .mockRejectedValue(new Error('Clone failed'));
+      mockGitHubHandler.getFiles.mockRejectedValue(new Error('Clone failed'));
       
-      const result = await stage.process(files, mockContext);
+      const result = await stage.process(mockInput);
       
-      expect(mockContext.emit).toHaveBeenCalledWith('warning', 
-        expect.stringContaining('Failed to load external source'));
-      expect(result).toEqual(files);
+      expect(result.files).toEqual(mockInput.files); // Only original files
     });
 
-    it('should skip non-existent local paths', async () => {
-      const files = [{ path: 'test.js' }];
-      mockContext.profile.external = ['/non/existent'];
+    it('should throw error for non-existent local paths', async () => {
+      const externalItems = [{
+        source: '/non/existent'
+      }];
+      stage = new ExternalSourceStage(externalItems);
       
       GitHubUrlHandler.isGitHubUrl.mockReturnValue(false);
-      fs.existsSync.mockReturnValue(false);
+      fs.pathExists.mockResolvedValue(false);
       
-      const result = await stage.process(files, mockContext);
-      
-      expect(mockContext.emit).toHaveBeenCalledWith('warning',
-        expect.stringContaining('does not exist'));
-      expect(result).toEqual(files);
+      await expect(stage.process(mockInput)).rejects.toThrow('External source path does not exist');
     });
 
-    it('should emit progress events', async () => {
-      const files = [];
-      const externalFiles = Array(50).fill(null).map((_, i) => ({
-        path: `file${i}.js`,
-        content: `content${i}`
-      }));
+    it('should process multiple external sources', async () => {
+      const externalItems = [
+        { source: 'https://github.com/user/repo1' },
+        { source: '/local/path', destination: 'local' }
+      ];
+      stage = new ExternalSourceStage(externalItems);
       
-      GitHubUrlHandler.isGitHubUrl.mockReturnValue(true);
-      GitHubUrlHandler.prototype.getFiles = jest.fn().mockResolvedValue('/cached');
-      FileLoader.prototype.loadFromDirectory = jest.fn().mockResolvedValue(externalFiles);
+      GitHubUrlHandler.isGitHubUrl
+        .mockReturnValueOnce(true)
+        .mockReturnValueOnce(false);
+      fs.pathExists.mockResolvedValue(true);
       
-      await stage.process(files, mockContext);
+      const result = await stage.process(mockInput);
       
-      expect(mockContext.emit).toHaveBeenCalledWith('external:loaded',
-        expect.objectContaining({
-          source: 'https://github.com/user/repo',
-          fileCount: 50
-        })
-      );
+      expect(result.files).toHaveLength(5); // 1 existing + 2 from first source + 2 from second source
+      expect(GitHubUrlHandler.isGitHubUrl).toHaveBeenCalledTimes(2);
     });
   });
 
-  describe('shouldApply', () => {
-    it('should apply when external sources exist', () => {
-      expect(stage.shouldApply(mockContext)).toBe(true);
+  describe('validate', () => {
+    it('should validate valid input', () => {
+      stage = new ExternalSourceStage([]);
+      expect(stage.validate(mockInput)).toBe(true);
     });
 
-    it('should not apply when no external sources', () => {
-      mockContext.profile = {};
-      expect(stage.shouldApply(mockContext)).toBe(false);
+    it('should throw error for invalid input', () => {
+      stage = new ExternalSourceStage([]);
+      expect(() => stage.validate(null)).toThrow('Input must be an object');
+      expect(() => stage.validate({})).toThrow('Input must have a files array');
     });
 
-    it('should not apply when external array is empty', () => {
-      mockContext.profile.external = [];
-      expect(stage.shouldApply(mockContext)).toBe(false);
+    it('should validate external items', () => {
+      const invalidItems = [{ destination: 'test' }]; // Missing source
+      stage = new ExternalSourceStage(invalidItems);
+      expect(() => stage.validate(mockInput)).toThrow('Each external item must have a source property');
     });
   });
 });

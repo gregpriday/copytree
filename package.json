@@ -2,7 +2,6 @@
   "name": "copytree",
   "version": "1.0.0",
   "description": "A Node.js CLI tool that copies directory structures and file contents into structured XML format",
-  "main": "index.js",
   "bin": {
     "copytree": "./bin/copytree.js"
   },

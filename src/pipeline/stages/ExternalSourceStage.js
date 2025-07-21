@@ -3,7 +3,6 @@ const fs = require('fs-extra');
 const Stage = require('../Stage');
 const GitHubUrlHandler = require('../../services/GitHubUrlHandler');
 const FileLoader = require('../../utils/fileLoader');
-const RulesetFilter = require('../../utils/rulesetFilter');
 const { logger } = require('../../utils/logger');
 
 /**
@@ -99,28 +98,27 @@ class ExternalSourceStage extends Stage {
       followSymlinks: false
     });
     
+    // Use rules as include patterns if provided, otherwise include all
+    const includePatterns = rules && rules.length > 0 ? rules : ['**/*'];
     const sourceFiles = await fileLoader.loadFiles({
-      include: ['**/*'],
+      include: includePatterns,
       exclude: ['**/.git/**', '**/node_modules/**']
     });
     
-    // Apply rules if provided
-    let filteredFiles = sourceFiles;
-    if (rules && rules.length > 0) {
-      const filter = new RulesetFilter([], [], rules);
-      filteredFiles = sourceFiles.filter(file => filter.accept(file));
-    }
-    
     // Remap paths with destination prefix
-    const remappedFiles = filteredFiles.map(file => {
+    const remappedFiles = sourceFiles.map(file => {
+      // Get the relative path from the file object
+      const relativePath = file.relativePath || file.path || '';
       const newPath = destination 
-        ? path.join(destination, file.relativePath)
-        : file.relativePath;
+        ? path.join(destination, relativePath)
+        : relativePath;
       
       return {
-        ...file,
-        relativePath: newPath,
         path: newPath,
+        absolutePath: file.absolutePath || file.path || path.join(sourcePath, relativePath),
+        size: file.stats?.size || file.size || 0,
+        modified: file.stats?.mtime || file.modified || new Date(),
+        content: file.content, // Include the content!
         isExternal: true,
         externalSource: source,
         externalDestination: destination
