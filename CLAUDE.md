@@ -2,224 +2,266 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚨 CRITICAL: Migration in Progress
-
-**This is an active migration project from PHP to Node.js. The codebase is currently being built from scratch.**
-
-### Current Status
-- **Phase**: Foundation & Implementation
-- **Progress**: Basic structure established, core commands need implementation
-- **Timeline**: 6-8 weeks total migration effort
-- **Complexity**: High - 12 commands, 13 transformers, complex pipeline architecture
-
-### Essential Migration Documentation
-
-Before working on this project, **you MUST review these documents** in order:
-
-1. **[docs/migration-roadmap.md](./docs/migration-roadmap.md)** - Master plan with phases and timeline
-2. **[docs/php-migration.md](./docs/php-migration.md)** - Comprehensive migration strategy (160-320 hours)
-3. **[docs/architecture-comparison.md](./docs/architecture-comparison.md)** - PHP vs Node.js architecture mapping
-4. **[docs/command-migration-guide.md](./docs/command-migration-guide.md)** - Detailed implementation for each command
-
-### Key Technical Documents
-
-- **[docs/file-transformation-pipeline.md](./docs/file-transformation-pipeline.md)** - 13 transformer implementations
-- **[docs/ai-integration-strategy.md](./docs/ai-integration-strategy.md)** - Multi-provider AI architecture
-- **[docs/configuration-migration-guide.md](./docs/configuration-migration-guide.md)** - Configuration system design
-- **[docs/dependency-mapping-guide.md](./docs/dependency-mapping-guide.md)** - PHP to Node.js package mappings
-
 ## Project Overview
 
-CopyTree is a sophisticated CLI tool that:
-- Copies directory structures and file contents into structured XML format
-- Features AI-powered file filtering using natural language queries
-- Integrates deeply with Git for modified/changed file filtering
-- Includes 13 file transformers (PDFs, images with OCR, AI summaries)
-- Provides conversational AI interface for codebase Q&A
-- Supports profile-based file selection with auto-detection
+CopyTree is a sophisticated CLI tool for intelligently copying and transforming project structures for AI consumption. It features:
 
-**Original PHP Implementation**: `/Users/gpriday/Dropbox/PHP/copytree` - Use `Task` tool to analyze when needed.
+- **Intelligent file selection** using profiles and AI-powered filtering
+- **15+ file transformers** for PDFs, images, code, and documents
+- **Deep Git integration** for tracking changes and modifications
+- **Conversational AI interface** for querying codebases
+- **MCP server** for Claude Desktop integration
+- **Watch mode** with automatic regeneration
+- **External sources** support (GitHub repositories)
 
-## Current Implementation Status
+## Architecture
 
-### ✅ Completed
-- Basic project structure
-- Commander.js CLI setup
-- Some utility modules (fileFilter, patternExpander)
-- Initial command files (structure only)
+### Core Components
 
-### 🚧 In Progress
-- **Pipeline Architecture** - Core processing engine
-- **Configuration System** - Laravel-like config management
-- **Main Copy Command** - Primary functionality
+**Pipeline System** (`src/pipeline/`)
+- Event-driven processing pipeline with 16 specialized stages
+- Memory-efficient streaming for large files
+- Error recovery and graceful degradation
 
-### ❌ Not Started
-- File transformation pipeline (13 transformers)
-- AI provider implementations (OpenAI, Gemini, Anthropic)
-- Git integration features
-- Profile system with auto-detection
-- Watch mode
-- MCP protocol support
-- Comprehensive test suite
+**Commands** (`src/commands/`)
+- `copy.js` - Main copy command with extensive options
+- `ask.js` - Interactive AI-powered Q&A about codebases
+- `watch.js` - File watching with auto-regeneration
+- `mcp.js` - MCP server for Claude Desktop
+- Profile commands: `profileList.js`, `profileCreate.js`, `profileValidate.js`
+- Utility commands: `configValidate.js`, `cacheClear.js`, `copyDocs.js`
+- Installation helpers: `installClaude.js`, `installCopytree.js`
 
-## Development Priority
+**Transformers** (`src/transforms/transformers/`)
+- Text: FirstLines, Markdown, HTMLStripper, MarkdownLinkStripper
+- Documents: PDF, DocumentToText, CSV
+- Images: Image (OCR), ImageDescription (AI), SVGDescription
+- AI-powered: AISummary, FileSummary, UnitTestSummary
+- Utilities: FileLoader, Binary
 
-Follow the phased approach in [migration-roadmap.md](./docs/migration-roadmap.md):
-
-1. **Current Focus**: Pipeline architecture and configuration system
-2. **Next**: Basic copy command with file discovery
-3. **Then**: Transformers and Git integration
-4. **Finally**: AI features and additional commands
-
-## Architecture Guidelines
-
-### Pipeline Implementation
-The pipeline is the heart of CopyTree. Reference the PHP implementation:
-```php
-// PHP Pipeline stages
-app(Pipeline::class)
-    ->send($files)
-    ->through([stages...])
-    ->thenReturn();
-```
-
-Must support:
-- Sequential stage processing
-- Event emission for progress
-- Error handling with recovery
-- Memory-efficient streaming
-
-### Command Structure
-Each command in `src/commands/` should:
-- Export an async function
-- Handle all options from PHP version
-- Include proper error handling
-- Support dry-run where applicable
+**Services** (`src/services/`)
+- `AIService.js` - Gemini AI integration
+- `CacheService.js` - Response caching
+- `ConversationService.js` - Stateful AI conversations
+- `GitHubUrlHandler.js` - GitHub repository handling
+- `ProfileGuesser.js` - Auto-detect project types
 
 ### Configuration System
-Implement hierarchical configuration like Laravel:
-- Default configs in `config/`
-- User overrides in `~/.copytree/`
-- Environment variable overrides
-- Runtime modifications
 
-## Critical Implementation Notes
+Hierarchical configuration with multiple sources:
+1. Default configs in `config/`
+2. User overrides in `~/.copytree/`
+3. Environment variables
+4. Runtime options
 
-### Async/Await Patterns
-```javascript
-// Always use async/await, never callbacks
-const files = await discoverFiles(path);
-const transformed = await Promise.all(
-    files.map(file => transformer.transform(file))
-);
+### Profile System
+
+- **Built-in profiles**: Default, Laravel, SvelteKit
+- **Auto-detection** for 14+ project types
+- **YAML-based** configuration
+- **Inheritance** support for profile composition
+
+## Documentation
+
+Comprehensive documentation available in `docs/`:
+
+- **[docs/index.md](./docs/index.md)** - Getting started guide
+- **[docs/cli/copytree-reference.md](./docs/cli/copytree-reference.md)** - Complete CLI reference
+- **[docs/profiles/transformer-reference.md](./docs/profiles/transformer-reference.md)** - All transformers documented
+- **[docs/usage/mcp-server.md](./docs/usage/mcp-server.md)** - MCP integration guide
+- **[docs/usage/troubleshooting.md](./docs/usage/troubleshooting.md)** - Common issues
+
+## Quick Reference
+
+```bash
+# Basic usage
+copytree                         # Copy current directory
+copytree /path/to/project        # Copy specific directory
+copytree https://github.com/...  # Copy GitHub repository
+
+# Profiles & filtering
+copytree --profile laravel       # Use Laravel profile
+copytree --git-modified          # Only modified files
+copytree --git-branch main       # Compare with branch
+copytree --ask "show auth"       # AI-powered filtering
+
+# Transformers
+copytree --transform             # Enable all transformers
+copytree --no-transform          # Disable transformers
+
+# Output options
+copytree --save output.xml       # Save to file
+copytree --display               # Show in terminal
+copytree --clipboard             # Copy to clipboard
+
+# Interactive features
+copytree ask                     # Q&A about codebase
+copytree watch                   # Watch mode
+copytree mcp                     # MCP server
+
+# Profile management
+copytree profile:list            # List profiles
+copytree profile:validate        # Validate profile
+copytree profile:create          # Create new profile
 ```
 
-### Memory Management
-For large projects, use streams:
-```javascript
-const stream = fs.createReadStream(filePath);
-// Process in chunks, don't load entire file
+## Development Guidelines
+
+### Code Style
+
+- **CommonJS modules** - Use `require()` and `module.exports`
+- **Async/await** - No callbacks, use promises
+- **Error handling** - Use custom error classes
+- **Logging** - Use the logger service consistently
+
+### Testing
+
+```bash
+npm test                  # Run all tests
+npm run test:unit         # Unit tests only
+npm run test:integration  # Integration tests
+npm run test:coverage     # Coverage report
 ```
+
+Test structure:
+- Unit tests: `tests/unit/`
+- Integration tests: `tests/integration/`
+- Performance benchmarks: `tests/performance/`
+- Test fixtures: `tests/fixtures/`
+
+### Performance Targets
+
+- Process 10,000 files in < 30 seconds
+- Memory usage < 500MB for large projects
+- Support projects up to 100MB total size
+- Stream files > 10MB
 
 ### Error Handling
+
 ```javascript
-class CommandError extends Error {
-    constructor(message, code, details) {
-        super(message);
-        this.code = code;
-        this.details = details;
-    }
+const { CommandError, ValidationError } = require('./utils/errors');
+
+// Throw specific errors
+throw new CommandError('Message', 'ERROR_CODE', { details });
+
+// Handle in commands
+try {
+  await operation();
+} catch (error) {
+  if (error instanceof ValidationError) {
+    logger.error('Validation failed:', error.message);
+  }
+  throw error;
 }
 ```
 
-## Testing Requirements
+## Key Features
 
-- Minimum 80% code coverage
-- Unit tests for all utilities
-- Integration tests for commands
-- E2E tests with real projects
-- Performance benchmarks
+### AI Integration
+- **Provider**: Google Gemini (gemini-1.5-flash/pro)
+- **Features**: File filtering, summaries, image descriptions, Q&A
+- **Caching**: Responses cached for performance
+- **Conversations**: Stateful chat with context retention
 
-## Dependencies to Install
+### Git Integration
+- Track modified files (`--git-modified`)
+- Compare branches (`--git-branch`)
+- Filter by commit range
+- Respect `.gitignore` patterns
 
-As you implement features, install these packages:
+### External Sources
+- Include files from GitHub repositories
+- Support for specific branches/tags
+- Local directory inclusion
+- Rule-based filtering for external files
 
-```bash
-# Core (Phase 1)
-npm install dotenv fs-extra glob fast-glob ignore
+### Transform Pipeline
+1. **File Discovery** - Find files based on patterns
+2. **Profile Filtering** - Apply profile rules
+3. **Git Filtering** - Apply git-based filters
+4. **AI Filtering** - Natural language queries
+5. **Transformation** - Apply file transformers
+6. **Output Formatting** - XML/JSON output
 
-# Transformers (Phase 2)
-npm install pdf-parse tesseract.js marked sharp
+## Current Status
 
-# AI Providers (Phase 4)
-npm install openai @anthropic-ai/sdk tiktoken
+- ✅ **Feature complete** - All planned features implemented
+- ✅ **15+ transformers** - Comprehensive file processing
+- ✅ **Full pipeline** - 16 processing stages
+- ✅ **AI integration** - Gemini provider with caching
+- ✅ **Git integration** - Complete git functionality
+- ✅ **MCP server** - Claude Desktop integration
+- ⚠️ **Tests** - Need fixes (120/352 failing)
+- 📝 **Documentation** - Comprehensive user docs
 
-# Additional
-npm install ora chalk inquirer js-yaml
-```
+## Dependencies
 
-## Key Differences from PHP Version
+All dependencies are installed and managed via npm:
 
-1. **No AI Profile Creation** - Explicitly excluded from Node.js version
-2. **Direct API Clients** - No Prism equivalent, use provider SDKs directly
-3. **Manual DI** - No Laravel service container
-4. **CommonJS** - Using require/module.exports, not ES modules
+### Core
+- CLI: commander, chalk, ora, inquirer
+- File System: fs-extra, glob, fast-glob, chokidar
+- Config: dotenv, js-yaml
+- Git: simple-git
+- Utilities: lodash, rimraf, adm-zip
 
-## Performance Targets
+### Transformers
+- PDF: pdf-parse
+- Images: sharp, tesseract.js, canvas
+- Markdown: marked
+- CSV: csv-parse
+- Documents: External tools (pandoc)
 
-- Process 10,000 files in under 30 seconds
-- Stay under 500MB memory for large projects
-- Support projects up to 100MB total size
-- Stream files larger than 10MB
-
-## When Working on This Project
-
-1. **Always consult the PHP version** for feature parity
-2. **Follow the migration phases** - don't skip ahead
-3. **Write tests as you go** - don't defer testing
-4. **Document complex logic** - this is a complex system
-5. **Ask for clarification** when PHP behavior is unclear
+### AI
+- Google Generative AI SDK
 
 ## Resources
 
-- PHP Source: `/Users/gpriday/Dropbox/PHP/copytree`
-- All Docs: `./docs/`
-- Original README: Review for feature list
-- Test Projects: Create in `tests/fixtures/projects/`
+- **Documentation**: `./docs/` - User and developer guides
+- **Test Fixtures**: `tests/fixtures/` - Sample projects
+- **Built-in Profiles**: `profiles/` - YAML profile definitions
+- **Configuration**: `config/` - Default settings
 
-Remember: This is a sophisticated application with complex requirements. Take time to understand the architecture before implementing features.
+## MCP Server Integration
 
-## CopyTree MCP Server
-
-This project has CopyTree's `project_ask` tool for querying the codebase using natural language.
+CopyTree includes an MCP server for Claude Desktop:
 
 ### Available Tools
+- **project_ask**: Query codebases with natural language
+- **project_copy**: Generate structured output
 
-- **project_ask**: Ask questions about the codebase, architecture, implementations, or debug issues
-- **project_copy**: Generate structured XML output of project files
+### Features
+- Stateful conversations
+- Streaming responses
+- Git integration
+- Custom file filtering
 
-### Example Queries
+### Setup
+```bash
+# Install globally
+npm install -g .
 
-- "What is the main purpose of this project?"
-- "How does the authentication system work?"
-- "Where is X implemented?"
-- "Why is this test failing?"
-- "Show me the database schema"
-- "Explain the API endpoints"
+# Configure Claude Desktop
+copytree install:claude
 
-### Advanced Features
+# Or run manually
+copytree mcp
+```
 
-- **Stateful conversations**: Use `state` parameter to maintain context across questions
-- **Streaming responses**: Use `stream: true` for real-time answers
-- **File filtering**: Ask about specific files, directories, or patterns
-- **Git integration**: Query modified files, recent changes, or branch differences
+## Best Practices
 
-### Usage Tips
+1. **Use profiles** for consistent file selection
+2. **Enable caching** for AI operations
+3. **Set file limits** to prevent memory issues
+4. **Test with dry-run** before large operations
+5. **Use .copytreeignore** for exclusions
+6. **Monitor memory** usage for large projects
 
-1. Ask specific questions about code functionality
-2. Request explanations of complex algorithms or patterns  
-3. Debug failing tests or error messages
-4. Understand project architecture and data flow
-5. Get help with code reviews and refactoring
+## Troubleshooting
 
-The CopyTree MCP server provides deep codebase understanding through AI-powered analysis.
+See [docs/usage/troubleshooting.md](./docs/usage/troubleshooting.md) for:
+- Common errors and solutions
+- Performance optimization tips
+- Configuration debugging
+- AI provider issues
+- Memory management
