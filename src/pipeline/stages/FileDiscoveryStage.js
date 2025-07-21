@@ -1,6 +1,6 @@
 const Stage = require('../Stage');
 const fastGlob = require('fast-glob');
-const ignore = require('ignore');
+const { minimatch } = require('minimatch');
 const fs = require('fs-extra');
 const path = require('path');
 
@@ -9,7 +9,7 @@ class FileDiscoveryStage extends Stage {
     super(options);
     this.basePath = options.basePath || process.cwd();
     this.patterns = options.patterns || ['**/*'];
-    this.gitignore = null;
+    this.gitignorePatterns = [];
   }
 
   async process(input) {
@@ -44,8 +44,46 @@ class FileDiscoveryStage extends Stage {
     
     if (await fs.pathExists(gitignorePath)) {
       const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
-      this.gitignore = ignore().add(gitignoreContent);
+      this.parseGitignoreContent(gitignoreContent);
       this.log('Loaded .gitignore rules', 'debug');
+    }
+  }
+
+  parseGitignoreContent(content) {
+    const lines = content.split('\n');
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Skip empty lines and comments
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      // Convert gitignore pattern to minimatch pattern
+      let pattern = trimmed;
+      const isNegated = pattern.startsWith('!');
+      
+      if (isNegated) {
+        pattern = pattern.substring(1);
+      }
+      
+      // If pattern doesn't start with /, it matches anywhere
+      if (!pattern.startsWith('/')) {
+        pattern = '**/' + pattern;
+      } else {
+        // Remove leading slash for relative matching
+        pattern = pattern.substring(1);
+      }
+      
+      // If pattern ends with /, it only matches directories
+      if (pattern.endsWith('/')) {
+        pattern = pattern + '**';
+      }
+      
+      this.gitignorePatterns.push({
+        pattern,
+        isNegated,
+        original: trimmed
+      });
     }
   }
 
@@ -53,70 +91,50 @@ class FileDiscoveryStage extends Stage {
     const globOptions = {
       cwd: this.basePath,
       absolute: false,
-      dot: this.config.get('copytree.includeHidden', false),
-      followSymbolicLinks: this.config.get('copytree.followSymlinks', false),
-      ignore: [
-        ...this.config.get('copytree.globalExcludedDirectories', []).map(dir => `**/${dir}/**`),
-        ...this.config.get('copytree.basePathExcludedDirectories', []).map(dir => `${dir}/**`),
-        ...this.config.get('copytree.globalExcludedFiles', [])
-      ],
+      dot: this.options.includeHidden || false,
       onlyFiles: true,
-      stats: true
+      stats: true,
+      ignore: this.options.respectGitignore === false ? [] : [
+        '**/node_modules/**',
+        '**/.git/**'
+      ]
     };
 
-    try {
-      const entries = await fastGlob(this.patterns, globOptions);
-      
-      return entries.map(entry => ({
-        path: entry.path,
-        absolutePath: path.join(this.basePath, entry.path),
-        size: entry.stats.size,
-        modified: entry.stats.mtime,
-        isSymbolicLink: entry.stats.isSymbolicLink()
-      }));
-    } catch (error) {
-      this.log(`Error discovering files: ${error.message}`, 'error');
-      throw error;
-    }
+    const entries = await fastGlob(this.patterns, globOptions);
+
+    return entries.map(entry => ({
+      path: entry.path,
+      absolutePath: path.join(this.basePath, entry.path),
+      size: entry.stats?.size || 0,
+      modified: entry.stats?.mtime || null
+    }));
   }
 
   filterFiles(files) {
-    const maxFileSize = this.config.get('copytree.maxFileSize');
-    const maxTotalSize = this.config.get('copytree.maxTotalSize');
-    const maxFileCount = this.config.get('copytree.maxFileCount');
-
-    let totalSize = 0;
-    const filtered = [];
-
-    for (const file of files) {
-      // Check gitignore
-      if (this.gitignore && this.gitignore.ignores(file.path)) {
-        continue;
-      }
-
-      // Check file size
-      if (maxFileSize && file.size > maxFileSize) {
-        this.log(`Skipping ${file.path} (size: ${this.formatBytes(file.size)} exceeds limit)`, 'debug');
-        continue;
-      }
-
-      // Check total size
-      if (maxTotalSize && totalSize + file.size > maxTotalSize) {
-        this.log(`Reached total size limit (${this.formatBytes(maxTotalSize)})`, 'warn');
-        break;
-      }
-
-      // Check file count
-      if (maxFileCount && filtered.length >= maxFileCount) {
-        this.log(`Reached file count limit (${maxFileCount})`, 'warn');
-        break;
-      }
-
-      filtered.push(file);
-      totalSize += file.size;
+    if (!this.gitignorePatterns.length) {
+      return files;
     }
 
-    return filtered;
+    return files.filter(file => !this.shouldIgnore(file.path));
+  }
+
+  shouldIgnore(filePath) {
+    // Process patterns in order - last match wins for gitignore compatibility
+    let ignored = false;
+    
+    for (const { pattern, isNegated } of this.gitignorePatterns) {
+      const options = {
+        dot: true,
+        matchBase: true,
+        nocase: process.platform === 'win32'
+      };
+      
+      if (minimatch(filePath, pattern, options)) {
+        ignored = !isNegated;
+      }
+    }
+    
+    return ignored;
   }
 }
 

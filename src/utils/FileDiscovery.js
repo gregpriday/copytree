@@ -1,5 +1,5 @@
 const fastGlob = require('fast-glob');
-const ignore = require('ignore');
+const { minimatch } = require('minimatch');
 const fs = require('fs-extra');
 const path = require('path');
 const { config } = require('../config/ConfigManager');
@@ -10,7 +10,7 @@ class FileDiscovery {
   constructor(options = {}) {
     this.basePath = options.basePath || process.cwd();
     this.patterns = options.patterns || ['**/*'];
-    this.gitignore = null;
+    this.gitignorePatterns = [];
     this.config = config();
     this.logger = options.logger || logger;
     
@@ -49,24 +49,22 @@ class FileDiscovery {
         await this.loadGitignore();
       }
 
-      // Discover files using glob
+      // Use fast-glob to find files
       const files = await this.globFiles();
 
       // Apply additional filters
       const filteredFiles = await this.filterFiles(files);
 
       const duration = Date.now() - startTime;
-      this.logger.debug(
-        `Discovered ${filteredFiles.length} files (${files.length} before filtering) in ${duration}ms`
+      this.logger.info(
+        `Discovered ${filteredFiles.length} files in ${duration}ms ` +
+        `(${files.length} total, ${files.length - filteredFiles.length} excluded)`
       );
 
       return filteredFiles;
     } catch (error) {
-      if (error instanceof FileSystemError) {
-        throw error;
-      }
       throw new FileSystemError(
-        `Failed to discover files: ${error.message}`,
+        `File discovery failed: ${error.message}`,
         this.basePath,
         'discover',
         { originalError: error }
@@ -83,11 +81,52 @@ class FileDiscovery {
     if (await fs.pathExists(gitignorePath)) {
       try {
         const content = await fs.readFile(gitignorePath, 'utf8');
-        this.gitignore = ignore().add(content);
+        this.parseGitignoreContent(content);
         this.logger.debug('Loaded .gitignore rules');
       } catch (error) {
         this.logger.warn(`Failed to load .gitignore: ${error.message}`);
       }
+    }
+  }
+
+  /**
+   * Parse gitignore content into patterns
+   */
+  parseGitignoreContent(content) {
+    const lines = content.split('\n');
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Skip empty lines and comments
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      // Convert gitignore pattern to minimatch pattern
+      let pattern = trimmed;
+      const isNegated = pattern.startsWith('!');
+      
+      if (isNegated) {
+        pattern = pattern.substring(1);
+      }
+      
+      // If pattern doesn't start with /, it matches anywhere
+      if (!pattern.startsWith('/')) {
+        pattern = '**/' + pattern;
+      } else {
+        // Remove leading slash for relative matching
+        pattern = pattern.substring(1);
+      }
+      
+      // If pattern ends with /, it only matches directories
+      if (pattern.endsWith('/')) {
+        pattern = pattern + '**';
+      }
+      
+      this.gitignorePatterns.push({
+        pattern,
+        isNegated,
+        original: trimmed
+      });
     }
   }
 
@@ -139,8 +178,8 @@ class FileDiscovery {
     let skippedBySize = 0;
 
     for (const file of files) {
-      // Check gitignore
-      if (this.gitignore && this.gitignore.ignores(file.path)) {
+      // Check gitignore patterns
+      if (this.shouldIgnoreByGitignore(file.path)) {
         skippedByGitignore++;
         continue;
       }
@@ -188,101 +227,65 @@ class FileDiscovery {
   }
 
   /**
-   * Get file tree structure
+   * Check if a file should be ignored based on gitignore patterns
    */
-  async getTree() {
-    const files = await this.discover();
-    return this.buildTree(files);
-  }
-
-  /**
-   * Build tree structure from flat file list
-   */
-  buildTree(files) {
-    const tree = {
-      name: path.basename(this.basePath),
-      path: this.basePath,
-      type: 'directory',
-      children: {}
-    };
-
-    for (const file of files) {
-      const parts = file.path.split(path.sep);
-      let current = tree.children;
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-
-        if (i === parts.length - 1) {
-          // It's a file
-          current[part] = {
-            name: part,
-            path: file.path,
-            absolutePath: file.absolutePath,
-            type: 'file',
-            size: file.size,
-            modified: file.modified
-          };
-        } else {
-          // It's a directory
-          if (!current[part]) {
-            current[part] = {
-              name: part,
-              type: 'directory',
-              children: {}
-            };
-          }
-          current = current[part].children;
-        }
-      }
+  shouldIgnoreByGitignore(filePath) {
+    if (this.gitignorePatterns.length === 0) {
+      return false;
     }
 
-    return tree;
+    // Process patterns in order - last match wins for gitignore compatibility
+    let ignored = false;
+    
+    for (const { pattern, isNegated } of this.gitignorePatterns) {
+      const options = {
+        dot: true,
+        matchBase: true,
+        nocase: process.platform === 'win32'
+      };
+      
+      if (minimatch(filePath, pattern, options)) {
+        ignored = !isNegated;
+      }
+    }
+    
+    return ignored;
   }
 
   /**
    * Get statistics about discovered files
    */
-  async getStats() {
-    const files = await this.discover();
-    
+  getStats(files) {
     const stats = {
-      totalFiles: files.length,
+      totalCount: files.length,
       totalSize: 0,
-      filesByExtension: {},
-      largestFiles: [],
-      directories: new Set()
+      largestFile: null,
+      fileTypes: {}
     };
 
     for (const file of files) {
       stats.totalSize += file.size;
-
-      // Count by extension
-      const ext = path.extname(file.path).toLowerCase() || 'no-extension';
-      stats.filesByExtension[ext] = (stats.filesByExtension[ext] || 0) + 1;
-
-      // Track directories
-      const dir = path.dirname(file.path);
-      if (dir !== '.') {
-        stats.directories.add(dir);
+      
+      if (!stats.largestFile || file.size > stats.largestFile.size) {
+        stats.largestFile = file;
       }
+      
+      const ext = path.extname(file.path).toLowerCase() || 'no-extension';
+      stats.fileTypes[ext] = (stats.fileTypes[ext] || 0) + 1;
     }
 
-    // Find largest files
-    stats.largestFiles = files
-      .sort((a, b) => b.size - a.size)
-      .slice(0, 10)
-      .map(f => ({
-        path: f.path,
-        size: f.size,
-        sizeFormatted: this.logger.formatBytes(f.size)
-      }));
-
-    stats.totalSizeFormatted = this.logger.formatBytes(stats.totalSize);
-    stats.directoryCount = stats.directories.size;
-    delete stats.directories; // Remove the Set from output
-
     return stats;
+  }
+
+  /**
+   * Create a sub-discovery for a subdirectory
+   */
+  createSubDiscovery(subPath, options = {}) {
+    return new FileDiscovery({
+      ...this.options,
+      ...options,
+      basePath: path.join(this.basePath, subPath)
+    });
   }
 }
 
