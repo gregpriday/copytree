@@ -86,6 +86,9 @@ copytree -r
 # Dry run (preview files without copying)
 copytree --dry-run
 
+# Show only directory tree structure (no file contents)
+copytree -t
+
 # Different output formats
 copytree --format json -o structure.json
 copytree --format tree  # Tree view in console

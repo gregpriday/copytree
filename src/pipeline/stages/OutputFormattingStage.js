@@ -8,6 +8,7 @@ class OutputFormattingStage extends Stage {
     this.format = options.format || 'xml';
     this.addLineNumbers = this.config.get('copytree.addLineNumbers', false);
     this.lineNumberFormat = this.config.get('copytree.lineNumberFormat', '%4d: ');
+    this.onlyTree = options.onlyTree || false;
   }
 
   async process(input) {
@@ -99,14 +100,16 @@ class OutputFormattingStage extends Stage {
         fileElement.att('gitStatus', file.gitStatus);
       }
       
-      // Add content
-      let content = file.content || '';
-      
-      if (this.addLineNumbers && !file.isBinary) {
-        content = this.addLineNumbersToContent(content);
+      // Add content (unless --only-tree is set)
+      if (!this.onlyTree) {
+        let content = file.content || '';
+        
+        if (this.addLineNumbers && !file.isBinary) {
+          content = this.addLineNumbersToContent(content);
+        }
+        
+        fileElement.ele('content').txt(content);
       }
-      
-      fileElement.ele('content').txt(content);
     }
 
     const prettyPrint = this.config.get('app.prettyPrint', true);
@@ -122,16 +125,24 @@ class OutputFormattingStage extends Stage {
         totalSize: this.calculateTotalSize(input.files),
         profile: input.profile
       },
-      files: input.files.filter(f => f !== null).map(file => ({
-        path: file.path,
-        size: file.size,
-        modified: file.modified,
-        isBinary: file.isBinary,
-        encoding: file.encoding,
-        content: this.addLineNumbers && !file.isBinary 
-          ? this.addLineNumbersToContent(file.content)
-          : file.content
-      }))
+      files: input.files.filter(f => f !== null).map(file => {
+        const fileObj = {
+          path: file.path,
+          size: file.size,
+          modified: file.modified,
+          isBinary: file.isBinary,
+          encoding: file.encoding
+        };
+        
+        // Add content unless --only-tree is set
+        if (!this.onlyTree) {
+          fileObj.content = this.addLineNumbers && !file.isBinary 
+            ? this.addLineNumbersToContent(file.content)
+            : file.content;
+        }
+        
+        return fileObj;
+      })
     };
 
     const prettyPrint = this.config.get('app.prettyPrint', true);

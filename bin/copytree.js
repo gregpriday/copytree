@@ -32,6 +32,7 @@ program
   .option('--include-binary', 'Include binary files')
   .option('--external <source...>', 'Include external sources')
   .option('--with-line-numbers', 'Add line numbers to file content')
+  .option('-t, --only-tree', 'Include only the directory tree, not file contents')
   .option('--info', 'Show info table')
   .option('--show-size', 'Show file sizes')
   .option('--with-git-status', 'Include git status in output')

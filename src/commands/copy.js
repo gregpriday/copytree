@@ -182,19 +182,21 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 7. File Loading Stage
-  const FileLoadingStage = require('../pipeline/stages/FileLoadingStage');
-  stages.push(new FileLoadingStage({
-    encoding: 'utf8'
-  }));
-  
-  // 8. Transformer Stage
-  const TransformStage = require('../pipeline/stages/TransformStage');
-  const registry = TransformerRegistry.createDefault();
-  stages.push(new TransformStage({
-    registry,
-    transformers: profile.transformers || {}
-  }));
+  // 7. File Loading Stage (skip if --only-tree)
+  if (!options.onlyTree) {
+    const FileLoadingStage = require('../pipeline/stages/FileLoadingStage');
+    stages.push(new FileLoadingStage({
+      encoding: 'utf8'
+    }));
+    
+    // 8. Transformer Stage
+    const TransformStage = require('../pipeline/stages/TransformStage');
+    const registry = TransformerRegistry.createDefault();
+    stages.push(new TransformStage({
+      registry,
+      transformers: profile.transformers || {}
+    }));
+  }
   
   // 9. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
@@ -205,6 +207,9 @@ async function setupPipelineStages(basePath, profile, options) {
   }
   
   // 10. Output Formatting Stage
+  // Determine output format (default to tree if --only-tree is used)
+  const outputFormat = options.format || (options.onlyTree ? 'tree' : (profile.output?.format || 'xml'));
+  
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
     const StreamingOutputStage = require('../pipeline/stages/StreamingOutputStage');
@@ -216,7 +221,7 @@ async function setupPipelineStages(basePath, profile, options) {
     }
     
     stages.push(new StreamingOutputStage({
-      format: options.format || profile.output?.format || 'xml',
+      format: outputFormat,
       addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
       prettyPrint: profile.output?.prettyPrint ?? true,
       outputStream
@@ -224,11 +229,12 @@ async function setupPipelineStages(basePath, profile, options) {
   } else {
     const OutputFormattingStage = require('../pipeline/stages/OutputFormattingStage');
     stages.push(new OutputFormattingStage({
-      format: options.format || profile.output?.format || 'xml',
+      format: outputFormat,
       addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
       prettyPrint: profile.output?.prettyPrint ?? true,
       includeMetadata: profile.output?.includeMetadata ?? true,
-      showSize: options.showSize
+      showSize: options.showSize,
+      onlyTree: options.onlyTree
     }));
   }
   
