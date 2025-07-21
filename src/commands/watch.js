@@ -9,6 +9,7 @@ const GitHubUrlHandler = require('../services/GitHubUrlHandler');
 const ProfileLoader = require('../profiles/ProfileLoader');
 const { execSync } = require('child_process');
 const { AIService } = require('../services/AIService');
+const Clipboard = require('../utils/clipboard');
 
 /**
  * Watch command - Watch directory for changes and regenerate output
@@ -137,12 +138,8 @@ async function watchCommand(watchPath, options = {}) {
           await updateFileState(basePath, fileState, options);
           
           // Reveal in Finder on macOS
-          if (process.platform === 'darwin' && options.reveal !== false) {
-            try {
-              execSync(`open -R "${outputPath}"`, { stdio: 'ignore' });
-            } catch (error) {
-              // Ignore reveal errors
-            }
+          if (options.reveal !== false) {
+            await Clipboard.revealInFinder(outputPath);
           }
         } catch (error) {
           console.log(chalk.red(`✗ Copy failed: ${error.message}\n`));

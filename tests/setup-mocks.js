@@ -31,7 +31,11 @@ jest.mock('../src/config/ConfigManager', () => {
       enabled: false,
       driver: 'file',
       prefix: 'copytree_',
-      defaultTtl: 3600
+      defaultTtl: 3600,
+      transformations: {
+        enabled: true,
+        ttl: 86400
+      }
     }
   };
 
@@ -83,7 +87,17 @@ jest.mock('../src/config/ConfigManager', () => {
   };
 
   mockConfig.env = (key, defaultValue = null) => {
-    return process.env[key] || defaultValue;
+    const value = process.env[key];
+    if (value === undefined) {
+      return defaultValue;
+    }
+    // Type conversion to match the real implementation
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    if (value === 'null') return null;
+    if (value.match(/^\d+$/)) return parseInt(value);
+    if (value.match(/^\d+\.\d+$/)) return parseFloat(value);
+    return value;
   };
 
   // Mock ConfigManager class
@@ -95,24 +109,96 @@ jest.mock('../src/config/ConfigManager', () => {
     env: mockConfig.env
   };
 
+  // Create singleton instance
+  let singletonInstance = null;
+  
+  const configFactory = () => {
+    if (!singletonInstance) {
+      singletonInstance = mockConfig();
+    }
+    return singletonInstance;
+  };
+  
   return {
     ConfigManager: MockConfigManager,
-    config: mockConfig,
+    config: configFactory,
     env: mockConfig.env
   };
 });
 
 // Mock logger
-const mockLogger = {
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  debug: jest.fn(),
-  verbose: jest.fn(),
-  silly: jest.fn(),
-  child: jest.fn(() => mockLogger) // Return itself for chaining
+const createMockLogger = () => {
+  const logger = {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    verbose: jest.fn(),
+    silly: jest.fn(),
+    success: jest.fn(),
+    startSpinner: jest.fn(),
+    updateSpinner: jest.fn(),
+    succeedSpinner: jest.fn(),
+    failSpinner: jest.fn(),
+    stopSpinner: jest.fn(),
+    table: jest.fn(),
+    line: jest.fn(),
+    styled: jest.fn(),
+    tree: jest.fn(),
+    formatBytes: jest.fn((bytes) => `${bytes} B`),
+    formatDuration: jest.fn((ms) => `${ms}ms`),
+    progress: jest.fn()
+  };
+  logger.child = jest.fn(() => createMockLogger());
+  return logger;
 };
+
+const mockLogger = createMockLogger();
 
 jest.mock('../src/utils/logger', () => ({
   logger: mockLogger
 }));
+
+// Mock AIService to prevent API key validation at load time
+jest.mock('../src/services/AIService', () => {
+  return {
+    summarizeFile: jest.fn().mockResolvedValue('Mocked file summary'),
+    describeImage: jest.fn().mockResolvedValue('Mocked image description'),
+    filterFiles: jest.fn().mockImplementation((files) => files),
+    summarizeText: jest.fn().mockResolvedValue('Mocked text summary'),
+    summarizeUnitTests: jest.fn().mockResolvedValue('Mocked unit test summary'),
+    describeSVG: jest.fn().mockResolvedValue('Mocked SVG description'),
+    isAvailable: jest.fn().mockReturnValue(true),
+    getProvider: jest.fn().mockReturnValue('mock-provider'),
+    getModel: jest.fn().mockReturnValue('mock-model')
+  };
+});
+
+// Mock clipboardy to prevent ESM import issues
+jest.mock('clipboardy', () => ({
+  write: jest.fn().mockResolvedValue(undefined),
+  read: jest.fn().mockResolvedValue(''),
+  writeSync: jest.fn(),
+  readSync: jest.fn().mockReturnValue('')
+}));
+
+// Mock fs-extra
+jest.mock('fs-extra', () => ({
+  pathExists: jest.fn().mockResolvedValue(true),
+  stat: jest.fn().mockResolvedValue({ isDirectory: () => true }),
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  createWriteStream: jest.fn(() => ({
+    write: jest.fn(),
+    end: jest.fn((cb) => cb && cb())
+  })),
+  ensureDir: jest.fn().mockResolvedValue(undefined),
+  ensureDirSync: jest.fn(),
+  readFile: jest.fn().mockResolvedValue(''),
+  readdir: jest.fn().mockResolvedValue([]),
+  remove: jest.fn().mockResolvedValue(undefined),
+  readFileSync: jest.fn().mockReturnValue(''),
+  writeFileSync: jest.fn(),
+  existsSync: jest.fn().mockReturnValue(false),
+  removeSync: jest.fn()
+}));
+

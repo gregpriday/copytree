@@ -5,7 +5,7 @@ const TransformerRegistry = require('../transforms/TransformerRegistry');
 const { logger } = require('../utils/logger');
 const { CommandError, handleError } = require('../utils/errors');
 const { config } = require('../config/ConfigManager');
-const clipboardy = require('clipboardy');
+const Clipboard = require('../utils/clipboard');
 const fs = require('fs-extra');
 const path = require('path');
 
@@ -62,15 +62,20 @@ async function copyCommand(targetPath = '.', options = {}) {
     
     logger.succeedSpinner(`Processed ${result.files.length} files`);
     
-    // 7. Handle output
-    await handleOutput(result, options);
-    
-    // 8. Show summary
-    if (options.info || options.display) {
-      showSummary(result, startTime);
+    // 7. Handle output (skip if dry-run)
+    if (!options.dryRun) {
+      await handleOutput(result, options);
+    } else {
+      // For dry-run, just show file count and size
+      const fileCount = result.files.length;
+      const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
+      logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}]`);
     }
     
-    logger.success('Copy completed successfully!');
+    // 8. Show summary
+    if (options.info) {
+      showSummary(result, startTime);
+    }
     
   } catch (error) {
     logger.stopSpinner();
@@ -263,8 +268,13 @@ function setupProgressTracking(pipeline) {
 async function handleOutput(result, options) {
   // If streaming was used, output has already been handled
   if (result.streamed) {
+    const fileCount = result.files.length;
+    const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
+    
     if (options.output) {
-      logger.success(`Output streamed to: ${path.resolve(options.output)}`);
+      logger.success(`Streamed ${fileCount} files [${logger.formatBytes(totalSize)}] to ${path.resolve(options.output)}`);
+    } else {
+      logger.success(`Streamed ${fileCount} files [${logger.formatBytes(totalSize)}]`);
     }
     return;
   }
@@ -275,17 +285,43 @@ async function handleOutput(result, options) {
     throw new CommandError('No output generated', 'copy');
   }
   
+  // Calculate output size
+  const outputSize = Buffer.byteLength(output, 'utf8');
+  const fileCount = result.files.length;
+  
+  // Handle --as-reference option
+  if (options.asReference) {
+    const format = options.format || 'xml';
+    const extension = format === 'json' ? 'json' : 'xml';
+    const tempFile = path.join(require('os').tmpdir(), `copytree-${Date.now()}.${extension}`);
+    await fs.writeFile(tempFile, output, 'utf8');
+    
+    try {
+      await Clipboard.copyFileReference(tempFile);
+      logger.success(`Copied reference to temporary file: ${path.basename(tempFile)} [${logger.formatBytes(outputSize)}]`);
+    } catch (error) {
+      logger.warn('Failed to copy reference to clipboard');
+      logger.info(`Output saved to: ${tempFile}`);
+      logger.info(`${fileCount} files [${logger.formatBytes(outputSize)}]`);
+    }
+    return;
+  }
+  
   // Determine output destination
   if (options.output) {
     // Write to file
     const outputPath = path.resolve(options.output);
     await fs.ensureDir(path.dirname(outputPath));
     await fs.writeFile(outputPath, output, 'utf8');
-    logger.success(`Output written to: ${outputPath}`);
+    logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${outputPath}`);
+    
+    // Reveal in Finder on macOS
+    await Clipboard.revealInFinder(outputPath);
     
   } else if (options.display) {
     // Display to console
     console.log('\n' + output);
+    logger.success(`Displayed ${fileCount} files [${logger.formatBytes(outputSize)}]`);
     
   } else if (options.stream) {
     // Stream to stdout (shouldn't reach here if streaming was properly used)
@@ -294,11 +330,19 @@ async function handleOutput(result, options) {
   } else {
     // Default: copy to clipboard
     try {
-      await clipboardy.write(output);
-      logger.success('Output copied to clipboard!');
+      await Clipboard.copyText(output);
+      logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard.`);
     } catch (error) {
-      logger.warn('Failed to copy to clipboard, displaying instead');
-      console.log('\n' + output);
+      // If clipboard fails, save to temporary file
+      const format = options.format || 'xml';
+      const extension = format === 'json' ? 'json' : 'xml';
+      const tempFile = path.join(require('os').tmpdir(), `copytree-${Date.now()}.${extension}`);
+      await fs.writeFile(tempFile, output, 'utf8');
+      logger.warn(`Failed to copy to clipboard. Output saved to: ${tempFile}`);
+      logger.info(`${fileCount} files [${logger.formatBytes(outputSize)}]`);
+      
+      // Reveal in Finder on macOS
+      await Clipboard.revealInFinder(tempFile);
     }
   }
 }

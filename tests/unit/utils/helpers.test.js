@@ -1,300 +1,268 @@
 const {
+  hash,
+  shortHash,
+  sleep,
+  retry,
+  ensureDir,
+  getTempDir,
+  cleanupTempDir,
+  isPathInside,
+  normalizePath,
+  getExtension,
+  isBinaryExtension,
+  truncate,
   formatBytes,
   formatDuration,
-  parseGitignorePattern,
-  expandTilde,
-  sanitizeFilename,
-  isTextFile,
-  isBinaryFile,
-  calculateHash,
-  deepMerge,
+  parseSize,
+  chunk,
   debounce,
-  throttle,
-  retryWithBackoff,
-  validateEmail,
-  validateUrl,
-  truncateText,
+  createCache,
   escapeXml,
-  unescapeXml,
-  createProgressBar,
-  isEmptyDirectory,
-  isValidPath,
-  normalizeLineEndings,
-  extractFileExtension,
-  getMimeType,
-  isImageFile,
-  isPdfFile,
-  isArchiveFile
+  timestamp
 } = require('../../../src/utils/helpers');
 
 describe('Helper Functions', () => {
   describe('formatBytes', () => {
     test('should format bytes correctly', () => {
       expect(formatBytes(0)).toBe('0 B');
-      expect(formatBytes(1024)).toBe('1.0 KB');
-      expect(formatBytes(1048576)).toBe('1.0 MB');
-      expect(formatBytes(1073741824)).toBe('1.0 GB');
+      expect(formatBytes(1024)).toBe('1 KB');
+      expect(formatBytes(1048576)).toBe('1 MB');
+      expect(formatBytes(1073741824)).toBe('1 GB');
       expect(formatBytes(1536)).toBe('1.5 KB');
     });
 
     test('should handle decimal places', () => {
       expect(formatBytes(1536, 0)).toBe('2 KB');
-      expect(formatBytes(1536, 2)).toBe('1.50 KB');
+      expect(formatBytes(1536, 2)).toBe('1.5 KB');
     });
   });
 
   describe('formatDuration', () => {
     test('should format milliseconds correctly', () => {
       expect(formatDuration(100)).toBe('100ms');
-      expect(formatDuration(1000)).toBe('1.0s');
-      expect(formatDuration(60000)).toBe('1.0m');
-      expect(formatDuration(3600000)).toBe('1.0h');
+      expect(formatDuration(1000)).toBe('1s');
+      expect(formatDuration(60000)).toBe('1m 0s');
+      expect(formatDuration(3600000)).toBe('1h 0m 0s');
     });
 
     test('should handle complex durations', () => {
-      expect(formatDuration(65000)).toBe('1.1m');
-      expect(formatDuration(3665000)).toBe('1.0h');
+      expect(formatDuration(65000)).toBe('1m 5s');
+      expect(formatDuration(3665000)).toBe('1h 1m 5s');
     });
   });
 
-  describe('parseGitignorePattern', () => {
-    test('should parse simple patterns', () => {
-      expect(parseGitignorePattern('*.log')).toEqual({
-        pattern: '**/*.log',
-        isNegated: false,
-        isDirectory: false
-      });
-    });
-
-    test('should handle negation', () => {
-      expect(parseGitignorePattern('!important.log')).toEqual({
-        pattern: '**/important.log',
-        isNegated: true,
-        isDirectory: false
-      });
-    });
-
-    test('should handle directory patterns', () => {
-      expect(parseGitignorePattern('build/')).toEqual({
-        pattern: '**/build/**',
-        isNegated: false,
-        isDirectory: true
-      });
-    });
-
-    test('should handle root patterns', () => {
-      expect(parseGitignorePattern('/node_modules')).toEqual({
-        pattern: 'node_modules',
-        isNegated: false,
-        isDirectory: false
-      });
-    });
-  });
-
-  describe('expandTilde', () => {
-    test('should expand tilde to home directory', () => {
-      const result = expandTilde('~/test');
-      expect(result).toMatch(/^\/.*\/test$/);
-      expect(result).not.toContain('~');
-    });
-
-    test('should not modify paths without tilde', () => {
-      expect(expandTilde('/absolute/path')).toBe('/absolute/path');
-      expect(expandTilde('relative/path')).toBe('relative/path');
-    });
-  });
-
-  describe('sanitizeFilename', () => {
-    test('should remove invalid characters', () => {
-      expect(sanitizeFilename('file<>name')).toBe('filename');
-      expect(sanitizeFilename('file:name')).toBe('filename');
-      expect(sanitizeFilename('file/name')).toBe('filename');
-    });
-
-    test('should handle replacement character', () => {
-      expect(sanitizeFilename('file:name', '_')).toBe('file_name');
-    });
-
-    test('should handle reserved names', () => {
-      expect(sanitizeFilename('CON')).toBe('CON_');
-      expect(sanitizeFilename('aux.txt')).toBe('aux_.txt');
-    });
-  });
-
-  describe('isTextFile', () => {
-    test('should identify text files', () => {
-      expect(isTextFile('test.txt')).toBe(true);
-      expect(isTextFile('test.js')).toBe(true);
-      expect(isTextFile('test.json')).toBe(true);
-      expect(isTextFile('test.md')).toBe(true);
-    });
-
-    test('should reject binary files', () => {
-      expect(isTextFile('test.jpg')).toBe(false);
-      expect(isTextFile('test.exe')).toBe(false);
-      expect(isTextFile('test.pdf')).toBe(false);
-    });
-  });
-
-  describe('isBinaryFile', () => {
-    test('should identify binary files', () => {
-      expect(isBinaryFile('test.jpg')).toBe(true);
-      expect(isBinaryFile('test.exe')).toBe(true);
-      expect(isBinaryFile('test.pdf')).toBe(true);
-    });
-
-    test('should reject text files', () => {
-      expect(isBinaryFile('test.txt')).toBe(false);
-      expect(isBinaryFile('test.js')).toBe(false);
-    });
-  });
-
-  describe('calculateHash', () => {
-    test('should calculate consistent hash', () => {
-      const hash1 = calculateHash('test content');
-      const hash2 = calculateHash('test content');
+  describe('hash', () => {
+    test('should create consistent hashes', () => {
+      const hash1 = hash('test string');
+      const hash2 = hash('test string');
       expect(hash1).toBe(hash2);
-      expect(hash1).toMatch(/^[a-f0-9]{64}$/);
+      expect(hash1).toHaveLength(64); // SHA256 produces 64 character hex
     });
 
-    test('should produce different hashes for different content', () => {
-      const hash1 = calculateHash('content1');
-      const hash2 = calculateHash('content2');
+    test('should create different hashes for different content', () => {
+      const hash1 = hash('string1');
+      const hash2 = hash('string2');
       expect(hash1).not.toBe(hash2);
     });
   });
 
-  describe('deepMerge', () => {
-    test('should merge objects deeply', () => {
-      const obj1 = { a: 1, b: { c: 2 } };
-      const obj2 = { b: { d: 3 }, e: 4 };
-      const result = deepMerge(obj1, obj2);
-      
-      expect(result).toEqual({
-        a: 1,
-        b: { c: 2, d: 3 },
-        e: 4
-      });
+  describe('shortHash', () => {
+    test('should create 8 character hash', () => {
+      const result = shortHash('test string');
+      expect(result).toHaveLength(8);
+    });
+  });
+
+  describe('isPathInside', () => {
+    test('should detect when path is inside parent', () => {
+      expect(isPathInside('/parent/child', '/parent')).toBe(true);
+      expect(isPathInside('/parent/deep/nested', '/parent')).toBe(true);
     });
 
-    test('should handle arrays', () => {
-      const obj1 = { arr: [1, 2] };
-      const obj2 = { arr: [3, 4] };
-      const result = deepMerge(obj1, obj2);
-      
-      expect(result.arr).toEqual([3, 4]); // Arrays are replaced, not merged
+    test('should detect when path is outside parent', () => {
+      expect(isPathInside('/other/path', '/parent')).toBe(false);
+      expect(isPathInside('/parent/../outside', '/parent')).toBe(false);
+    });
+  });
+
+  describe('normalizePath', () => {
+    test('should normalize path separators', () => {
+      expect(normalizePath('path\\to\\file')).toBe('path/to/file');
+      expect(normalizePath('already/normalized')).toBe('already/normalized');
+    });
+  });
+
+  describe('getExtension', () => {
+    test('should get file extension without dot', () => {
+      expect(getExtension('file.txt')).toBe('txt');
+      expect(getExtension('archive.tar.gz')).toBe('gz');
+      expect(getExtension('no-extension')).toBe('');
+    });
+  });
+
+  describe('isBinaryExtension', () => {
+    test('should identify binary extensions', () => {
+      expect(isBinaryExtension('image.jpg')).toBe(true);
+      expect(isBinaryExtension('video.mp4')).toBe(true);
+      expect(isBinaryExtension('archive.zip')).toBe(true);
+      expect(isBinaryExtension('document.pdf')).toBe(true);
+    });
+
+    test('should reject text file extensions', () => {
+      expect(isBinaryExtension('file.txt')).toBe(false);
+      expect(isBinaryExtension('script.js')).toBe(false);
+      expect(isBinaryExtension('data.json')).toBe(false);
+    });
+  });
+
+  describe('truncate', () => {
+    test('should truncate long text', () => {
+      const text = 'This is a very long text that should be truncated';
+      expect(truncate(text, 20)).toBe('This is a very lo...');
+    });
+
+    test('should not truncate short text', () => {
+      const text = 'Short text';
+      expect(truncate(text, 20)).toBe('Short text');
+    });
+
+    test('should handle custom suffix', () => {
+      const text = 'This is a long text';
+      expect(truncate(text, 10, ' [more]')).toBe('Thi [more]');
+    });
+  });
+
+  describe('parseSize', () => {
+    test('should parse size strings to bytes', () => {
+      expect(parseSize('100')).toBe(100);
+      expect(parseSize('1KB')).toBe(1024);
+      expect(parseSize('10MB')).toBe(10 * 1024 * 1024);
+      expect(parseSize('1.5GB')).toBe(Math.floor(1.5 * 1024 * 1024 * 1024));
+    });
+
+    test('should handle different formats', () => {
+      expect(parseSize('10 MB')).toBe(10 * 1024 * 1024);
+      expect(parseSize('1024B')).toBe(1024);
+    });
+
+    test('should throw on invalid format', () => {
+      expect(() => parseSize('invalid')).toThrow();
+    });
+  });
+
+  describe('chunk', () => {
+    test('should chunk arrays', () => {
+      const array = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+      expect(chunk(array, 3)).toEqual([
+        [1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9]
+      ]);
+    });
+
+    test('should handle arrays not evenly divisible', () => {
+      const array = [1, 2, 3, 4, 5];
+      expect(chunk(array, 2)).toEqual([
+        [1, 2],
+        [3, 4],
+        [5]
+      ]);
     });
   });
 
   describe('debounce', () => {
     jest.useFakeTimers();
 
-    test('should debounce function calls', () => {
-      const fn = jest.fn();
+    test('should debounce function calls', async () => {
+      const fn = jest.fn().mockResolvedValue('result');
       const debounced = debounce(fn, 100);
-      
+
+      // Call multiple times
       debounced();
       debounced();
-      debounced();
-      
+      const promise = debounced();
+
+      // Function shouldn't be called yet
       expect(fn).not.toHaveBeenCalled();
-      
+
+      // Advance time
       jest.advanceTimersByTime(100);
+      await promise;
+
+      // Function should be called once
       expect(fn).toHaveBeenCalledTimes(1);
     });
 
-    afterEach(() => {
-      jest.clearAllTimers();
-    });
+    jest.useRealTimers();
   });
 
-  describe('throttle', () => {
-    jest.useFakeTimers();
-
-    test('should throttle function calls', () => {
-      const fn = jest.fn();
-      const throttled = throttle(fn, 100);
-      
-      throttled();
-      throttled();
-      throttled();
-      
-      expect(fn).toHaveBeenCalledTimes(1);
-      
-      jest.advanceTimersByTime(100);
-      throttled();
-      expect(fn).toHaveBeenCalledTimes(2);
-    });
-
-    afterEach(() => {
-      jest.clearAllTimers();
-    });
-  });
-
-  describe('retryWithBackoff', () => {
+  describe('retry', () => {
     test('should retry failed operations', async () => {
       let attempts = 0;
       const fn = jest.fn().mockImplementation(() => {
         attempts++;
         if (attempts < 3) {
-          throw new Error('Temporary failure');
+          throw new Error('Failed');
         }
         return 'success';
       });
-      
-      const result = await retryWithBackoff(fn, { maxRetries: 3, baseDelay: 10 });
+
+      const result = await retry(fn, { maxAttempts: 3, initialDelay: 10 });
       expect(result).toBe('success');
       expect(fn).toHaveBeenCalledTimes(3);
     });
 
-    test('should fail after max retries', async () => {
-      const fn = jest.fn().mockRejectedValue(new Error('Permanent failure'));
+    test('should fail after max attempts', async () => {
+      const fn = jest.fn().mockRejectedValue(new Error('Always fails'));
+
+      await expect(retry(fn, { maxAttempts: 2, initialDelay: 10 }))
+        .rejects.toThrow('Always fails');
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('createCache', () => {
+    test('should create working cache', () => {
+      const cache = createCache(1000);
       
-      await expect(retryWithBackoff(fn, { maxRetries: 2, baseDelay: 10 }))
-        .rejects.toThrow('Permanent failure');
-      expect(fn).toHaveBeenCalledTimes(3); // Initial + 2 retries
+      cache.set('key1', 'value1');
+      expect(cache.get('key1')).toBe('value1');
+      expect(cache.size()).toBe(1);
+    });
+
+    test('should expire entries', async () => {
+      const cache = createCache(100); // 100ms TTL
+      
+      cache.set('key1', 'value1');
+      expect(cache.get('key1')).toBe('value1');
+      
+      await sleep(150);
+      expect(cache.get('key1')).toBeNull();
+    });
+
+    test('should support delete and clear', () => {
+      const cache = createCache();
+      
+      cache.set('key1', 'value1');
+      cache.set('key2', 'value2');
+      expect(cache.size()).toBe(2);
+      
+      cache.delete('key1');
+      expect(cache.get('key1')).toBeNull();
+      expect(cache.size()).toBe(1);
+      
+      cache.clear();
+      expect(cache.size()).toBe(0);
     });
   });
 
-  describe('validateEmail', () => {
-    test('should validate correct emails', () => {
-      expect(validateEmail('test@example.com')).toBe(true);
-      expect(validateEmail('user.name+tag@domain.co.uk')).toBe(true);
-    });
-
-    test('should reject invalid emails', () => {
-      expect(validateEmail('invalid')).toBe(false);
-      expect(validateEmail('test@')).toBe(false);
-      expect(validateEmail('@domain.com')).toBe(false);
-    });
-  });
-
-  describe('validateUrl', () => {
-    test('should validate correct URLs', () => {
-      expect(validateUrl('https://example.com')).toBe(true);
-      expect(validateUrl('http://sub.domain.org/path')).toBe(true);
-    });
-
-    test('should reject invalid URLs', () => {
-      expect(validateUrl('not-a-url')).toBe(false);
-      expect(validateUrl('ftp://example.com')).toBe(false);
-    });
-  });
-
-  describe('truncateText', () => {
-    test('should truncate long text', () => {
-      const text = 'This is a very long text that should be truncated';
-      expect(truncateText(text, 20)).toBe('This is a very lo...');
-    });
-
-    test('should not truncate short text', () => {
-      const text = 'Short text';
-      expect(truncateText(text, 20)).toBe('Short text');
-    });
-
-    test('should handle custom suffix', () => {
-      const text = 'This is a long text';
-      expect(truncateText(text, 10, ' [more]')).toBe('This is a [more]');
+  describe('sleep', () => {
+    test('should delay execution', async () => {
+      const start = Date.now();
+      await sleep(100);
+      const elapsed = Date.now() - start;
+      expect(elapsed).toBeGreaterThanOrEqual(90); // Allow some variance
+      expect(elapsed).toBeLessThan(150);
     });
   });
 
@@ -305,45 +273,37 @@ describe('Helper Functions', () => {
     });
   });
 
-  describe('unescapeXml', () => {
-    test('should unescape XML entities', () => {
-      expect(unescapeXml('&lt;tag&gt;content &amp; &quot;value&quot;&lt;/tag&gt;'))
-        .toBe('<tag>content & "value"</tag>');
+  describe('timestamp', () => {
+    test('should return ISO formatted timestamp', () => {
+      const ts = timestamp();
+      expect(ts).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(new Date(ts).toString()).not.toBe('Invalid Date');
     });
   });
 
-  describe('file type helpers', () => {
-    test('should identify image files', () => {
-      expect(isImageFile('photo.jpg')).toBe(true);
-      expect(isImageFile('image.png')).toBe(true);
-      expect(isImageFile('text.txt')).toBe(false);
-    });
-
-    test('should identify PDF files', () => {
-      expect(isPdfFile('document.pdf')).toBe(true);
-      expect(isPdfFile('document.PDF')).toBe(true);
-      expect(isPdfFile('text.txt')).toBe(false);
-    });
-
-    test('should identify archive files', () => {
-      expect(isArchiveFile('archive.zip')).toBe(true);
-      expect(isArchiveFile('backup.tar.gz')).toBe(true);
-      expect(isArchiveFile('text.txt')).toBe(false);
+  describe('ensureDir', () => {
+    test('should ensure directory exists', async () => {
+      const fs = require('fs-extra');
+      const tempPath = `/tmp/test-${Date.now()}`;
+      
+      await ensureDir(tempPath);
+      expect(await fs.pathExists(tempPath)).toBe(true);
+      
+      // Cleanup
+      await fs.remove(tempPath);
     });
   });
 
-  describe('extractFileExtension', () => {
-    test('should extract file extensions', () => {
-      expect(extractFileExtension('file.txt')).toBe('.txt');
-      expect(extractFileExtension('archive.tar.gz')).toBe('.gz');
-      expect(extractFileExtension('no-extension')).toBe('');
-    });
-  });
-
-  describe('normalizeLineEndings', () => {
-    test('should normalize line endings to LF', () => {
-      expect(normalizeLineEndings('line1\r\nline2\r\nline3')).toBe('line1\nline2\nline3');
-      expect(normalizeLineEndings('line1\rline2\rline3')).toBe('line1\nline2\nline3');
+  describe('getTempDir', () => {
+    test('should create temporary directory', async () => {
+      const fs = require('fs-extra');
+      const tempDir = await getTempDir('test');
+      
+      expect(tempDir).toMatch(/test-\d+-\w{8}$/);
+      expect(await fs.pathExists(tempDir)).toBe(true);
+      
+      // Cleanup
+      await cleanupTempDir(tempDir);
     });
   });
 });

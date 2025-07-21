@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
+// Suppress dotenv console output
+const originalLog = console.log;
+console.log = () => {};
 require('dotenv').config();
+console.log = originalLog;
 const { Command } = require('commander');
 const program = new Command();
 

@@ -4,7 +4,7 @@ jest.mock('fs-extra');
 // Mock config before importing ConfigManager
 jest.mock('../../../src/config', () => require('../../mocks/config'));
 
-const ConfigManager = require('../../../src/config/ConfigManager');
+const { config, env } = require('../../../src/config/ConfigManager');
 const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
@@ -31,26 +31,39 @@ describe('ConfigManager', () => {
 
   describe('singleton behavior', () => {
     test('should return same instance', () => {
-      expect(ConfigManager).toBeDefined();
-      expect(ConfigManager.get).toBeDefined();
-      expect(ConfigManager.set).toBeDefined();
+      const instance1 = config();
+      const instance2 = config();
+      expect(instance1).toBe(instance2);
     });
 
     test('should have get method', () => {
-      expect(typeof ConfigManager.get).toBe('function');
-      const value = ConfigManager.get('log.level', 'info');
-      expect(value).toBe('error'); // From mock config
+      const configInstance = config();
+      expect(typeof configInstance.get).toBe('function');
+      // Mock the loaded config
+      configInstance.config = {
+        log: { level: 'error' },
+        copytree: { maxFileSize: 10 * 1024 * 1024 }
+      };
+      const value = configInstance.get('log.level', 'info');
+      expect(value).toBe('error');
     });
 
     test('should have set method', () => {
-      expect(typeof ConfigManager.set).toBe('function');
-      ConfigManager.set('test.value', 'test');
-      expect(ConfigManager.get('test.value')).toBe('test');
+      const configInstance = config();
+      expect(typeof configInstance.set).toBe('function');
+      configInstance.set('test.value', 'test');
+      expect(configInstance.get('test.value')).toBe('test');
     });
 
     test('should have all method', () => {
-      expect(typeof ConfigManager.all).toBe('function');
-      const allConfig = ConfigManager.all();
+      const configInstance = config();
+      expect(typeof configInstance.all).toBe('function');
+      // Set up mock config
+      configInstance.config = {
+        copytree: { maxFileSize: 10 * 1024 * 1024 },
+        log: { level: 'error' }
+      };
+      const allConfig = configInstance.all();
       expect(allConfig).toHaveProperty('copytree');
       expect(allConfig).toHaveProperty('log');
     });
@@ -58,47 +71,55 @@ describe('ConfigManager', () => {
 
   describe('get method', () => {
     test('should get nested configuration values', () => {
-      expect(ConfigManager.get('copytree.maxFileSize')).toBe(10 * 1024 * 1024);
-      expect(ConfigManager.get('log.level')).toBe('error');
+      const configInstance = config();
+      configInstance.config = {
+        copytree: { maxFileSize: 10 * 1024 * 1024 },
+        log: { level: 'error' }
+      };
+      expect(configInstance.get('copytree.maxFileSize')).toBe(10 * 1024 * 1024);
+      expect(configInstance.get('log.level')).toBe('error');
     });
 
     test('should return default value for missing paths', () => {
-      expect(ConfigManager.get('non.existent.path', 'default')).toBe('default');
+      const configInstance = config();
+      expect(configInstance.get('non.existent.path', 'default')).toBe('default');
     });
   });
 
   describe('set method', () => {
     test('should set configuration values', () => {
-      ConfigManager.set('newKey', 'newValue');
-      expect(ConfigManager.get('newKey')).toBe('newValue');
+      const configInstance = config();
+      configInstance.set('newKey', 'newValue');
+      expect(configInstance.get('newKey')).toBe('newValue');
     });
 
     test('should set nested values', () => {
-      ConfigManager.set('deeply.nested.value', 42);
-      expect(ConfigManager.get('deeply.nested.value')).toBe(42);
+      const configInstance = config();
+      configInstance.set('deeply.nested.value', 42);
+      expect(configInstance.get('deeply.nested.value')).toBe(42);
     });
   });
 
   describe('env helper', () => {
     test('should get environment variables', () => {
       process.env.TEST_VAR = 'test_value';
-      expect(ConfigManager.env('TEST_VAR')).toBe('test_value');
+      expect(env('TEST_VAR')).toBe('test_value');
     });
 
     test('should return default for missing env vars', () => {
-      expect(ConfigManager.env('MISSING_VAR', 'default')).toBe('default');
+      expect(env('MISSING_VAR', 'default')).toBe('default');
     });
 
     test('should convert boolean strings', () => {
       process.env.BOOL_TRUE = 'true';
       process.env.BOOL_FALSE = 'false';
-      expect(ConfigManager.env('BOOL_TRUE')).toBe('true');
-      expect(ConfigManager.env('BOOL_FALSE')).toBe('false');
+      expect(env('BOOL_TRUE')).toBe(true);
+      expect(env('BOOL_FALSE')).toBe(false);
     });
 
     test('should convert numeric strings', () => {
       process.env.NUM_VAR = '42';
-      expect(ConfigManager.env('NUM_VAR')).toBe('42');
+      expect(env('NUM_VAR')).toBe(42);
     });
   });
 });

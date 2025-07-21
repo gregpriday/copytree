@@ -6,7 +6,7 @@ A powerful Node.js CLI tool that transforms codebases into structured, AI-friend
 
 ### Core Functionality
 - **Smart File Discovery** - Intelligent file selection with gitignore support
-- **13+ File Transformers** - PDF text extraction, image descriptions, code summaries
+- **15+ File Transformers** - PDF text extraction, image OCR/descriptions, code summaries
 - **Multiple Output Formats** - XML, JSON, tree view, and markdown
 - **Profile System** - Pre-configured profiles for Laravel, SvelteKit, and more
 - **External Sources** - Include files from GitHub repos or other directories
@@ -27,7 +27,7 @@ A powerful Node.js CLI tool that transforms codebases into structured, AI-friend
 - **Deduplication** - Remove duplicate files based on content
 - **Always Include** - Force include critical files regardless of filters
 
-## Installation
+## 📦 Installation
 
 ### Global Installation
 ```bash
@@ -42,64 +42,70 @@ npm install
 npm link  # Makes 'copytree' available globally
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
-# Copy current directory to XML
+# Copy current directory to clipboard
 copytree
 
 # Copy specific directory with AI filtering
-copytree /path/to/project --ai-filter "authentication and user management files"
+copytree /path/to/project -a "authentication and user management files"
 
 # Use a framework profile
-copytree --profile laravel --output project-structure.xml
+copytree -p laravel -o project-structure.xml
 
 # Ask AI about your codebase
 copytree ask "How does the authentication system work?"
 
 # Watch for changes and auto-regenerate
-copytree watch /path/to/project --output live-structure.xml
+copytree watch /path/to/project -o live-structure.xml
 
 # Copy from GitHub repository
-copytree https://github.com/user/repo --profile default
+copytree https://github.com/user/repo -p default
 
 # Copy specific branch/path from GitHub
-copytree https://github.com/user/repo/tree/main/src --output repo-src.xml
+copytree https://github.com/user/repo/tree/main/src -o repo-src.xml
 ```
 
-## Usage Examples
+## 📖 Usage Examples
 
 ### Basic Operations
 ```bash
-# Copy current directory
+# Copy current directory (default: to clipboard)
 copytree
 
 # Copy to file
-copytree --output structure.xml
+copytree -o structure.xml
 
-# Copy to clipboard (macOS)
-copytree --clipboard
+# Display to console instead of clipboard
+copytree -i
 
-# Dry run (preview without executing)
+# Copy file path reference to clipboard
+copytree -r
+
+# Dry run (preview files without copying)
 copytree --dry-run
 
 # Different output formats
-copytree --format json --output structure.json
+copytree --format json -o structure.json
 copytree --format tree  # Tree view in console
 ```
 
 ### Advanced Filtering
 ```bash
 # Include/exclude patterns
-copytree --include "*.js" --include "*.ts" --exclude "node_modules"
+copytree -f "*.js" -f "*.ts" --exclude "node_modules"
 
 # Git-based filtering
-copytree --modified     # Only modified files
-copytree --changed      # Files changed from main branch
+copytree -m                 # Only modified files
+copytree -c main            # Files changed from main branch
 
 # AI-powered filtering
-copytree --ai-filter "API routes and database models"
-copytree --ai-filter "test files that are failing"
+copytree -a "API routes and database models"
+copytree -a "test files that are failing"
+
+# Combine filters
+copytree -p laravel -m -a "controller files"
 ```
 
 ### Profile Usage
@@ -110,10 +116,13 @@ copytree profile:list
 # Validate a profile
 copytree profile:validate laravel
 
+# Create a new profile with AI assistance
+copytree profile:create
+
 # Use built-in profiles
-copytree --profile laravel      # Laravel projects
-copytree --profile sveltekit    # SvelteKit projects
-copytree --profile default      # General projects
+copytree -p laravel      # Laravel projects
+copytree -p sveltekit    # SvelteKit projects
+copytree -p default      # General projects
 ```
 
 ### AI Features
@@ -124,14 +133,17 @@ copytree ask "Where is user authentication handled?"
 copytree ask "What tests are failing and why?"
 
 # Streaming responses
-copytree ask "Explain the database schema" --stream
+copytree ask "Explain the database schema" -S
 
 # Maintain conversation context
-copytree ask "How does login work?" --state conversation-1
-copytree ask "What about logout?" --state conversation-1
+copytree ask "How does login work?" -s conversation-1
+copytree ask "What about logout?" -s conversation-1
+
+# AI-powered file summaries
+copytree --transform  # Apply all transformers including AI summaries
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 Create a `.env` file in your project or home directory:
@@ -165,7 +177,7 @@ module.exports = {
 };
 ```
 
-## Commands Reference
+## 📚 Commands Reference
 
 ### Core Commands
 - `copytree [path]` - Copy directory structure to XML/JSON
@@ -181,15 +193,15 @@ module.exports = {
 ### Documentation & Setup
 - `copytree copy:docs` - Copy built-in documentation
 - `copytree install:copytree` - Set up CopyTree environment
-- `copytree install:claude` - Configure Claude Code integration
+- `copytree install:claude` - Configure Claude Desktop integration
 
 ### Utility Commands
 - `copytree cache:clear` - Clear AI and file processing caches
 - `copytree config:validate` - Validate application configuration
 
-## File Transformers
+## 🔧 File Transformers
 
-CopyTree includes 13+ specialized transformers:
+CopyTree includes 15+ specialized transformers:
 
 ### Text Processing
 - **FileLoader**: Default transformer, loads content as-is
@@ -212,36 +224,67 @@ CopyTree includes 13+ specialized transformers:
 
 ### Binary & Media
 - **BinaryTransformer**: Replace binary content with metadata
-- **ImageTransformer**: Handle images with placeholders or AI descriptions
+- **ImageTransformer**: Handle images with OCR (Tesseract) or AI descriptions
 
-## Integration
+## 🔌 Integration
 
-### Claude Code Integration
-Set up CopyTree as an MCP server for Claude Code:
+### Claude Desktop Integration
+Set up CopyTree as an MCP server for Claude Desktop:
 
 ```bash
+# Install globally first
+npm install -g copytree
+
 # In your project directory
 copytree install:claude
 
 # This creates mcp.json and optionally updates CLAUDE.md
-# Restart Claude Code to load the integration
+# Restart Claude Desktop to load the integration
 ```
+
+### MCP Server Features
+- **project_ask**: Query codebases with natural language
+- **project_copy**: Generate structured output
+- Stateful conversations
+- Streaming responses
+- Git integration
+- Custom file filtering
 
 ### Git Integration
 CopyTree integrates with Git to provide context-aware file filtering:
 
 ```bash
 # Show only files modified in working directory
-copytree --modified
+copytree -m
 
 # Show files changed from main branch
-copytree --changed
+copytree -c main
 
 # Include git status in output
-copytree --git-status
+copytree --with-git-status
+
+# Compare with specific branch
+copytree -c develop
 ```
 
-## Performance
+## 🏗️ Architecture
+
+CopyTree uses an event-driven pipeline architecture with 16 processing stages:
+
+1. **FileDiscoveryStage** - Find files matching patterns
+2. **ProfileFilterStage** - Apply profile-based rules
+3. **GitFilterStage** - Apply git-based filtering
+4. **AIFilterStage** - Apply AI-powered filtering  
+5. **ExternalSourceStage** - Include external files
+6. **TransformStage** - Apply file transformations
+7. **DeduplicationStage** - Remove duplicate files
+8. **CharacterLimitStage** - Enforce size limits
+9. **OutputFormattingStage** - Format output (XML/JSON/tree)
+10. **StreamingOutputStage** - Write to destination
+
+And additional stages for caching, metadata, sorting, and more.
+
+## ⚡ Performance
 
 CopyTree is optimized for large codebases:
 
@@ -250,14 +293,15 @@ CopyTree is optimized for large codebases:
 - **Smart caching** for AI operations and file transformations
 - **Configurable limits** to prevent resource exhaustion
 
-### Benchmarks
-- **Small projects** (10 files): ~100ms
-- **Medium projects** (100 files): ~1s  
-- **Large projects** (1000+ files): ~10s
+### Performance Targets
+- Process 10,000 files in < 30 seconds
+- Memory usage < 500MB for large projects  
+- Support projects up to 100MB total size
+- Stream files > 10MB without loading into memory
 
 Run benchmarks: `npm run benchmark`
 
-## Development
+## 🛠️ Development
 
 ### Setup
 ```bash
@@ -279,26 +323,40 @@ npm run format
 npm run format:check
 ```
 
-### Architecture
-CopyTree uses a pipeline architecture with stages:
-
-1. **FileDiscoveryStage** - Find files matching patterns
-2. **GitFilterStage** - Apply git-based filtering
-3. **AIFilterStage** - Apply AI-powered filtering  
-4. **ProfileFilterStage** - Apply profile-based rules
-5. **FileLoadingStage** - Load file contents
-6. **TransformStage** - Apply file transformations
-7. **OutputFormattingStage** - Format output (XML/JSON/tree)
-8. **StreamingOutputStage** - Write to destination
+### Project Structure
+```
+copytree/
+├── src/
+│   ├── commands/        # CLI command implementations
+│   ├── pipeline/        # Processing pipeline stages
+│   ├── services/        # Core services (AI, Cache, Git)
+│   ├── transforms/      # File transformers
+│   └── utils/          # Utility functions
+├── config/             # Default configurations
+├── profiles/           # Built-in profiles
+├── docs/               # Documentation
+└── tests/              # Test suites
+```
 
 ### Testing
 - **Unit tests**: `tests/unit/`
 - **Integration tests**: `tests/integration/`
 - **Performance tests**: `tests/performance/`
+- **Test fixtures**: `tests/fixtures/`
 
-Coverage target: 80%
+## 📖 Documentation
 
-## Troubleshooting
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[Getting Started](docs/index.md)** - Introduction and quick start
+- **[Installation Guide](docs/installation/installation-guide.md)** - Detailed setup instructions
+- **[CLI Reference](docs/cli/copytree-reference.md)** - Complete command documentation
+- **[Profile Overview](docs/profiles/profile-overview.md)** - Understanding profiles
+- **[Transformer Reference](docs/profiles/transformer-reference.md)** - All transformers explained
+- **[MCP Server Guide](docs/usage/mcp-server.md)** - Claude Desktop integration
+- **[Troubleshooting](docs/usage/troubleshooting.md)** - Common issues and solutions
+
+## 🐛 Troubleshooting
 
 ### Common Issues
 
@@ -319,18 +377,24 @@ DEBUG=copytree:* copytree /path/to/project
 COPYTREE_PERFORMANCE=true copytree /path/to/project
 ```
 
-## Migration from PHP Version
+## 🔄 Migration from PHP Version
 
 If migrating from the PHP version of CopyTree:
 
 1. **Configuration**: Convert PHP config arrays to JavaScript objects
 2. **Profiles**: YAML profiles remain compatible
 3. **Commands**: Most command syntax is preserved
-4. **AI features**: Now uses Google Gemini instead of multiple providers
+4. **AI Provider**: Now uses Google Gemini exclusively (no OpenAI/Anthropic support)
+5. **New Features**: MCP server, watch mode, enhanced pipeline architecture
 
-See `docs/migration-guide.md` for detailed migration instructions.
+Key differences:
+- Single AI provider (Gemini) instead of multiple
+- JavaScript configuration instead of PHP arrays
+- Enhanced pipeline architecture
+- Native MCP server implementation
+- More transformers (15+ vs 13)
 
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -341,10 +405,10 @@ See `docs/migration-guide.md` for detailed migration instructions.
 7. Push to the branch (`git push origin feature/amazing-feature`)
 8. Open a Pull Request
 
-## License
+## 📄 License
 
 MIT License. See [LICENSE](LICENSE) file for details.
 
-## Changelog
+## 📝 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.

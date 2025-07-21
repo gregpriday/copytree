@@ -2,21 +2,45 @@ const TransformerRegistry = require('../../../src/transforms/TransformerRegistry
 const BaseTransformer = require('../../../src/transforms/BaseTransformer');
 const { TransformError } = require('../../../src/utils/errors');
 
-// Mock transformer for testing
-class TestTransformer extends BaseTransformer {
+// Create a mock transformer factory
+const createMockTransformer = (name) => {
+  return jest.fn().mockImplementation(() => ({
+    transform: jest.fn(),
+    canTransform: jest.fn(() => true),
+    doTransform: jest.fn()
+  }));
+};
+
+// Mock all transformer modules
+jest.mock('../../../src/transforms/transformers/FileLoaderTransformer', () => createMockTransformer('FileLoaderTransformer'));
+jest.mock('../../../src/transforms/transformers/MarkdownTransformer', () => createMockTransformer('MarkdownTransformer'));
+jest.mock('../../../src/transforms/transformers/CSVTransformer', () => createMockTransformer('CSVTransformer'));
+jest.mock('../../../src/transforms/transformers/BinaryTransformer', () => createMockTransformer('BinaryTransformer'));
+jest.mock('../../../src/transforms/transformers/PDFTransformer', () => createMockTransformer('PDFTransformer'));
+jest.mock('../../../src/transforms/transformers/ImageTransformer', () => createMockTransformer('ImageTransformer'));
+jest.mock('../../../src/transforms/transformers/AISummaryTransformer', () => createMockTransformer('AISummaryTransformer'));
+
+// Mock transformer for testing - simple implementation without BaseTransformer
+class TestTransformer {
   constructor(options = {}) {
-    super('test-transformer', options);
+    this.options = options;
   }
 
-  async canTransform(filePath) {
-    return filePath.endsWith('.test');
+  async canTransform(file) {
+    return file.path.endsWith('.test');
   }
 
-  async transform(filePath, content, metadata) {
+  async transform(file) {
     return {
-      content: `transformed: ${content}`,
-      metadata: { ...metadata, transformed: true }
+      ...file,
+      content: `transformed: ${file.content}`,
+      transformed: true,
+      transformedBy: 'TestTransformer'
     };
+  }
+
+  async doTransform(file) {
+    return this.transform(file);
   }
 }
 
@@ -24,6 +48,22 @@ describe('TransformerRegistry', () => {
   let registry;
 
   beforeEach(() => {
+    // Clear all mocks before each test
+    jest.clearAllMocks();
+    
+    // Debug logger setup
+    const { logger } = require('../../../src/utils/logger');
+    const mockLogger = {
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn()
+    };
+    
+    // Override the child method to return a proper mock
+    logger.child = jest.fn(() => mockLogger);
+    
+    // Create a new registry for each test
     registry = new TransformerRegistry();
   });
 
@@ -132,19 +172,21 @@ describe('TransformerRegistry', () => {
       expect(result).toBe(transformer);
     });
 
-    test('should return null for unhandled file', () => {
-      const result = registry.getForFile({ path: 'file.unknown' });
-      expect(result).toBeNull();
+    test('should throw for unhandled file', () => {
+      expect(() => registry.getForFile({ path: 'file.unknown' }))
+        .toThrow(TransformError);
     });
   });
 
-  describe('loadDefaults', () => {
-    test('should load default transformers', () => {
-      const initialSize = registry.transformers.size;
-      registry.loadDefaults();
+  describe('createDefault', () => {
+    test('should create registry with default transformers', () => {
+      const defaultRegistry = TransformerRegistry.createDefault();
       
       // Should have loaded some default transformers
-      expect(registry.transformers.size).toBeGreaterThan(initialSize);
+      expect(defaultRegistry.transformers.size).toBeGreaterThan(0);
+      expect(defaultRegistry.has('file-loader')).toBe(true);
+      expect(defaultRegistry.has('markdown')).toBe(true);
+      expect(defaultRegistry.has('csv')).toBe(true);
     });
   });
 

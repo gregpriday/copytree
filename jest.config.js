@@ -48,7 +48,7 @@ module.exports = {
   
   // Transform ignore patterns to handle ES modules
   transformIgnorePatterns: [
-    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3)/)'
+    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy)/)'
   ],
   
   // Ignore patterns

@@ -35,6 +35,9 @@ class BaseTransformer {
    */
   async transform(file) {
     try {
+      // Validate input first
+      this.validateInput(file);
+      
       this.logger.debug(`Transforming ${file.path}`);
       const startTime = Date.now();
 
@@ -46,9 +49,6 @@ class BaseTransformer {
           return cached;
         }
       }
-
-      // Validate input
-      this.validateInput(file);
 
       // Perform transformation
       const result = await this.doTransform(file);
@@ -72,7 +72,7 @@ class BaseTransformer {
       throw new TransformError(
         `Transform failed: ${error.message}`,
         this.constructor.name,
-        file.path,
+        file ? file.path : undefined,
         { originalError: error }
       );
     }
