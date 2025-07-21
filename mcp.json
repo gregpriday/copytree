@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "copytree": {
+      "command": "copytree",
+      "args": [
+        "mcp"
+      ],
+      "env": {},
+      "workingDirectory": "/Users/gpriday/Dropbox/Node/copytree"
+    }
+  }
+}

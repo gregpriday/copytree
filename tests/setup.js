@@ -1,57 +1,72 @@
-// Jest setup file
-// Load environment variables for testing
-require('dotenv').config({ path: '.env.test' });
+// Global test setup
+// This file runs before all tests
 
-// Set test environment
+// Set test environment variables
 process.env.NODE_ENV = 'test';
+process.env.COPYTREE_CACHE_ENABLED = 'false'; // Disable caching in tests
 
-// Suppress console output during tests (unless debugging)
-if (!process.env.DEBUG_TESTS) {
-  global.console = {
-    ...console,
-    log: jest.fn(),
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    // Keep error for debugging failed tests
-    error: console.error,
-  };
-}
+// Mock console methods to reduce noise in tests
+global.console = {
+  ...console,
+  log: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  info: jest.fn(),
+  debug: jest.fn()
+};
+
+// Add custom matchers if needed
+expect.extend({
+  toBeValidPath(received) {
+    const pass = typeof received === 'string' && received.length > 0;
+    return {
+      pass,
+      message: () => `expected ${received} to be a valid file path`
+    };
+  },
+  
+  toContainFile(received, filepath) {
+    const files = Array.isArray(received) ? received : [];
+    const pass = files.some(f => f.path === filepath);
+    return {
+      pass,
+      message: () => pass
+        ? `expected files not to contain ${filepath}`
+        : `expected files to contain ${filepath}`
+    };
+  }
+});
 
 // Global test utilities
 global.testUtils = {
-  // Create a temporary test directory
-  async createTempDir() {
-    const fs = require('fs-extra');
-    const path = require('path');
-    const os = require('os');
-    
-    const tempDir = path.join(os.tmpdir(), `copytree-test-${Date.now()}`);
-    await fs.ensureDir(tempDir);
-    
-    return tempDir;
-  },
+  createMockFile: (path, content = '', metadata = {}) => ({
+    path,
+    content,
+    absolutePath: `/test/project/${path}`,
+    size: content.length,
+    mtime: new Date(),
+    ...metadata
+  }),
   
-  // Clean up temporary test directory
-  async cleanupTempDir(dir) {
-    const fs = require('fs-extra');
-    await fs.remove(dir);
-  },
+  createMockProfile: (overrides = {}) => ({
+    name: 'test-profile',
+    patterns: ['**/*'],
+    exclude: ['node_modules/**'],
+    transformers: [],
+    ...overrides
+  }),
   
-  // Create test files in a directory
-  async createTestFiles(dir, files) {
-    const fs = require('fs-extra');
-    const path = require('path');
-    
-    for (const [filePath, content] of Object.entries(files)) {
-      const fullPath = path.join(dir, filePath);
-      await fs.ensureDir(path.dirname(fullPath));
-      await fs.writeFile(fullPath, content);
-    }
-  },
+  createMockContext: (overrides = {}) => ({
+    basePath: '/test/project',
+    options: {},
+    profile: global.testUtils.createMockProfile(),
+    emit: jest.fn(),
+    ...overrides
+  })
 };
 
-// Increase timeout for CI environments
-if (process.env.CI) {
-  jest.setTimeout(30000);
-}
+// Cleanup after tests
+afterAll(() => {
+  // Restore console
+  global.console = console;
+});

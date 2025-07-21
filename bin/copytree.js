@@ -31,6 +31,12 @@ program
   .option('--info', 'Show info table')
   .option('--show-size', 'Show file sizes')
   .option('--with-git-status', 'Include git status in output')
+  .option('--as-reference', 'Generate reference documentation')
+  .option('--validate', 'Validate profile without executing')
+  .option('--clipboard', 'Copy output to clipboard')
+  .option('--sort <by>', 'Sort files by: path, size, modified, name, extension')
+  .option('--dedupe', 'Remove duplicate files')
+  .option('--always <patterns...>', 'Always include these patterns')
   .action(async (path, options) => {
     const copyCommand = require('../src/commands/copy');
     await copyCommand(path || '.', options);
@@ -53,9 +59,16 @@ program
 program
   .command('watch [path]')
   .description('Watch directory for changes and regenerate output')
-  .option('--output <file>', 'Output file (required)')
+  .option('--output <file>', 'Output file (auto-generated if not specified)')
   .option('--profile <name>', 'Profile to use')
   .option('--debounce <ms>', 'Debounce delay in milliseconds', '1000')
+  .option('--no-cache', 'Disable caching for GitHub repositories')
+  .option('--size-report', 'Show file size report on each update')
+  .option('--no-reveal', 'Disable macOS Finder reveal')
+  .option('--skip-initial', 'Skip initial copy on start')
+  .option('--depth <n>', 'Max directory depth to watch')
+  .option('--poll-interval <ms>', 'File polling interval', '1000')
+  .option('-v, --verbose', 'Show verbose output')
   .action(async (path, options) => {
     const watchCommand = require('../src/commands/watch');
     await watchCommand(path || '.', options);
@@ -63,12 +76,13 @@ program
 
 // 4. MCP command
 program
-  .command('mcp')
-  .description('Start CopyTree MCP server')
-  .option('--port <port>', 'Server port', '3000')
-  .action(async (options) => {
+  .command('mcp [directory]')
+  .description('Start CopyTree MCP server for Claude integration')
+  .option('--port <port>', 'Server port (default: stdio)')
+  .option('--debug', 'Enable debug logging')
+  .action(async (directory, options) => {
     const mcpCommand = require('../src/commands/mcp');
-    await mcpCommand(options);
+    await mcpCommand(directory, options);
   });
 
 // 5. Profile create command
@@ -106,8 +120,10 @@ program
 // 8. Copy docs command
 program
   .command('copy:docs')
-  .description('Copy profile documentation')
-  .option('--output <file>', 'Output file (default: profile-docs.txt)')
+  .description('Copy framework/library documentation')
+  .option('--topic <name>', 'Documentation topic to copy')
+  .option('--output <file>', 'Output file instead of clipboard')
+  .option('--no-clipboard', 'Display to console instead of clipboard')
   .action(async (options) => {
     const copyDocsCommand = require('../src/commands/copyDocs');
     await copyDocsCommand(options);

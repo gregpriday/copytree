@@ -46,3 +46,4 @@ temp/
 # Output files
 output/
 *.xml
+/.copytree-cache

@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed pattern matching edge cases in TransformerRegistry
 - Improved configuration loading reliability
 
-## [1.0.0] - 2024-XX-XX
+## [1.0.0] - 2025-07-21
 
 ### Added
 - **Phase 1: Foundation**

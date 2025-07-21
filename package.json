@@ -11,7 +11,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:unit": "jest tests/unit",
     "test:integration": "jest tests/integration",
+    "test:e2e": "jest tests/e2e",
     "benchmark": "node tests/performance/benchmark.js",
     "lint": "eslint src/ bin/ --ext .js",
     "lint:fix": "eslint src/ bin/ --ext .js --fix",
@@ -41,6 +43,7 @@
     "fast-glob": "^3.3.2",
     "fs-extra": "^11.3.0",
     "glob": "^11.0.3",
+    "globby": "^14.1.0",
     "inquirer": "^12.2.0",
     "joi": "^17.13.3",
     "js-yaml": "^4.1.0",
@@ -59,7 +62,9 @@
     "babel-jest": "^30.0.4",
     "eslint": "^9.18.0",
     "jest": "^30.0.4",
+    "jest-mock-fs": "^1.0.2",
     "prettier": "^3.5.0",
+    "sharp": "^0.34.3",
     "typescript": "^5.8.3"
   }
 }

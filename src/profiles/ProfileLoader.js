@@ -166,6 +166,17 @@ class ProfileLoader {
       include: joi.array().items(joi.string()),
       exclude: joi.array().items(joi.string()),
       filter: joi.array().items(joi.string()),
+      always: joi.array().items(joi.string()),
+      
+      // External sources
+      external: joi.array().items(
+        joi.object({
+          source: joi.string().required(),
+          destination: joi.string(),
+          rules: joi.array().items(joi.string()),
+          optional: joi.boolean()
+        })
+      ),
       
       // Options
       options: joi.object({
@@ -181,23 +192,37 @@ class ProfileLoader {
       // Transformations
       transformers: joi.object().pattern(
         joi.string(),
-        joi.object({
-          enabled: joi.boolean(),
-          options: joi.object()
-        })
+        joi.alternatives().try(
+          joi.boolean(),
+          joi.object({
+            enabled: joi.boolean(),
+            options: joi.object()
+          })
+        )
       ),
       
       // Output
       output: joi.object({
-        format: joi.string().valid('xml', 'json', 'tree'),
+        format: joi.string().valid('xml', 'json', 'tree', 'markdown'),
         includeMetadata: joi.boolean(),
         addLineNumbers: joi.boolean(),
-        prettyPrint: joi.boolean()
+        prettyPrint: joi.boolean(),
+        characterLimit: joi.number().positive()
+      }),
+      
+      // Pipeline configuration
+      pipeline: joi.object({
+        stages: joi.array().items(joi.string()),
+        parallel: joi.boolean(),
+        stopOnError: joi.boolean()
       }),
       
       // Metadata
       _source: joi.string(),
-      _loadedAt: joi.string()
+      _loadedAt: joi.string(),
+      created: joi.string(),
+      author: joi.string(),
+      tags: joi.array().items(joi.string())
     });
 
     const { error, value } = schema.validate(profile, {

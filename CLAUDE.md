@@ -188,3 +188,38 @@ npm install ora chalk inquirer js-yaml
 - Test Projects: Create in `tests/fixtures/projects/`
 
 Remember: This is a sophisticated application with complex requirements. Take time to understand the architecture before implementing features.
+
+## CopyTree MCP Server
+
+This project has CopyTree's `project_ask` tool for querying the codebase using natural language.
+
+### Available Tools
+
+- **project_ask**: Ask questions about the codebase, architecture, implementations, or debug issues
+- **project_copy**: Generate structured XML output of project files
+
+### Example Queries
+
+- "What is the main purpose of this project?"
+- "How does the authentication system work?"
+- "Where is X implemented?"
+- "Why is this test failing?"
+- "Show me the database schema"
+- "Explain the API endpoints"
+
+### Advanced Features
+
+- **Stateful conversations**: Use `state` parameter to maintain context across questions
+- **Streaming responses**: Use `stream: true` for real-time answers
+- **File filtering**: Ask about specific files, directories, or patterns
+- **Git integration**: Query modified files, recent changes, or branch differences
+
+### Usage Tips
+
+1. Ask specific questions about code functionality
+2. Request explanations of complex algorithms or patterns  
+3. Debug failing tests or error messages
+4. Understand project architecture and data flow
+5. Get help with code reviews and refactoring
+
+The CopyTree MCP server provides deep codebase understanding through AI-powered analysis.

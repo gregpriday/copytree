@@ -22,7 +22,7 @@ class CSVTransformer extends BaseTransformer {
       content = await fs.readFile(file.absolutePath, 'utf8');
     }
 
-    if (!content || typeof content !== 'string') {
+    if (content === undefined || content === null || typeof content !== 'string') {
       return {
         ...file,
         content: content || '',
@@ -51,10 +51,11 @@ class CSVTransformer extends BaseTransformer {
       this.logger.warn(`Failed to parse CSV ${file.path}: ${error.message}`);
       
       // Return first N lines as fallback
-      const lines = content.split('\n').slice(0, this.maxRows);
+      const allLines = content.split('\n');
+      const lines = allLines.slice(0, this.maxRows);
       return {
         ...file,
-        content: lines.join('\n') + (lines.length < content.split('\n').length ? '\n...' : ''),
+        content: lines.join('\n') + (lines.length < allLines.length ? '\n...' : ''),
         originalContent: content,
         transformed: true,
         transformedBy: this.constructor.name,
@@ -135,7 +136,7 @@ class CSVTransformer extends BaseTransformer {
     const delimiters = [',', '\t', ';', '|'];
     const counts = delimiters.map(delim => ({
       delimiter: delim,
-      count: (firstLine.match(new RegExp(delim, 'g')) || []).length
+      count: (firstLine.match(new RegExp(delim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length
     }));
 
     // Return delimiter with highest count

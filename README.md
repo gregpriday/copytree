@@ -1,18 +1,31 @@
 # CopyTree
 
-A sophisticated Node.js CLI tool that copies directory structures and file contents into structured XML format with AI-powered features. Migrated from PHP/Laravel Zero with enhanced capabilities.
+A powerful Node.js CLI tool that transforms codebases into structured, AI-friendly formats. This is a complete rewrite of the original PHP/Laravel Zero version with full feature parity and enhanced capabilities.
 
-## Features
+## 🚀 Features
 
-- 🚀 **Fast file processing** with streaming and parallel operations
-- 🤖 **AI-powered filtering** using natural language queries (Google Gemini)
-- 📁 **Smart file detection** with 13+ file transformers (PDF, images, etc.)
-- 🔍 **Git integration** for filtering modified/changed files  
-- 📋 **Flexible output** formats (XML, JSON, tree view)
-- 🎯 **Profile system** with built-in templates for common frameworks
-- 💬 **Conversational AI** for codebase questions and analysis
-- 🔧 **Claude Code integration** via MCP protocol
-- ⚡ **Watch mode** for real-time file monitoring
+### Core Functionality
+- **Smart File Discovery** - Intelligent file selection with gitignore support
+- **13+ File Transformers** - PDF text extraction, image descriptions, code summaries
+- **Multiple Output Formats** - XML, JSON, tree view, and markdown
+- **Profile System** - Pre-configured profiles for Laravel, SvelteKit, and more
+- **External Sources** - Include files from GitHub repos or other directories
+- **Character Limiting** - Stay within AI context windows automatically
+
+### AI Integration (Gemini)
+- **Natural Language Filtering** - "Show me authentication files"
+- **AI-Powered Summaries** - Automatic code and test file summarization
+- **Image Analysis** - Generate descriptions for images and diagrams
+- **Conversational Interface** - Ask questions about your codebase
+- **Smart Profile Creation** - AI suggests optimal settings for your project
+
+### Advanced Features
+- **Watch Mode** - Monitor changes and regenerate output automatically
+- **Git Integration** - Filter by modified, staged, or untracked files
+- **MCP Server** - Direct integration with Claude Desktop
+- **Profile Auto-Detection** - Automatically detect project type
+- **Deduplication** - Remove duplicate files based on content
+- **Always Include** - Force include critical files regardless of filters
 
 ## Installation
 
@@ -46,6 +59,12 @@ copytree ask "How does the authentication system work?"
 
 # Watch for changes and auto-regenerate
 copytree watch /path/to/project --output live-structure.xml
+
+# Copy from GitHub repository
+copytree https://github.com/user/repo --profile default
+
+# Copy specific branch/path from GitHub
+copytree https://github.com/user/repo/tree/main/src --output repo-src.xml
 ```
 
 ## Usage Examples
@@ -152,27 +171,48 @@ module.exports = {
 - `copytree [path]` - Copy directory structure to XML/JSON
 - `copytree ask <query>` - Ask AI questions about your codebase  
 - `copytree watch [path]` - Monitor directory and auto-regenerate output
+- `copytree mcp [directory]` - Start MCP server for Claude integration
 
 ### Profile Management
+- `copytree profile:create [path]` - Create new profile with AI assistance
 - `copytree profile:list` - List all available profiles
 - `copytree profile:validate <name>` - Validate profile configuration
+
+### Documentation & Setup
+- `copytree copy:docs` - Copy built-in documentation
+- `copytree install:copytree` - Set up CopyTree environment
+- `copytree install:claude` - Configure Claude Code integration
 
 ### Utility Commands
 - `copytree cache:clear` - Clear AI and file processing caches
 - `copytree config:validate` - Validate application configuration
-- `copytree install:claude` - Set up Claude Code integration
 
 ## File Transformers
 
-CopyTree includes specialized transformers for different file types:
+CopyTree includes 13+ specialized transformers:
 
-- **Text files**: Direct content inclusion with encoding detection
-- **Markdown**: Rendered HTML or plain text modes
-- **PDF**: Text extraction with metadata
-- **Images**: OCR text extraction and metadata
-- **CSV**: Structured data with preview options
-- **Binary**: Metadata and file signatures only
-- **AI Summary**: AI-generated summaries for large files
+### Text Processing
+- **FileLoader**: Default transformer, loads content as-is
+- **FirstLines**: Show only first N lines of files
+- **MarkdownTransformer**: Strip formatting or convert markdown
+- **MarkdownLinkStripper**: Remove links while preserving text
+- **HTMLStripper**: Convert HTML to plain text
+
+### AI-Powered (Gemini)
+- **AISummary**: General AI-powered summaries
+- **FileSummary**: Summarize any text file in 2-3 sentences
+- **UnitTestSummary**: Specialized summaries for test files
+- **ImageDescription**: Describe images using vision AI
+- **SvgDescription**: Analyze and describe SVG files
+
+### Document Conversion
+- **PDFTransformer**: Extract text from PDF files
+- **DocumentToText**: Convert Word/ODT documents (requires Pandoc)
+- **CSVTransformer**: Preview or full CSV content with formatting
+
+### Binary & Media
+- **BinaryTransformer**: Replace binary content with metadata
+- **ImageTransformer**: Handle images with placeholders or AI descriptions
 
 ## Integration
 

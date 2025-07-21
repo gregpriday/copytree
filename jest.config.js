@@ -4,52 +4,63 @@ module.exports = {
   // Test file patterns
   testMatch: [
     '**/tests/**/*.test.js',
-    '**/__tests__/**/*.js',
+    '**/tests/**/*.spec.js'
   ],
   
   // Coverage configuration
+  collectCoverage: false, // Set to true when running coverage
   collectCoverageFrom: [
     'src/**/*.js',
     '!src/**/*.test.js',
-    '!src/**/__tests__/**',
+    '!src/**/*.spec.js',
+    '!src/index.js' // CLI entry point
   ],
-  
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {
-      branches: 60,
-      functions: 60,
-      lines: 60,
-      statements: 60,
-    },
-  },
-  
-  coverageDirectory: 'coverage',
-  
-  // Setup files
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
-  
-  // Transform files
-  transform: {
-    '^.+\\.js$': ['babel-jest', { 
-      presets: [['@babel/preset-env', { targets: { node: 'current' } }]] 
-    }],
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80
+    }
   },
   
   // Module paths
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^.*/config/ConfigManager$': '<rootDir>/tests/mocks/ConfigManager.js',
+    '^.*/utils/logger$': '<rootDir>/tests/mocks/logger.js',
+    '^.*/config$': '<rootDir>/tests/mocks/config.js'
+  },
+  
+  // Module directories
+  moduleDirectories: ['node_modules', 'src'],
+  
+  // Setup files
+  setupFiles: ['<rootDir>/tests/setup-mocks.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  
+  // Transform files
+  transform: {
+    '^.+\\.js$': 'babel-jest'
   },
   
   // Ignore patterns
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
-    '/build/',
+    '/coverage/'
   ],
+  
+  // Timeouts
+  testTimeout: 10000, // 10 seconds for async operations
   
   // Verbose output
   verbose: true,
   
-  // Timeout
-  testTimeout: 10000,
+  // Clear mocks between tests
+  clearMocks: true,
+  resetMocks: true,
+  restoreMocks: true
 };
