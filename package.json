@@ -11,10 +11,14 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:integration": "jest tests/integration",
+    "benchmark": "node tests/performance/benchmark.js",
     "lint": "eslint src/ bin/ --ext .js",
     "lint:fix": "eslint src/ bin/ --ext .js --fix",
     "format": "prettier --write \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\"",
-    "format:check": "prettier --check \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\""
+    "format:check": "prettier --check \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\"",
+    "prepare": "npm run lint && npm run test",
+    "prepublishOnly": "npm run test:coverage && npm run benchmark"
   },
   "keywords": [
     "cli",
