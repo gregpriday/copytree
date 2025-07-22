@@ -101,9 +101,19 @@ class Pipeline extends EventEmitter {
           input: result
         });
         
-        const stageInstance = typeof Stage === 'function' && Stage.prototype 
-          ? new Stage(this.options) 
-          : Stage;
+        // Determine what type of stage we have
+        let stageInstance;
+        
+        if (typeof Stage === 'function' && !Stage.prototype) {
+          // It's a plain function, use it directly
+          stageInstance = Stage;
+        } else if (typeof Stage === 'object' && Stage.process) {
+          // It's already an instance with a process method
+          stageInstance = Stage;
+        } else {
+          // It's a constructor, instantiate it
+          stageInstance = new Stage(this.options);
+        }
           
         const processMethod = stageInstance.process || stageInstance;
         

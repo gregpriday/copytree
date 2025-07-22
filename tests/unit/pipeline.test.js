@@ -82,7 +82,7 @@ describe('Pipeline', () => {
     // Add a small delay stage to ensure duration is measurable
     class DelayStage extends Stage {
       async process(input) {
-        await new Promise(resolve => setTimeout(resolve, 1));
+        await new Promise(resolve => setTimeout(resolve, 10));
         return input;
       }
     }

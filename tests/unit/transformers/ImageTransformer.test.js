@@ -35,7 +35,14 @@ describe('ImageTransformer', () => {
       terminate: jest.fn().mockResolvedValue(undefined)
     };
 
-    Tesseract.createWorker.mockResolvedValue(mockWorker);
+    Tesseract.createWorker.mockImplementation((lang) => {
+      // If called with language string, proceed normally
+      if (typeof lang === 'string') {
+        return Promise.resolve(mockWorker);
+      }
+      // If called with old API (object), also return worker
+      return Promise.resolve(mockWorker);
+    });
     os.tmpdir.mockReturnValue('/tmp');
     
     transformer = new ImageTransformer();
@@ -337,11 +344,7 @@ describe('ImageTransformer', () => {
     it('should create and configure worker on first use', async () => {
       const result = await transformer.performOCR('/path/to/image.jpg');
 
-      expect(Tesseract.createWorker).toHaveBeenCalledWith({
-        logger: expect.any(Function)
-      });
-      expect(mockWorker.loadLanguage).toHaveBeenCalledWith('eng');
-      expect(mockWorker.initialize).toHaveBeenCalledWith('eng');
+      expect(Tesseract.createWorker).toHaveBeenCalledWith('eng');
       expect(mockWorker.recognize).toHaveBeenCalledWith('/path/to/image.jpg');
       expect(result.text).toBe('Sample extracted text from image');
       expect(result.confidence).toBe(85.5);
@@ -353,8 +356,7 @@ describe('ImageTransformer', () => {
 
       await transformer.performOCR('/path/to/french.jpg');
 
-      expect(mockWorker.loadLanguage).toHaveBeenCalledWith('fra');
-      expect(mockWorker.initialize).toHaveBeenCalledWith('fra');
+      expect(Tesseract.createWorker).toHaveBeenCalledWith('fra');
     });
 
     it('should handle OCR errors', async () => {
@@ -431,23 +433,8 @@ describe('ImageTransformer', () => {
       expect(result.confidence).toBe(0);
     });
 
-    it('should handle language loading failure', async () => {
-      mockWorker.loadLanguage.mockRejectedValue(new Error('Language load failed'));
-
-      const result = await transformer.performOCR('/path/to/image.jpg');
-
-      expect(result.error).toBe('Language load failed');
-      expect(transformer.logger.warn).toHaveBeenCalled();
-    });
-
-    it('should handle worker initialization failure', async () => {
-      mockWorker.initialize.mockRejectedValue(new Error('Init failed'));
-
-      const result = await transformer.performOCR('/path/to/image.jpg');
-
-      expect(result.error).toBe('Init failed');
-      expect(transformer.logger.warn).toHaveBeenCalled();
-    });
+    // Note: In Tesseract.js v6, worker creation and initialization happen in one step
+    // The loadLanguage and initialize methods no longer exist separately
   });
 
   describe('edge cases', () => {

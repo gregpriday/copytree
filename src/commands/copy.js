@@ -94,6 +94,8 @@ async function loadProfile(profileLoader, profileName, options) {
   
   if (options.filter) {
     overrides.filter = Array.isArray(options.filter) ? options.filter : [options.filter];
+    // Also update include patterns for file discovery
+    overrides.include = Array.isArray(options.filter) ? options.filter : [options.filter];
   }
   
   if (options.includeHidden !== undefined) {
@@ -158,6 +160,14 @@ async function setupPipelineStages(basePath, profile, options) {
     exclude: profile.exclude || [],
     filter: profile.filter || []
   }));
+  
+  // 4. Always Include Stage (if --always option is used)
+  if (options.always) {
+    const AlwaysIncludeStage = require('../pipeline/stages/AlwaysIncludeStage');
+    stages.push(new AlwaysIncludeStage({
+      patterns: Array.isArray(options.always) ? options.always : [options.always]
+    }));
+  }
   
   // 5. External Source Stage (if external sources are configured)
   if (profile.external && profile.external.length > 0) {

@@ -210,9 +210,14 @@ Summary:`;
 }
 
 // Export singleton instance and class
-const defaultAI = new AIService();
+let defaultAI = null;
 
 module.exports = {
   AIService,
-  ai: defaultAI
+  get ai() {
+    if (!defaultAI) {
+      defaultAI = new AIService();
+    }
+    return defaultAI;
+  }
 };
