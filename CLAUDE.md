@@ -9,7 +9,7 @@ CopyTree is a sophisticated CLI tool for intelligently copying and transforming 
 - **Intelligent file selection** using profiles
 - **15+ file transformers** for PDFs, images, code, and documents
 - **Deep Git integration** for tracking changes and modifications
-- **Watch mode** with automatic regeneration
+
 - **External sources** support (GitHub repositories)
 
 ## Architecture
@@ -182,7 +182,7 @@ All dependencies are installed and managed via npm:
 
 ### Core
 - CLI: commander, chalk, ora, inquirer
-- File System: fs-extra, glob, fast-glob, chokidar
+- File System: fs-extra, glob, fast-glob
 - Config: dotenv, js-yaml
 - Git: simple-git
 - Utilities: lodash, rimraf, adm-zip

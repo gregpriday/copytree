@@ -17,7 +17,7 @@ A powerful Node.js CLI tool that transforms codebases into structured, AI-friend
 - **Image Analysis** - Generate descriptions for images and diagrams
 
 ### Advanced Features
-- **Watch Mode** - Monitor changes and regenerate output automatically
+
 - **Git Integration** - Filter by modified, staged, or untracked files
 - **Profile Auto-Detection** - Automatically detect project type
 - **Deduplication** - Remove duplicate files based on content
@@ -326,7 +326,7 @@ If migrating from the PHP version of CopyTree:
 2. **Profiles**: YAML profiles remain compatible
 3. **Commands**: Most command syntax is preserved
 4. **AI Provider**: Now uses Google Gemini exclusively (no OpenAI/Anthropic support)
-5. **New Features**: Watch mode, enhanced pipeline architecture
+5. **New Features**: Enhanced pipeline architecture
 
 Key differences:
 - Single AI provider (Gemini) instead of multiple

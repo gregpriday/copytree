@@ -34,7 +34,7 @@ describe('BaseTransformer', () => {
   describe('constructor', () => {
     test('should initialize with default options', () => {
       expect(transformer.options).toEqual({});
-      expect(transformer.cacheEnabled).toBe(true);
+      expect(transformer.cacheEnabled).toBe(false); // Default for non-AI transformers
       expect(transformer.cacheTTL).toBe(86400);
     });
 
@@ -103,10 +103,11 @@ describe('BaseTransformer', () => {
   });
 
   describe('caching', () => {
-    test('should cache transformations when enabled', async () => {
+    test('should not cache transformations by default', async () => {
       const { CacheService } = require('../../../src/services/CacheService');
       
       const customTransformer = new TestTransformer({
+        cache: false, // Explicitly disable
         logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }
       });
       
@@ -117,8 +118,8 @@ describe('BaseTransformer', () => {
 
       await customTransformer.transform(file);
       
-      // Check that cache was created
-      expect(CacheService.create).toHaveBeenCalled();
+      // Check that cache was not created
+      expect(CacheService.create).not.toHaveBeenCalled();
     });
 
     test('should not cache when disabled', async () => {
@@ -155,8 +156,9 @@ describe('BaseTransformer', () => {
         set: jest.fn()
       });
       
-      // Create a new transformer with custom logger
+      // Create a new transformer with caching enabled
       const cachedTransformer = new TestTransformer({
+        cache: true,
         logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }
       });
 
