@@ -133,9 +133,6 @@ copytree --clipboard
 ### 2. File Output
 
 ```bash
-# Save to file with auto-generated name
-copytree --output
-
 # Save to specific file
 copytree --output project-snapshot.xml
 

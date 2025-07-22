@@ -69,11 +69,11 @@ copytree -c HEAD~5..HEAD
 ### Output Options
 
 #### `--output[=<file>]`, `-o [<file>]`
-Save output to a file. If no filename provided, uses AI to generate one.
+Save output to a file.
 
 ```bash
 copytree --output output.xml
-copytree -o  # AI generates filename
+copytree -o output.xml
 ```
 
 #### `--display`, `-i`

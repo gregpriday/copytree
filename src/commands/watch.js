@@ -8,7 +8,6 @@ const copyCommand = require('./copy');
 const GitHubUrlHandler = require('../services/GitHubUrlHandler');
 const ProfileLoader = require('../profiles/ProfileLoader');
 const { execSync } = require('child_process');
-const { AIService } = require('../services/AIService');
 const Clipboard = require('../utils/clipboard');
 
 /**
@@ -333,31 +332,14 @@ function getEventColor(eventType) {
 }
 
 /**
- * Generate output path using AI if not provided
+ * Generate output path using standard naming
  */
 async function generateOutputPath(basePath, options) {
   try {
     const projectName = path.basename(basePath);
     const timestamp = new Date().toISOString().slice(0, 10);
     
-    // Use AI to generate descriptive filename if API key is available
-    if (process.env.GEMINI_API_KEY && options.aiFilename !== false) {
-      try {
-        const aiService = new AIService();
-        const prompt = `Generate a short, descriptive filename for a copytree output of the "${projectName}" project. Return only the filename without extension, using kebab-case. Maximum 30 characters.`;
-        
-        const suggestion = await aiService.generate(prompt, { maxTokens: 50 });
-        const cleanName = suggestion.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 30);
-        
-        if (cleanName && cleanName.length > 0) {
-          return path.join(process.cwd(), `${cleanName}-${timestamp}.xml`);
-        }
-      } catch (error) {
-        logger.warn('Failed to generate AI filename', { error: error.message });
-      }
-    }
-    
-    // Fallback to standard naming
+    // Standard naming
     return path.join(process.cwd(), `copytree-${projectName}-${timestamp}.xml`);
   } catch (error) {
     // Ultimate fallback

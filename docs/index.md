@@ -51,7 +51,7 @@ Comprehensive guide to using CopyTree's MCP server with Claude Code.
 
 ### 3. **Multiple Output Options**
 - **Clipboard**: Default output for easy pasting
-- **File Output**: Save to file with AI-generated names
+- **File Output**: Save to file
 - **Streaming**: Real-time output for large projects
 - **Multiple Formats**: XML (default), JSON, or tree view
 
@@ -98,8 +98,8 @@ copytree --changes main..feature-branch
 # Watch and auto-copy on changes
 copytree watch --profile react
 
-# Watch with AI-generated filenames
-copytree watch --output --ai-filename
+# Watch and save to file
+copytree watch --output
 ```
 
 ## 🔧 Configuration

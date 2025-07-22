@@ -178,27 +178,6 @@ Summary:`;
     return response.content;
   }
 
-  /**
-   * Generate a filename based on content
-   * @param {string} content - File content
-   * @param {Object} options - Additional options
-   * @returns {Promise<string>} Generated filename
-   */
-  async generateFilename(content, options = {}) {
-    const prompt = `Based on the following content, suggest an appropriate filename with extension. The filename should be descriptive, use lowercase with hyphens, and include the correct file extension.
-
-Content (first 500 chars):
-${content.substring(0, 500)}
-
-Filename:`;
-
-    const response = await this.performTask('filenameGeneration', {
-      prompt,
-      ...options
-    });
-    
-    return response.content.trim();
-  }
 
   /**
    * Filter files using AI

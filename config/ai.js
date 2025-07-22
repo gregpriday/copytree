@@ -33,11 +33,6 @@ module.exports = {
       maxTokens: env('AI_CLASSIFICATION_MAX_TOKENS', 256),
     },
     
-    filenameGeneration: {
-      temperature: env('AI_FILENAME_TEMPERATURE', 0.5),
-      maxTokens: env('AI_FILENAME_MAX_TOKENS', 64),
-    },
-    
     codeDescription: {
       temperature: env('AI_CODE_DESCRIPTION_TEMPERATURE', 0.3),
       maxTokens: env('AI_CODE_DESCRIPTION_MAX_TOKENS', 2048),
