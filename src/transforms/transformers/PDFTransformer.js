@@ -12,6 +12,7 @@ class PDFTransformer extends BaseTransformer {
     this.supportedExtensions = ['.pdf'];
     this.maxPages = options.maxPages || 50;
     this.includeMetadata = options.includeMetadata ?? true;
+    this.isHeavy = true; // PDF parsing is a heavy operation
   }
 
   async doTransform(file) {

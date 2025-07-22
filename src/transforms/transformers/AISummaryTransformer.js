@@ -17,6 +17,7 @@ class AISummaryTransformer extends BaseTransformer {
     
     // Initialize AI service
     this.ai = AIService.forTask('codeDescription', options);
+    this.isHeavy = true; // AI analysis is a heavy operation
   }
 
   async doTransform(file) {

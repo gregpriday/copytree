@@ -23,6 +23,7 @@ class BatchAISummaryTransformer extends BaseTransformer {
     // Batch queue
     this.batchQueue = [];
     this.batchPromises = new Map();
+    this.isHeavy = true; // AI batch analysis is a heavy operation
   }
 
   async doTransform(file) {

@@ -23,6 +23,8 @@ class FileSummaryTransformer extends BaseTransformer {
         model: options.model || "gemini-1.5-flash"
       });
     }
+    
+    this.isHeavy = true; // AI file analysis is a heavy operation
   }
 
   /**

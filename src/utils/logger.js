@@ -58,7 +58,7 @@ class Logger {
    * Start a spinner with a message
    */
   startSpinner(message) {
-    if (this.options.silent) return;
+    if (this.options.silent || !process.stdout.isTTY) return;
     
     this.stopSpinner(); // Stop any existing spinner
     this.spinner = ora({
@@ -71,7 +71,7 @@ class Logger {
    * Update spinner text
    */
   updateSpinner(message) {
-    if (this.spinner) {
+    if (this.spinner && process.stdout.isTTY) {
       this.spinner.text = message;
     }
   }
@@ -102,6 +102,10 @@ class Logger {
   stopSpinner() {
     if (this.spinner) {
       this.spinner.stop();
+      // Clear the line after stopping
+      if (process.stdout.isTTY) {
+        process.stdout.write('\r\x1b[2K');
+      }
       this.spinner = null;
     }
   }

@@ -16,6 +16,10 @@ class BaseTransformer {
     this.cacheEnabled = options.cache ?? this.config.get('cache.transformations.enabled', true);
     this.cacheTTL = options.cacheTTL ?? this.config.get('cache.transformations.ttl', 86400);
     
+    // Indicates whether this transformer performs heavy/slow operations
+    // Heavy transformers will show progress during processing
+    this.isHeavy = false;
+    
     // Initialize cache service for transformations
     if (this.cacheEnabled) {
       const transformerName = this.constructor.name.toLowerCase().replace('transformer', '');

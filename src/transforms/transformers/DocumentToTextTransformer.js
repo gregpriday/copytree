@@ -16,6 +16,7 @@ class DocumentToTextTransformer extends BaseTransformer {
     this.maxDocSize = options.maxDocSize || 50 * 1024 * 1024; // 50MB default
     this.pandocPath = options.pandocPath || 'pandoc';
     this.pandocAvailable = this.checkPandoc();
+    this.isHeavy = true; // Document conversion is a heavy operation
   }
 
   /**

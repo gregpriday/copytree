@@ -23,6 +23,8 @@ class ImageDescriptionTransformer extends BaseTransformer {
         model: options.model || "gemini-1.5-flash"
       });
     }
+    
+    this.isHeavy = true; // AI image analysis is a heavy operation
   }
 
   /**

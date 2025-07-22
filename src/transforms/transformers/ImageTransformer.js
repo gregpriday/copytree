@@ -18,6 +18,7 @@ class ImageTransformer extends BaseTransformer {
     this.enableOCR = options.enableOCR ?? true;
     this.language = options.language || 'eng';
     this.includeMetadata = options.includeMetadata ?? true;
+    this.isHeavy = true; // OCR is a heavy operation
     
     // Initialize Tesseract worker
     this.worker = null;
