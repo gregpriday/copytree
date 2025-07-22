@@ -8,6 +8,7 @@ const { config } = require('../config/ConfigManager');
 const Clipboard = require('../utils/clipboard');
 const fs = require('fs-extra');
 const path = require('path');
+const { Listr } = require('listr2');
 
 /**
  * Main copy command implementation
@@ -15,70 +16,113 @@ const path = require('path');
  */
 async function copyCommand(targetPath = '.', options = {}) {
   const startTime = Date.now();
-  
+
+  // Define the tasks
+  const tasks = new Listr([
+    {
+      title: 'Initializing',
+      task: async (ctx) => {
+        // Task 1: Load Profile
+        ctx.profileLoader = new ProfileLoader();
+        const profileName = options.profile || 'default';
+        ctx.profile = await loadProfile(ctx.profileLoader, profileName, options);
+
+        // Task 2: Validate Path
+        ctx.basePath = path.resolve(targetPath);
+        if (!await fs.pathExists(ctx.basePath)) {
+          throw new CommandError(`Path does not exist: ${ctx.basePath}`, 'copy');
+        }
+      },
+    },
+    {
+      title: 'Processing Files',
+      task: async (ctx, task) => {
+        // Initialize the pipeline
+        const pipeline = new Pipeline({
+          continueOnError: true,
+          emitProgress: true
+        });
+
+        // Pass the listr task context to the stages
+        const stages = await setupPipelineStages(ctx.basePath, ctx.profile, options, task);
+        pipeline.through(stages);
+        
+        // Setup basic progress tracking for non-transform stages
+        setupProgressTracking(pipeline, task);
+        
+        // Execute pipeline and store result in context
+        ctx.result = await pipeline.process({
+          basePath: ctx.basePath,
+          profile: ctx.profile,
+          options,
+          startTime,
+          parentTask: task
+        });
+      },
+    },
+    {
+      title: 'Finalizing Output',
+      enabled: (ctx) => !options.dryRun, // Only run if not a dry run
+      task: async (ctx) => {
+        // Store the output result but don't display yet
+        ctx.outputResult = await prepareOutput(ctx.result, options);
+      },
+    },
+  ], {
+    concurrent: false,
+    exitOnError: true,
+    renderer: process.stdout.isTTY ? 'default' : 'silent',
+    rendererOptions: {
+      showTimer: false,
+      removeEmptyLines: false,
+      collapse: false
+    }
+  });
+
+  let context;
   try {
-    // Initialize components
-    logger.startSpinner('Initializing CopyTree...');
-    
-    // 1. Load profile
-    const profileLoader = new ProfileLoader();
-    const profileName = options.profile || 'default';
-    const profile = await loadProfile(profileLoader, profileName, options);
-    
-    logger.updateSpinner(`Using profile: ${profile.name}`);
-    
-    // 2. Validate and resolve path
-    const basePath = path.resolve(targetPath);
-    if (!await fs.pathExists(basePath)) {
-      throw new CommandError(`Path does not exist: ${basePath}`, 'copy');
-    }
-    
-    // 3. Check for dry run
-    if (options.dryRun) {
-      logger.info('🔍 Dry run mode - no files will be processed');
-    }
-    
-    // 4. Initialize pipeline with stages
-    const pipeline = new Pipeline({
-      continueOnError: true,
-      emitProgress: true
-    });
-    
-    // Setup pipeline stages
-    const stages = await setupPipelineStages(basePath, profile, options);
-    pipeline.through(stages);
-    
-    // 5. Setup progress tracking
-    setupProgressTracking(pipeline);
-    
-    // 6. Execute pipeline
-    logger.updateSpinner('Processing files...');
-    const result = await pipeline.process({
-      basePath,
-      profile,
-      options,
-      startTime
-    });
-    
-    logger.succeedSpinner(`Processed ${result.files.length} files`);
-    
-    // 7. Handle output (skip if dry-run)
-    if (!options.dryRun) {
-      await handleOutput(result, options);
-    } else {
-      // For dry-run, just show file count and size
-      const fileCount = result.files.length;
-      const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
-      logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}]`);
-    }
-    
-    // 8. Show summary
-    if (options.info) {
-      showSummary(result, startTime);
-    }
-    
+    // Run the tasks
+    context = await tasks.run();
   } catch (error) {
-    logger.stopSpinner();
+    throw error;
+  }
+
+  // Clear the terminal of all Listr output
+  if (process.stdout.isTTY) {
+    process.stdout.write('\x1b[2K\r');  // Clear current line
+    // Move up and clear lines for each task
+    for (let i = 0; i < 3; i++) {
+      process.stdout.write('\x1b[1A\x1b[2K\r');
+    }
+  }
+
+  try {
+    // Now handle the actual output after clearing
+    if (!options.dryRun && context.outputResult) {
+      await displayOutput(context.outputResult, options);
+    }
+
+    // Handle post-run messages
+    if (options.dryRun) {
+      logger.info('🔍 Dry run mode - no files were processed.');
+      const fileCount = context.result.files.length;
+      const totalSize = context.result.files.reduce((sum, file) => sum + (file.size || 0), 0);
+      logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}] would be processed`);
+    }
+
+    if (options.info) {
+      showSummary(context.result, startTime);
+    }
+
+  } catch (error) {
+    // Clear Listr output on error too
+    if (process.stdout.isTTY) {
+      process.stdout.write('\x1b[2K\r');
+      for (let i = 0; i < 3; i++) {
+        process.stdout.write('\x1b[1A\x1b[2K\r');
+      }
+    }
+    
     handleError(error, {
       exit: true,
       verbose: options.verbose || config().get('app.verboseErrors', false)
@@ -126,7 +170,7 @@ async function loadProfile(profileLoader, profileName, options) {
 /**
  * Setup pipeline stages based on profile and options
  */
-async function setupPipelineStages(basePath, profile, options) {
+async function setupPipelineStages(basePath, profile, options, parentTask) {
   const stages = [];
   
   // 1. File Discovery Stage
@@ -244,23 +288,13 @@ async function setupPipelineStages(basePath, profile, options) {
 /**
  * Setup progress tracking for pipeline
  */
-function setupProgressTracking(pipeline) {
-  let stageIndex = 0;
-  const stageNames = [
-    'Discovering files',
-    'Applying git filters',
-    'Applying profile filters',
-    'Processing external sources',
-    'Limiting files',
-    'Loading content',
-    'Transforming files',
-    'Applying char limit',
-    'Formatting output'
-  ];
-  
-  pipeline.on('stage:start', ({ stage, index }) => {
-    const stageName = stageNames[stageIndex++] || stage;
-    logger.updateSpinner(stageName);
+function setupProgressTracking(pipeline, task) {
+  // Only update task title for key stages
+  pipeline.on('stage:start', ({ stage }) => {
+    // Don't update title for transform stage as it has its own display
+    if (stage.constructor.name !== 'TransformStage') {
+      task.title = 'Processing files';
+    }
   });
   
   pipeline.on('stage:error', ({ stage, error }) => {
@@ -269,20 +303,20 @@ function setupProgressTracking(pipeline) {
 }
 
 /**
- * Handle output based on options
+ * Prepare output but don't display yet
  */
-async function handleOutput(result, options) {
+async function prepareOutput(result, options) {
   // If streaming was used, output has already been handled
   if (result.streamed) {
     const fileCount = result.files.length;
     const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
     
-    if (options.output) {
-      logger.success(`Streamed ${fileCount} files [${logger.formatBytes(totalSize)}] to ${path.resolve(options.output)}`);
-    } else {
-      logger.success(`Streamed ${fileCount} files [${logger.formatBytes(totalSize)}]`);
-    }
-    return;
+    return {
+      type: 'streamed',
+      fileCount,
+      totalSize,
+      outputPath: options.output
+    };
   }
   
   const output = result.output;
@@ -295,6 +329,29 @@ async function handleOutput(result, options) {
   const outputSize = Buffer.byteLength(output, 'utf8');
   const fileCount = result.files.length;
   
+  return {
+    type: 'normal',
+    output,
+    outputSize,
+    fileCount
+  };
+}
+
+/**
+ * Display the final output after Listr has cleared
+ */
+async function displayOutput(outputResult, options) {
+  const { type, output, outputSize, fileCount, totalSize, outputPath } = outputResult;
+  
+  if (type === 'streamed') {
+    if (outputPath) {
+      logger.success(`Streamed ${fileCount} files [${logger.formatBytes(totalSize)}] to ${path.resolve(outputPath)}`);
+    } else {
+      logger.success(`Streamed ${fileCount} files [${logger.formatBytes(totalSize)}]`);
+    }
+    return;
+  }
+
   // Handle --as-reference option
   if (options.asReference) {
     const format = options.format || 'xml';
@@ -304,7 +361,7 @@ async function handleOutput(result, options) {
     
     try {
       await Clipboard.copyFileReference(tempFile);
-      logger.success(`Copied reference to temporary file: ${path.basename(tempFile)} [${logger.formatBytes(outputSize)}]`);
+      logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${path.basename(tempFile)}`);
     } catch (error) {
       logger.warn('Failed to copy reference to clipboard');
       logger.info(`Output saved to: ${tempFile}`);
@@ -326,7 +383,7 @@ async function handleOutput(result, options) {
     
   } else if (options.display) {
     // Display to console
-    console.log('\n' + output);
+    console.log(output);
     logger.success(`Displayed ${fileCount} files [${logger.formatBytes(outputSize)}]`);
     
   } else if (options.stream) {
@@ -337,7 +394,7 @@ async function handleOutput(result, options) {
     // Default: copy to clipboard
     try {
       await Clipboard.copyText(output);
-      logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard.`);
+      logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
     } catch (error) {
       // If clipboard fails, save to temporary file
       const format = options.format || 'xml';
@@ -352,6 +409,7 @@ async function handleOutput(result, options) {
     }
   }
 }
+
 
 /**
  * Show summary information
