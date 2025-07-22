@@ -330,9 +330,8 @@ describe('Command Integration Tests', () => {
       expect(stdout).toContain('utils.js');
     });
 
-    test('should respect exclude patterns', async () => {
-      // Since there's no --exclude, we'll use profile patterns instead
-      // This test now checks that filtering works by including only specific files
+    test('should respect filter patterns for including specific files', async () => {
+      // Test that --filter and --always options work correctly to include specific file types
       const { stdout, exitCode } = await runCommand(
         `node "${cliPath}" copy . --filter "**/*.js" "**/*.md" --always "**/*.js" "**/*.md" --format tree --display`,
         { cwd: testProjectDir }

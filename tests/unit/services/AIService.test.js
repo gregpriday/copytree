@@ -1,26 +1,48 @@
-// Basic test to verify AIService mock is loaded
-// The actual AI functionality would be tested in integration tests
+// Test that verifies AIService mock is working correctly
+// The mock is defined in setup-mocks.js and provides static methods
+// that are used by transformer tests
 
+// Note: We need to require this AFTER jest has set up the mocks
 const AIService = require('../../../src/services/AIService');
 
-describe('AIService', () => {
-  test('should be mocked', () => {
+describe('AIService Mock', () => {
+  it('should be properly mocked', () => {
+    // The AIService should be mocked by setup-mocks.js
     expect(AIService).toBeDefined();
   });
 
-  test('should have required methods', () => {
-    // Just verify the methods exist
-    expect(typeof AIService.summarizeFile).toBe('function');
-    expect(typeof AIService.describeImage).toBe('function');
-    expect(typeof AIService.isAvailable).toBe('function');
+  it('should provide mocked static methods', () => {
+    // These methods are added by the mock in setup-mocks.js
+    expect(AIService.summarizeFile).toBeDefined();
+    expect(AIService.describeImage).toBeDefined();
+    expect(AIService.summarizeText).toBeDefined();
+    expect(AIService.summarizeUnitTests).toBeDefined();
+    expect(AIService.describeSVG).toBeDefined();
+    expect(AIService.isAvailable).toBeDefined();
+    expect(AIService.getProvider).toBeDefined();
+    expect(AIService.getModel).toBeDefined();
   });
 
-  test('should be callable without errors', () => {
-    // Just verify the mocks can be called
+  it('should have callable mock methods', () => {
+    // Verify the mocked methods can be called without errors
     expect(() => {
-      AIService.summarizeFile('test.js', 'code');
+      AIService.summarizeFile('test.js', 'content');
       AIService.describeImage(Buffer.from('test'), 'image/png');
+      AIService.summarizeText('test text');
+      AIService.summarizeUnitTests('test code');
+      AIService.describeSVG('<svg></svg>');
       AIService.isAvailable();
+      AIService.getProvider();
+      AIService.getModel();
     }).not.toThrow();
   });
 });
+
+// Note: This test file verifies that the AIService mock is working correctly.
+// The mock is necessary because:
+// 1. The real AIService requires API keys and external services
+// 2. Many transformer tests depend on these mocked methods
+// 3. Unit tests should not make actual API calls
+//
+// The actual AIService implementation would be tested in integration tests
+// where the external dependencies can be properly controlled.
