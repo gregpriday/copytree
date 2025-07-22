@@ -221,9 +221,6 @@ copytree config:validate
 ```bash
 # Test transformations (requires API key for AI transforms)
 copytree --transform --dry-run
-
-# Test watch mode
-copytree watch --dry-run
 ```
 
 ## Troubleshooting

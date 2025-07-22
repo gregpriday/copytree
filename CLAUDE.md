@@ -23,7 +23,6 @@ CopyTree is a sophisticated CLI tool for intelligently copying and transforming 
 
 **Commands** (`src/commands/`)
 - `copy.js` - Main copy command with extensive options
-- `watch.js` - File watching with auto-regeneration
 - Profile commands: `profileList.js`, `profileValidate.js`
 - Utility commands: `configValidate.js`, `cacheClear.js`, `copyDocs.js`
 - Installation helpers: `installCopytree.js`
@@ -86,9 +85,6 @@ copytree --no-transform          # Disable transformers
 copytree --save output.xml       # Save to file
 copytree --display               # Show in terminal
 copytree --clipboard             # Copy to clipboard
-
-# Interactive features
-copytree watch                   # Watch mode
 
 # Profile management
 copytree profile:list            # List profiles

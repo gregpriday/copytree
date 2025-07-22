@@ -17,8 +17,7 @@ tests/
 │   ├── profiles/       # Profile loading and validation
 │   └── external/       # External source integration
 ├── e2e/                # End-to-end command tests
-│   ├── copy.test.js
-│   └── watch.test.js
+│   └── copy.test.js
 └── fixtures/           # Test data and mock projects
     ├── projects/       # Sample projects
     ├── files/         # Individual test files
@@ -43,8 +42,6 @@ npm run test:e2e
 # Run with coverage
 npm run test:coverage
 
-# Watch mode
-npm run test:watch
 ```
 
 ## Test Coverage Goals

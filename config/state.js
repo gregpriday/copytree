@@ -42,13 +42,6 @@ module.exports = {
     resumable: env('STATE_FILE_RESUMABLE', false),
   },
   
-  // Watch mode state
-  watch: {
-    saveState: env('STATE_WATCH_SAVE', true),
-    stateFile: env('STATE_WATCH_FILE', '.copytree-watch'),
-    includeTimestamps: env('STATE_WATCH_TIMESTAMPS', true),
-  },
-  
   // State serialization
   serialization: {
     format: env('STATE_FORMAT', 'json'), // json, yaml

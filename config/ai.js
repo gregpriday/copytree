@@ -43,12 +43,6 @@ module.exports = {
       maxTokens: env('AI_IMAGE_DESCRIPTION_MAX_TOKENS', 512),
     },
     
-    ask: {
-      temperature: env('AI_ASK_TEMPERATURE', 0.7),
-      maxTokens: env('AI_ASK_MAX_TOKENS', 4096),
-      stream: env('AI_ASK_STREAM', true),
-    },
-    
     profileCreation: {
       temperature: env('AI_PROFILE_TEMPERATURE', 0.5),
       maxTokens: env('AI_PROFILE_MAX_TOKENS', 4096),

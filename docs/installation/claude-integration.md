@@ -43,17 +43,6 @@ copytree -o project-context.xml
 
 Then you can reference this file in Claude Code conversations.
 
-### 3. Watch Mode for Live Updates
-
-Keep your context up-to-date as you work:
-
-```bash
-# Watch and auto-regenerate
-copytree watch -o live-context.xml
-
-# Watch with specific profile
-copytree watch --profile react -o react-app.xml
-```
 
 ## Best Practices
 

@@ -50,7 +50,6 @@ Set up CopyTree with Claude Code and other AI assistants for enhanced productivi
 - **Multiple Formats**: XML (default), JSON, or tree view
 
 ### 4. **Developer-Friendly**
-- **Watch Mode**: Auto-regenerate on file changes
 - **External Sources**: Include files from GitHub or other directories
 - **Editor Integration**: Works with VS Code, Cursor, and Claude Code
 
@@ -83,14 +82,6 @@ copytree --modified
 copytree --changes main..feature-branch
 ```
 
-### Watch Mode Development
-```bash
-# Watch and auto-copy on changes
-copytree watch --profile react
-
-# Watch and save to file
-copytree watch --output
-```
 
 ## 🔧 Configuration
 

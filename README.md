@@ -47,9 +47,6 @@ copytree
 # Use a framework profile
 copytree -p laravel -o project-structure.xml
 
-# Watch for changes and auto-regenerate
-copytree watch /path/to/project -o live-structure.xml
-
 # Copy from GitHub repository
 copytree https://github.com/user/repo -p default
 
@@ -155,8 +152,6 @@ module.exports = {
 
 ### Core Commands
 - `copytree [path]` - Copy directory structure to XML/JSON
-- `copytree watch [path]` - Monitor directory and auto-regenerate output
-
 ### Profile Management
 - `copytree profile:list` - List all available profiles
 - `copytree profile:validate <name>` - Validate profile configuration

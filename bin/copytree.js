@@ -47,26 +47,7 @@ program
     await copyCommand(path || '.', options);
   });
 
-// 2. Watch command
-program
-  .command('watch [path]')
-  .description('Watch directory for changes and regenerate output')
-  .option('-o, --output <file>', 'Output file (auto-generated if not specified)')
-  .option('-p, --profile <name>', 'Profile to use')
-  .option('-w, --debounce <ms>', 'Debounce delay in milliseconds', '1000')
-  .option('--no-cache', 'Disable caching for GitHub repositories')
-  .option('--size-report', 'Show file size report on each update')
-  .option('--no-reveal', 'Disable macOS Finder reveal')
-  .option('--skip-initial', 'Skip initial copy on start')
-  .option('-d, --depth <n>', 'Max directory depth to watch')
-  .option('--poll-interval <ms>', 'File polling interval', '1000')
-  .option('-v, --verbose', 'Show verbose output')
-  .action(async (path, options) => {
-    const watchCommand = require('../src/commands/watch');
-    await watchCommand(path || '.', options);
-  });
-
-// 4. Profile list command
+// 2. Profile list command
 program
   .command('profile:list')
   .description('List all available profiles')

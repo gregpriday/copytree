@@ -73,6 +73,12 @@ class OutputFormattingStage extends Stage {
         input.gitMetadata.hasUncommittedChanges ? 'true' : 'false'
       );
     }
+    
+    // Add directory structure to metadata
+    const directoryStructure = this.generateDirectoryStructure(input.files);
+    if (directoryStructure) {
+      metadata.ele('directoryStructure').txt(directoryStructure);
+    }
 
     // Add files
     const filesElement = root.ele('files');
@@ -126,7 +132,8 @@ class OutputFormattingStage extends Stage {
         generated: new Date().toISOString(),
         fileCount: input.files.length,
         totalSize: this.calculateTotalSize(input.files),
-        profile: input.profile
+        profile: input.profile,
+        directoryStructure: this.generateDirectoryStructure(input.files)
       },
       files: input.files.filter(f => f !== null).map(file => {
         const fileObj = {
@@ -252,6 +259,46 @@ class OutputFormattingStage extends Stage {
     return files.reduce((total, file) => {
       return total + (file ? file.size : 0);
     }, 0);
+  }
+
+  generateDirectoryStructure(files) {
+    const validFiles = files.filter(f => f !== null);
+    if (validFiles.length === 0) return '';
+    
+    // Build tree structure
+    const tree = this.buildTreeStructure(validFiles);
+    
+    // Render tree to string
+    const lines = [];
+    this.renderDirectoryTree(tree, lines, '', true);
+    
+    return lines.join('\n');
+  }
+  
+  renderDirectoryTree(node, lines, prefix, isRoot) {
+    const entries = Object.entries(node).sort(([a], [b]) => {
+      // Directories first, then files
+      const aIsFile = node[a].isFile;
+      const bIsFile = node[b].isFile;
+      
+      if (aIsFile && !bIsFile) return 1;
+      if (!aIsFile && bIsFile) return -1;
+      
+      return a.localeCompare(b);
+    });
+    
+    entries.forEach(([name, value], index) => {
+      const isLastEntry = index === entries.length - 1;
+      const connector = isLastEntry ? '└── ' : '├── ';
+      const isFile = value.isFile;
+      
+      lines.push(`${prefix}${connector}${name}${isFile ? '' : '/'}`);
+      
+      if (!isFile) {
+        const extension = isLastEntry ? '    ' : '│   ';
+        this.renderDirectoryTree(value, lines, prefix + extension, false);
+      }
+    });
   }
 }
 
