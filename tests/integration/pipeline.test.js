@@ -1,3 +1,6 @@
+// Unmock fs-extra for integration tests
+jest.unmock('fs-extra');
+
 const Pipeline = require('../../src/pipeline/Pipeline');
 const fs = require('fs-extra');
 const path = require('path');
@@ -33,6 +36,9 @@ describe('Pipeline Integration Tests', () => {
     await fs.ensureDir(path.join(tempDir, 'src'));
     await fs.writeFile(path.join(tempDir, 'src/app.js'), 'const app = express();');
     
+    // Verify files were created
+    const files = await fs.readdir(tempDir);
+    
     pipeline = new Pipeline();
   });
 
@@ -60,6 +66,7 @@ describe('Pipeline Integration Tests', () => {
         profile: {},
         options: {}
       });
+
 
       expect(result.files).toHaveLength(4); // index.js, utils.js, app.js, README.md
       const paths = result.files.map(f => f.path).sort();
@@ -283,9 +290,17 @@ describe('Pipeline Integration Tests', () => {
       
       // Ensure different modification times
       const now = Date.now();
-      await fs.utimes(path.join(tempDir, 'small.txt'), now - 3000, now - 3000);
-      await fs.utimes(path.join(tempDir, 'medium.txt'), now - 2000, now - 2000);
-      await fs.utimes(path.join(tempDir, 'large.txt'), now - 1000, now - 1000);
+      // Use fs.utimes with promisify
+      const { promisify } = require('util');
+      const utimes = promisify(require('fs').utimes);
+      
+      try {
+        await utimes(path.join(tempDir, 'small.txt'), new Date(now - 3000), new Date(now - 3000));
+        await utimes(path.join(tempDir, 'medium.txt'), new Date(now - 2000), new Date(now - 2000));
+        await utimes(path.join(tempDir, 'large.txt'), new Date(now - 1000), new Date(now - 1000));
+      } catch (err) {
+        console.error('Error setting file times:', err);
+      }
     });
 
     it('should sort by size', async () => {

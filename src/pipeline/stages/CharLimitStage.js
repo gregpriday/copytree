@@ -34,7 +34,7 @@ class CharLimitStage extends Stage {
         
         limitedFiles.push({
           ...file,
-          content: truncatedContent + '\n\n[... truncated due to character limit ...]',
+          content: truncatedContent + '\n\n... truncated due to character limit ...',
           originalLength: contentLength,
           truncated: true
         });

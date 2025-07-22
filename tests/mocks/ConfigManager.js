@@ -3,6 +3,9 @@ class ConfigManager {
   constructor() {
     this.config = {
       copytree: {
+        globalExcludedDirectories: [],
+        basePathExcludedDirectories: [],
+        globalExcludedFiles: [],
         maxFileSize: 10 * 1024 * 1024,
         maxTotalSize: 100 * 1024 * 1024,
         defaultExclusions: ['node_modules', '.git'],
@@ -10,6 +13,10 @@ class ConfigManager {
           enabled: false,
           ttl: 86400000
         }
+      },
+      app: {
+        debug: false,
+        prettyPrint: true
       },
       log: {
         level: 'error',
@@ -52,4 +59,21 @@ class ConfigManager {
   }
 }
 
-module.exports = new ConfigManager();
+// Helper function to get environment variables with defaults
+function env(key, defaultValue = null) {
+  return process.env[key] !== undefined ? process.env[key] : defaultValue;
+}
+
+// Singleton instance
+let instance = null;
+
+module.exports = {
+  ConfigManager,
+  config() {
+    if (!instance) {
+      instance = new ConfigManager();
+    }
+    return instance;
+  },
+  env
+};

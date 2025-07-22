@@ -9,6 +9,7 @@ class FileDiscoveryStage extends Stage {
     super(options);
     this.basePath = options.basePath || process.cwd();
     this.patterns = options.patterns || ['**/*'];
+    this.respectGitignore = options.respectGitignore !== false;
     this.gitignorePatterns = [];
   }
 
@@ -17,10 +18,14 @@ class FileDiscoveryStage extends Stage {
     const startTime = Date.now();
 
     // Load ignore rules in parallel
-    await Promise.all([
-      this.loadGitignore(),
-      this.loadCopytreeIgnore()
-    ]);
+    const loadTasks = [];
+    if (this.respectGitignore) {
+      loadTasks.push(this.loadGitignore());
+      loadTasks.push(this.loadCopytreeIgnore());
+    }
+    if (loadTasks.length > 0) {
+      await Promise.all(loadTasks);
+    }
 
     // Get all files matching patterns
     const files = await this.discoverFiles();
@@ -101,28 +106,30 @@ class FileDiscoveryStage extends Stage {
   }
 
   async discoverFiles() {
-    // Load copytree config for exclusions
-    const copytreeConfig = require('../../../config/copytree');
-    
-    // Combine all ignore patterns early for better performance
+    // Get copytree config for exclusions from ConfigManager
     const ignorePatterns = [];
     
     // Add default ignores from config
-    if (this.options.respectGitignore !== false) {
+    if (this.respectGitignore) {
       // Add global excluded directories
-      ignorePatterns.push(...copytreeConfig.globalExcludedDirectories.map(dir => `**/${dir}/**`));
+      const globalExcludedDirs = this.config.get('copytree.globalExcludedDirectories', []);
+      ignorePatterns.push(...globalExcludedDirs.map(dir => `**/${dir}/**`));
       
       // Add base path excluded directories (only at root)
-      ignorePatterns.push(...copytreeConfig.basePathExcludedDirectories.map(dir => `${dir}/**`));
+      const basePathExcludedDirs = this.config.get('copytree.basePathExcludedDirectories', []);
+      ignorePatterns.push(...basePathExcludedDirs.map(dir => `${dir}/**`));
       
       // Add global excluded files
-      ignorePatterns.push(...copytreeConfig.globalExcludedFiles);
+      const globalExcludedFiles = this.config.get('copytree.globalExcludedFiles', []);
+      ignorePatterns.push(...globalExcludedFiles);
     }
     
     // Add gitignore patterns (converted to glob format)
-    for (const { pattern, isNegated } of this.gitignorePatterns) {
-      if (!isNegated) {
-        ignorePatterns.push(pattern);
+    if (this.respectGitignore) {
+      for (const { pattern, isNegated } of this.gitignorePatterns) {
+        if (!isNegated) {
+          ignorePatterns.push(pattern);
+        }
       }
     }
     
@@ -145,8 +152,8 @@ class FileDiscoveryStage extends Stage {
     const entries = await fastGlob(this.patterns, globOptions);
 
     return entries.map(entry => ({
-      path: entry.path,
-      absolutePath: path.join(this.basePath, entry.path),
+      path: entry.path || entry,
+      absolutePath: path.join(this.basePath, entry.path || entry),
       size: entry.stats?.size || 0,
       modified: entry.stats?.mtime || null,
       stats: entry.stats

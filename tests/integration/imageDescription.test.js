@@ -1,12 +1,8 @@
-const fs = require('fs-extra');
 const path = require('path');
 const dotenv = require('dotenv');
 
 // Load environment variables from root .env file
 dotenv.config({ path: path.join(__dirname, '../../.env') });
-
-// Now require the transformer after environment is loaded
-const ImageDescriptionTransformer = require('../../src/transforms/transformers/ImageDescriptionTransformer');
 
 describe('ImageDescriptionTransformer Integration Test', () => {
   it('should generate description for image using real Gemini API', async () => {
@@ -15,6 +11,14 @@ describe('ImageDescriptionTransformer Integration Test', () => {
       console.log('GEMINI_API_KEY is not set. Skipping ImageDescription integration test.');
       return;
     }
+
+    // Reset modules and unmock fs-extra for this specific test
+    jest.resetModules();
+    jest.unmock('fs-extra');
+    
+    // Require modules after unmocking
+    const fs = require('fs-extra');
+    const ImageDescriptionTransformer = require('../../src/transforms/transformers/ImageDescriptionTransformer');
 
     // Get the path to the test image
     const imagePath = path.join(__dirname, '../fixtures/images/painting.jpg');
@@ -33,8 +37,10 @@ describe('ImageDescriptionTransformer Integration Test', () => {
       stats: stats
     };
     
-    // Instantiate the ImageDescription transformer
-    const transformer = new ImageDescriptionTransformer();
+    // Instantiate the ImageDescription transformer with explicit model
+    const transformer = new ImageDescriptionTransformer({
+      model: 'gemini-1.5-flash' // Use a specific model for testing
+    });
     
     // Check if transformer can handle this file
     expect(transformer.canTransform(file)).toBe(true);

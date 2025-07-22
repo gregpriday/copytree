@@ -132,7 +132,7 @@ class OutputFormattingStage extends Stage {
         generated: new Date().toISOString(),
         fileCount: input.files.length,
         totalSize: this.calculateTotalSize(input.files),
-        profile: input.profile,
+        profile: input.profile?.name || 'default',
         directoryStructure: this.generateDirectoryStructure(input.files)
       },
       files: input.files.filter(f => f !== null).map(file => {
