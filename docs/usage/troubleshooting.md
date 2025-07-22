@@ -269,31 +269,6 @@ copytree --format tree
 
 ## AI-Related Errors
 
-### AI Filter Not Working
-
-**Problem**: --ai-filter returns errors or no results
-
-**Solutions**:
-
-1. **Check API configuration**:
-   ```bash
-   copytree config:validate ai
-   ```
-
-2. **Test with simple query**:
-   ```bash
-   copytree --ai-filter "JavaScript files" --dry-run
-   ```
-
-3. **Verify API quota**:
-   - Check your Gemini API dashboard
-   - Ensure you haven't exceeded limits
-
-4. **Use debug mode**:
-   ```bash
-   DEBUG=copytree:* copytree --ai-filter "test files"
-   ```
-
 ### AI Response Timeout
 
 **Problem**: AI operations timing out
@@ -312,7 +287,7 @@ copytree --format tree
 
 2. **Use smaller scope**:
    ```bash
-   copytree src/ --ai-filter "controllers"
+   copytree src/ --profile minimal
    ```
 
 3. **Skip AI features**:

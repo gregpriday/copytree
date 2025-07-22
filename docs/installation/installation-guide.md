@@ -96,7 +96,6 @@ This will:
 - Set up AI provider credentials
 - Configure default settings
 - Test API connections
-- Initialize conversation database
 
 ### 3. Manual Configuration
 
