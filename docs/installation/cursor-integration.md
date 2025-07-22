@@ -6,11 +6,10 @@ This guide covers setting up CopyTree for seamless integration with Cursor IDE, 
 
 The CopyTree Cursor integration allows you to use the `@copytree` symbol in Cursor's chat to:
 
-- Ask questions about your codebase
-- Debug complex issues with AI assistance
-- Get contextual code explanations
-- Navigate large projects efficiently
-- Understand dependencies and relationships
+- Copy structured code context to share with AI
+- Generate XML/JSON representations of your codebase
+- Apply transformations to files (PDF to text, image OCR, etc.)
+- Filter files by patterns or Git status
 
 ## Prerequisites
 
@@ -49,112 +48,121 @@ If you prefer manual installation:
 
 ## Usage
 
-### Basic Queries
+### Basic Commands
 
 Once installed, you can use `@copytree` in Cursor's chat:
 
 ```
-@copytree ask "What is the main purpose of this project?"
+@copytree
 ```
+Copies the current project structure to clipboard in XML format
 
 ```
-@copytree ask "How does the authentication system work?"
+@copytree --profile laravel
 ```
+Uses the Laravel profile to filter relevant files
 
 ```
-@copytree ask "Where are the API endpoints defined?"
+@copytree --modified
 ```
+Only includes files modified since the last commit
 
 ### Advanced Usage
 
-#### Contextual Questions
-Be specific about what you want to know:
+#### Output Formats
+Choose different output formats:
 
 ```
-@copytree ask "Explain the data flow in the user registration process"
+@copytree --format json
 ```
+Outputs in JSON format instead of XML
 
 ```
-@copytree ask "What design patterns are used in the service layer?"
+@copytree --format tree
 ```
-
-#### Debugging Help
-Use CopyTree to understand code issues:
+Shows a tree view of the project structure
 
 ```
-@copytree ask "Why might the login function be returning undefined?"
+@copytree --only-tree
 ```
+Shows only the directory structure without file contents
+
+#### Git Integration
+Filter files based on Git status:
 
 ```
-@copytree ask "What are the dependencies of the PaymentService class?"
+@copytree --modified
 ```
-
-#### Code Navigation
-Find specific implementations:
+Only modified files in working directory
 
 ```
-@copytree ask "Where is email validation implemented?"
+@copytree --changed main
 ```
+Files changed compared to main branch
+
+#### File Filtering
+Use patterns to include/exclude files:
 
 ```
-@copytree ask "Show me all the database migrations"
+@copytree --filter "src/**/*.js"
 ```
-
-### Stateful Conversations
-
-CopyTree maintains conversation state for follow-up questions:
+Only JavaScript files in src directory
 
 ```
-// Initial question
-@copytree ask "What authentication methods are supported?"
-
-// Follow-up question (maintains context)
-@copytree ask "How is JWT token validation implemented?"
+@copytree --always "README.md" --always "package.json"
 ```
+Always include specific files regardless of other filters
 
 ### Options
 
-You can pass additional options to customize behavior:
-
-```
-@copytree ask "Analyze the testing strategy" --profile nodejs
-```
-
-Available options:
-- `--profile <name>`: Use a specific profile for file selection
-- `--verbose`: Get more detailed responses
-- `--focus <path>`: Limit analysis to specific directories
+Available options for customizing output:
+- `--profile <name>`: Use a specific profile (laravel, react, api, etc.)
+- `--format <type>`: Output format (xml, json, tree)
+- `--modified`: Only Git modified files
+- `--changed <ref>`: Files changed from Git reference
+- `--filter <pattern>`: Include files matching pattern
+- `--head <n>`: Limit to first N files
+- `--transform`: Apply transformations (PDF to text, OCR, etc.)
+- `--only-tree`: Directory structure only
+- `--with-line-numbers`: Add line numbers to code
 
 ## How It Works
 
 1. **MDC Rule File**: Cursor reads the `.cursor/rules/copytree.mdc` file
 2. **Symbol Registration**: The `@copytree` symbol becomes available in chat
 3. **Command Execution**: When used, Cursor executes the CopyTree CLI
-4. **Context Generation**: CopyTree analyzes your codebase and generates context
-5. **AI Response**: Cursor's AI uses the context to provide accurate answers
+4. **Context Generation**: CopyTree generates structured output of your codebase
+5. **AI Analysis**: Cursor's AI can analyze the structured code context
 
 ## Best Practices
 
-### 1. Be Specific
-More specific questions yield better results:
-- ❌ "How does this work?"
-- ✅ "How does the payment processing workflow handle failed transactions?"
-
-### 2. Use Project Context
-Reference specific files or components:
-- "Explain the purpose of UserController.js"
-- "How does the config/database.js file connect to MongoDB?"
-
-### 3. Iterative Exploration
-Start broad, then narrow down:
-1. "What are the main components of this application?"
-2. "Tell me more about the authentication component"
-3. "How does the JWT refresh token mechanism work?"
-
-### 4. Leverage Profiles
-Use appropriate profiles for better results:
+### 1. Use Appropriate Profiles
+Select profiles that match your project type:
 ```
-@copytree ask "Analyze the React components" --profile react
+@copytree --profile laravel
+@copytree --profile react
+@copytree --profile api
+```
+
+### 2. Filter for Relevance
+Use Git filters to focus on current work:
+```
+@copytree --modified          # Current changes
+@copytree --changed feature   # Changes in feature branch
+```
+
+### 3. Manage Output Size
+For large projects, limit the output:
+```
+@copytree --head 50              # First 50 files
+@copytree --char-limit 50000     # Character limit
+@copytree --only-tree            # Structure only
+```
+
+### 4. Use Transformations
+Enable transformations for better context:
+```
+@copytree --transform            # All transformations
 ```
 
 ## Troubleshooting
@@ -179,7 +187,7 @@ Use appropriate profiles for better results:
 
 2. Test the command directly in terminal:
    ```bash
-   copytree ask "test question"
+   copytree --dry-run
    ```
 
 3. Check for configuration issues:
@@ -206,14 +214,11 @@ Use appropriate profiles for better results:
 
 Create project-specific profiles for better results:
 
-1. Create a custom profile:
-   ```bash
-   copytree profile:create --name myproject
-   ```
+1. Create a custom profile manually in `.copytree/myproject.yaml`
 
 2. Use it with @copytree:
    ```
-   @copytree ask "Analyze the codebase" --profile myproject
+   @copytree --profile myproject
    ```
 
 ### Excluding Files

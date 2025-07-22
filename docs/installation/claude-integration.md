@@ -1,305 +1,202 @@
 # Claude Code Integration
 
-This guide covers setting up CopyTree's MCP (Model Context Protocol) server for seamless integration with Claude Code.
+This guide covers using CopyTree with Claude Code for enhanced productivity.
 
 ## Overview
 
-CopyTree includes a built-in MCP server that allows Claude Code to directly interact with your codebase. This enables Claude to:
+CopyTree works seamlessly with Claude Code by providing structured, AI-friendly representations of your codebase that you can copy and share. This enables you to:
 
-- Ask questions about your project structure and code
-- Search for specific files or patterns
-- Read file contents
-- Generate structured project summaries
-- Understand your codebase context better
+- Share project context efficiently
+- Get AI assistance with code understanding
+- Generate documentation
+- Analyze code patterns
+- Debug issues with full context
 
-## Prerequisites
+## Basic Usage
 
-- CopyTree installed globally (`npm install -g copytree`)
-- Claude Code desktop application
-- A project you want to analyze
+### 1. Copy Project to Clipboard
 
-## Installation
-
-### 1. Run the Claude Integration Setup
-
-CopyTree provides an automated setup command:
+The simplest way to share your project with Claude Code:
 
 ```bash
-copytree install:claude
+# Copy current directory
+copytree
+
+# Copy with a specific profile
+copytree --profile laravel
+
+# Copy only modified files
+copytree --modified
 ```
 
-This command will:
-- Detect your Claude Code configuration file location
-- Add CopyTree's MCP server configuration
-- Validate the setup
-- Provide instructions for restarting Claude Code
+### 2. Copy to Reference File
 
-### 2. Manual Setup (Alternative)
+For larger projects or when you need persistent context:
 
-If you prefer manual setup or the automated setup doesn't work:
+```bash
+# Save to a file
+copytree --output project-context.xml
 
-1. Locate your Claude Code configuration file:
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Linux: `~/.config/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. Add the CopyTree MCP server configuration:
-
-```json
-{
-  "mcpServers": {
-    "copytree": {
-      "command": "copytree",
-      "args": ["mcp"],
-      "cwd": "/path/to/your/project"
-    }
-  }
-}
+# Or use the shorthand
+copytree -o project-context.xml
 ```
 
-3. Restart Claude Code for the changes to take effect.
+Then you can reference this file in Claude Code conversations.
 
-## Configuration Options
+### 3. Watch Mode for Live Updates
 
-### Basic Configuration
+Keep your context up-to-date as you work:
 
-The minimal configuration shown above is usually sufficient. The MCP server will:
-- Start in the specified working directory (`cwd`)
-- Use default CopyTree settings
-- Auto-detect project type and apply appropriate profiles
+```bash
+# Watch and auto-regenerate
+copytree watch -o live-context.xml
 
-### Advanced Configuration
-
-You can pass additional arguments to customize behavior:
-
-```json
-{
-  "mcpServers": {
-    "copytree": {
-      "command": "copytree",
-      "args": ["mcp", "--profile", "laravel", "--debug"],
-      "cwd": "/path/to/your/project"
-    }
-  }
-}
+# Watch with specific profile
+copytree watch --profile react -o react-app.xml
 ```
 
-Available options:
-- `--profile <name>`: Use a specific profile
-- `--debug`: Enable debug logging
-- `--port <number>`: Use a specific port (default: auto)
+## Best Practices
 
-## Available Tools
+### 1. Use Appropriate Profiles
 
-Once configured, Claude Code can use these CopyTree tools:
+Select profiles that match your project type:
 
-### 1. `project_ask`
-Ask questions about the codebase using natural language.
+```bash
+# List available profiles
+copytree profile:list
 
-**Example prompts in Claude:**
-- "What is the main purpose of this project?"
-- "How does the authentication system work?"
-- "Where is the database configuration?"
-- "Find all API endpoints"
-
-### 2. `project_copy`
-Generate structured XML output of project files.
-
-**Example usage in Claude:**
-- "Copy all React components"
-- "Get the contents of the authentication module"
-- "Show me all test files"
-
-### 3. `list_files`
-List files in the project with optional filtering.
-
-**Example usage in Claude:**
-- "List all JavaScript files"
-- "Show me files in the src directory"
-- "Find all test files"
-
-### 4. `read_file`
-Read the contents of a specific file.
-
-**Example usage in Claude:**
-- "Read the package.json file"
-- "Show me the main configuration file"
-- "What's in the README?"
-
-### 5. `search_files`
-Search for patterns across the codebase.
-
-**Example usage in Claude:**
-- "Search for 'TODO' comments"
-- "Find all occurrences of 'authenticate'"
-- "Search for error handling patterns"
-
-### 6. `get_file_tree`
-Get the project's directory structure.
-
-**Example usage in Claude:**
-- "Show me the project structure"
-- "What's the directory layout?"
-- "Display the file tree"
-
-## Usage in Claude Code
-
-### Starting a Conversation
-
-1. Open Claude Code
-2. Start a new conversation
-3. The MCP indicator should show "copytree" as available
-4. Begin asking questions about your codebase
-
-### Example Workflow
-
-```
-You: What is the structure of this project?
-
-Claude: [Uses get_file_tree tool to analyze structure]
-This appears to be a Node.js project with the following structure...
-
-You: How does the authentication system work?
-
-Claude: [Uses project_ask and search_files tools]
-Based on my analysis of the codebase...
-
-You: Can you show me all the API endpoints?
-
-Claude: [Uses search_files tool with pattern matching]
-I found the following API endpoints...
+# Use framework-specific profiles
+copytree --profile laravel
+copytree --profile sveltekit
+copytree --profile react
 ```
 
-### Best Practices
+### 2. Filter for Relevance
 
-1. **Be Specific**: More specific questions yield better results
-2. **Use Context**: Reference specific files or components when asking questions
-3. **Iterative Exploration**: Start broad, then narrow down to specific areas
-4. **Combine Tools**: Claude will automatically use multiple tools for comprehensive answers
+Focus on the code that matters:
 
-## Troubleshooting
+```bash
+# Only modified files
+copytree --modified
 
-### MCP Server Not Showing in Claude
+# Files changed from main branch
+copytree --changed main
 
-1. Verify configuration file is valid JSON:
-   ```bash
-   # Check syntax
-   cat ~/Library/Application\ Support/Claude/claude_desktop_config.json | jq .
-   ```
-
-2. Ensure CopyTree is in PATH:
-   ```bash
-   which copytree  # Should show the installation path
-   ```
-
-3. Restart Claude Code completely (quit and reopen)
-
-### Connection Errors
-
-1. Check if MCP server starts manually:
-   ```bash
-   copytree mcp --debug
-   ```
-
-2. Verify working directory exists and is accessible
-
-3. Check for port conflicts (try specifying a different port)
-
-### Tool Errors
-
-1. Ensure you're in a valid project directory
-2. Check file permissions
-3. Verify Git is installed (for Git-related features)
-4. Run `copytree config:validate` to check configuration
-
-### Debug Mode
-
-Enable debug logging for troubleshooting:
-
-```json
-{
-  "mcpServers": {
-    "copytree": {
-      "command": "copytree",
-      "args": ["mcp", "--debug"],
-      "cwd": "/path/to/your/project",
-      "env": {
-        "DEBUG": "copytree:*"
-      }
-    }
-  }
-}
+# Specific file patterns
+copytree --filter "src/**/*.js"
 ```
 
-## Advanced Usage
+### 3. Enable Transformations
 
-### Multiple Projects
+Get better context with AI-powered transformations:
 
-Configure multiple CopyTree instances for different projects:
+```bash
+# Enable all transformations
+copytree --transform
 
-```json
-{
-  "mcpServers": {
-    "project-frontend": {
-      "command": "copytree",
-      "args": ["mcp"],
-      "cwd": "/path/to/frontend"
-    },
-    "project-backend": {
-      "command": "copytree",
-      "args": ["mcp"],
-      "cwd": "/path/to/backend"
-    }
-  }
-}
+# This includes:
+# - PDF to text conversion
+# - Image OCR and descriptions
+# - Code summaries for large files
+# - Test file summaries
 ```
 
-### Custom Profiles
+### 4. Manage Output Size
 
-Use project-specific profiles:
+For large projects, control the output size:
 
-```json
-{
-  "mcpServers": {
-    "copytree": {
-      "command": "copytree",
-      "args": ["mcp", "--profile", "my-custom-profile"],
-      "cwd": "/path/to/project"
-    }
-  }
-}
+```bash
+# Limit to first 50 files
+copytree --head 50
+
+# Set character limit
+copytree --char-limit 100000
+
+# Show only tree structure
+copytree --only-tree
 ```
 
-### Environment Variables
+## Workflow Examples
 
-Pass environment variables to customize behavior:
+### Debugging Session
 
-```json
-{
-  "mcpServers": {
-    "copytree": {
-      "command": "copytree",
-      "args": ["mcp"],
-      "cwd": "/path/to/project",
-      "env": {
-        "COPYTREE_AI_PROVIDER": "gemini",
-        "COPYTREE_CACHE_ENABLED": "false"
-      }
-    }
-  }
-}
+```bash
+# Copy only files related to the error
+copytree --modified --transform -o debug-context.xml
+```
+
+### Code Review
+
+```bash
+# Copy files changed in feature branch
+copytree --changed main --transform
+```
+
+### Documentation Generation
+
+```bash
+# Copy with summaries and descriptions
+copytree --profile docs --transform --always "README.md" --always "docs/**/*"
+```
+
+### Understanding New Codebase
+
+```bash
+# Get overview with tree structure first
+copytree --only-tree
+
+# Then dive into specific areas
+copytree --filter "src/components/**" --transform
 ```
 
 ## Tips for Effective Use
 
-1. **Project Context**: Always start Claude Code from your project directory for best results
-2. **Profile Selection**: Use appropriate profiles for your project type
-3. **File Filters**: Leverage .ctreeignore to exclude irrelevant files
-4. **Caching**: CopyTree caches responses for better performance
-5. **Regular Updates**: Keep CopyTree updated for new features and improvements
+1. **Start Small**: Begin with filtered views before sharing entire codebases
+2. **Use Profiles**: Leverage built-in profiles for better file selection
+3. **Enable Caching**: Keep caching enabled for faster AI transformations
+4. **Iterate**: Use git filters to focus on current work
+5. **Reference Files**: For ongoing work, use file output instead of clipboard
+
+## Troubleshooting
+
+### Large Clipboard Issues
+
+If clipboard fails with large output:
+
+```bash
+# Save to file instead
+copytree -o context.xml
+
+# Or limit the output size
+copytree --char-limit 50000
+```
+
+### Performance Issues
+
+For better performance:
+
+```bash
+# Enable caching (default)
+copytree --transform
+
+# Or disable specific transformations
+copytree --no-transform
+```
+
+### Missing Context
+
+If important files are missing:
+
+```bash
+# Force include specific files
+copytree --always "config/*" --always ".env.example"
+
+# Check what profile is being used
+copytree --dry-run
+```
 
 ## Related Documentation
 
-- [MCP Server Usage](../usage/mcp-server.md) - Detailed MCP server documentation
+- [Basic Usage](../usage/basic-usage.md) - General usage guide
 - [Profile Overview](../profiles/profile-overview.md) - Understanding profiles
-- [Basic Usage](../usage/basic-usage.md) - General CopyTree usage
+- [CLI Reference](../cli/copytree-reference.md) - Complete command reference

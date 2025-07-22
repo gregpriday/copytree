@@ -219,11 +219,11 @@ copytree config:validate
 ### AI Features Test
 
 ```bash
-# Test AI filtering (requires API key)
-copytree --ai-filter "test files" --dry-run
+# Test transformations (requires API key for AI transforms)
+copytree --transform --dry-run
 
-# Test conversational interface
-copytree ask "What is the main purpose of this project?"
+# Test watch mode
+copytree watch --dry-run
 ```
 
 ## Troubleshooting

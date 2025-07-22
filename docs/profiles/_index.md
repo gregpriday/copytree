@@ -44,9 +44,6 @@ copytree profile:list
 ### Creating a Custom Profile
 
 ```bash
-# Interactive profile creation
-copytree profile:create
-
 # Create profile manually
 cat > .copytree/my-profile.yaml << EOF
 name: my-profile
@@ -151,9 +148,6 @@ copytree profile:list --verbose
 ### Create New Profiles
 
 ```bash
-# Interactive creation
-copytree profile:create
-
 # Create from template
 cp ~/.copytree/profiles/template.yaml .copytree/new-profile.yaml
 ```

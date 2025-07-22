@@ -206,44 +206,6 @@ describe('Command Integration Tests', () => {
     });
   });
 
-  describe('Install Commands', () => {
-    test('install:claude should create mcp.json', async () => {
-      const mcpFile = path.join(testProjectDir, 'claude_desktop_config.json');
-      
-      // Ensure clean state
-      if (await fs.pathExists(mcpFile)) {
-        await fs.remove(mcpFile);
-      }
-      
-      const { stdout, stderr, exitCode } = await runCommand(
-        `node "${cliPath}" install:claude`,
-        { cwd: testProjectDir }
-      );
-      
-      if (exitCode !== 0) {
-        console.error('install:claude failed:');
-        console.error('Exit code:', exitCode);
-        console.error('Stderr:', stderr);
-        console.error('Stdout:', stdout);
-      }
-      
-      expect(exitCode).toBe(0);
-      // Check either stdout or stderr for success message
-      const output = stdout + stderr;
-      expect(output).toMatch(/claude.*integration.*installed|installation.*complete/i);
-      
-      // Check claude_desktop_config.json was created
-      const configExists = await fs.pathExists(mcpFile);
-      if (configExists) {
-        const mcpConfig = await fs.readJson(mcpFile);
-        expect(mcpConfig.mcpServers.copytree).toBeDefined();
-        expect(mcpConfig.mcpServers.copytree.command).toBe('copytree');
-      } else {
-        // Maybe it's installed in user home directory instead
-        console.log('Config not found in test directory, might be in user home');
-      }
-    });
-  });
 
   describe('Error Handling', () => {
     test('should handle invalid command', async () => {

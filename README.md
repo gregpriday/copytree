@@ -15,13 +15,10 @@ A powerful Node.js CLI tool that transforms codebases into structured, AI-friend
 ### AI Integration (Gemini)
 - **AI-Powered Summaries** - Automatic code and test file summarization
 - **Image Analysis** - Generate descriptions for images and diagrams
-- **Conversational Interface** - Ask questions about your codebase
-- **Smart Profile Creation** - AI suggests optimal settings for your project
 
 ### Advanced Features
 - **Watch Mode** - Monitor changes and regenerate output automatically
 - **Git Integration** - Filter by modified, staged, or untracked files
-- **MCP Server** - Direct integration with Claude Desktop
 - **Profile Auto-Detection** - Automatically detect project type
 - **Deduplication** - Remove duplicate files based on content
 - **Always Include** - Force include critical files regardless of filters
@@ -49,9 +46,6 @@ copytree
 
 # Use a framework profile
 copytree -p laravel -o project-structure.xml
-
-# Ask AI about your codebase
-copytree ask "How does the authentication system work?"
 
 # Watch for changes and auto-regenerate
 copytree watch /path/to/project -o live-structure.xml
@@ -111,9 +105,6 @@ copytree profile:list
 # Validate a profile
 copytree profile:validate laravel
 
-# Create a new profile with AI assistance
-copytree profile:create
-
 # Use built-in profiles
 copytree -p laravel      # Laravel projects
 copytree -p sveltekit    # SvelteKit projects
@@ -122,18 +113,6 @@ copytree -p default      # General projects
 
 ### AI Features
 ```bash
-# Ask questions about your codebase
-copytree ask "What are the main API endpoints?"
-copytree ask "Where is user authentication handled?"
-copytree ask "What tests are failing and why?"
-
-# Streaming responses
-copytree ask "Explain the database schema" -S
-
-# Maintain conversation context
-copytree ask "How does login work?" -s conversation-1
-copytree ask "What about logout?" -s conversation-1
-
 # AI-powered file summaries
 copytree --transform  # Apply all transformers including AI summaries
 ```
@@ -176,19 +155,15 @@ module.exports = {
 
 ### Core Commands
 - `copytree [path]` - Copy directory structure to XML/JSON
-- `copytree ask <query>` - Ask AI questions about your codebase  
 - `copytree watch [path]` - Monitor directory and auto-regenerate output
-- `copytree mcp [directory]` - Start MCP server for Claude integration
 
 ### Profile Management
-- `copytree profile:create [path]` - Create new profile with AI assistance
 - `copytree profile:list` - List all available profiles
 - `copytree profile:validate <name>` - Validate profile configuration
 
 ### Documentation & Setup
 - `copytree copy:docs` - Copy built-in documentation
 - `copytree install:copytree` - Set up CopyTree environment
-- `copytree install:claude` - Configure Claude Desktop integration
 
 ### Utility Commands
 - `copytree cache:clear` - Clear AI and file processing caches
@@ -222,28 +197,6 @@ CopyTree includes 15+ specialized transformers:
 - **ImageTransformer**: Handle images with OCR (Tesseract) or AI descriptions
 
 ## 🔌 Integration
-
-### Claude Desktop Integration
-Set up CopyTree as an MCP server for Claude Desktop:
-
-```bash
-# Install globally first
-npm install -g copytree
-
-# In your project directory
-copytree install:claude
-
-# This creates mcp.json and optionally updates CLAUDE.md
-# Restart Claude Desktop to load the integration
-```
-
-### MCP Server Features
-- **project_ask**: Query codebases with natural language
-- **project_copy**: Generate structured output
-- Stateful conversations
-- Streaming responses
-- Git integration
-- Custom file filtering
 
 ### Git Integration
 CopyTree integrates with Git to provide context-aware file filtering:
@@ -347,7 +300,6 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[CLI Reference](docs/cli/copytree-reference.md)** - Complete command documentation
 - **[Profile Overview](docs/profiles/profile-overview.md)** - Understanding profiles
 - **[Transformer Reference](docs/profiles/transformer-reference.md)** - All transformers explained
-- **[MCP Server Guide](docs/usage/mcp-server.md)** - Claude Desktop integration
 - **[Troubleshooting](docs/usage/troubleshooting.md)** - Common issues and solutions
 
 ## 🐛 Troubleshooting
@@ -379,14 +331,38 @@ If migrating from the PHP version of CopyTree:
 2. **Profiles**: YAML profiles remain compatible
 3. **Commands**: Most command syntax is preserved
 4. **AI Provider**: Now uses Google Gemini exclusively (no OpenAI/Anthropic support)
-5. **New Features**: MCP server, watch mode, enhanced pipeline architecture
+5. **New Features**: Watch mode, enhanced pipeline architecture
 
 Key differences:
 - Single AI provider (Gemini) instead of multiple
 - JavaScript configuration instead of PHP arrays
 - Enhanced pipeline architecture
-- Native MCP server implementation
 - More transformers (15+ vs 13)
+
+## 🎯 Creating Profiles with AI Assistance
+
+CopyTree profiles can be created or refined using AI assistants like Claude Code:
+
+```bash
+# Create a profile in one conversation
+claude -p "Please create a CopyTree profile for this project.  
+Start by running \`copytree copy:docs --display\` to read the profile docs,  
+then walk through an iterative process to create an optimal profile."
+
+# Or build a .copytreeignore file instead
+claude -p "Please create a .copytreeignore file for this project.  
+Start by running \`copytree copy:docs --display\` to review ignore rules,  
+then iteratively refine the defaults."
+```
+
+The `copytree copy:docs --display` step provides the AI with CopyTree's documentation to ensure accurate profile creation without hallucinated options.
+
+```bash
+# Validate the YAML profile
+copytree profile:validate myprofile      # Returns 0 if valid
+```
+
+For detailed guidance: [Profile Creation Guide](docs/profiles/profile-creation-guide.md)
 
 ## 🤝 Contributing
 

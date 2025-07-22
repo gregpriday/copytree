@@ -29,8 +29,6 @@ Learn about CopyTree's powerful profile system for project-specific file selecti
 ### [AI Integration](./installation/claude-integration.md)
 Set up CopyTree with Claude Code and other AI assistants for enhanced productivity.
 
-### [MCP Server Usage](./usage/mcp-server.md)
-Comprehensive guide to using CopyTree's MCP server with Claude Code.
 
 ## ✨ Key Features
 
@@ -54,7 +52,6 @@ Comprehensive guide to using CopyTree's MCP server with Claude Code.
 ### 4. **Developer-Friendly**
 - **Watch Mode**: Auto-regenerate on file changes
 - **External Sources**: Include files from GitHub or other directories
-- **MCP Server**: Model Context Protocol support
 - **Editor Integration**: Works with VS Code, Cursor, and Claude Code
 
 ## 🎯 Common Use Cases
@@ -133,7 +130,6 @@ copytree cache:clear
 ## 📘 Usage Guides
 
 - [Basic Usage](./usage/basic-usage.md) - Get started with CopyTree
-- [MCP Server](./usage/mcp-server.md) - Detailed MCP server documentation
 - [Troubleshooting](./usage/troubleshooting.md) - Solve common problems
 
 ## 🐛 Troubleshooting

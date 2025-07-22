@@ -18,9 +18,7 @@ tests/
 │   └── external/       # External source integration
 ├── e2e/                # End-to-end command tests
 │   ├── copy.test.js
-│   ├── watch.test.js
-│   ├── ask.test.js
-│   └── mcp.test.js
+│   └── watch.test.js
 └── fixtures/           # Test data and mock projects
     ├── projects/       # Sample projects
     ├── files/         # Individual test files

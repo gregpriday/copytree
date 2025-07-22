@@ -47,20 +47,7 @@ program
     await copyCommand(path || '.', options);
   });
 
-// 2. Ask command
-program
-  .command('ask <query>')
-  .description('Ask a question about the project codebase')
-  .option('-s, --state [id]', 'Conversation state ID')
-  .option('--provider <name>', 'AI provider to use')
-  .option('--model <name>', 'Specific model to use')
-  .option('--no-stream', 'Disable streaming responses')
-  .action(async (query, options) => {
-    const askCommand = require('../src/commands/ask');
-    await askCommand(query, options);
-  });
-
-// 3. Watch command
+// 2. Watch command
 program
   .command('watch [path]')
   .description('Watch directory for changes and regenerate output')
@@ -79,30 +66,7 @@ program
     await watchCommand(path || '.', options);
   });
 
-// 4. MCP command
-program
-  .command('mcp [directory]')
-  .description('Start CopyTree MCP server for Claude integration')
-  .option('--port <port>', 'Server port (default: stdio)')
-  .option('--debug', 'Enable debug logging')
-  .action(async (directory, options) => {
-    const mcpCommand = require('../src/commands/mcp');
-    await mcpCommand(directory, options);
-  });
-
-// 5. Profile create command
-program
-  .command('profile:create [path]')
-  .description('Create new profile by scanning project and collecting goals')
-  .option('-c, --char-limit <num>', 'Character limit for profile', '50000')
-  .option('--name <name>', 'Profile name')
-  .option('-o, --output <file>', 'Output file path')
-  .action(async (path, options) => {
-    const profileCreateCommand = require('../src/commands/profileCreate');
-    await profileCreateCommand(path || '.', options);
-  });
-
-// 6. Profile list command
+// 4. Profile list command
 program
   .command('profile:list')
   .description('List all available profiles')
@@ -166,16 +130,6 @@ program
   .action(async () => {
     const installCopytreeCommand = require('../src/commands/installCopytree');
     await installCopytreeCommand();
-  });
-
-// 12. Install claude command
-program
-  .command('install:claude')
-  .description('Install CopyTree MCP server configuration for Claude Code')
-  .option('--update-claude-md', 'Also update CLAUDE.md file')
-  .action(async (options) => {
-    const installClaudeCommand = require('../src/commands/installClaude');
-    await installClaudeCommand(options);
   });
 
 program.parse(process.argv);

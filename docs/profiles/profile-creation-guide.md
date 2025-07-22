@@ -1,27 +1,10 @@
 # Profile Creation Guide
 
-This guide walks you through creating custom profiles for CopyTree, from simple configurations to advanced setups.
+This guide walks you through creating custom profiles for CopyTree manually.
 
 ## Quick Start
 
-### Interactive Profile Creation
-
-The easiest way to create a profile is using the interactive command:
-
-```bash
-copytree profile:create
-```
-
-This will prompt you for:
-1. Profile name
-2. Description
-3. Base profile to extend (optional)
-4. Include patterns
-5. Exclude patterns
-6. Transformer configuration
-7. External sources
-
-### Manual Profile Creation
+### Profile Creation
 
 Create a YAML file in `.copytree/` directory:
 
@@ -96,26 +79,6 @@ transformers:
       maxPages: 10
 ```
 
-## Creating Profiles with AI
-
-CopyTree can analyze your project and generate an optimized profile:
-
-```bash
-# AI-powered profile generation
-copytree profile:create --name my-project
-
-# Skip AI generation
-copytree profile:create --skip-ai
-
-# Custom character limit for analysis
-copytree profile:create --character-limit 200000
-```
-
-The AI will:
-1. Analyze your project structure
-2. Identify frameworks and patterns
-3. Generate appropriate include/exclude rules
-4. Suggest relevant transformers
 
 ## Rule Writing
 

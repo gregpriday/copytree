@@ -127,95 +127,6 @@ copytree profile:validate my-api --strict
 copytree profile:validate project-config /path/to/project
 ```
 
-## profile:create
-
-Create a new profile interactively.
-
-### Usage
-```bash
-copytree profile:create [options]
-```
-
-### Options
-- `--name` - Profile name (prompted if not provided)
-- `--output` - Output directory (defaults to `.copytree/`)
-
-### Description
-The `profile:create` command provides an interactive wizard to create custom profiles:
-
-1. **Profile Name** - Unique identifier for the profile
-2. **Description** - Brief description of the profile's purpose
-3. **Base Profile** - Optional parent profile to extend
-4. **Include Rules** - Patterns for files to include
-5. **Exclude Rules** - Patterns for files to exclude
-6. **Transformers** - File transformation configurations
-7. **External Sources** - Optional external file sources
-
-### Interactive Example
-```
-$ copytree profile:create
-
-? Profile name: my-api-docs
-? Description: API documentation and endpoints
-? Extend from base profile? (Use arrow keys)
-❯ No base profile
-  laravel
-  nodejs
-  api
-  minimal
-
-? Add include patterns (comma-separated): routes/**/*.js, controllers/**/*.js, docs/**/*.md
-? Add exclude patterns (comma-separated): **/*.test.js, **/node_modules/**, **/.git/**
-? Configure transformers? (y/N) y
-? Select transformers: (Press <space> to select, <a> to toggle all)
- ◯ pdf - PDF to text conversion
- ◉ markdown - Markdown processing
- ◯ csv - CSV formatting
- ◉ ai-summary - AI-powered summaries
-
-? Add external sources? (y/N) n
-
-✓ Profile created successfully at .copytree/my-api-docs.yaml
-
-You can now use it with: copytree --profile my-api-docs
-```
-
-### Generated Profile Example
-```yaml
-name: my-api-docs
-description: API documentation and endpoints
-
-rules:
-  - include: "routes/**/*.js"
-  - include: "controllers/**/*.js"
-  - include: "docs/**/*.md"
-  - exclude: "**/*.test.js"
-  - exclude: "**/node_modules/**"
-  - exclude: "**/.git/**"
-
-transformers:
-  markdown:
-    enabled: true
-    options:
-      mode: strip
-  ai-summary:
-    enabled: true
-    options:
-      max_length: 500
-```
-
-### Examples
-```bash
-# Create profile interactively
-copytree profile:create
-
-# Create with predefined name
-copytree profile:create --name my-custom
-
-# Create in specific directory
-copytree profile:create --output ~/my-profiles/
-```
-
 ## Best Practices
 
 1. **Profile Organization**
@@ -228,11 +139,6 @@ copytree profile:create --output ~/my-profiles/
    - Use `--strict` mode before sharing profiles
    - Test profiles with `--dry-run` before actual use
 
-3. **Profile Creation**
-   - Start with a base profile when possible
-   - Be specific with include patterns
-   - Use exclude patterns to filter noise
-   - Document transformer configurations
 
 ## Related Documentation
 

@@ -370,52 +370,6 @@ copytree --format tree
    NODE_OPTIONS="--max-old-space-size=4096" copytree
    ```
 
-## MCP Server Issues
-
-### MCP Server Won't Start
-
-**Problem**: MCP server fails to start
-
-**Solutions**:
-
-1. **Check port availability**:
-   ```bash
-   lsof -i :3000  # Default port
-   ```
-
-2. **Use different port**:
-   ```bash
-   copytree mcp --port 3001
-   ```
-
-3. **Debug mode**:
-   ```bash
-   copytree mcp --debug
-   ```
-
-### Claude Code Integration Not Working
-
-**Problem**: @copytree not recognized in Claude
-
-**Solutions**:
-
-1. **Verify configuration**:
-   ```bash
-   cat ~/Library/Application\ Support/Claude/claude_desktop_config.json | jq .
-   ```
-
-2. **Restart Claude Code completely**
-
-3. **Check CopyTree in PATH**:
-   ```bash
-   which copytree
-   ```
-
-4. **Test MCP server directly**:
-   ```bash
-   copytree mcp --debug
-   ```
-
 ## Platform-Specific Issues
 
 ### macOS Issues

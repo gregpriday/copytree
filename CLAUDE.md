@@ -9,8 +9,6 @@ CopyTree is a sophisticated CLI tool for intelligently copying and transforming 
 - **Intelligent file selection** using profiles
 - **15+ file transformers** for PDFs, images, code, and documents
 - **Deep Git integration** for tracking changes and modifications
-- **Conversational AI interface** for querying codebases
-- **MCP server** for Claude Desktop integration
 - **Watch mode** with automatic regeneration
 - **External sources** support (GitHub repositories)
 
@@ -25,12 +23,10 @@ CopyTree is a sophisticated CLI tool for intelligently copying and transforming 
 
 **Commands** (`src/commands/`)
 - `copy.js` - Main copy command with extensive options
-- `ask.js` - Interactive AI-powered Q&A about codebases
 - `watch.js` - File watching with auto-regeneration
-- `mcp.js` - MCP server for Claude Desktop
-- Profile commands: `profileList.js`, `profileCreate.js`, `profileValidate.js`
+- Profile commands: `profileList.js`, `profileValidate.js`
 - Utility commands: `configValidate.js`, `cacheClear.js`, `copyDocs.js`
-- Installation helpers: `installClaude.js`, `installCopytree.js`
+- Installation helpers: `installCopytree.js`
 
 **Transformers** (`src/transforms/transformers/`)
 - Text: FirstLines, Markdown, HTMLStripper, MarkdownLinkStripper
@@ -42,7 +38,6 @@ CopyTree is a sophisticated CLI tool for intelligently copying and transforming 
 **Services** (`src/services/`)
 - `AIService.js` - Gemini AI integration
 - `CacheService.js` - Response caching
-- `ConversationService.js` - Stateful AI conversations
 - `GitHubUrlHandler.js` - GitHub repository handling
 - `ProfileGuesser.js` - Auto-detect project types
 
@@ -68,7 +63,6 @@ Comprehensive documentation available in `docs/`:
 - **[docs/index.md](./docs/index.md)** - Getting started guide
 - **[docs/cli/copytree-reference.md](./docs/cli/copytree-reference.md)** - Complete CLI reference
 - **[docs/profiles/transformer-reference.md](./docs/profiles/transformer-reference.md)** - All transformers documented
-- **[docs/usage/mcp-server.md](./docs/usage/mcp-server.md)** - MCP integration guide
 - **[docs/usage/troubleshooting.md](./docs/usage/troubleshooting.md)** - Common issues
 
 ## Quick Reference
@@ -94,14 +88,11 @@ copytree --display               # Show in terminal
 copytree --clipboard             # Copy to clipboard
 
 # Interactive features
-copytree ask                     # Q&A about codebase
 copytree watch                   # Watch mode
-copytree mcp                     # MCP server
 
 # Profile management
 copytree profile:list            # List profiles
 copytree profile:validate        # Validate profile
-copytree profile:create          # Create new profile
 ```
 
 ## Development Guidelines
@@ -158,9 +149,8 @@ try {
 
 ### AI Integration
 - **Provider**: Google Gemini (gemini-1.5-flash/pro)
-- **Features**: Summaries, image descriptions, Q&A
+- **Features**: Summaries, image descriptions
 - **Caching**: Responses cached for performance
-- **Conversations**: Stateful chat with context retention
 
 ### Git Integration
 - Track modified files (`--git-modified`)
@@ -188,7 +178,6 @@ try {
 - ✅ **Full pipeline** - 16 processing stages
 - ✅ **AI integration** - Gemini provider with caching
 - ✅ **Git integration** - Complete git functionality
-- ✅ **MCP server** - Claude Desktop integration
 - 📝 **Documentation** - Comprehensive user docs
 
 ## Dependencies
@@ -218,32 +207,6 @@ All dependencies are installed and managed via npm:
 - **Test Fixtures**: `tests/fixtures/` - Sample projects
 - **Built-in Profiles**: `profiles/` - YAML profile definitions
 - **Configuration**: `config/` - Default settings
-
-## MCP Server Integration
-
-CopyTree includes an MCP server for Claude Desktop:
-
-### Available Tools
-- **project_ask**: Query codebases with natural language
-- **project_copy**: Generate structured output
-
-### Features
-- Stateful conversations
-- Streaming responses
-- Git integration
-- Custom file filtering
-
-### Setup
-```bash
-# Install globally
-npm install -g .
-
-# Configure Claude Desktop
-copytree install:claude
-
-# Or run manually
-copytree mcp
-```
 
 ## Best Practices
 
