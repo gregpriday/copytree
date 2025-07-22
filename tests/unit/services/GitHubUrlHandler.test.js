@@ -20,6 +20,8 @@ const GitHubUrlHandler = require('../../../src/services/GitHubUrlHandler');
 describe('GitHubUrlHandler', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Add rmSync to fs mock
+    fs.rmSync = jest.fn();
   });
 
   describe('isGitHubUrl', () => {
@@ -77,6 +79,7 @@ describe('GitHubUrlHandler', () => {
       // Mock that the target path exists after cloning
       fs.existsSync
         .mockReturnValueOnce(false) // repo doesn't exist initially
+        .mockReturnValueOnce(false) // incomplete repo check
         .mockReturnValueOnce(true); // target path exists after clone
       
       const targetPath = await handler.getFiles();
