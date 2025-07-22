@@ -152,15 +152,7 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 3. AI Filter Stage (if --ai-filter is used)
-  if (options.aiFilter) {
-    const AIFilterStage = require('../pipeline/stages/AIFilterStage');
-    stages.push(new AIFilterStage({
-      query: options.aiFilter
-    }));
-  }
-  
-  // 4. Profile Filter Stage (applies exclude patterns)
+  // 3. Profile Filter Stage (applies exclude patterns)
   const ProfileFilterStage = require('../pipeline/stages/ProfileFilterStage');
   stages.push(new ProfileFilterStage({
     exclude: profile.exclude || [],
@@ -193,7 +185,8 @@ async function setupPipelineStages(basePath, profile, options) {
     const registry = TransformerRegistry.createDefault();
     stages.push(new TransformStage({
       registry,
-      transformers: profile.transformers || {}
+      transformers: profile.transformers || {},
+      noCache: options.noCache
     }));
   }
   

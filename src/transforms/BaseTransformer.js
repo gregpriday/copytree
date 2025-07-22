@@ -13,7 +13,13 @@ class BaseTransformer {
     this.options = options;
     this.config = config();
     this.logger = options.logger || logger.child(this.constructor.name);
-    this.cacheEnabled = options.cache ?? this.config.get('cache.transformations.enabled', true);
+    
+    // Only enable caching for AI-based transformers by default
+    const isAITransformer = this.constructor.name.toLowerCase().includes('ai') || 
+                           this.constructor.name.toLowerCase().includes('summary') ||
+                           this.constructor.name.toLowerCase().includes('description');
+    
+    this.cacheEnabled = options.noCache ? false : (options.cache ?? (isAITransformer && this.config.get('cache.transformations.enabled', true)));
     this.cacheTTL = options.cacheTTL ?? this.config.get('cache.transformations.ttl', 86400);
     
     // Indicates whether this transformer performs heavy/slow operations

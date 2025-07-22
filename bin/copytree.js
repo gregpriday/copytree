@@ -19,7 +19,6 @@ program
   .description('Copy directory structure to XML with customizable profiles and filters')
   .option('-p, --profile <name>', 'Use a predefined profile (default: auto-detect)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
-  .option('-a, --ai-filter <query>', 'Use AI to filter files based on natural language query')
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
   .option('-o, --output <file>', 'Save output to file')
@@ -42,6 +41,7 @@ program
   .option('-s, --sort <by>', 'Sort files by: path, size, modified, name, extension')
   .option('--dedupe', 'Remove duplicate files')
   .option('--always <patterns...>', 'Always include these patterns')
+  .option('--no-cache', 'Disable caching for AI operations')
   .action(async (path, options) => {
     const copyCommand = require('../src/commands/copy');
     await copyCommand(path || '.', options);

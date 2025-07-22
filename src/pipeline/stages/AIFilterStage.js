@@ -8,6 +8,7 @@ class AIFilterStage extends Stage {
   constructor(options = {}) {
     super(options);
     this.query = options.query;
+    this.noCache = options.noCache;
     this.ai = new AIService();
   }
 
@@ -31,7 +32,7 @@ class AIFilterStage extends Stage {
       }));
 
       // Filter files using AI
-      const filteredFiles = await this.ai.filterFiles(fileInfo, this.query);
+      const filteredFiles = await this.ai.filterFiles(fileInfo, this.query, { noCache: this.noCache });
       
       // Get the paths of filtered files
       const filteredPaths = new Set(filteredFiles.map(f => f.path));

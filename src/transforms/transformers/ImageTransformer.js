@@ -116,11 +116,7 @@ class ImageTransformer extends BaseTransformer {
     try {
       // Create worker if not exists
       if (!this.worker) {
-        this.worker = await Tesseract.createWorker({
-          logger: m => this.logger.debug(`Tesseract: ${m.status}`)
-        });
-        await this.worker.loadLanguage(this.language);
-        await this.worker.initialize(this.language);
+        this.worker = await Tesseract.createWorker(this.language);
       }
 
       // Perform OCR

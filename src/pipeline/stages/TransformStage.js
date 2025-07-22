@@ -9,10 +9,11 @@ class TransformStage extends Stage {
     this.registry = options.registry;
     this.transformerConfig = options.transformers || {};
     this.maxConcurrency = options.maxConcurrency || require('../../../config/app').maxConcurrency || 5;
+    this.noCache = options.noCache;
     
-    // Initialize cache for transformations
+    // Initialize cache for transformations (disabled if noCache is true)
     this.cache = options.cache || CacheService.create('transformations', {
-      enabled: options.cacheEnabled ?? true,
+      enabled: options.cacheEnabled ?? !options.noCache,
       defaultTtl: 86400 // 24 hours
     });
   }
@@ -224,6 +225,11 @@ class TransformStage extends Stage {
       
       if (config && config.enabled === false) {
         return null;
+      }
+      
+      // Set noCache option on transformer if specified
+      if (this.noCache) {
+        transformer.cacheEnabled = false;
       }
       
       return transformer;
