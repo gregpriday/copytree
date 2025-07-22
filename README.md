@@ -13,7 +13,6 @@ A powerful Node.js CLI tool that transforms codebases into structured, AI-friend
 - **Character Limiting** - Stay within AI context windows automatically
 
 ### AI Integration (Gemini)
-- **Natural Language Filtering** - "Show me authentication files"
 - **AI-Powered Summaries** - Automatic code and test file summarization
 - **Image Analysis** - Generate descriptions for images and diagrams
 - **Conversational Interface** - Ask questions about your codebase
@@ -47,9 +46,6 @@ npm link  # Makes 'copytree' available globally
 ```bash
 # Copy current directory to clipboard
 copytree
-
-# Copy specific directory with AI filtering
-copytree /path/to/project -a "authentication and user management files"
 
 # Use a framework profile
 copytree -p laravel -o project-structure.xml
@@ -103,12 +99,8 @@ copytree -f "*.js" -f "*.ts" --exclude "node_modules"
 copytree -m                 # Only modified files
 copytree -c main            # Files changed from main branch
 
-# AI-powered filtering
-copytree -a "API routes and database models"
-copytree -a "test files that are failing"
-
 # Combine filters
-copytree -p laravel -m -a "controller files"
+copytree -p laravel -m
 ```
 
 ### Profile Usage
@@ -277,9 +269,8 @@ CopyTree uses an event-driven pipeline architecture with 16 processing stages:
 1. **FileDiscoveryStage** - Find files matching patterns
 2. **ProfileFilterStage** - Apply profile-based rules
 3. **GitFilterStage** - Apply git-based filtering
-4. **AIFilterStage** - Apply AI-powered filtering  
-5. **ExternalSourceStage** - Include external files
-6. **TransformStage** - Apply file transformations
+4. **ExternalSourceStage** - Include external files
+5. **TransformStage** - Apply file transformations
 7. **DeduplicationStage** - Remove duplicate files
 8. **CharacterLimitStage** - Enforce size limits
 9. **OutputFormattingStage** - Format output (XML/JSON/tree)

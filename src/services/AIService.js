@@ -179,43 +179,6 @@ Summary:`;
   }
 
 
-  /**
-   * Filter files using AI
-   * @param {Array} files - List of files with paths and content
-   * @param {string} query - Natural language query
-   * @param {Object} options - Additional options
-   * @returns {Promise<Array>} Filtered files
-   */
-  async filterFiles(files, query, options = {}) {
-    // Create a summary of files
-    const fileList = files.map(f => `- ${f.path}`).join('\n');
-    
-    const prompt = `You are helping filter files based on the user's query. Here is the list of files:
-
-${fileList}
-
-User's query: "${query}"
-
-Please return a comma-separated list of file paths that match the query. Only include files that are relevant. If no files match, return "NONE".
-
-Matching files:`;
-
-    const response = await this.performTask('classification', {
-      prompt,
-      ...options
-    });
-    
-    const content = response.content.trim();
-    if (content === 'NONE') {
-      return [];
-    }
-    
-    // Parse the comma-separated list
-    const selectedPaths = content.split(',').map(p => p.trim());
-    
-    // Return the matching files
-    return files.filter(f => selectedPaths.includes(f.path));
-  }
 
   /**
    * Get provider information

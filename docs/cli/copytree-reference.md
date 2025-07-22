@@ -42,14 +42,6 @@ copytree --filter "*.js" --filter "*.ts"
 copytree -f "src/**/*.php" -f "tests/**/*.php"
 ```
 
-#### `--ai-filter=<description>`, `-a <description>`
-Use AI to filter files based on natural language description.
-
-```bash
-copytree --ai-filter "authentication and user management files"
-copytree -a "React components but not tests"
-```
-
 #### `--modified`, `-m`
 Only include files modified since the last Git commit.
 
@@ -292,9 +284,6 @@ copytree profile:list
 
 ### Filtering Files
 ```bash
-# AI-powered filtering
-copytree --ai-filter "test files and documentation"
-
 # Pattern matching
 copytree --filter "src/**/*.js" --filter "*.json"
 
@@ -325,7 +314,7 @@ copytree --format tree
 copytree --profile react --modified --transform --output
 
 # Debug mode with dry run
-copytree --debug --dry-run --ai-filter "API endpoints"
+copytree --debug --dry-run
 
 # Size analysis
 copytree --size-report --max-lines 50
@@ -337,6 +326,5 @@ copytree --stream --no-transform | gzip > project.xml.gz
 ## Notes
 
 - The `--validate` option cannot be combined with output options or filters
-- AI filtering is skipped in `--dry-run` mode to avoid API calls
 - External sources (GitHub URLs) are cached by default in `~/.copytree/repos/`
 - Use `DEBUG=copytree:*` environment variable for detailed debugging

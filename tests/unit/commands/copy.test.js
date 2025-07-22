@@ -50,7 +50,6 @@ jest.mock('../../../src/pipeline/stages/ProfileFilterStage', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/FileLoadingStage', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/OutputFormattingStage', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/TransformStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/AIFilterStage', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/GitFilterStage', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/ExternalSourceStage', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/LimitStage', () => jest.fn());
@@ -209,33 +208,6 @@ describe('copy command', () => {
     });
   });
 
-  describe('AI filtering', () => {
-    beforeEach(() => {
-      process.env.GEMINI_API_KEY = 'test-key';
-    });
-
-    afterEach(() => {
-      delete process.env.GEMINI_API_KEY;
-    });
-
-    it('should apply AI filter when specified', async () => {
-      // AIService is already mocked, so we just need to verify the pipeline setup
-      await copy('.', { aiFilter: 'authentication files' });
-      
-      // The AI filter is handled by the AIFilterStage in the pipeline
-      expect(mockPipeline.through).toHaveBeenCalled();
-      expect(mockPipeline.process).toHaveBeenCalled();
-    });
-
-    it('should warn when AI filter specified without API key', async () => {
-      delete process.env.GEMINI_API_KEY;
-      
-      await copy('.', { aiFilter: 'test query' });
-      
-      // AI filter is processed in pipeline, no direct warning
-      expect(mockPipeline.process).toHaveBeenCalled();
-    });
-  });
 
   describe('format options', () => {
     it('should support JSON format', async () => {

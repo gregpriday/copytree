@@ -12,7 +12,6 @@ describe('AIService', () => {
     // Just verify the methods exist
     expect(typeof AIService.summarizeFile).toBe('function');
     expect(typeof AIService.describeImage).toBe('function');
-    expect(typeof AIService.filterFiles).toBe('function');
     expect(typeof AIService.isAvailable).toBe('function');
   });
 
@@ -21,7 +20,6 @@ describe('AIService', () => {
     expect(() => {
       AIService.summarizeFile('test.js', 'code');
       AIService.describeImage(Buffer.from('test'), 'image/png');
-      AIService.filterFiles([]);
       AIService.isAvailable();
     }).not.toThrow();
   });

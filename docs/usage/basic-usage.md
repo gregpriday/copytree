@@ -88,22 +88,7 @@ copytree --filter "*.js" --filter "*.jsx"
 copytree --filter "src/**/*.{js,ts}"
 ```
 
-### 2. AI-Powered Selection
-
-Use natural language to describe what you want:
-
-```bash
-# Select authentication-related files
-copytree --ai-filter "authentication and login files"
-
-# Select test files
-copytree --ai-filter "unit tests and test utilities"
-
-# Select API endpoints
-copytree --ai-filter "REST API endpoints and controllers"
-```
-
-### 3. Git-Based Selection
+### 2. Git-Based Selection
 
 Select files based on Git status:
 
@@ -219,9 +204,6 @@ project/
 # Copy project for AI analysis
 copytree --profile react
 
-# Copy specific feature
-copytree --ai-filter "shopping cart implementation"
-
 # Copy with transformations
 copytree --transform
 ```
@@ -255,9 +237,6 @@ copytree --only-tree
 ### 4. Debugging Support
 
 ```bash
-# Copy error-related files
-copytree --ai-filter "error handling and logging"
-
 # Copy with line numbers
 copytree --line-numbers
 

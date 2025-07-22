@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CopyTree is a sophisticated CLI tool for intelligently copying and transforming project structures for AI consumption. It features:
 
-- **Intelligent file selection** using profiles and AI-powered filtering
+- **Intelligent file selection** using profiles
 - **15+ file transformers** for PDFs, images, code, and documents
 - **Deep Git integration** for tracking changes and modifications
 - **Conversational AI interface** for querying codebases
@@ -83,7 +83,6 @@ copytree https://github.com/...  # Copy GitHub repository
 copytree --profile laravel       # Use Laravel profile
 copytree --git-modified          # Only modified files
 copytree --git-branch main       # Compare with branch
-copytree --ask "show auth"       # AI-powered filtering
 
 # Transformers
 copytree --transform             # Enable all transformers
@@ -159,7 +158,7 @@ try {
 
 ### AI Integration
 - **Provider**: Google Gemini (gemini-1.5-flash/pro)
-- **Features**: File filtering, summaries, image descriptions, Q&A
+- **Features**: Summaries, image descriptions, Q&A
 - **Caching**: Responses cached for performance
 - **Conversations**: Stateful chat with context retention
 
@@ -179,9 +178,8 @@ try {
 1. **File Discovery** - Find files based on patterns
 2. **Profile Filtering** - Apply profile rules
 3. **Git Filtering** - Apply git-based filters
-4. **AI Filtering** - Natural language queries
-5. **Transformation** - Apply file transformers
-6. **Output Formatting** - XML/JSON output
+4. **Transformation** - Apply file transformers
+5. **Output Formatting** - XML/JSON output
 
 ## Current Status
 

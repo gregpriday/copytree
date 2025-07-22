@@ -164,7 +164,6 @@ jest.mock('../src/services/AIService', () => {
   return {
     summarizeFile: jest.fn().mockResolvedValue('Mocked file summary'),
     describeImage: jest.fn().mockResolvedValue('Mocked image description'),
-    filterFiles: jest.fn().mockImplementation((files) => files),
     summarizeText: jest.fn().mockResolvedValue('Mocked text summary'),
     summarizeUnitTests: jest.fn().mockResolvedValue('Mocked unit test summary'),
     describeSVG: jest.fn().mockResolvedValue('Mocked SVG description'),

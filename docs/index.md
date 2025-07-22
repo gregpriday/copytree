@@ -13,9 +13,6 @@ copytree
 
 # Copy with a specific profile
 copytree --profile laravel
-
-# Filter files with AI
-copytree --ai-filter "Only files related to authentication"
 ```
 
 ## 📚 Documentation Sections
@@ -39,7 +36,6 @@ Comprehensive guide to using CopyTree's MCP server with Claude Code.
 
 ### 1. **Intelligent File Selection**
 - **Profile System**: Pre-configured profiles for popular frameworks (React, Laravel, Django, etc.)
-- **AI-Powered Filtering**: Use natural language to select files
 - **Git Integration**: Copy only modified or changed files
 - **Pattern Matching**: Flexible include/exclude rules
 
@@ -70,9 +66,6 @@ copytree
 
 # Copy only Python files
 copytree --profile python
-
-# Copy specific components
-copytree --ai-filter "React components for user authentication"
 ```
 
 ### Document Generation
