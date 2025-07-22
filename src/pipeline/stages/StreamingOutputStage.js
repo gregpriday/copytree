@@ -109,7 +109,10 @@ class StreamingOutputStage extends Stage {
       let xml = `    <file path="${this.escapeXML(file.path)}" size="${file.size}"`;
       
       if (file.modified) {
-        xml += ` modified="${file.modified.toISOString()}"`;
+        const modifiedDate = file.modified instanceof Date 
+          ? file.modified 
+          : new Date(file.modified);
+        xml += ` modified="${modifiedDate.toISOString()}"`;
       }
       
       if (file.isBinary) {

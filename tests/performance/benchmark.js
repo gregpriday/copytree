@@ -285,6 +285,135 @@ class CopyTreeBenchmark {
   }
 
   /**
+   * Run transformation benchmarks
+   */
+  async runTransformationBenchmarks() {
+    console.log('\n=== Transformation Benchmarks ===');
+    
+    const project = await this.createTestProject({
+      name: 'transform-project',
+      fileCount: 50,
+      directoryDepth: 2,
+      averageFileSize: 2048,
+      fileTypes: ['.js', '.md', '.json', '.txt', '.css']
+    });
+
+    // Test parallel transformations
+    await this.runBenchmark('Transformations - Sequential', async () => {
+      const outputFile = path.join(this.tempDir, 'transform-seq.xml');
+      await copyCommand(project, { 
+        output: outputFile,
+        transform: true,
+        maxConcurrency: 1  // Force sequential
+      });
+      const stats = await fs.stat(outputFile);
+      return { outputSize: stats.size };
+    });
+
+    await this.runBenchmark('Transformations - Parallel (5)', async () => {
+      const outputFile = path.join(this.tempDir, 'transform-par5.xml');
+      await copyCommand(project, { 
+        output: outputFile,
+        transform: true,
+        maxConcurrency: 5  // Default parallel
+      });
+      const stats = await fs.stat(outputFile);
+      return { outputSize: stats.size };
+    });
+
+    await this.runBenchmark('Transformations - Parallel (10)', async () => {
+      const outputFile = path.join(this.tempDir, 'transform-par10.xml');
+      await copyCommand(project, { 
+        output: outputFile,
+        transform: true,
+        maxConcurrency: 10  // High parallel
+      });
+      const stats = await fs.stat(outputFile);
+      return { outputSize: stats.size };
+    });
+
+    // Test with caching
+    await this.runBenchmark('Transformations - With Cache (1st run)', async () => {
+      const outputFile = path.join(this.tempDir, 'transform-cache1.xml');
+      await copyCommand(project, { 
+        output: outputFile,
+        transform: true,
+        cacheEnabled: true
+      });
+      const stats = await fs.stat(outputFile);
+      return { outputSize: stats.size };
+    });
+
+    await this.runBenchmark('Transformations - With Cache (2nd run)', async () => {
+      const outputFile = path.join(this.tempDir, 'transform-cache2.xml');
+      await copyCommand(project, { 
+        output: outputFile,
+        transform: true,
+        cacheEnabled: true
+      });
+      const stats = await fs.stat(outputFile);
+      return { outputSize: stats.size };
+    });
+  }
+
+  /**
+   * Run performance optimization benchmarks
+   */
+  async runOptimizationBenchmarks() {
+    console.log('\n=== Optimization Benchmarks ===');
+    
+    const largeProject = await this.createTestProject({
+      name: 'optimization-project',
+      fileCount: 1000,
+      directoryDepth: 5,
+      averageFileSize: 1024,
+      includeLargeFiles: true
+    });
+
+    // Test optimized file discovery
+    await this.runBenchmark('File Discovery - Standard', async () => {
+      const outputFile = path.join(this.tempDir, 'discovery-standard.xml');
+      await copyCommand(largeProject, { 
+        output: outputFile,
+        optimizedDiscovery: false
+      });
+      const stats = await fs.stat(outputFile);
+      return { outputSize: stats.size };
+    });
+
+    await this.runBenchmark('File Discovery - Optimized', async () => {
+      const outputFile = path.join(this.tempDir, 'discovery-optimized.xml');
+      await copyCommand(largeProject, { 
+        output: outputFile,
+        optimizedDiscovery: true
+      });
+      const stats = await fs.stat(outputFile);
+      return { outputSize: stats.size };
+    });
+
+    // Test streaming performance
+    await this.runBenchmark('Output - Buffered', async () => {
+      const outputFile = path.join(this.tempDir, 'output-buffered.xml');
+      await copyCommand(largeProject, { 
+        output: outputFile,
+        streaming: false
+      });
+      const stats = await fs.stat(outputFile);
+      return { outputSize: stats.size };
+    });
+
+    await this.runBenchmark('Output - Streaming', async () => {
+      const outputFile = path.join(this.tempDir, 'output-streaming.xml');
+      await copyCommand(largeProject, { 
+        output: outputFile,
+        streaming: true
+      });
+      const stats = await fs.stat(outputFile);
+      return { outputSize: stats.size };
+    });
+  }
+
+  /**
    * Format bytes to human readable string
    */
   formatBytes(bytes) {
@@ -336,6 +465,50 @@ class CopyTreeBenchmark {
       console.log(`Large project (500+ files): ${largeProjectResult.duration}ms ${largeProjectResult.duration < 30000 ? '✓' : '⚠'}`);
     }
 
+    // Optimization impact analysis
+    console.log('\n=== Optimization Impact ===');
+    
+    // Parallel transformation analysis
+    const seqTransform = this.results.find(r => r.name.includes('Sequential'));
+    const par5Transform = this.results.find(r => r.name.includes('Parallel (5)'));
+    const par10Transform = this.results.find(r => r.name.includes('Parallel (10)'));
+    
+    if (seqTransform && par5Transform) {
+      const speedup5 = ((seqTransform.duration - par5Transform.duration) / seqTransform.duration * 100).toFixed(1);
+      console.log(`Parallel transformations (5): ${speedup5}% faster`);
+    }
+    if (seqTransform && par10Transform) {
+      const speedup10 = ((seqTransform.duration - par10Transform.duration) / seqTransform.duration * 100).toFixed(1);
+      console.log(`Parallel transformations (10): ${speedup10}% faster`);
+    }
+    
+    // Cache impact analysis
+    const cache1 = this.results.find(r => r.name.includes('Cache (1st run)'));
+    const cache2 = this.results.find(r => r.name.includes('Cache (2nd run)'));
+    
+    if (cache1 && cache2) {
+      const cacheSpeedup = ((cache1.duration - cache2.duration) / cache1.duration * 100).toFixed(1);
+      console.log(`Transformation caching: ${cacheSpeedup}% faster on cached run`);
+    }
+    
+    // Discovery optimization analysis
+    const standardDiscovery = this.results.find(r => r.name.includes('Discovery - Standard'));
+    const optimizedDiscovery = this.results.find(r => r.name.includes('Discovery - Optimized'));
+    
+    if (standardDiscovery && optimizedDiscovery) {
+      const discoverySpeedup = ((standardDiscovery.duration - optimizedDiscovery.duration) / standardDiscovery.duration * 100).toFixed(1);
+      console.log(`File discovery optimization: ${discoverySpeedup}% faster`);
+    }
+    
+    // Streaming impact analysis
+    const bufferedOutput = this.results.find(r => r.name.includes('Output - Buffered'));
+    const streamingOutput = this.results.find(r => r.name.includes('Output - Streaming'));
+    
+    if (bufferedOutput && streamingOutput) {
+      const memoryReduction = ((bufferedOutput.memory.heapUsed - streamingOutput.memory.heapUsed) / bufferedOutput.memory.heapUsed * 100).toFixed(1);
+      console.log(`Streaming output: ${memoryReduction}% less memory used`);
+    }
+
     // Memory analysis
     const highMemoryTests = this.results.filter(r => r.memory.heapUsed > 50 * 1024 * 1024); // 50MB
     if (highMemoryTests.length > 0) {
@@ -362,6 +535,11 @@ class CopyTreeBenchmark {
   async run() {
     console.log('CopyTree Performance Benchmark');
     console.log('==============================');
+    console.log(`Node.js: ${process.version}`);
+    console.log(`Platform: ${os.platform()} ${os.arch()}`);
+    console.log(`CPUs: ${os.cpus().length} x ${os.cpus()[0].model}`);
+    console.log(`Memory: ${this.formatBytes(os.totalmem())}`);
+    console.log('');
     
     // Setup
     this.tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'copytree-benchmark-'));
@@ -370,6 +548,8 @@ class CopyTreeBenchmark {
     try {
       await this.runCopyBenchmarks();
       await this.runFilteringBenchmarks();
+      await this.runTransformationBenchmarks();
+      await this.runOptimizationBenchmarks();
       
       const report = this.generateReport();
       

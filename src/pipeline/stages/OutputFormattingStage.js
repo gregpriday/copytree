@@ -86,7 +86,10 @@ class OutputFormattingStage extends Stage {
       });
       
       if (file.modified) {
-        fileElement.att('modified', file.modified.toISOString());
+        const modifiedDate = file.modified instanceof Date 
+          ? file.modified 
+          : new Date(file.modified);
+        fileElement.att('modified', modifiedDate.toISOString());
       }
       
       if (file.isBinary) {

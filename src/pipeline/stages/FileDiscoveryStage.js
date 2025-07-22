@@ -16,8 +16,11 @@ class FileDiscoveryStage extends Stage {
     this.log(`Discovering files in ${this.basePath}`, 'debug');
     const startTime = Date.now();
 
-    // Load gitignore rules if present
-    await this.loadGitignore();
+    // Load ignore rules in parallel
+    await Promise.all([
+      this.loadGitignore(),
+      this.loadCopytreeIgnore()
+    ]);
 
     // Get all files matching patterns
     const files = await this.discoverFiles();
@@ -46,6 +49,16 @@ class FileDiscoveryStage extends Stage {
       const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
       this.parseGitignoreContent(gitignoreContent);
       this.log('Loaded .gitignore rules', 'debug');
+    }
+  }
+
+  async loadCopytreeIgnore() {
+    const copytreeIgnorePath = path.join(this.basePath, '.copytreeignore');
+    
+    if (await fs.pathExists(copytreeIgnorePath)) {
+      const copytreeIgnoreContent = await fs.readFile(copytreeIgnorePath, 'utf8');
+      this.parseGitignoreContent(copytreeIgnoreContent);
+      this.log('Loaded .copytreeignore rules', 'debug');
     }
   }
 
@@ -88,16 +101,45 @@ class FileDiscoveryStage extends Stage {
   }
 
   async discoverFiles() {
+    // Load copytree config for exclusions
+    const copytreeConfig = require('../../../config/copytree');
+    
+    // Combine all ignore patterns early for better performance
+    const ignorePatterns = [];
+    
+    // Add default ignores from config
+    if (this.options.respectGitignore !== false) {
+      // Add global excluded directories
+      ignorePatterns.push(...copytreeConfig.globalExcludedDirectories.map(dir => `**/${dir}/**`));
+      
+      // Add base path excluded directories (only at root)
+      ignorePatterns.push(...copytreeConfig.basePathExcludedDirectories.map(dir => `${dir}/**`));
+      
+      // Add global excluded files
+      ignorePatterns.push(...copytreeConfig.globalExcludedFiles);
+    }
+    
+    // Add gitignore patterns (converted to glob format)
+    for (const { pattern, isNegated } of this.gitignorePatterns) {
+      if (!isNegated) {
+        ignorePatterns.push(pattern);
+      }
+    }
+    
+    // Add profile exclusions if provided
+    if (this.options.profileExclusions) {
+      ignorePatterns.push(...this.options.profileExclusions);
+    }
+    
     const globOptions = {
       cwd: this.basePath,
       absolute: false,
       dot: this.options.includeHidden || false,
       onlyFiles: true,
       stats: true,
-      ignore: this.options.respectGitignore === false ? [] : [
-        '**/node_modules/**',
-        '**/.git/**'
-      ]
+      ignore: ignorePatterns,
+      // Use stream for large directories
+      concurrency: this.options.maxConcurrency || 100
     };
 
     const entries = await fastGlob(this.patterns, globOptions);
@@ -106,7 +148,8 @@ class FileDiscoveryStage extends Stage {
       path: entry.path,
       absolutePath: path.join(this.basePath, entry.path),
       size: entry.stats?.size || 0,
-      modified: entry.stats?.mtime || null
+      modified: entry.stats?.mtime || null,
+      stats: entry.stats
     }));
   }
 

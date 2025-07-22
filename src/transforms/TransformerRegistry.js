@@ -142,6 +142,14 @@ class TransformerRegistry {
   }
 
   /**
+   * Get all transformer instances
+   * @returns {Array} Array of transformer instances
+   */
+  getAllTransformers() {
+    return Array.from(this.transformers.values()).map(entry => entry.transformer);
+  }
+
+  /**
    * Clear all registered transformers
    */
   clear() {
