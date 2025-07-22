@@ -32,7 +32,7 @@ class ImageDescriptionTransformer extends BaseTransformer {
    */
   canTransform(file) {
     const ext = path.extname(file.path).toLowerCase();
-    return this.supportedExtensions.includes(ext) && this.apiKey;
+    return this.supportedExtensions.includes(ext) && !!this.apiKey;
   }
 
   /**
