@@ -1,6 +1,6 @@
 # CopyTree
 
-A powerful Node.js CLI tool that transforms codebases into structured, AI-friendly formats. This is a complete rewrite of the original PHP/Laravel Zero version with full feature parity and enhanced capabilities.
+A powerful Node.js CLI tool that transforms codebases into structured, AI-friendly formats.
 
 ## 🚀 Features
 
@@ -318,21 +318,6 @@ DEBUG=copytree:* copytree /path/to/project
 COPYTREE_PERFORMANCE=true copytree /path/to/project
 ```
 
-## 🔄 Migration from PHP Version
-
-If migrating from the PHP version of CopyTree:
-
-1. **Configuration**: Convert PHP config arrays to JavaScript objects
-2. **Profiles**: YAML profiles remain compatible
-3. **Commands**: Most command syntax is preserved
-4. **AI Provider**: Now uses Google Gemini exclusively (no OpenAI/Anthropic support)
-5. **New Features**: Enhanced pipeline architecture
-
-Key differences:
-- Single AI provider (Gemini) instead of multiple
-- JavaScript configuration instead of PHP arrays
-- Enhanced pipeline architecture
-- More transformers (15+ vs 13)
 
 ## 🎯 Creating Profiles with AI Assistance
 
