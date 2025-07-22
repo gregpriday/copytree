@@ -20,7 +20,7 @@ class FileSummaryTransformer extends BaseTransformer {
     } else {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       this.model = this.genAI.getGenerativeModel({ 
-        model: options.model || "gemini-1.5-flash"
+        model: options.model || this.config.get('ai.gemini.model')
       });
     }
     

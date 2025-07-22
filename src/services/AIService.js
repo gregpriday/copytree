@@ -12,9 +12,8 @@ class AIService {
     this.config = config();
     this.logger = logger.child('AIService');
     
-    // Initialize Gemini provider
-    const modelType = options.modelType || 'small';
-    const modelName = this.config.get(`ai.gemini.models.${modelType}`);
+    // Initialize Gemini provider with single model
+    const modelName = this.config.get('ai.gemini.model');
     
     this.provider = new GeminiProvider({
       model: modelName,
@@ -136,19 +135,8 @@ class AIService {
       throw new Error(`Unknown AI task: ${task}`);
     }
     
-    // Get model for task
-    const modelType = taskConfig.model || 'small';
-    const modelName = this.config.get(`ai.gemini.models.${modelType}`);
-    
-    // Create provider for this task if different model
-    let provider = this.provider;
-    if (modelName !== this.provider.model) {
-      provider = new GeminiProvider({
-        model: modelName,
-        temperature: taskConfig.temperature,
-        maxTokens: taskConfig.maxTokens
-      });
-    }
+    // Use the same provider for all tasks (single model)
+    const provider = this.provider;
     
     // Prepare options
     const requestOptions = {
@@ -272,7 +260,6 @@ Matching files:`;
     }
     
     return new AIService({
-      modelType: taskConfig.model || 'small',
       temperature: taskConfig.temperature,
       maxTokens: taskConfig.maxTokens,
       ...options

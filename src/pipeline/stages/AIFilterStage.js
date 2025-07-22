@@ -8,7 +8,7 @@ class AIFilterStage extends Stage {
   constructor(options = {}) {
     super(options);
     this.query = options.query;
-    this.ai = new AIService({ modelType: 'small' });
+    this.ai = new AIService();
   }
 
   async process(input) {

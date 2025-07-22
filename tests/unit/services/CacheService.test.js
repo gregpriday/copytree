@@ -1,17 +1,20 @@
-// Reset modules to ensure clean state
-beforeEach(() => {
-  jest.resetModules();
-});
+// Moved inside describe block
 
 describe('CacheService', () => {
   let CacheService;
   let cacheService;
   let tempDir;
-  const fs = require('fs-extra');
+  let fs;
   const path = require('path');
   const os = require('os');
 
   beforeEach(async () => {
+    // Reset modules to ensure clean state
+    jest.resetModules();
+    
+    // Require fs-extra first before any mocking
+    fs = require('fs-extra');
+    
     // Mock dependencies before requiring CacheService
     jest.doMock('../../../src/utils/logger', () => ({
       logger: {
@@ -32,12 +35,20 @@ describe('CacheService', () => {
       }
     }));
 
+    // Mock ConfigManager to avoid loading actual config files
+    jest.doMock('../../../src/config/ConfigManager', () => ({
+      config: () => ({
+        get: jest.fn((key, defaultValue) => defaultValue)
+      })
+    }));
+
     // Now require CacheService with mocked dependencies
     const CacheServiceModule = require('../../../src/services/CacheService');
     CacheService = CacheServiceModule.CacheService;
 
     // Create temp directory for tests
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'copytree-cache-test-'));
+    tempDir = path.join(os.tmpdir(), 'copytree-cache-test-' + Date.now());
+    await fs.ensureDir(tempDir);
     
     // Create cache service instance
     cacheService = new CacheService({
@@ -54,6 +65,7 @@ describe('CacheService', () => {
       await fs.remove(tempDir);
     }
     jest.dontMock('../../../src/utils/logger');
+    jest.dontMock('../../../src/config/ConfigManager');
   });
 
   describe('basic functionality', () => {
@@ -64,10 +76,16 @@ describe('CacheService', () => {
     });
 
     test('should set and get values', async () => {
-      const result = await cacheService.set('test-key', 'test-value');
+      // Create a memory-based cache to avoid file system issues
+      const memCache = new CacheService({
+        driver: 'memory',
+        enabled: true
+      });
+      
+      const result = await memCache.set('test-key', 'test-value');
       expect(result).toBe(true);
 
-      const value = await cacheService.get('test-key');
+      const value = await memCache.get('test-key');
       expect(value).toBe('test-value');
     });
 

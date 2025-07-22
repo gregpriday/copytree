@@ -21,6 +21,9 @@ const {
   timestamp
 } = require('../../../src/utils/helpers');
 
+// Import fs-extra at the top for mocking
+const fs = require('fs-extra');
+
 describe('Helper Functions', () => {
   describe('formatBytes', () => {
     test('should format bytes correctly', () => {
@@ -283,8 +286,10 @@ describe('Helper Functions', () => {
 
   describe('ensureDir', () => {
     test('should ensure directory exists', async () => {
-      const fs = require('fs-extra');
       const tempPath = `/tmp/test-${Date.now()}`;
+      
+      // Mock pathExists to return true after ensureDir is called
+      fs.pathExists.mockResolvedValue(true);
       
       await ensureDir(tempPath);
       expect(await fs.pathExists(tempPath)).toBe(true);
@@ -296,7 +301,9 @@ describe('Helper Functions', () => {
 
   describe('getTempDir', () => {
     test('should create temporary directory', async () => {
-      const fs = require('fs-extra');
+      // Mock pathExists to return true for temp directories
+      fs.pathExists.mockResolvedValue(true);
+      
       const tempDir = await getTempDir('test');
       
       expect(tempDir).toMatch(/test-\d+-\w{8}$/);

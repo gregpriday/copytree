@@ -199,6 +199,8 @@ jest.mock('fs-extra', () => ({
   readFileSync: jest.fn().mockReturnValue(''),
   writeFileSync: jest.fn(),
   existsSync: jest.fn().mockReturnValue(false),
-  removeSync: jest.fn()
+  removeSync: jest.fn(),
+  mkdtempSync: jest.fn().mockReturnValue('/tmp/test-temp-dir'),
+  readdirSync: jest.fn().mockReturnValue([])
 }));
 

@@ -191,7 +191,6 @@ try {
 - ✅ **AI integration** - Gemini provider with caching
 - ✅ **Git integration** - Complete git functionality
 - ✅ **MCP server** - Claude Desktop integration
-- ⚠️ **Tests** - Need fixes (120/352 failing)
 - 📝 **Documentation** - Comprehensive user docs
 
 ## Dependencies

@@ -1,7 +1,31 @@
 // Mock dependencies
 jest.mock('child_process');
-jest.mock('fs-extra');
+jest.mock('fs-extra', () => ({
+  mkdtemp: jest.fn(),
+  writeFile: jest.fn(),
+  remove: jest.fn()
+}));
 jest.mock('os');
+jest.mock('../../../src/utils/logger', () => ({
+  logger: {
+    child: () => ({
+      error: jest.fn(),
+      warn: jest.fn(),
+      info: jest.fn(),
+      debug: jest.fn()
+    })
+  }
+}));
+jest.mock('../../../src/config/ConfigManager', () => ({
+  config: () => ({
+    get: jest.fn((key, defaultValue) => defaultValue)
+  })
+}));
+jest.mock('../../../src/services/CacheService', () => ({
+  CacheService: {
+    create: jest.fn(() => null)
+  }
+}));
 
 const DocumentToTextTransformer = require('../../../src/transforms/transformers/DocumentToTextTransformer');
 const { execSync } = require('child_process');
@@ -34,12 +58,6 @@ describe('DocumentToTextTransformer', () => {
     os.tmpdir.mockReturnValue('/tmp');
     
     transformer = new DocumentToTextTransformer();
-    transformer.logger = {
-      error: jest.fn(),
-      warn: jest.fn(),
-      info: jest.fn(),
-      debug: jest.fn()
-    };
   });
 
   describe('constructor', () => {
@@ -66,9 +84,15 @@ describe('DocumentToTextTransformer', () => {
       expect(transformer.pandocAvailable).toBe(true);
     });
 
-    it.skip('should handle Pandoc not available', () => {
-      // This test is complex due to logger initialization during constructor
-      // The functionality is tested through canTransform when pandocAvailable is false
+    it('should handle Pandoc not available', () => {
+      execSync.mockImplementation(() => {
+        throw new Error('Command not found');
+      });
+      
+      const transformer = new DocumentToTextTransformer();
+      expect(transformer.pandocAvailable).toBe(false);
+      expect(transformer.logger.warn).toHaveBeenCalledWith('Pandoc not found. Document conversion will be disabled.');
+      expect(transformer.logger.warn).toHaveBeenCalledWith('Install pandoc: https://pandoc.org/installing.html');
     });
   });
 
@@ -237,10 +261,7 @@ describe('DocumentToTextTransformer', () => {
       );
     });
 
-    it.skip('should handle temp directory creation failure', async () => {
-      // This test is complex due to async error handling in mkdtemp
-      // The error handling is covered by other error scenarios
-    });
+    // Removed test for temp directory creation failure since it's covered by general error handling tests
 
     it('should handle file write errors', async () => {
       fs.writeFile.mockRejectedValue(new Error('Write permission denied'));
@@ -356,7 +377,6 @@ describe('DocumentToTextTransformer', () => {
         throw new Error('Command not found');
       });
       
-      transformer.logger = { warn: jest.fn() };
       const result = transformer.checkPandoc();
       
       expect(result).toBe(false);
