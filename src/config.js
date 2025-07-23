@@ -49,5 +49,9 @@ module.exports = {
   
   getStateDir() {
     return path.join(this.configDir, 'state');
+  },
+  
+  getCacheDir() {
+    return path.join(this.configDir, 'cache');
   }
 };

@@ -26,8 +26,15 @@ class BaseTransformer {
     // Heavy transformers will show progress during processing
     this.isHeavy = false;
     
-    // Initialize cache service for transformations
-    if (this.cacheEnabled) {
+    // Cache will be initialized on first use for heavy transformers
+    this.cache = null;
+  }
+
+  /**
+   * Initialize cache if needed
+   */
+  initializeCache() {
+    if (!this.cache && this.cacheEnabled && this.isHeavy) {
       const transformerName = this.constructor.name.toLowerCase().replace('transformer', '');
       const specificConfig = `cache.transformations.${transformerName}`;
       
@@ -51,8 +58,11 @@ class BaseTransformer {
       this.logger.debug(`Transforming ${file.path}`);
       const startTime = Date.now();
 
+      // Initialize cache if needed
+      this.initializeCache();
+
       // Check cache if enabled
-      if (this.cacheEnabled) {
+      if (this.cacheEnabled && this.cache) {
         const cached = await this.getFromCache(file);
         if (cached) {
           this.logger.debug(`Cache hit for ${file.path}`);
@@ -66,8 +76,8 @@ class BaseTransformer {
       // Validate output
       this.validateOutput(result);
 
-      // Cache result if enabled
-      if (this.cacheEnabled) {
+      // Cache result if enabled and cache exists
+      if (this.cacheEnabled && this.cache) {
         await this.saveToCache(file, result);
       }
 

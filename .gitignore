@@ -46,4 +46,4 @@ temp/
 # Output files
 output/
 *.xml
-/.copytree-cache
+# Cache is now stored in ~/.copytree/cache instead of local directory

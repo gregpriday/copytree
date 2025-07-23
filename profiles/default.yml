@@ -90,11 +90,11 @@ transformers:
   file-loader:
     enabled: true
   markdown:
-    enabled: true
+    enabled: false  # Must be explicitly enabled - not applied automatically to .md files
     options:
       mode: strip
   csv:
-    enabled: true
+    enabled: false  # Must be explicitly enabled - only shows first N rows when enabled
     options:
       maxRows: 10
   binary:

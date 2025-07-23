@@ -16,11 +16,19 @@ class CacheService {
     this.defaultTtl = options.defaultTtl || config().get('cache.defaultTtl', 3600);
     
     // File cache settings
-    this.cachePath = path.resolve(
-      options.cachePath || config().get('cache.file.path', '.copytree-cache')
-    );
+    let configPath = options.cachePath || config().get('cache.file.path');
+    
+    // If no path from config, use home directory cache
+    if (!configPath) {
+      const os = require('os');
+      configPath = path.join(os.homedir(), '.copytree', 'cache');
+    }
+    
+    // Ensure cache path is absolute
+    this.cachePath = path.isAbsolute(configPath) ? configPath : path.resolve(configPath);
     this.extension = config().get('cache.file.extension', '.cache');
     this.gcProbability = config().get('cache.file.gcProbability', 0.01);
+    this.maxCacheAge = options.maxCacheAge || config().get('cache.file.maxAge', 7 * 24 * 60 * 60 * 1000); // 7 days in ms
     
     // Memory cache for current process
     this.memoryCache = new Map();
@@ -245,14 +253,16 @@ class CacheService {
 
   /**
    * Run garbage collection on file cache
+   * @param {Object} options - GC options
    * @returns {Promise<number>} Number of expired items removed
    */
-  async runGarbageCollection() {
+  async runGarbageCollection(options = {}) {
     if (!this.enabled || this.driver !== 'file') {
       return 0;
     }
 
     let removed = 0;
+    let totalSize = 0;
     
     try {
       this.logger.debug('Running cache garbage collection...');
@@ -266,21 +276,48 @@ class CacheService {
         const filePath = path.join(this.cachePath, file);
         
         try {
+          const stats = await fs.stat(filePath);
           const data = await fs.readJson(filePath);
           
+          // Remove if expired
           if (data.expires < now) {
             await fs.remove(filePath);
             removed++;
+            totalSize += stats.size;
+            continue;
+          }
+          
+          // Remove if older than max cache age
+          const fileAge = now - stats.mtimeMs;
+          if (fileAge > this.maxCacheAge) {
+            await fs.remove(filePath);
+            removed++;
+            totalSize += stats.size;
+            continue;
+          }
+          
+          // Remove if created date is too old (fallback for files without mtime)
+          if (data.created && (now - data.created) > this.maxCacheAge) {
+            await fs.remove(filePath);
+            removed++;
+            totalSize += stats.size;
           }
         } catch (error) {
           // Remove corrupted cache files
+          try {
+            const stats = await fs.stat(filePath);
+            totalSize += stats.size;
+          } catch {}
           await fs.remove(filePath);
           removed++;
         }
       }
       
       if (removed > 0) {
-        this.logger.debug(`Garbage collection removed ${removed} expired items`);
+        const sizeStr = totalSize > 1024 * 1024 
+          ? `${(totalSize / 1024 / 1024).toFixed(2)} MB`
+          : `${(totalSize / 1024).toFixed(2)} KB`;
+        this.logger.debug(`Garbage collection removed ${removed} items (${sizeStr})`);
       }
       
       return removed;
@@ -315,9 +352,15 @@ class CacheService {
 }
 
 // Export singleton instance and class
-const defaultCache = new CacheService();
+// Delay creation of defaultCache to avoid initialization order issues
+let defaultCache = null;
 
 module.exports = {
   CacheService,
-  cache: defaultCache
+  get cache() {
+    if (!defaultCache) {
+      defaultCache = new CacheService();
+    }
+    return defaultCache;
+  }
 };

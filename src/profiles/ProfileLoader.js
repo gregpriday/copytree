@@ -80,19 +80,38 @@ class ProfileLoader {
    * @returns {Promise<Object>} Raw profile data
    */
   async loadProfileFile(profileNameOrPath) {
-    // If it's a path, load directly
-    if (profileNameOrPath.includes('/') || profileNameOrPath.includes('\\')) {
-      return await this.loadFromPath(profileNameOrPath);
+    // If it's a path (absolute or relative), load directly
+    if (profileNameOrPath.includes('/') || profileNameOrPath.includes('\\') || path.isAbsolute(profileNameOrPath)) {
+      // Check if file exists as-is
+      if (await fs.pathExists(profileNameOrPath)) {
+        return await this.loadFromPath(profileNameOrPath);
+      }
+      
+      // If no extension, try common extensions
+      if (!path.extname(profileNameOrPath)) {
+        const extensions = ['.yml', '.yaml', '.json'];
+        for (const ext of extensions) {
+          const pathWithExt = profileNameOrPath + ext;
+          if (await fs.pathExists(pathWithExt)) {
+            return await this.loadFromPath(pathWithExt);
+          }
+        }
+      }
+      
+      throw new ProfileError(
+        `Profile file not found: ${profileNameOrPath}`,
+        profileNameOrPath
+      );
     }
 
     // Search for profile by name
     const searchPaths = [
-      // Project-specific profiles have highest priority
-      path.join(this.projectProfilesDir, `${profileNameOrPath}.yml`),
-      path.join(this.projectProfilesDir, `${profileNameOrPath}.yaml`),
-      path.join(this.projectProfilesDir, `${profileNameOrPath}.json`),
+      // Current directory .copytree folder has highest priority
+      path.join(process.cwd(), '.copytree', `${profileNameOrPath}.yml`),
+      path.join(process.cwd(), '.copytree', `${profileNameOrPath}.yaml`),
+      path.join(process.cwd(), '.copytree', `${profileNameOrPath}.json`),
       
-      // User profiles
+      // User profiles in home directory
       path.join(this.userProfilesDir, `${profileNameOrPath}.yml`),
       path.join(this.userProfilesDir, `${profileNameOrPath}.yaml`),
       path.join(this.userProfilesDir, `${profileNameOrPath}.json`),
@@ -136,10 +155,20 @@ class ProfileLoader {
         data = JSON.parse(content);
         break;
       default:
-        throw new ProfileError(
-          `Unsupported profile format: ${ext}`,
-          filePath
-        );
+        // For files without recognized extensions, try YAML first, then JSON
+        try {
+          data = yaml.load(content);
+        } catch (yamlError) {
+          try {
+            data = JSON.parse(content);
+          } catch (jsonError) {
+            throw new ProfileError(
+              `Unable to parse profile file as YAML or JSON: ${filePath}`,
+              filePath,
+              { yamlError: yamlError.message, jsonError: jsonError.message }
+            );
+          }
+        }
     }
 
     // Add metadata
