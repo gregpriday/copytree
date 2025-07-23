@@ -3,7 +3,9 @@
 // Suppress dotenv console output
 const originalLog = console.log;
 console.log = () => {};
-require('dotenv').config();
+const path = require('path');
+// Load .env from the project directory (copytree root)
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 console.log = originalLog;
 const { Command } = require('commander');
 const program = new Command();
