@@ -1,18 +1,18 @@
-# .copytreeignore Documentation
+# .ctreeignore Documentation
 
-The `.copytreeignore` file allows you to exclude files and directories from CopyTree's output at the project level, similar to how `.gitignore` works for Git.
+The `.ctreeignore` file allows you to exclude files and directories from CopyTree's output at the project level, similar to how `.gitignore` works for Git.
 
 ## Overview
 
-`.copytreeignore` is a project-specific file that defines patterns for files and directories that should always be excluded when running CopyTree, regardless of the profile being used.
+`.ctreeignore` is a project-specific file that defines patterns for files and directories that should always be excluded when running CopyTree, regardless of the profile being used.
 
 ## File Location
 
-Place `.copytreeignore` in your project root:
+Place `.ctreeignore` in your project root:
 
 ```
 project/
-├── .copytreeignore
+├── .ctreeignore
 ├── .gitignore
 ├── package.json
 └── src/
@@ -20,7 +20,7 @@ project/
 
 ## Syntax
 
-`.copytreeignore` uses the same syntax as `.gitignore`:
+`.ctreeignore` uses the same syntax as `.gitignore`:
 
 ```bash
 # Comments start with hash
@@ -81,7 +81,7 @@ build/             # Directory (with trailing slash)
 
 ### Processing Order
 
-1. `.copytreeignore` patterns are applied first
+1. `.ctreeignore` patterns are applied first
 2. Profile exclude rules are applied second  
 3. Profile include rules select from remaining files
 4. Profile always rules override everything
@@ -89,7 +89,7 @@ build/             # Directory (with trailing slash)
 ### Example Flow
 
 ```yaml
-# .copytreeignore
+# .ctreeignore
 *.log
 temp/
 
@@ -105,7 +105,7 @@ rules:
 ### Development Files
 
 ```bash
-# .copytreeignore
+# .ctreeignore
 # IDE files
 .idea/
 .vscode/
@@ -186,14 +186,14 @@ logs/
 
 ### Profile Exclusions
 
-`.copytreeignore` works alongside profile exclusions:
+`.ctreeignore` works alongside profile exclusions:
 
 ```yaml
 # Profile
 rules:
   - exclude: "**/*.test.js"
   
-# .copytreeignore
+# .ctreeignore
 **/*.spec.js
 
 # Result: Both *.test.js and *.spec.js are excluded
@@ -201,10 +201,10 @@ rules:
 
 ### Override with Always
 
-Profile `always` rules override `.copytreeignore`:
+Profile `always` rules override `.ctreeignore`:
 
 ```bash
-# .copytreeignore
+# .ctreeignore
 config/*
 ```
 
@@ -276,7 +276,7 @@ copytree --dry-run | grep "filename"
 ### Differences
 
 - `.gitignore` controls version control
-- `.copytreeignore` controls CopyTree output
+- `.ctreeignore` controls CopyTree output
 - They can have different patterns
 
 ### Using Both
@@ -289,7 +289,7 @@ node_modules/
 .env
 dist/
 
-# .copytreeignore  
+# .ctreeignore  
 node_modules/     # Same as git
 .env             # Same as git
 dist/            # Same as git
@@ -311,7 +311,7 @@ options:
 ### Node.js Project
 
 ```bash
-# .copytreeignore for Node.js project
+# .ctreeignore for Node.js project
 # Dependencies
 node_modules/
 bower_components/
@@ -357,7 +357,7 @@ Thumbs.db
 ### React Project
 
 ```bash
-# .copytreeignore for React
+# .ctreeignore for React
 # Dependencies
 node_modules/
 
@@ -390,7 +390,7 @@ storybook-static/
 ### API Project
 
 ```bash
-# .copytreeignore for API
+# .ctreeignore for API
 # Dependencies
 node_modules/
 
@@ -426,7 +426,7 @@ api-docs/dist/
 
 ### Files Still Included
 
-**Problem**: Files matching `.copytreeignore` patterns still appear
+**Problem**: Files matching `.ctreeignore` patterns still appear
 
 **Solutions**:
 
@@ -462,18 +462,18 @@ api-docs/dist/
 **Debug**:
 
 ```bash
-# Test without .copytreeignore
-mv .copytreeignore .copytreeignore.bak
+# Test without .ctreeignore
+mv .ctreeignore .ctreeignore.bak
 copytree --dry-run
 
 # Test with different pattern
-echo "*.test.js" > .copytreeignore
+echo "*.test.js" > .ctreeignore
 copytree --dry-run
 ```
 
 ### Performance Issues
 
-Large `.copytreeignore` files can slow down file discovery:
+Large `.ctreeignore` files can slow down file discovery:
 
 ```bash
 # Optimize patterns
@@ -507,18 +507,18 @@ rules:
 For monorepos:
 
 ```bash
-# Root .copytreeignore
+# Root .ctreeignore
 packages/*/node_modules/
 packages/*/dist/
 
-# Package-specific (packages/app/.copytreeignore)
+# Package-specific (packages/app/.ctreeignore)
 test-fixtures/
 benchmarks/
 ```
 
 ### Dynamic Patterns
 
-Generate `.copytreeignore` programmatically:
+Generate `.ctreeignore` programmatically:
 
 ```javascript
 // scripts/update-ignore.js
@@ -531,7 +531,7 @@ const patterns = [
   ...getGeneratedFiles()
 ];
 
-fs.writeFileSync('.copytreeignore', patterns.join('\n'));
+fs.writeFileSync('.ctreeignore', patterns.join('\n'));
 ```
 
 ## Next Steps

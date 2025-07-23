@@ -210,7 +210,7 @@ All dependencies are installed and managed via npm:
 2. **Enable caching** for AI operations
 3. **Set file limits** to prevent memory issues
 4. **Test with dry-run** before large operations
-5. **Use .copytreeignore** for exclusions
+5. **Use .ctreeignore** for exclusions
 6. **Monitor memory** usage for large projects
 
 ## Troubleshooting

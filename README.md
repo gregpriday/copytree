@@ -329,8 +329,8 @@ claude -p "Please create a CopyTree profile for this project.
 Start by running \`copytree copy:docs --display\` to read the profile docs,  
 then walk through an iterative process to create an optimal profile."
 
-# Or build a .copytreeignore file instead
-claude -p "Please create a .copytreeignore file for this project.  
+# Or build a .ctreeignore file instead
+claude -p "Please create a .ctreeignore file for this project.  
 Start by running \`copytree copy:docs --display\` to review ignore rules,  
 then iteratively refine the defaults."
 ```

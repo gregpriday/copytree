@@ -21,7 +21,7 @@ class FileDiscoveryStage extends Stage {
     const loadTasks = [];
     if (this.respectGitignore) {
       loadTasks.push(this.loadGitignore());
-      loadTasks.push(this.loadCopytreeIgnore());
+      loadTasks.push(this.loadCtreeIgnore());
     }
     if (loadTasks.length > 0) {
       await Promise.all(loadTasks);
@@ -57,13 +57,13 @@ class FileDiscoveryStage extends Stage {
     }
   }
 
-  async loadCopytreeIgnore() {
-    const copytreeIgnorePath = path.join(this.basePath, '.copytreeignore');
+  async loadCtreeIgnore() {
+    const ctreeignorePath = path.join(this.basePath, '.ctreeignore');
     
-    if (await fs.pathExists(copytreeIgnorePath)) {
-      const copytreeIgnoreContent = await fs.readFile(copytreeIgnorePath, 'utf8');
-      this.parseGitignoreContent(copytreeIgnoreContent);
-      this.log('Loaded .copytreeignore rules', 'debug');
+    if (await fs.pathExists(ctreeignorePath)) {
+      const ctreeignoreContent = await fs.readFile(ctreeignorePath, 'utf8');
+      this.parseGitignoreContent(ctreeignoreContent);
+      this.log('Loaded .ctreeignore rules', 'debug');
     }
   }
 
