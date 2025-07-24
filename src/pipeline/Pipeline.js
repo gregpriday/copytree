@@ -111,8 +111,8 @@ class Pipeline extends EventEmitter {
           // It's already an instance with a process method
           stageInstance = Stage;
         } else {
-          // It's a constructor, instantiate it
-          stageInstance = new Stage(this.options);
+          // It's a constructor, instantiate it with pipeline reference
+          stageInstance = new Stage({ ...this.options, pipeline: this });
         }
           
         const processMethod = stageInstance.process || stageInstance;

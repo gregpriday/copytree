@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+// Note: Removed @babel/register for better performance
+
 // Suppress dotenv console output
 const originalLog = console.log;
 console.log = () => {};
@@ -7,7 +9,12 @@ const path = require('path');
 // Load .env from the project directory (copytree root)
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 console.log = originalLog;
+
+const React = require('react');
+const { render } = require('ink');
 const { Command } = require('commander');
+const App = require('../src/ui/App.js');
+
 const program = new Command();
 
 program
@@ -45,8 +52,11 @@ program
   .option('--always <patterns...>', 'Always include these patterns')
   .option('--no-cache', 'Disable caching for AI operations')
   .action(async (path, options) => {
-    const copyCommand = require('../src/commands/copy');
-    await copyCommand(path || '.', options);
+    render(React.createElement(App, {
+      command: 'copy',
+      path: path || '.',
+      options
+    }));
   });
 
 // 2. Profile list command
@@ -55,8 +65,11 @@ program
   .description('List all available profiles')
   .option('--json', 'Output as JSON')
   .action(async (options) => {
-    const profileListCommand = require('../src/commands/profileList');
-    await profileListCommand(options);
+    render(React.createElement(App, {
+      command: 'profile:list',
+      path: null,
+      options
+    }));
   });
 
 // 7. Profile validate command
@@ -65,8 +78,11 @@ program
   .description('Validate profile syntax and structure')
   .option('--all', 'Validate all profiles')
   .action(async (profile, options) => {
-    const profileValidateCommand = require('../src/commands/profileValidate');
-    await profileValidateCommand(profile, options);
+    render(React.createElement(App, {
+      command: 'profile:validate',
+      path: null,
+      options: { ...options, profile }
+    }));
   });
 
 // 8. Copy docs command
@@ -77,8 +93,11 @@ program
   .option('-o, --output <file>', 'Output file instead of clipboard')
   .option('--no-clipboard', 'Display to console instead of clipboard')
   .action(async (options) => {
-    const copyDocsCommand = require('../src/commands/copyDocs');
-    await copyDocsCommand(options);
+    render(React.createElement(App, {
+      command: 'copy:docs',
+      path: null,
+      options
+    }));
   });
 
 // 9. Config validate command
@@ -86,8 +105,11 @@ program
   .command('config:validate')
   .description('Validate application configuration')
   .action(async () => {
-    const configValidateCommand = require('../src/commands/configValidate');
-    await configValidateCommand();
+    render(React.createElement(App, {
+      command: 'config:validate',
+      path: null,
+      options: {}
+    }));
   });
 
 // 10. Cache clear command
@@ -102,8 +124,11 @@ program
   .option('--status', 'Show cache status after clearing')
   .option('-v, --verbose', 'Show verbose output')
   .action(async (options) => {
-    const cacheClearCommand = require('../src/commands/cacheClear');
-    await cacheClearCommand(options);
+    render(React.createElement(App, {
+      command: 'cache:clear',
+      path: null,
+      options
+    }));
   });
 
 // 11. Install copytree command
@@ -111,8 +136,11 @@ program
   .command('install:copytree')
   .description('Set up CopyTree environment and configuration')
   .action(async () => {
-    const installCopytreeCommand = require('../src/commands/installCopytree');
-    await installCopytreeCommand();
+    render(React.createElement(App, {
+      command: 'install:copytree',
+      path: null,
+      options: {}
+    }));
   });
 
 program.parse(process.argv);

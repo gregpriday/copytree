@@ -4,15 +4,20 @@ module.exports = {
   // Test file patterns
   testMatch: [
     '**/tests/**/*.test.js',
-    '**/tests/**/*.spec.js'
+    '**/tests/**/*.spec.js',
+    '**/tests/**/*.test.jsx',
+    '**/tests/**/*.spec.jsx'
   ],
   
   // Coverage configuration
   collectCoverage: false, // Set to true when running coverage
   collectCoverageFrom: [
     'src/**/*.js',
+    'src/**/*.jsx',
     '!src/**/*.test.js',
     '!src/**/*.spec.js',
+    '!src/**/*.test.jsx',
+    '!src/**/*.spec.jsx',
     '!src/index.js' // CLI entry point
   ],
   coverageDirectory: 'coverage',
@@ -43,12 +48,12 @@ module.exports = {
   
   // Transform files
   transform: {
-    '^.+\\.js$': 'babel-jest'
+    '^.+\\.(js|jsx)$': 'babel-jest'
   },
   
   // Transform ignore patterns to handle ES modules
   transformIgnorePatterns: [
-    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy)/)'
+    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy|ink-testing-library|ink|ink-spinner)/)'
   ],
   
   // Ignore patterns

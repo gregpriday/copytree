@@ -9,6 +9,11 @@ class Stage {
     this.options = options;
     this.config = config();
     this.name = this.constructor.name;
+    this.pipeline = options.pipeline; // Reference to parent pipeline for event emission
+    
+    // Performance optimization: throttle file events
+    this.fileEventCount = 0;
+    this.lastFileEventTime = 0;
   }
 
   /**
@@ -41,11 +46,22 @@ class Stage {
   }
 
   /**
-   * Log a message (respects debug settings)
+   * Log a message and emit stage events for UI
    * @param {string} message - Message to log
    * @param {string} level - Log level (info, warn, error, debug)
    */
   log(message, level = 'info') {
+    // Emit event for UI if pipeline is available
+    if (this.pipeline) {
+      this.pipeline.emit('stage:log', {
+        stage: this.name,
+        message,
+        level,
+        timestamp: Date.now()
+      });
+    }
+
+    // Original logging behavior for debug mode or errors
     if (this.config.get('app.debug') || level === 'error') {
       const prefix = `[${this.name}]`;
       
@@ -64,6 +80,46 @@ class Stage {
         default:
           console.log(prefix, message);
       }
+    }
+  }
+
+  /**
+   * Emit progress update for current stage
+   * @param {number} progress - Progress percentage (0-100)
+   * @param {string} message - Optional progress message
+   */
+  emitProgress(progress, message) {
+    if (this.pipeline) {
+      this.pipeline.emit('stage:progress', {
+        stage: this.name,
+        progress,
+        message,
+        timestamp: Date.now()
+      });
+    }
+  }
+
+  /**
+   * Emit file processing event (throttled for performance)
+   * @param {string} filePath - Path of file being processed
+   * @param {string} action - Action being performed
+   */
+  emitFileEvent(filePath, action = 'processed') {
+    if (!this.pipeline) return;
+    
+    this.fileEventCount++;
+    const now = Date.now();
+    
+    // Only emit every 20th file or every 100ms
+    if (this.fileEventCount % 20 === 0 || now - this.lastFileEventTime > 100) {
+      this.pipeline.emit('file:batch', {
+        stage: this.name,
+        count: this.fileEventCount,
+        lastFile: filePath,
+        action,
+        timestamp: now
+      });
+      this.lastFileEventTime = now;
     }
   }
 
