@@ -26,7 +26,7 @@ class BaseTransformer {
     // Heavy transformers will show progress during processing
     this.isHeavy = false;
     
-    // Cache will be initialized on first use for heavy transformers
+    // Cache will be initialized on first use if caching is enabled
     this.cache = null;
   }
 
@@ -34,7 +34,7 @@ class BaseTransformer {
    * Initialize cache if needed
    */
   initializeCache() {
-    if (!this.cache && this.cacheEnabled && this.isHeavy) {
+    if (!this.cache && this.cacheEnabled) {
       const transformerName = this.constructor.name.toLowerCase().replace('transformer', '');
       const specificConfig = `cache.transformations.${transformerName}`;
       

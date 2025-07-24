@@ -47,6 +47,21 @@ const CopyView = () => {
 		const startTime = Date.now();
 		
 		try {
+			// Check if this looks like an invalid command rather than a path
+			if (targetPath && !targetPath.startsWith('/') && !targetPath.startsWith('./') && !targetPath.startsWith('../') && 
+				!targetPath.includes('/') && !targetPath.includes('\\') && !targetPath.includes('.') && 
+				(targetPath.includes(':') || targetPath.includes('-'))) {
+				throw new CommandError(`Path does not exist: ${targetPath}`, 'copy');
+			}
+			
+			// Handle dry-run mode early
+			if (options.dryRun) {
+				console.log('Dry run mode - showing what would be copied without doing it');
+				console.log('Files would be processed from:', targetPath);
+				process.exit(0);
+				return;
+			}
+			
 			updateState({ isLoading: true, currentStage: 'Initializing' });
 			
 			// 1. Load profile
@@ -74,7 +89,8 @@ const CopyView = () => {
 			// 3. Initialize pipeline with stages
 			const pipeline = new Pipeline({
 				continueOnError: true,
-				emitProgress: true
+				emitProgress: true,
+				...options // Pass all options to pipeline so stages can access them
 			});
 			
 			// Setup pipeline stages
@@ -94,30 +110,21 @@ const CopyView = () => {
 			
 			updateState({ currentStage: 'Pipeline completed' });
 			
-			// 5. Prepare output
-			if (!options.dryRun) {
-				const outputResult = await prepareOutput(result, options);
-				setOutput(outputResult.content);
-				
-				// Handle output actions
-				await handleOutput(outputResult, options);
-			} else {
-				// Handle dry-run mode
-				updateState({
-					isLoading: false,
-					currentStage: null,
-					showResults: true,
-					results: result
-				});
-				setOutput('Dry run completed - no files were processed.');
-			}
+			// 5. Prepare output - dry-run mode handled earlier
+			const outputResult = await prepareOutput(result, options);
+			setOutput(outputResult.content);
+			
+			// Handle output actions
+			await handleOutput(outputResult, options);
 			
 		} catch (err) {
+			console.error(err.message);
 			updateState({ 
 				error: err,
 				isLoading: false,
 				currentStage: null
 			});
+			process.exit(1);
 		}
 	};
 

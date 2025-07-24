@@ -1,20 +1,18 @@
 const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
-const chalk = require('chalk');
 const { execSync } = require('child_process');
 const { logger } = require('../utils/logger');
 const { CommandError } = require('../utils/errors');
 
 /**
  * Install copytree command - Set up CopyTree environment and configuration
+ * (Now handled by InstallView component)
  */
 async function installCopytreeCommand(options = {}) {
   const startTime = Date.now();
   
   try {
-    console.log(chalk.bold('CopyTree Installation Setup\n'));
-    
     const steps = [];
     
     // Step 1: Create directories
@@ -57,30 +55,13 @@ async function installCopytreeCommand(options = {}) {
       details: `Created ${profiles.created} example profiles`
     });
     
-    // Display results
-    console.log(chalk.bold('\nInstallation Summary:\n'));
-    
-    for (const step of steps) {
-      const icon = step.status === 'success' ? chalk.green('✓') :
-                   step.status === 'warning' ? chalk.yellow('⚠') :
-                   chalk.gray('○');
-      console.log(`${icon} ${step.name}: ${step.details}`);
-    }
-    
-    // Show next steps
-    console.log(chalk.bold('\nNext Steps:\n'));
-    console.log('1. Set up your API keys:');
-    console.log(chalk.gray(`   export GEMINI_API_KEY=your-key-here`));
-    console.log();
-    console.log('2. Create your first profile:');
-    console.log(chalk.gray(`   copytree profile:create`));
-    console.log();
-    console.log('3. Run copytree on your project:');
-    console.log(chalk.gray(`   copytree --profile default`));
-    console.log();
-    
     const duration = Date.now() - startTime;
-    console.log(chalk.green(`✓ Installation completed in ${duration}ms`));
+    
+    return {
+      steps,
+      duration,
+      success: true
+    };
     
   } catch (error) {
     logger.error('Installation failed', { 

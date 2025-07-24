@@ -6,6 +6,8 @@ const { AppProvider, useAppContext } = require('./contexts/AppContext.js');
 const CopyView = require('./components/CopyView.jsx');
 const ProfileListView = require('./components/ProfileListView.jsx');
 const ValidationView = require('./components/ValidationView.jsx');
+const DocsView = require('./components/DocsView.jsx');
+const InstallView = require('./components/InstallView.jsx');
 
 const AppContent = () => {
 	const { command, updateState } = useAppContext();
@@ -28,6 +30,10 @@ const AppContent = () => {
 					successMessage: 'Cache cleared successfully',
 					type: 'cache'
 				});
+			case 'copy:docs':
+				return React.createElement(DocsView);
+			case 'install:copytree':
+				return React.createElement(InstallView);
 			default:
 				return React.createElement(Text, { color: 'red' }, `Unknown command: ${command}`);
 		}

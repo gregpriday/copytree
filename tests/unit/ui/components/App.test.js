@@ -3,14 +3,14 @@ const React = require('react');
 describe('App Component', () => {
 	test('App module can be required without errors', () => {
 		expect(() => {
-			const App = require('../../../../src/ui/App.jsx');
+			const App = require('../../../../src/ui/App.js');
 			expect(typeof App).toBe('function');
 		}).not.toThrow();
 	});
 
 	test('AppContext can be required without errors', () => {
 		expect(() => {
-			const { AppProvider, useAppContext } = require('../../../../src/ui/contexts/AppContext.jsx');
+			const { AppProvider, useAppContext } = require('../../../../src/ui/contexts/AppContext.js');
 			expect(typeof AppProvider).toBe('function');
 			expect(typeof useAppContext).toBe('function');
 		}).not.toThrow();

@@ -1,201 +1,289 @@
+const React = require('react');
+const { useEffect, useState } = React;
+const { Box, Text } = require('ink');
+const { useAppContext } = require('../contexts/AppContext.js');
 const fs = require('fs-extra');
 const path = require('path');
 const clipboardy = require('clipboardy');
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
+
+const TopicsList = ({ topics }) => {
+	if (!topics || topics.length === 0) {
+		return null;
+	}
+
+	return React.createElement(
+		Box,
+		{ flexDirection: 'column' },
+		React.createElement(
+			Text,
+			{ bold: true, color: 'yellow' },
+			'Available Documentation Topics:'
+		),
+		React.createElement(Box, { marginTop: 1 }, null),
+		...topics.map(section => 
+			React.createElement(
+				Box,
+				{ key: section.title, flexDirection: 'column', marginBottom: 1 },
+				React.createElement(
+					Text,
+					{ color: section.color, bold: true },
+					section.title + ':'
+				),
+				...section.items.map(item =>
+					React.createElement(
+						Box,
+						{ key: item.name, marginLeft: 2 },
+						React.createElement(
+							Text,
+							{ bold: true },
+							item.name.padEnd(20)
+						),
+						React.createElement(
+							Text,
+							{ dimColor: true },
+							item.description
+						)
+					)
+				)
+			)
+		),
+		React.createElement(
+			Text,
+			{ dimColor: true, marginTop: 1 },
+			'Usage: copytree copy:docs --topic <name>'
+		)
+	);
+};
+
+const DocContent = ({ content, stats, action }) => {
+	return React.createElement(
+		Box,
+		{ flexDirection: 'column' },
+		React.createElement(
+			Text,
+			{ color: 'green', bold: true },
+			`✓ ${action}`
+		),
+		stats && React.createElement(
+			Text,
+			{ dimColor: true },
+			`${stats.lines} lines, ${stats.characters} characters`
+		)
+	);
+};
+
+const DocsView = () => {
+	const { options, updateState } = useAppContext();
+	const [loading, setLoading] = useState(true);
+	const [topics, setTopics] = useState([]);
+	const [result, setResult] = useState(null);
+	const [error, setError] = useState(null);
+
+	useEffect(() => {
+		const runDocsCommand = async () => {
+			try {
+				const docsDir = path.join(__dirname, '../../../docs');
+				const topic = options.topic;
+
+				if (!topic) {
+					// List available topics
+					const availableTopics = await getAvailableTopics(docsDir);
+					setTopics(availableTopics);
+				} else {
+					// Load and handle documentation
+					const docContent = await loadDocumentation(docsDir, topic);
+					
+					if (!docContent) {
+						throw new Error(`Documentation not found for topic: ${topic}`);
+					}
+
+					const stats = {
+						lines: docContent.split('\n').length,
+						characters: docContent.length
+					};
+
+					// Handle output
+					let action = '';
+					if (options.output) {
+						await fs.writeFile(options.output, docContent, 'utf8');
+						action = `Documentation written to ${options.output}`;
+					} else if (options.clipboard !== false) {
+						await clipboardy.write(docContent);
+						action = `Documentation for "${topic}" copied to clipboard`;
+					} else {
+						action = 'Documentation displayed';
+					}
+
+					setResult({ content: docContent, stats, action });
+				}
+			} catch (err) {
+				setError(err.message);
+				updateState({ error: err });
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		runDocsCommand();
+	}, [options, updateState]);
+
+	if (loading) {
+		return React.createElement(
+			Text,
+			{ color: 'blue' },
+			'Loading documentation...'
+		);
+	}
+
+	if (error) {
+		return React.createElement(
+			Text,
+			{ color: 'red' },
+			`Error: ${error}`
+		);
+	}
+
+	if (topics.length > 0) {
+		return React.createElement(TopicsList, { topics });
+	}
+
+	if (result) {
+		return React.createElement(DocContent, {
+			content: result.content,
+			stats: result.stats,
+			action: result.action
+		});
+	}
+
+	return React.createElement(
+		Text,
+		{ color: 'yellow' },
+		'No documentation found'
+	);
+};
 
 /**
- * Copy docs command - Copy framework/library documentation
+ * Get available documentation topics
  */
-async function copyDocsCommand(options) {
-  try {
-    // Determine docs directory
-    const docsDir = path.join(__dirname, '../../docs');
-    
-    // Get topic from options
-    const topic = options.topic;
-    
-    if (!topic) {
-      // List available topics
-      await listAvailableTopics(docsDir);
-      return;
-    }
-    
-    // Find and load documentation
-    const docContent = await loadDocumentation(docsDir, topic);
-    
-    if (!docContent) {
-      throw new CommandError(
-        `Documentation not found for topic: ${topic}`,
-        'copy:docs'
-      );
-    }
-    
-    // Handle output
-    if (options.output) {
-      // Write to file
-      await fs.writeFile(options.output, docContent, 'utf8');
-    } else if (options.clipboard !== false) {
-      // Copy to clipboard (default)
-      await clipboardy.write(docContent);
-    }
-    
-    // Return result for UI
-    return {
-      content: docContent,
-      stats: {
-        lines: docContent.split('\n').length,
-        characters: docContent.length
-      },
-      action: options.output ? `Documentation written to ${options.output}` :
-              options.clipboard !== false ? `Documentation for "${topic}" copied to clipboard` :
-              'Documentation displayed'
-    };
-    
-  } catch (error) {
-    logger.error('Copy docs command failed', { 
-      error: error.message,
-      stack: error.stack 
-    });
-    
-    if (error instanceof CommandError) {
-      throw error;
-    }
-    
-    throw new CommandError(
-      `Failed to copy documentation: ${error.message}`,
-      'copy:docs'
-    );
-  }
-}
+async function getAvailableTopics(docsDir) {
+	const topics = [];
 
-/**
- * List available documentation topics (now handled by DocsView component)
- */
-async function listAvailableTopics(docsDir) {
-  const topics = [];
+	// Check for framework docs
+	const frameworksDir = path.join(docsDir, 'frameworks');
+	if (await fs.pathExists(frameworksDir)) {
+		const frameworks = await fs.readdir(frameworksDir);
+		const frameworkItems = [];
+		
+		for (const file of frameworks) {
+			if (file.endsWith('.md')) {
+				const name = path.basename(file, '.md');
+				frameworkItems.push({
+					name,
+					description: 'Framework-specific documentation'
+				});
+			}
+		}
+		
+		if (frameworkItems.length > 0) {
+			topics.push({
+				title: 'Frameworks',
+				color: 'blue',
+				items: frameworkItems
+			});
+		}
+	}
 
-  // Check for framework docs
-  const frameworksDir = path.join(docsDir, 'frameworks');
-  if (await fs.pathExists(frameworksDir)) {
-    const frameworks = await fs.readdir(frameworksDir);
-    const frameworkItems = [];
-    
-    for (const file of frameworks) {
-      if (file.endsWith('.md')) {
-        const name = path.basename(file, '.md');
-        frameworkItems.push({
-          name,
-          description: 'Framework-specific documentation'
-        });
-      }
-    }
-    
-    if (frameworkItems.length > 0) {
-      topics.push({
-        title: 'Frameworks',
-        color: 'blue',
-        items: frameworkItems
-      });
-    }
-  }
+	// Check for topic docs
+	const topicsDir = path.join(docsDir, 'topics');
+	if (await fs.pathExists(topicsDir)) {
+		const topicFiles = await fs.readdir(topicsDir);
+		const topicItems = [];
+		
+		for (const file of topicFiles) {
+			if (file.endsWith('.md')) {
+				const name = path.basename(file, '.md');
+				const description = await getTopicDescription(path.join(topicsDir, file));
+				topicItems.push({ name, description });
+			}
+		}
+		
+		if (topicItems.length > 0) {
+			topics.push({
+				title: 'Topics',
+				color: 'green',
+				items: topicItems
+			});
+		}
+	}
 
-  // Check for topic docs
-  const topicsDir = path.join(docsDir, 'topics');
-  if (await fs.pathExists(topicsDir)) {
-    const topicFiles = await fs.readdir(topicsDir);
-    const topicItems = [];
-    
-    for (const file of topicFiles) {
-      if (file.endsWith('.md')) {
-        const name = path.basename(file, '.md');
-        const description = await getTopicDescription(path.join(topicsDir, file));
-        topicItems.push({ name, description });
-      }
-    }
-    
-    if (topicItems.length > 0) {
-      topics.push({
-        title: 'Topics',
-        color: 'green',
-        items: topicItems
-      });
-    }
-  }
+	// Built-in docs
+	topics.push({
+		title: 'Built-in',
+		color: 'magenta',
+		items: [
+			{ name: 'profiles', description: 'Profile system documentation' },
+			{ name: 'transformers', description: 'File transformer documentation' },
+			{ name: 'pipeline', description: 'Pipeline architecture documentation' },
+			{ name: 'configuration', description: 'Configuration guide' }
+		]
+	});
 
-  // Built-in docs
-  topics.push({
-    title: 'Built-in',
-    color: 'magenta',
-    items: [
-      { name: 'profiles', description: 'Profile system documentation' },
-      { name: 'transformers', description: 'File transformer documentation' },
-      { name: 'pipeline', description: 'Pipeline architecture documentation' },
-      { name: 'configuration', description: 'Configuration guide' }
-    ]
-  });
-
-  return topics;
+	return topics;
 }
 
 /**
  * Load documentation for a topic
  */
 async function loadDocumentation(docsDir, topic) {
-  // Check different locations
-  const locations = [
-    path.join(docsDir, 'frameworks', `${topic}.md`),
-    path.join(docsDir, 'topics', `${topic}.md`),
-    path.join(docsDir, `${topic}.md`)
-  ];
-  
-  for (const location of locations) {
-    if (await fs.pathExists(location)) {
-      return await fs.readFile(location, 'utf8');
-    }
-  }
-  
-  // Check for built-in documentation
-  const builtInDocs = await getBuiltInDocumentation(topic);
-  if (builtInDocs) {
-    return builtInDocs;
-  }
-  
-  return null;
+	// Check different locations
+	const locations = [
+		path.join(docsDir, 'frameworks', `${topic}.md`),
+		path.join(docsDir, 'topics', `${topic}.md`),
+		path.join(docsDir, `${topic}.md`)
+	];
+
+	for (const location of locations) {
+		if (await fs.pathExists(location)) {
+			return await fs.readFile(location, 'utf8');
+		}
+	}
+
+	// Check for built-in documentation
+	return getBuiltInDocumentation(topic);
 }
 
 /**
  * Get description from topic file
  */
 async function getTopicDescription(filePath) {
-  try {
-    const content = await fs.readFile(filePath, 'utf8');
-    const lines = content.split('\n');
-    
-    // Look for description in first few lines
-    for (let i = 0; i < Math.min(10, lines.length); i++) {
-      const line = lines[i].trim();
-      if (line.startsWith('Description:') || line.startsWith('Summary:')) {
-        return line.split(':')[1].trim();
-      }
-      // Also check for subtitle after title
-      if (i === 1 && !line.startsWith('#') && line.length > 0) {
-        return line;
-      }
-    }
-    
-    return 'Documentation available';
-  } catch (error) {
-    return 'Documentation available';
-  }
+	try {
+		const content = await fs.readFile(filePath, 'utf8');
+		const lines = content.split('\n');
+
+		// Look for description in first few lines
+		for (let i = 0; i < Math.min(10, lines.length); i++) {
+			const line = lines[i].trim();
+			if (line.startsWith('Description:') || line.startsWith('Summary:')) {
+				return line.split(':')[1].trim();
+			}
+			// Also check for subtitle after title
+			if (i === 1 && !line.startsWith('#') && line.length > 0) {
+				return line;
+			}
+		}
+
+		return 'Documentation available';
+	} catch (error) {
+		return 'Documentation available';
+	}
 }
 
 /**
- * Get built-in documentation
+ * Get built-in documentation (same as original implementation)
  */
-async function getBuiltInDocumentation(topic) {
-  const docs = {
-    profiles: `# CopyTree Profile System
+function getBuiltInDocumentation(topic) {
+	const docs = {
+		profiles: `# CopyTree Profile System
 
 ## Overview
 
@@ -270,7 +358,7 @@ Profiles are searched in this order:
 - **minimal**: Minimal output with key files only
 `,
 
-    transformers: `# CopyTree Transformers
+		transformers: `# CopyTree Transformers
 
 ## Overview
 
@@ -344,7 +432,7 @@ class MyTransformer extends BaseTransformer {
 \`\`\`
 `,
 
-    pipeline: `# CopyTree Pipeline Architecture
+		pipeline: `# CopyTree Pipeline Architecture
 
 ## Overview
 
@@ -417,7 +505,7 @@ pipeline:
 \`\`\`
 `,
 
-    configuration: `# CopyTree Configuration Guide
+		configuration: `# CopyTree Configuration Guide
 
 ## Configuration Hierarchy
 
@@ -529,9 +617,9 @@ transformers:
       lineCount: 100
 \`\`\`
 `
-  };
-  
-  return docs[topic] || null;
+	};
+
+	return docs[topic] || null;
 }
 
-module.exports = copyDocsCommand;
+module.exports = DocsView;

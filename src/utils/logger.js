@@ -1,13 +1,16 @@
 const chalk = require('chalk');
 const ora = require('ora');
 const { config } = require('../config/ConfigManager');
+const EventEmitter = require('events');
 
-class Logger {
+class Logger extends EventEmitter {
   constructor(options = {}) {
+    super();
     this.options = {
       debug: config().get('app.debug', false),
       silent: options.silent || false,
       prefix: options.prefix || 'CopyTree',
+      useInkEvents: options.useInkEvents || false, // New option for Ink integration
       ...options
     };
     
@@ -18,6 +21,15 @@ class Logger {
    * Log an info message
    */
   info(message, ...args) {
+    if (this.options.useInkEvents) {
+      this.emit('log', {
+        type: 'info',
+        message: typeof message === 'string' ? message : JSON.stringify(message),
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     if (this.options.silent) return;
     console.log(chalk.blue(`[${this.options.prefix}]`), message, ...args);
   }
@@ -26,6 +38,15 @@ class Logger {
    * Log a success message
    */
   success(message, ...args) {
+    if (this.options.useInkEvents) {
+      this.emit('log', {
+        type: 'success',
+        message: typeof message === 'string' ? message : JSON.stringify(message),
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     if (this.options.silent) return;
     console.log(chalk.green(`✓ ${message}`), ...args);
   }
@@ -34,6 +55,15 @@ class Logger {
    * Log a warning message
    */
   warn(message, ...args) {
+    if (this.options.useInkEvents) {
+      this.emit('log', {
+        type: 'warning',
+        message: typeof message === 'string' ? message : JSON.stringify(message),
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     if (this.options.silent) return;
     console.warn(chalk.yellow(`⚠ ${message}`), ...args);
   }
@@ -42,6 +72,15 @@ class Logger {
    * Log an error message
    */
   error(message, ...args) {
+    if (this.options.useInkEvents) {
+      this.emit('log', {
+        type: 'error',
+        message: typeof message === 'string' ? message : JSON.stringify(message),
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     // Errors are never silenced
     console.error(chalk.red(`✗ ${message}`), ...args);
   }
@@ -50,7 +89,18 @@ class Logger {
    * Log a debug message (only if debug mode is enabled)
    */
   debug(message, ...args) {
-    if (!this.options.debug || this.options.silent) return;
+    if (!this.options.debug) return;
+    
+    if (this.options.useInkEvents) {
+      this.emit('log', {
+        type: 'debug',
+        message: typeof message === 'string' ? message : JSON.stringify(message),
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
+    if (this.options.silent) return;
     console.log(chalk.gray(`[DEBUG] ${message}`), ...args);
   }
 
@@ -58,6 +108,15 @@ class Logger {
    * Start a spinner with a message
    */
   startSpinner(message) {
+    if (this.options.useInkEvents) {
+      this.emit('progress', {
+        type: 'start',
+        message,
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     if (this.options.silent || !process.stdout.isTTY) return;
     
     this.stopSpinner(); // Stop any existing spinner
@@ -71,6 +130,15 @@ class Logger {
    * Update spinner text
    */
   updateSpinner(message) {
+    if (this.options.useInkEvents) {
+      this.emit('progress', {
+        type: 'update',
+        message,
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     if (this.spinner && process.stdout.isTTY) {
       this.spinner.text = message;
     }
@@ -80,6 +148,15 @@ class Logger {
    * Stop spinner with success
    */
   succeedSpinner(message) {
+    if (this.options.useInkEvents) {
+      this.emit('progress', {
+        type: 'success',
+        message,
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     if (this.spinner) {
       this.spinner.succeed(message || this.spinner.text);
       this.spinner = null;
@@ -90,6 +167,15 @@ class Logger {
    * Stop spinner with failure
    */
   failSpinner(message) {
+    if (this.options.useInkEvents) {
+      this.emit('progress', {
+        type: 'error',
+        message,
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     if (this.spinner) {
       this.spinner.fail(message || this.spinner.text);
       this.spinner = null;
@@ -100,6 +186,14 @@ class Logger {
    * Stop spinner without status
    */
   stopSpinner() {
+    if (this.options.useInkEvents) {
+      this.emit('progress', {
+        type: 'stop',
+        timestamp: Date.now()
+      });
+      return;
+    }
+    
     if (this.spinner) {
       this.spinner.stop();
       // Clear the line after stopping
@@ -163,6 +257,20 @@ class Logger {
       ...this.options,
       prefix: `${this.options.prefix}:${prefix}`
     });
+  }
+
+  /**
+   * Enable or disable Ink events mode
+   */
+  setInkEventsMode(enabled) {
+    this.options.useInkEvents = enabled;
+  }
+
+  /**
+   * Check if Ink events mode is enabled
+   */
+  isInkEventsMode() {
+    return this.options.useInkEvents;
   }
 
   /**
