@@ -8,6 +8,7 @@ const { config } = require('../config/ConfigManager');
 const Clipboard = require('../utils/clipboard');
 const fs = require('fs-extra');
 const path = require('path');
+const GitHubUrlHandler = require('../services/GitHubUrlHandler');
 
 /**
  * Main copy command implementation
@@ -26,9 +27,18 @@ async function copyCommand(targetPath = '.', options = {}) {
     const profile = await loadProfile(profileLoader, profileName, options);
     
     // 2. Validate and resolve path
-    const basePath = path.resolve(targetPath);
-    if (!await fs.pathExists(basePath)) {
-      throw new CommandError(`Path does not exist: ${basePath}`, 'copy');
+    let basePath;
+    if (GitHubUrlHandler.isGitHubUrl(targetPath)) {
+      // For GitHub URLs, clone/update the repository and get the local path
+      logger.updateSpinner('Cloning GitHub repository');
+      const githubHandler = new GitHubUrlHandler(targetPath);
+      basePath = await githubHandler.getFiles();
+      logger.info(`Using GitHub repository: ${targetPath}`);
+    } else {
+      basePath = path.resolve(targetPath);
+      if (!await fs.pathExists(basePath)) {
+        throw new CommandError(`Path does not exist: ${basePath}`, 'copy');
+      }
     }
     
     // 3. Update to processing
