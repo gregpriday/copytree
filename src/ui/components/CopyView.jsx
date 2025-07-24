@@ -108,14 +108,14 @@ const CopyView = () => {
 				startTime
 			});
 			
-			updateState({ currentStage: 'Pipeline completed' });
+			// Don't set currentStage here - let the completion message handle it
 			
 			// 5. Prepare output - dry-run mode handled earlier
 			const outputResult = await prepareOutput(result, options);
 			setOutput(outputResult.content);
 			
-			// Handle output actions
-			await handleOutput(outputResult, options);
+			// Handle output actions and create completion message
+			const completionMessage = await handleOutputAndCreateMessage(outputResult, options, result);
 			
 		} catch (err) {
 			console.error(err.message);
@@ -239,7 +239,23 @@ const CopyView = () => {
 		};
 	};
 
-	const handleOutput = async (outputResult, options) => {
+	const handleOutputAndCreateMessage = async (outputResult, options, result) => {
+		const stats = result.stats || {};
+		const fileCount = stats.totalFiles || stats.processedFiles || stats.fileCount || 0;
+		const totalSize = outputResult.content ? outputResult.content.length : 0;
+		
+		// Helper function to format bytes
+		const formatBytes = (bytes) => {
+			if (bytes === 0) return '0 B';
+			const k = 1024;
+			const sizes = ['B', 'KB', 'MB', 'GB'];
+			const i = Math.floor(Math.log(bytes) / Math.log(k));
+			return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+		};
+
+		let destination = '';
+		let action = '';
+
 		// Handle --as-reference option
 		if (options.asReference) {
 			const format = options.format || 'xml';
@@ -249,56 +265,62 @@ const CopyView = () => {
 			
 			try {
 				await Clipboard.copyFileReference(tempFile);
-				updateState({ 
-					showResults: true,
-					output: `Copied file reference to ${path.basename(tempFile)} to clipboard`
-				});
+				destination = '';
+				action = 'copied as file';
 			} catch (error) {
-				updateState({ 
-					showResults: true,
-					output: `Failed to copy reference to clipboard. Output saved to: ${tempFile}`
-				});
+				destination = tempFile;
+				action = 'saved';
 			}
-			return;
-		}
-		
-		if (options.output) {
+		} else if (options.output) {
 			await fs.writeFile(options.output, outputResult.content, 'utf8');
-			updateState({ 
-				showResults: true,
-				output: `Output saved to: ${options.output}`
-			});
+			destination = options.output;
+			action = 'saved';
 		} else if (options.clipboard) {
 			await Clipboard.copyText(outputResult.content);
-			updateState({ 
-				showResults: true,
-				output: 'Output copied to clipboard'
-			});
+			destination = 'clipboard';
+			action = 'copied';
 		} else if (options.display) {
-			updateState({ 
-				showResults: true,
-				output: outputResult.content
-			});
+			destination = 'terminal';
+			action = 'displayed';
 		} else {
 			// Default: copy to clipboard
 			try {
 				await Clipboard.copyText(outputResult.content);
-				updateState({ 
-					showResults: true,
-					output: 'Output copied to clipboard'
-				});
+				destination = 'clipboard';
+				action = 'copied';
 			} catch (error) {
 				// If clipboard fails, save to temporary file
 				const format = options.format || 'xml';
 				const extension = format === 'json' ? 'json' : 'xml';
 				const tempFile = path.join(require('os').tmpdir(), `copytree-${Date.now()}.${extension}`);
 				await fs.writeFile(tempFile, outputResult.content, 'utf8');
-				updateState({ 
-					showResults: true,
-					output: `Failed to copy to clipboard. Output saved to: ${tempFile}`
-				});
+				destination = tempFile;
+				action = 'saved';
 			}
 		}
+
+		// Determine the appropriate icon based on the action
+		let icon = '🟢'; // default green dot
+		if (action.includes('saved') || destination.includes('.')) {
+			icon = '📄'; // file icon for saved files
+		} else if (action.includes('copied as file')) {
+			icon = '🔗'; // link icon for file references
+		} else if (action.includes('copied') || destination === 'clipboard') {
+			icon = '📋'; // clipboard icon for clipboard operations
+		} else if (destination === 'terminal' || action.includes('displayed')) {
+			icon = '💻'; // terminal icon for display
+		}
+
+		// Create comprehensive completion message with icon
+		const sizeText = totalSize > 0 ? ` [${formatBytes(totalSize)}]` : '';
+		const completionMessage = destination 
+			? `${fileCount} files${sizeText} ${action} to ${destination}`
+			: `${fileCount} files${sizeText} ${action}`;
+		
+		updateState({ 
+			currentStage: `ICON:${icon}:${completionMessage}`,
+			isLoading: false
+		});
 	};
 
 	if (error) {

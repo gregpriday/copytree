@@ -25,7 +25,8 @@ const AppProvider = ({ children }) => {
 		
 		// UI state
 		showResults: false,
-		logs: []
+		logs: [],
+		completionIcon: null
 	});
 
 	const updateState = useCallback((updates) => {
