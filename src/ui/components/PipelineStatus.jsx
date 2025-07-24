@@ -22,7 +22,7 @@ const PipelineStatus = ({ currentStage, isLoading, message, progress }) => {
 	
 	return React.createElement(
 		Text,
-		{ color: 'blue' },
+		{ color: isLoading ? 'blue' : 'green' },
 		icon + displayMessage + progressText
 	);
 };

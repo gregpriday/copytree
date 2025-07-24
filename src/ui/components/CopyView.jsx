@@ -280,6 +280,8 @@ const CopyView = () => {
 			destination = 'clipboard';
 			action = 'copied';
 		} else if (options.display) {
+			// Write output directly to stdout for --display option
+			process.stdout.write(outputResult.content);
 			destination = 'terminal';
 			action = 'displayed';
 		} else {
@@ -300,15 +302,15 @@ const CopyView = () => {
 		}
 
 		// Determine the appropriate icon based on the action
-		let icon = '🟢'; // default green dot
+		let icon = '✅'; // default green checkmark
 		if (action.includes('saved') || destination.includes('.')) {
-			icon = '📄'; // file icon for saved files
+			icon = '💾'; // floppy disk for saved files
 		} else if (action.includes('copied as file')) {
-			icon = '🔗'; // link icon for file references
+			icon = '📎'; // paperclip for file references
 		} else if (action.includes('copied') || destination === 'clipboard') {
-			icon = '📋'; // clipboard icon for clipboard operations
+			icon = '✅'; // green checkmark for clipboard operations
 		} else if (destination === 'terminal' || action.includes('displayed')) {
-			icon = '💻'; // terminal icon for display
+			icon = '🖥️'; // monitor for terminal display
 		}
 
 		// Create comprehensive completion message with icon
