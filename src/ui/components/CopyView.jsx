@@ -266,7 +266,7 @@ const CopyView = () => {
 			try {
 				await Clipboard.copyFileReference(tempFile);
 				destination = '';
-				action = 'copied as file';
+				action = 'copied as file reference';
 			} catch (error) {
 				destination = tempFile;
 				action = 'saved';
@@ -305,7 +305,7 @@ const CopyView = () => {
 		let icon = '✅'; // default green checkmark
 		if (action.includes('saved') || destination.includes('.')) {
 			icon = '💾'; // floppy disk for saved files
-		} else if (action.includes('copied as file')) {
+		} else if (action.includes('copied as file reference')) {
 			icon = '📎'; // paperclip for file references
 		} else if (action.includes('copied') || destination === 'clipboard') {
 			icon = '✅'; // green checkmark for clipboard operations

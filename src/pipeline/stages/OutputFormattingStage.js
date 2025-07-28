@@ -42,74 +42,72 @@ class OutputFormattingStage extends Stage {
   }
 
   formatAsXML(input) {
-    const root = create({ version: '1.0', encoding: 'UTF-8' })
-      .ele('directory', { path: input.basePath });
-
+    // Manual XML construction to avoid any escaping
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xml += `<ct:directory path="${input.basePath}">\n`;
+    
     // Add metadata
-    const metadata = root.ele('metadata');
-    metadata.ele('generated').txt(new Date().toISOString());
-    metadata.ele('fileCount').txt(input.files.length.toString());
-    metadata.ele('totalSize').txt(this.calculateTotalSize(input.files).toString());
+    xml += '  <ct:metadata>\n';
+    xml += `    <ct:generated>${new Date().toISOString()}</ct:generated>\n`;
+    xml += `    <ct:fileCount>${input.files.length}</ct:fileCount>\n`;
+    xml += `    <ct:totalSize>${this.calculateTotalSize(input.files)}</ct:totalSize>\n`;
     
     if (input.profile) {
-      metadata.ele('profile').txt(input.profile.name || 'default');
+      xml += `    <ct:profile>${input.profile.name || 'default'}</ct:profile>\n`;
     }
     
     // Add git metadata if present
     if (input.gitMetadata) {
-      const gitElement = metadata.ele('git');
+      xml += '    <ct:git>\n';
       if (input.gitMetadata.branch) {
-        gitElement.ele('branch').txt(input.gitMetadata.branch);
+        xml += `      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`;
       }
       if (input.gitMetadata.lastCommit) {
-        gitElement.ele('lastCommit', {
-          hash: input.gitMetadata.lastCommit.hash
-        }).txt(input.gitMetadata.lastCommit.message);
+        xml += `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}">${input.gitMetadata.lastCommit.message}</ct:lastCommit>\n`;
       }
       if (input.gitMetadata.filterType) {
-        gitElement.ele('filterType').txt(input.gitMetadata.filterType);
+        xml += `      <ct:filterType>${input.gitMetadata.filterType}</ct:filterType>\n`;
       }
-      gitElement.ele('hasUncommittedChanges').txt(
-        input.gitMetadata.hasUncommittedChanges ? 'true' : 'false'
-      );
+      xml += `      <ct:hasUncommittedChanges>${input.gitMetadata.hasUncommittedChanges ? 'true' : 'false'}</ct:hasUncommittedChanges>\n`;
+      xml += '    </ct:git>\n';
     }
     
     // Add directory structure to metadata
     const directoryStructure = this.generateDirectoryStructure(input.files);
     if (directoryStructure) {
-      metadata.ele('directoryStructure').txt(directoryStructure);
+      xml += `    <ct:directoryStructure>${directoryStructure}</ct:directoryStructure>\n`;
     }
-
-    // Add files
-    const filesElement = root.ele('files');
     
+    xml += '  </ct:metadata>\n';
+    xml += '  <ct:files>\n';
+    
+    // Add files
     for (const file of input.files) {
       if (file === null) continue; // Skip files that were filtered out
       
-      const fileElement = filesElement.ele('file', { 
-        path: file.path,
-        size: file.size.toString()
-      });
+      xml += `    <ct:file path="${file.path}" size="${file.size}"`;
       
       if (file.modified) {
         const modifiedDate = file.modified instanceof Date 
           ? file.modified 
           : new Date(file.modified);
-        fileElement.att('modified', modifiedDate.toISOString());
+        xml += ` modified="${modifiedDate.toISOString()}"`;
       }
       
       if (file.isBinary) {
-        fileElement.att('binary', 'true');
+        xml += ` binary="true"`;
         if (file.encoding) {
-          fileElement.att('encoding', file.encoding);
+          xml += ` encoding="${file.encoding}"`;
         }
       }
       
       if (file.gitStatus) {
-        fileElement.att('gitStatus', file.gitStatus);
+        xml += ` gitStatus="${file.gitStatus}"`;
       }
       
-      // Add content (unless --only-tree is set)
+      xml += '>';
+      
+      // Add content directly to file element (unless --only-tree is set)
       if (!this.onlyTree) {
         let content = file.content || '';
         
@@ -117,12 +115,17 @@ class OutputFormattingStage extends Stage {
           content = this.addLineNumbersToContent(content);
         }
         
-        fileElement.ele('content').txt(content);
+        // Output raw content without any escaping
+        xml += content;
       }
+      
+      xml += '</ct:file>\n';
     }
-
-    const prettyPrint = this.config.get('app.prettyPrint', true);
-    return root.end({ prettyPrint });
+    
+    xml += '  </ct:files>\n';
+    xml += '</ct:directory>\n';
+    
+    return xml;
   }
 
   formatAsJSON(input) {

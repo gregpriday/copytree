@@ -68,36 +68,36 @@ class StreamingOutputStage extends Stage {
 
     // Write XML header and metadata
     const header = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    const rootStart = `<directory path="${this.escapeXML(input.basePath)}">\n`;
+    const rootStart = `<ct:directory path="${input.basePath}">\n`;
     
     stream.write(header);
     stream.write(rootStart);
     
     // Write metadata
-    stream.write('  <metadata>\n');
-    stream.write(`    <generated>${new Date().toISOString()}</generated>\n`);
-    stream.write(`    <fileCount>${input.files.length}</fileCount>\n`);
-    stream.write(`    <totalSize>${this.calculateTotalSize(input.files)}</totalSize>\n`);
+    stream.write('  <ct:metadata>\n');
+    stream.write(`    <ct:generated>${new Date().toISOString()}</ct:generated>\n`);
+    stream.write(`    <ct:fileCount>${input.files.length}</ct:fileCount>\n`);
+    stream.write(`    <ct:totalSize>${this.calculateTotalSize(input.files)}</ct:totalSize>\n`);
     
     if (input.profile) {
-      stream.write(`    <profile>${this.escapeXML(input.profile.name || 'default')}</profile>\n`);
+      stream.write(`    <ct:profile>${input.profile.name || 'default'}</ct:profile>\n`);
     }
     
     if (input.gitMetadata) {
-      stream.write('    <git>\n');
+      stream.write('    <ct:git>\n');
       if (input.gitMetadata.branch) {
-        stream.write(`      <branch>${this.escapeXML(input.gitMetadata.branch)}</branch>\n`);
+        stream.write(`      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`);
       }
       if (input.gitMetadata.lastCommit) {
-        stream.write(`      <lastCommit hash="${this.escapeXML(input.gitMetadata.lastCommit.hash)}">${
-          this.escapeXML(input.gitMetadata.lastCommit.message)
-        }</lastCommit>\n`);
+        stream.write(`      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}">${
+          input.gitMetadata.lastCommit.message
+        }</ct:lastCommit>\n`);
       }
-      stream.write('    </git>\n');
+      stream.write('    </ct:git>\n');
     }
     
-    stream.write('  </metadata>\n');
-    stream.write('  <files>\n');
+    stream.write('  </ct:metadata>\n');
+    stream.write('  <ct:files>\n');
     
     // Transform for individual files
     stream._transform = (file, encoding, callback) => {
@@ -106,7 +106,7 @@ class StreamingOutputStage extends Stage {
         return;
       }
       
-      let xml = `    <file path="${this.escapeXML(file.path)}" size="${file.size}"`;
+      let xml = `    <ct:file path="${file.path}" size="${file.size}"`;
       
       if (file.modified) {
         const modifiedDate = file.modified instanceof Date 
@@ -126,16 +126,17 @@ class StreamingOutputStage extends Stage {
         xml += ` gitStatus="${file.gitStatus}"`;
       }
       
-      xml += '>\n';
+      xml += '>';
       
-      // Add content
+      // Add content directly to file element
       let content = file.content || '';
       if (this.addLineNumbers && !file.isBinary) {
         content = this.addLineNumbersToContent(content);
       }
       
-      xml += `      <content>${this.escapeXML(content)}</content>\n`;
-      xml += '    </file>\n';
+      // Output raw content without any escaping
+      xml += content;
+      xml += '</ct:file>\n';
       
       callback(null, xml);
     };
@@ -143,8 +144,8 @@ class StreamingOutputStage extends Stage {
     // Add end handler to close XML
     stream.on('pipe', (src) => {
       src.on('end', () => {
-        stream.write('  </files>\n');
-        stream.write('</directory>\n');
+        stream.write('  </ct:files>\n');
+        stream.write('</ct:directory>\n');
         stream.end();
       });
     });
@@ -279,15 +280,7 @@ class StreamingOutputStage extends Stage {
     transformStream.end();
   }
 
-  escapeXML(str) {
-    if (!str) return '';
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
-  }
+  // Removed escapeXML method - content is now output raw without escaping
 
   addLineNumbersToContent(content) {
     if (!content) return content;

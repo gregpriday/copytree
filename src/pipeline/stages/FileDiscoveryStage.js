@@ -14,6 +14,11 @@ class FileDiscoveryStage extends Stage {
   }
 
   async process(input) {
+    // Use basePath from input if provided, otherwise fall back to constructor option
+    if (input.basePath) {
+      this.basePath = input.basePath;
+    }
+    
     this.log(`Discovering files in ${this.basePath}`, 'debug');
     const startTime = Date.now();
 
