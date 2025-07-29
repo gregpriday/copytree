@@ -1,6 +1,6 @@
 {
   "name": "copytree",
-  "version": "1.0.0",
+  "version": "0.9.0",
   "description": "A Node.js CLI tool that copies directory structures and file contents into structured XML format",
   "bin": {
     "copytree": "./bin/copytree.js"
@@ -28,8 +28,19 @@
     "copy",
     "ai"
   ],
-  "author": "",
+  "author": "Greg Priday <greg@siteorigin.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gregpriday/copytree.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gregpriday/copytree/issues"
+  },
+  "homepage": "https://copytree.dev",
+  "engines": {
+    "node": ">=14.0.0"
+  },
   "type": "commonjs",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

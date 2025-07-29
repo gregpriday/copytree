@@ -2,6 +2,8 @@
 
 A powerful Node.js CLI tool that transforms codebases into structured, AI-friendly formats.
 
+🌐 **[copytree.dev](https://copytree.dev)**
+
 ## 🚀 Features
 
 ### Core Functionality
@@ -32,7 +34,7 @@ npm install -g copytree
 
 ### Local Development
 ```bash
-git clone <repository-url>
+git clone https://github.com/gregpriday/copytree.git
 cd copytree
 npm install
 npm link  # Makes 'copytree' available globally
@@ -247,7 +249,7 @@ Run benchmarks: `npm run benchmark`
 
 ### Setup
 ```bash
-git clone <repository-url>
+git clone https://github.com/gregpriday/copytree.git
 cd copytree
 npm install
 
