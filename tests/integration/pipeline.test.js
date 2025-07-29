@@ -127,10 +127,10 @@ describe('Pipeline Integration Tests', () => {
         options: {}
       });
 
-      expect(result.output).toContain('<directory');
-      expect(result.output).toContain('<file path="index.js"');
+      expect(result.output).toContain('<ct:directory');
+      expect(result.output).toContain('<ct:file path="index.js"');
       expect(result.output).toContain('console.log("Hello");');
-      expect(result.output).toContain('</directory>');
+      expect(result.output).toContain('</ct:directory>');
     });
 
     it('should generate JSON output', async () => {

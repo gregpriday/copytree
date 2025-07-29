@@ -148,7 +148,7 @@ describe('Command Integration Tests', () => {
       
       const content = nodeFs.readFileSync(fullOutputPath, 'utf8');
       expect(content).toContain('<?xml');
-      expect(content).toMatch(/<files[\s\/>]/); // Match <files> or <files/>
+      expect(content).toMatch(/<ct:files[\s\/>]/); // Match <ct:files> or <ct:files/>
     });
 
     test('should copy with dry-run flag', async () => {
