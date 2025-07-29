@@ -6,6 +6,8 @@ const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
+const inquirer = require('inquirer');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const InstallStep = ({ step, isActive, isCompleted }) => {
 	const getIcon = () => {
@@ -53,27 +55,23 @@ const NextSteps = () => {
 		React.createElement(
 			Box,
 			{ marginTop: 1, flexDirection: 'column', marginLeft: 2 },
-			React.createElement(
-				Text,
-				null,
-				'1. Set up your API keys:'
-			),
-			React.createElement(
-				Text,
-				{ dimColor: true, marginLeft: 2 },
-				'export GEMINI_API_KEY=your-key-here'
-			),
-			React.createElement(Text, { marginTop: 1 }, '2. Create your first profile:'),
+			React.createElement(Text, null, '1. Create your first profile:'),
 			React.createElement(
 				Text,
 				{ dimColor: true, marginLeft: 2 },
 				'copytree profile:create'
 			),
-			React.createElement(Text, { marginTop: 1 }, '3. Run copytree on your project:'),
+			React.createElement(Text, { marginTop: 1 }, '2. Run copytree on your project:'),
 			React.createElement(
 				Text,
 				{ dimColor: true, marginLeft: 2 },
 				'copytree --profile default'
+			),
+			React.createElement(Text, { marginTop: 1 }, '3. Use AI-powered transformers:'),
+			React.createElement(
+				Text,
+				{ dimColor: true, marginLeft: 2 },
+				'copytree --transform'
 			)
 		)
 	);
@@ -96,6 +94,7 @@ const InstallView = () => {
 					{ name: 'Create directories', details: '' },
 					{ name: 'Copy default configuration', details: '' },
 					{ name: 'Set up environment', details: '' },
+					{ name: 'Set up Gemini API key', details: '' },
 					{ name: 'Check dependencies', details: '' },
 					{ name: 'Create example profiles', details: '' }
 				];
@@ -132,20 +131,30 @@ const InstallView = () => {
 				};
 				setSteps([...installSteps]);
 
-				// Step 4: Check dependencies
+				// Step 4: Set up Gemini API key
 				setCurrentStep(3);
-				const deps = await checkDependencies();
+				const apiKeySetup = await setupGeminiApiKey();
 				installSteps[3] = {
+					name: 'Set up Gemini API key',
+					status: apiKeySetup.status,
+					details: apiKeySetup.message
+				};
+				setSteps([...installSteps]);
+
+				// Step 5: Check dependencies
+				setCurrentStep(4);
+				const deps = await checkDependencies();
+				installSteps[4] = {
 					name: 'Check dependencies',
 					status: deps.allGood ? 'success' : 'warning',
 					details: deps.message
 				};
 				setSteps([...installSteps]);
 
-				// Step 5: Create example profiles
-				setCurrentStep(4);
+				// Step 6: Create example profiles
+				setCurrentStep(5);
 				const profiles = await createExampleProfiles();
-				installSteps[4] = {
+				installSteps[5] = {
 					name: 'Create example profiles',
 					status: profiles.created > 0 ? 'success' : 'skipped',
 					details: `Created ${profiles.created} example profiles`
@@ -461,6 +470,122 @@ output:
 	}
 
 	return { created };
+}
+
+/**
+ * Set up Gemini API key interactively
+ */
+async function setupGeminiApiKey() {
+	const homeDir = os.homedir();
+	const envPath = path.join(homeDir, '.copytree', '.env');
+	
+	try {
+		// Read existing .env file
+		let envContent = '';
+		if (await fs.pathExists(envPath)) {
+			envContent = await fs.readFile(envPath, 'utf8');
+		}
+		
+		// Check if API key is already set
+		const hasApiKey = envContent.includes('GEMINI_API_KEY=') && 
+						  !envContent.match(/GEMINI_API_KEY=\s*$/m);
+		
+		if (hasApiKey) {
+			return {
+				status: 'skipped',
+				message: 'API key already configured'
+			};
+		}
+		
+		// Prompt for API key
+		console.log('\n'); // Add space for inquirer prompt
+		const answers = await inquirer.prompt([
+			{
+				type: 'input',
+				name: 'apiKey',
+				message: 'Enter your Gemini API key (get one at https://makersuite.google.com/app/apikey):',
+				validate: (input) => {
+					if (!input || input.trim().length === 0) {
+						return 'API key is required for AI features';
+					}
+					if (input.trim().length < 20) {
+						return 'API key seems too short';
+					}
+					return true;
+				}
+			},
+			{
+				type: 'confirm',
+				name: 'validateKey',
+				message: 'Would you like to validate the API key now?',
+				default: true
+			}
+		]);
+		
+		// Optionally validate the API key
+		if (answers.validateKey) {
+			try {
+				const genAI = new GoogleGenerativeAI(answers.apiKey.trim());
+				const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+				await model.generateContent('Hello, this is a test.');
+				console.log('\n✓ API key validated successfully!');
+			} catch (error) {
+				console.log('\n⚠ API key validation failed:', error.message);
+				const continueAnyway = await inquirer.prompt([
+					{
+						type: 'confirm',
+						name: 'continue',
+						message: 'Continue with this API key anyway?',
+						default: false
+					}
+				]);
+				if (!continueAnyway.continue) {
+					return {
+						status: 'warning',
+						message: 'API key setup cancelled'
+					};
+				}
+			}
+		}
+		
+		// Update .env file with the API key
+		if (envContent.includes('GEMINI_API_KEY=')) {
+			// Replace existing empty key
+			envContent = envContent.replace(/GEMINI_API_KEY=.*$/m, `GEMINI_API_KEY=${answers.apiKey.trim()}`);
+		} else {
+			// Add new key
+			const apiSection = envContent.indexOf('# API Keys');
+			if (apiSection > -1) {
+				const lines = envContent.split('\n');
+				let insertIndex = -1;
+				for (let i = 0; i < lines.length; i++) {
+					if (lines[i].includes('# API Keys')) {
+						insertIndex = i + 1;
+						break;
+					}
+				}
+				if (insertIndex > -1) {
+					lines.splice(insertIndex, 0, `GEMINI_API_KEY=${answers.apiKey.trim()}`);
+					envContent = lines.join('\n');
+				}
+			} else {
+				envContent += `\nGEMINI_API_KEY=${answers.apiKey.trim()}\n`;
+			}
+		}
+		
+		await fs.writeFile(envPath, envContent, 'utf8');
+		
+		return {
+			status: 'success',
+			message: 'API key configured successfully'
+		};
+		
+	} catch (error) {
+		return {
+			status: 'warning',
+			message: `Failed to set API key: ${error.message}`
+		};
+	}
 }
 
 module.exports = InstallView;

@@ -217,9 +217,9 @@ copytree --format tree
    copytree --dry-run --verbose
    ```
 
-4. **Check .ctreeignore**:
+4. **Check .copytreeignore**:
    ```bash
-   cat .ctreeignore
+   cat .copytreeignore
    ```
 
 ### Too Many Files Selected
@@ -235,9 +235,9 @@ copytree --format tree
 
 2. **Add exclusions**:
    ```bash
-   # Create .ctreeignore
-   echo "node_modules/" > .ctreeignore
-   echo "dist/" >> .ctreeignore
+   # Create .copytreeignore
+   echo "node_modules/" > .copytreeignore
+   echo "dist/" >> .copytreeignore
    ```
 
 3. **Use filters**:
@@ -320,8 +320,8 @@ copytree --format tree
 
 4. **Exclude large directories**:
    ```bash
-   echo "coverage/" >> .ctreeignore
-   echo "build/" >> .ctreeignore
+   echo "coverage/" >> .copytreeignore
+   echo "build/" >> .copytreeignore
    ```
 
 ### High Memory Usage
@@ -436,7 +436,7 @@ ls -la ~/.copytree/cache/
 ### "No files found matching criteria"
 - Current directory might be empty
 - Profile rules might be too restrictive
-- Check .gitignore and .ctreeignore
+- Check .gitignore and .copytreeignore
 
 ### "API rate limit exceeded"
 - Wait before retrying

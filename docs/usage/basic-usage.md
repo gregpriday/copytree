@@ -374,7 +374,7 @@ copytree config:validate
 
 1. **Nothing copied**: Check if files match profile rules
 2. **Too many files**: Use more specific profile or filters
-3. **Missing files**: Check .ctreeignore and gitignore
+3. **Missing files**: Check .copytreeignore and gitignore
 4. **Slow performance**: Limit scope or skip transformations
 
 ## Next Steps

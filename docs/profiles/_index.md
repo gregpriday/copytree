@@ -19,8 +19,8 @@ Real-world examples of profile configurations for various scenarios.
 ### [Advanced Profile Features](./profile-advanced.md)
 Deep dive into advanced features like inheritance, external sources, and complex rules.
 
-### [.ctreeignore Guide](./ctreeignore.md)
-Documentation on using .ctreeignore files for project-specific exclusions.
+### [.copytreeignore Guide](./copytreeignore.md)
+Documentation on using .copytreeignore files for project-specific exclusions.
 
 ### [Transformer Reference](./transformer-reference.md)
 Complete reference for all available file transformers and their options.
