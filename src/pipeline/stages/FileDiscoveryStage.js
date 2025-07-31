@@ -14,6 +14,11 @@ class FileDiscoveryStage extends Stage {
   }
 
   async process(input) {
+    // Use basePath from input if provided, otherwise fall back to constructor option
+    if (input.basePath) {
+      this.basePath = input.basePath;
+    }
+    
     this.log(`Discovering files in ${this.basePath}`, 'debug');
     const startTime = Date.now();
 
@@ -58,11 +63,11 @@ class FileDiscoveryStage extends Stage {
   }
 
   async loadCopytreeIgnore() {
-    const copytreeIgnorePath = path.join(this.basePath, '.copytreeignore');
+    const copytreeignorePath = path.join(this.basePath, '.copytreeignore');
     
-    if (await fs.pathExists(copytreeIgnorePath)) {
-      const copytreeIgnoreContent = await fs.readFile(copytreeIgnorePath, 'utf8');
-      this.parseGitignoreContent(copytreeIgnoreContent);
+    if (await fs.pathExists(copytreeignorePath)) {
+      const copytreeignoreContent = await fs.readFile(copytreeignorePath, 'utf8');
+      this.parseGitignoreContent(copytreeignoreContent);
       this.log('Loaded .copytreeignore rules', 'debug');
     }
   }

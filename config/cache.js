@@ -1,4 +1,5 @@
 const { env } = require('../src/config/ConfigManager');
+const appConfig = require('../src/config');
 
 module.exports = {
   // Cache driver
@@ -11,10 +12,11 @@ module.exports = {
   
   // File cache settings
   file: {
-    path: env('CACHE_FILE_PATH', '.copytree-cache'),
+    path: env('CACHE_FILE_PATH', null) || appConfig.getCacheDir(),
     extension: env('CACHE_FILE_EXTENSION', '.cache'),
     umask: env('CACHE_FILE_UMASK', 0o644),
     gcProbability: env('CACHE_FILE_GC_PROBABILITY', 0.01), // 1% chance of GC on write
+    maxAge: env('CACHE_FILE_MAX_AGE', 7 * 24 * 60 * 60 * 1000), // 7 days in milliseconds
   },
   
   // Memory cache settings

@@ -78,9 +78,18 @@ describe('GitHubUrlHandler', () => {
     it('should clone repository if not cached', async () => {
       // Mock that the target path exists after cloning
       fs.existsSync
-        .mockReturnValueOnce(false) // repo doesn't exist initially
-        .mockReturnValueOnce(false) // incomplete repo check
-        .mockReturnValueOnce(true); // target path exists after clone
+        .mockReturnValueOnce(false) // repoDir doesn't exist (line 68)
+        .mockReturnValueOnce(false) // repoDir check in else block (line 72)
+        .mockReturnValueOnce(false) // repoDir check before removal in cloneRepository (line 111)
+        .mockReturnValueOnce(true); // targetPath exists after clone (line 85)
+      
+      // Mock detectDefaultBranch to return 'main'
+      execSync.mockImplementation((cmd) => {
+        if (cmd.includes('ls-remote')) {
+          return 'ref: refs/heads/main\tHEAD\n';
+        }
+        return '';
+      });
       
       const targetPath = await handler.getFiles();
       

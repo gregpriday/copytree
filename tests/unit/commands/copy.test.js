@@ -158,10 +158,30 @@ describe('copy command', () => {
 
   describe('basic functionality', () => {
     it('should copy current directory with default options', async () => {
-      // Skip this test for now - it's too implementation-specific
-      // The copy command has complex internal logic that's hard to mock
-      console.log('Skipping copy command test - needs redesign');
-      expect(true).toBe(true);
+      // Test that the copy command creates a pipeline and processes files correctly
+      await copy('.', {});
+      
+      // Verify ProfileLoader was used
+      expect(ProfileLoader).toHaveBeenCalled();
+      
+      // Verify Pipeline was created and configured
+      expect(Pipeline).toHaveBeenCalled();
+      expect(mockPipeline.through).toHaveBeenCalled();
+      expect(mockPipeline.process).toHaveBeenCalledWith(expect.objectContaining({
+        basePath: expect.any(String),
+        profile: expect.any(Object),
+        options: expect.any(Object)
+      }));
+      
+      // Verify the output was copied to clipboard (default behavior)
+      expect(Clipboard.copyText).toHaveBeenCalledWith(
+        expect.stringContaining('<copytree>')
+      );
+      
+      // Verify success message was shown
+      expect(logger.success).toHaveBeenCalledWith(
+        expect.stringContaining('Copied')
+      );
     });
 
     it('should use specified profile', async () => {

@@ -17,6 +17,12 @@ class GitFilterStage extends Stage {
   }
 
   async process(input) {
+    // Use basePath from input if provided, otherwise fall back to constructor option
+    if (input.basePath) {
+      this.basePath = input.basePath;
+      this.gitUtils = new GitUtils(this.basePath);
+    }
+    
     // Skip if no git filtering is requested
     if (!this.modified && !this.changed && !this.includeGitStatus) {
       return input;

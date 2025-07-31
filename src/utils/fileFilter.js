@@ -16,8 +16,8 @@ class FileFilter {
     // Load .gitignore if it exists
     this.loadGitignore();
     
-    // Load .ctreeignore if it exists
-    this.loadCtreeignore();
+    // Load .copytreeignore if it exists
+    this.loadCopytreeignore();
   }
   
   loadGitignore() {
@@ -28,10 +28,10 @@ class FileFilter {
     }
   }
   
-  loadCtreeignore() {
-    const ctreeignorePath = path.join(this.basePath, '.ctreeignore');
-    if (fs.existsSync(ctreeignorePath)) {
-      const content = fs.readFileSync(ctreeignorePath, 'utf8');
+  loadCopytreeignore() {
+    const copytreeignorePath = path.join(this.basePath, '.copytreeignore');
+    if (fs.existsSync(copytreeignorePath)) {
+      const content = fs.readFileSync(copytreeignorePath, 'utf8');
       this.addGitignorePatterns(content);
     }
   }

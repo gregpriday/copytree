@@ -357,14 +357,14 @@ options:
   respectGitignore: true    # Use .gitignore for exclusion
 ```
 
-## Using .ctreeignore
+## Using .copytreeignore
 
 ### Project-Specific Exclusions
 
-Create `.ctreeignore` in your project:
+Create `.copytreeignore` in your project:
 
 ```bash
-# .ctreeignore
+# .copytreeignore
 # Build artifacts
 dist/
 build/
@@ -393,14 +393,14 @@ coverage/
 
 ### Ignore File Precedence
 
-1. `.ctreeignore` patterns are applied first
+1. `.copytreeignore` patterns are applied first
 2. Profile exclude rules are applied second
 3. Profile include rules select from remaining
 4. Always rules override everything
 
 ### Pattern Syntax
 
-`.ctreeignore` uses gitignore syntax:
+`.copytreeignore` uses gitignore syntax:
 
 ```bash
 # Comments start with #

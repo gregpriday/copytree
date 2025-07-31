@@ -190,13 +190,13 @@ class TransformerRegistry {
     });
 
     registry.register('markdown', new MarkdownTransformer(), {
-      extensions: ['.md', '.markdown', '.mdown', '.mkd'],
+      extensions: [], // Must be explicitly enabled - not applied automatically
       priority: 10
     });
 
     registry.register('csv', new CSVTransformer(), {
-      extensions: ['.csv', '.tsv'],
-      mimeTypes: ['text/csv', 'text/tab-separated-values'],
+      extensions: [], // Must be explicitly enabled - not applied automatically
+      mimeTypes: [], // Must be explicitly enabled - not applied automatically
       priority: 10
     });
 

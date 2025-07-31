@@ -104,7 +104,15 @@ class GitHubUrlHandler {
     if (!this.branch) {
       this.branch = await this.detectDefaultBranch();
       this.updateCacheKey();
-      this.setupCacheDirectory();
+      this.repoDir = path.join(this.cacheDir, this.cacheKey);
+    }
+
+    // Clean up existing directory if it exists
+    if (fs.existsSync(this.repoDir)) {
+      logger.warn('Repository cache already exists, removing...', { 
+        cacheDir: this.repoDir 
+      });
+      fs.rmSync(this.repoDir, { recursive: true, force: true });
     }
 
     const command = `git clone --branch ${this.branch} --single-branch ${this.repoUrl} ${this.repoDir}`;

@@ -12,10 +12,11 @@ class TransformStage extends Stage {
     this.noCache = options.noCache;
     
     // Initialize cache for transformations (disabled if noCache is true)
-    this.cache = options.cache || CacheService.create('transformations', {
-      enabled: options.cacheEnabled ?? !options.noCache,
+    // Only create cache if not disabled
+    this.cache = options.noCache ? null : (options.cache || CacheService.create('transformations', {
+      enabled: options.cacheEnabled ?? true,
       defaultTtl: 86400 // 24 hours
-    });
+    }));
   }
 
   async process(input) {
@@ -53,17 +54,21 @@ class TransformStage extends Stage {
       
       const transformerName = transformer.constructor.name;
       const cacheKey = generateTransformCacheKey(file, transformerName, this.transformerConfig[transformerName]);
-      const cached = await this.cache.get(cacheKey);
       
-      if (cached) {
-        cachedResults.set(file, cached);
-        if (cached.transformed) transformCount++;
-      } else {
-        filesToTransform.push({ file, transformer, cacheKey });
-        // Check if any transformer is heavy
-        if (transformer.isHeavy) {
-          hasHeavyTransformers = true;
+      // Only check cache for heavy transformers
+      if (transformer.isHeavy && this.cache) {
+        const cached = await this.cache.get(cacheKey);
+        if (cached) {
+          cachedResults.set(file, cached);
+          if (cached.transformed) transformCount++;
+          continue;
         }
+      }
+      
+      filesToTransform.push({ file, transformer, cacheKey });
+      // Check if any transformer is heavy
+      if (transformer.isHeavy) {
+        hasHeavyTransformers = true;
       }
     }
     
@@ -105,8 +110,10 @@ class TransformStage extends Stage {
               transformCount++;
             }
             
-            // Cache the result
-            await this.cache.set(cacheKey, transformed);
+            // Cache the result only for heavy transformers
+            if (transformer.isHeavy && this.cache) {
+              await this.cache.set(cacheKey, transformed);
+            }
             
             // Update display
             completedCount++;
