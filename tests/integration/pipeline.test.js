@@ -128,7 +128,7 @@ describe('Pipeline Integration Tests', () => {
       });
 
       expect(result.output).toContain('<ct:directory');
-      expect(result.output).toContain('<ct:file path="index.js"');
+      expect(result.output).toContain('<ct:file path="@index.js"');
       expect(result.output).toContain('console.log("Hello");');
       expect(result.output).toContain('</ct:directory>');
     });
@@ -250,7 +250,7 @@ describe('Pipeline Integration Tests', () => {
         options: {}
       });
 
-      expect(result.output.length).toBeLessThan(700); // Account for XML wrapper
+      expect(result.output.length).toBeLessThan(1600); // Account for XML wrapper and instructions
       expect(result.output).toContain('truncated due to character limit');
     });
   });

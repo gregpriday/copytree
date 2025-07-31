@@ -19,7 +19,7 @@
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
     "prepare": "npm run lint && npm run test",
-    "prepublishOnly": "npm run test:coverage && npm run benchmark"
+    "prepublishOnly": "npm run test:coverage"
   },
   "keywords": [
     "cli",

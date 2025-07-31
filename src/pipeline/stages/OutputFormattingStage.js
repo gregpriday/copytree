@@ -1,6 +1,7 @@
 const Stage = require('../Stage');
 const { create } = require('xmlbuilder2');
 const path = require('path');
+const fs = require('fs-extra');
 
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
@@ -19,7 +20,7 @@ class OutputFormattingStage extends Stage {
     
     switch (this.format) {
       case 'xml':
-        output = this.formatAsXML(input);
+        output = await this.formatAsXML(input);
         break;
       case 'json':
         output = this.formatAsJSON(input);
@@ -41,7 +42,7 @@ class OutputFormattingStage extends Stage {
     };
   }
 
-  formatAsXML(input) {
+  async formatAsXML(input) {
     // Manual XML construction to avoid any escaping
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += `<ct:directory path="${input.basePath}">\n`;
@@ -78,6 +79,19 @@ class OutputFormattingStage extends Stage {
       xml += `    <ct:directoryStructure>${directoryStructure}</ct:directoryStructure>\n`;
     }
     
+    // Load instructions.md from project root
+    const instructionsPath = path.join(__dirname, '..', '..', 'templates', 'instructions.md');
+    let instructionsContent = '';
+    try {
+      instructionsContent = await fs.readFile(instructionsPath, 'utf8');
+    } catch (error) {
+      // Handle file not found or read error gracefully
+      console.warn('Warning: instructions.md not found or could not be read. Skipping <ct:instructions>.');
+    }
+    if (instructionsContent) {
+      xml += `    <ct:instructions>${instructionsContent}</ct:instructions>\n`;
+    }
+    
     xml += '  </ct:metadata>\n';
     xml += '  <ct:files>\n';
     
@@ -85,7 +99,7 @@ class OutputFormattingStage extends Stage {
     for (const file of input.files) {
       if (file === null) continue; // Skip files that were filtered out
       
-      xml += `    <ct:file path="${file.path}" size="${file.size}"`;
+      xml += `    <ct:file path="@${file.path}" size="${file.size}"`;
       
       if (file.modified) {
         const modifiedDate = file.modified instanceof Date 
