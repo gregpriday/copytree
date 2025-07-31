@@ -35,14 +35,14 @@ This profile:
 
 ### 1. Profile Loading
 
-When you run CopyTree, it loads profiles in this order:
+When you run CopyTree, it loads the default profile:
 
 ```bash
-# Auto-detect profile based on project
+# Use default profile
 copytree
 
-# Use specific profile
-copytree --profile react
+# Explicitly specify default profile
+copytree --profile default
 
 # Skip profile loading
 copytree --no-profile
@@ -162,23 +162,9 @@ rules:
   - exclude: "src/legacy/**"
 ```
 
-## Profile Auto-Detection
+## No Auto-Detection
 
-CopyTree automatically detects your project type by looking for:
-
-### Node.js Projects
-- `package.json` with dependencies
-- Common frameworks: React, Vue, Angular, Express
-
-### Framework Detection
-```javascript
-// Detection priority:
-1. React: presence of "react" in dependencies
-2. Vue: presence of "vue" in dependencies
-3. Angular: presence of "@angular/core"
-4. Express: presence of "express"
-5. Generic Node.js: presence of package.json
-```
+CopyTree no longer auto-detects project types. All projects use the default profile, which works well with `.gitignore` and `.copytreeignore` files for project-specific customizations.
 
 ## Common Use Cases
 
@@ -233,7 +219,7 @@ CopyTree searches for profiles in:
 
 1. **Built-in profiles**: Shipped with CopyTree
    - Located in the package installation
-   - Examples: react, vue, nodejs, api, docs
+   - Currently only includes: default
 
 2. **Project profiles**: `.copytree/` directory
    - Custom profiles for your project

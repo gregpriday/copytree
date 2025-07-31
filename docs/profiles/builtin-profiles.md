@@ -1,6 +1,6 @@
 # Built-in Profiles
 
-CopyTree includes several pre-configured profiles for common frameworks and use cases. These profiles are carefully crafted to include relevant files while excluding unnecessary ones.
+CopyTree includes a default profile with sensible defaults for most projects. Custom profiles can be created for specific use cases.
 
 ## Available Built-in Profiles
 
@@ -28,90 +28,24 @@ The general-purpose profile with sensible defaults for most projects.
 copytree --profile default
 ```
 
-### laravel
 
-Optimized for Laravel PHP framework projects.
+## No Auto-Detection
 
-**Key Features:**
-- Extends default profile
-- Includes PHP files, Blade templates, migrations, routes
-- Includes configuration and resource files
-- Excludes Laravel-specific build and cache directories
-
-**Includes:**
-- `app/**/*.php` - Application code
-- `resources/**/*.blade.php` - View templates
-- `routes/**/*.php` - Route definitions
-- `database/**/*.php` - Migrations and seeders
-- `config/**/*.php` - Configuration files
-- Essential files: `composer.json`, `artisan`, `.env.example`
-
-**Use When:**
-- Working with Laravel applications
-- Sharing Laravel code for review
-- Documenting Laravel projects
+CopyTree always uses the default profile. Framework-specific exclusions should be handled via `.gitignore` and `.copytreeignore` files.
 
 ```bash
-copytree --profile laravel
-```
-
-### sveltekit
-
-Tailored for SvelteKit JavaScript framework projects.
-
-**Key Features:**
-- Extends default profile
-- Includes Svelte components, routes, and static assets
-- Includes test files and documentation
-- Excludes SvelteKit build artifacts
-
-**Includes:**
-- `src/**/*` - Source files
-- `static/**/*` - Static assets
-- `tests/**/*` - Test files
-- Configuration files: `svelte.config.js`, `vite.config.js`, `tsconfig.json`
-
-**Excludes:**
-- `.svelte-kit/` - Build cache
-- `build/` - Build output
-- Deployment directories
-
-**Use When:**
-- Developing SvelteKit applications
-- Sharing Svelte components
-- Analyzing SvelteKit project structure
-
-```bash
-copytree --profile sveltekit
-```
-
-## Framework Auto-Detection
-
-CopyTree can automatically detect your project type and select the appropriate profile:
-
-```bash
-# Auto-detect profile
+# Always uses default profile
 copytree
 
-# Override auto-detection
-copytree --profile laravel
+# Explicitly specify default
+copytree --profile default
 ```
 
-### Detection Priority
-
-1. **Laravel**: Presence of `artisan` file and `composer.json`
-2. **SvelteKit**: Presence of `svelte.config.js`
-3. **React**: `react` in package.json dependencies
-4. **Vue**: `vue` in package.json dependencies
-5. **Default**: Fallback for unrecognized projects
-
-## Profile Comparison
+## Profile Details
 
 | Profile | Best For | File Limit | Size Limit | Key Focus |
 |---------|----------|------------|------------|-----------|
-| default | General projects | 10,000 | 100MB | Comprehensive |
-| laravel | Laravel apps | 5,000 | 50MB | PHP & Blade files |
-| sveltekit | SvelteKit apps | 5,000 | 50MB | Svelte components |
+| default | All projects | 10,000 | 100MB | Comprehensive with .gitignore support |
 
 ## Common Patterns
 
@@ -194,18 +128,10 @@ options:
 
 ## Choosing the Right Profile
 
-### For Web Applications
-- **Laravel**: PHP/Laravel projects
-- **SvelteKit**: Svelte-based apps
-- **Default**: Other frameworks (React, Vue, Angular)
-
-### For Libraries
-- **Default**: Most library projects
-- Create custom profile for specific needs
-
-### For Documentation
-- Consider creating a custom docs-focused profile
-- Default profile includes markdown files
+### For All Projects
+- **Default**: Works well for all project types
+- Create custom profiles for specific needs
+- Use `.copytreeignore` for project-specific exclusions
 
 ## Customizing Built-in Profiles
 
@@ -218,13 +144,13 @@ You can't modify built-in profiles directly, but you can:
 Example:
 ```yaml
 # .copytree/custom.yaml
-extends: laravel
+extends: default
 
 options:
   maxFileSize: 10485760  # Increase to 10MB
 
 rules:
-  - include: "packages/**/*.php"  # Add packages directory
+  - include: "src/**/*.js"  # Add specific includes
 ```
 
 ## Profile Testing
@@ -233,13 +159,13 @@ rules:
 
 ```bash
 # 1. Test what files are selected
-copytree --profile laravel --dry-run
+copytree --profile default --dry-run
 
 # 2. Check file count
-copytree --profile laravel --dry-run | grep "Total files:"
+copytree --profile default --dry-run | grep "Total files:"
 
 # 3. Verify specific files
-copytree --profile laravel --dry-run | grep "routes/web.php"
+copytree --profile default --dry-run | grep "package.json"
 ```
 
 ### Troubleshooting
@@ -254,9 +180,9 @@ copytree --profile laravel --dry-run | grep "routes/web.php"
 - Verify file extensions match
 - Test with `--no-profile` to confirm
 
-**Wrong profile selected?**
-- Override auto-detection with `--profile`
-- Check detection criteria
+**Need framework-specific exclusions?**
+- Use `.copytreeignore` file
+- Follow `.gitignore` syntax
 - Create project-specific profile
 
 ## Next Steps

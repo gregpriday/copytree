@@ -10,7 +10,7 @@ A powerful Node.js CLI tool that transforms codebases into structured, AI-friend
 - **Smart File Discovery** - Intelligent file selection with gitignore support
 - **15+ File Transformers** - PDF text extraction, image OCR/descriptions, code summaries
 - **Multiple Output Formats** - XML, JSON, tree view, and markdown
-- **Profile System** - Pre-configured profiles for Laravel, SvelteKit, and more
+- **Profile System** - Customizable profile system with sensible defaults
 - **External Sources** - Include files from GitHub repos or other directories
 - **Character Limiting** - Stay within AI context windows automatically
 
@@ -21,7 +21,6 @@ A powerful Node.js CLI tool that transforms codebases into structured, AI-friend
 ### Advanced Features
 
 - **Git Integration** - Filter by modified, staged, or untracked files
-- **Profile Auto-Detection** - Automatically detect project type
 - **Deduplication** - Remove duplicate files based on content
 - **Always Include** - Force include critical files regardless of filters
 
@@ -46,8 +45,8 @@ npm link  # Makes 'copytree' available globally
 # Copy current directory to clipboard
 copytree
 
-# Use a framework profile
-copytree -p laravel -o project-structure.xml
+# Use default profile with custom output
+copytree -p default -o project-structure.xml
 
 # Copy from GitHub repository
 copytree https://github.com/user/repo -p default
@@ -93,7 +92,7 @@ copytree -m                 # Only modified files
 copytree -c main            # Files changed from main branch
 
 # Combine filters
-copytree -p laravel -m
+copytree -m
 ```
 
 ### Profile Usage
@@ -102,11 +101,9 @@ copytree -p laravel -m
 copytree profile:list
 
 # Validate a profile
-copytree profile:validate laravel
+copytree profile:validate default
 
-# Use built-in profiles
-copytree -p laravel      # Laravel projects
-copytree -p sveltekit    # SvelteKit projects
+# Use default profile (or create custom profiles)
 copytree -p default      # General projects
 ```
 
@@ -117,6 +114,8 @@ copytree --transform  # Apply all transformers including AI summaries
 ```
 
 ## ⚙️ Configuration
+
+Use `.copytreeignore` files in your project directory for custom exclusions (similar to `.gitignore` syntax).
 
 ### Environment Variables
 Create a `.env` file in your project or home directory:

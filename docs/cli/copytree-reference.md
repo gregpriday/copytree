@@ -16,13 +16,12 @@ copytree [path] [options]
 #### `--profile=<name>`, `-p <name>`
 Apply a named profile for file selection.
 
-**Default:** `auto` (auto-detects based on project type)
+**Default:** `default`
 
 **Examples:**
 ```bash
-copytree --profile laravel
-copytree -p react
-copytree --profile=python
+copytree --profile default
+copytree -p default
 ```
 
 #### `--no-profile`
@@ -272,11 +271,11 @@ copytree https://github.com/facebook/react
 
 ### Using Profiles
 ```bash
-# Auto-detect profile
+# Use default profile
 copytree
 
-# Use specific profile
-copytree --profile laravel
+# Explicitly specify default profile
+copytree --profile default
 
 # List available profiles
 copytree profile:list

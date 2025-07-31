@@ -50,9 +50,9 @@ Hierarchical configuration with multiple sources:
 
 ### Profile System
 
-- **Built-in profiles**: Default, Laravel, SvelteKit
-- **Auto-detection** for 14+ project types
-- **YAML-based** configuration
+- **Built-in profiles**: Default only
+- **No auto-detection** - Always uses default profile
+- **YAML-based** configuration for custom profiles
 - **Inheritance** support for profile composition
 
 ## Documentation
@@ -73,7 +73,7 @@ copytree /path/to/project        # Copy specific directory
 copytree https://github.com/...  # Copy GitHub repository
 
 # Profiles & filtering
-copytree --profile laravel       # Use Laravel profile
+copytree --profile default       # Use default profile
 copytree --git-modified          # Only modified files
 copytree --git-branch main       # Compare with branch
 

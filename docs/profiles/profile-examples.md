@@ -13,7 +13,7 @@ This guide provides real-world examples of CopyTree profiles for various project
 7. [Microservices Architecture](#microservices-architecture)
 8. [Open Source Project](#open-source-project)
 9. [Development vs Production](#development-vs-production)
-10. [Custom Framework Profile](#custom-framework-profile)
+10. [Custom Project Profile](#custom-project-profile)
 
 ## React Frontend Application
 
@@ -522,15 +522,15 @@ transformers:
     enabled: true
 ```
 
-## Custom Framework Profile
+## Custom Project Profile
 
-Example of extending a built-in profile with custom rules.
+Example of extending the default profile with custom rules.
 
 ```yaml
-name: my-nextjs
-description: Custom Next.js profile with our conventions
+name: my-project
+description: Custom project profile with our conventions
 
-extends: react  # Start with React profile
+extends: default  # Start with default profile
 
 rules:
   # Next.js specific
@@ -583,8 +583,8 @@ transformers:
 ### 1. Start with Inheritance
 
 ```yaml
-# Don't reinvent the wheel
-extends: react  # or laravel, vue, etc.
+# Start with the default profile
+extends: default
 
 # Add your customizations
 rules:
