@@ -93,6 +93,20 @@ copytree profile:validate        # Validate profile
 
 ## Development Guidelines
 
+### Git Workflow
+
+- **Git Flow** - This project follows Git Flow branching model
+- **No automatic commits** - NEVER make commits unless explicitly asked by the user
+- **No automatic changelog** - NEVER create or update CHANGELOG entries unless:
+  - Explicitly asked by the user AND
+  - Currently on a release branch (e.g., `release/x.y.z`)
+- **Branch naming**:
+  - Feature branches: `feature/description`
+  - Release branches: `release/x.y.z`
+  - Hotfix branches: `hotfix/description`
+  - Development branch: `develop`
+  - Production branch: `main` or `master`
+
 ### Code Style
 
 - **CommonJS modules** - Use `require()` and `module.exports`
