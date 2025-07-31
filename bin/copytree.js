@@ -26,7 +26,7 @@ program
 program
   .command('copy [path]', { isDefault: true })
   .description('Copy directory structure to XML with customizable profiles and filters')
-  .option('-p, --profile <name>', 'Use a predefined profile (default: auto-detect)')
+  .option('-p, --profile <name>', 'Use a predefined profile (default: default)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')

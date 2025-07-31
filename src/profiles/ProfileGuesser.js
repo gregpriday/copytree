@@ -4,7 +4,7 @@ const { logger } = require('../utils/logger');
 
 /**
  * ProfileGuesser - Always returns default profile
- * Framework-specific detection has been removed in favor of using .gitignore and .copytreeignore
+ * Framework-specific detection removed in favor of using default + .gitignore/.copytreeignore
  */
 class ProfileGuesser {
   constructor(projectPath) {
@@ -13,11 +13,11 @@ class ProfileGuesser {
   }
 
   /**
-   * Always returns 'default' profile
-   * Framework-specific profiles have been removed in favor of .gitignore/.copytreeignore
+   * Always returns 'default' profile - framework auto-detection removed
+   * Framework-specific profiles have been removed in favor of using default + .gitignore/.copytreeignore
    */
   async guess() {
-    this.logger.debug('Profile guessing disabled, using default profile', { path: this.projectPath });
+    this.logger.debug('Framework auto-detection disabled, using default profile', { path: this.projectPath });
     return 'default';
   }
 

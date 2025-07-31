@@ -50,8 +50,8 @@ Hierarchical configuration with multiple sources:
 
 ### Profile System
 
-- **Built-in profiles**: Default only
-- **No auto-detection** - Always uses default profile
+- **Default profile**: Includes default profile with framework auto-detection removed
+- **Custom profiles**: Users can create YAML-based profiles
 - **YAML-based** configuration for custom profiles
 - **Inheritance** support for profile composition
 
@@ -74,6 +74,7 @@ copytree https://github.com/...  # Copy GitHub repository
 
 # Profiles & filtering
 copytree --profile default       # Use default profile
+copytree --profile customname    # Use custom profile
 copytree --git-modified          # Only modified files
 copytree --git-branch main       # Compare with branch
 
@@ -215,7 +216,7 @@ All dependencies are installed and managed via npm:
 
 - **Documentation**: `./docs/` - User and developer guides
 - **Test Fixtures**: `tests/fixtures/` - Sample projects
-- **Built-in Profiles**: `profiles/` - YAML profile definitions
+- **Example Profiles**: `profiles/` - Example custom profile templates
 - **Configuration**: `config/` - Default settings
 
 ## Best Practices

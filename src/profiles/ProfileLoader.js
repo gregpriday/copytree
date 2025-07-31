@@ -116,7 +116,7 @@ class ProfileLoader {
       path.join(this.userProfilesDir, `${profileNameOrPath}.yaml`),
       path.join(this.userProfilesDir, `${profileNameOrPath}.json`),
       
-      // Built-in profiles
+      // Built-in profiles (default only)
       path.join(this.builtInProfilesDir, `${profileNameOrPath}.yml`),
       path.join(this.builtInProfilesDir, `${profileNameOrPath}.yaml`),
       path.join(this.builtInProfilesDir, `${profileNameOrPath}.json`),

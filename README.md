@@ -10,7 +10,7 @@ A powerful Node.js CLI tool that transforms codebases into structured, AI-friend
 - **Smart File Discovery** - Intelligent file selection with gitignore support
 - **15+ File Transformers** - PDF text extraction, image OCR/descriptions, code summaries
 - **Multiple Output Formats** - XML, JSON, tree view, and markdown
-- **Profile System** - Customizable profile system with sensible defaults
+- **Profile System** - Default profile with customizable overrides
 - **Custom Instructions** - Include context-specific instructions for AI analysis
 - **External Sources** - Include files from GitHub repos or other directories
 - **Character Limiting** - Stay within AI context windows automatically
@@ -46,11 +46,11 @@ npm link  # Makes 'copytree' available globally
 # Copy current directory to clipboard
 copytree
 
-# Use default profile with custom output
-copytree -p default -o project-structure.xml
+# Use default profile (automatic)
+copytree -o project-structure.xml
 
 # Copy from GitHub repository
-copytree https://github.com/user/repo -p default
+copytree https://github.com/user/repo
 
 # Copy specific branch/path from GitHub
 copytree https://github.com/user/repo/tree/main/src -o repo-src.xml
@@ -114,8 +114,9 @@ copytree profile:list
 # Validate a profile
 copytree profile:validate default
 
-# Use default profile (or create custom profiles)
-copytree -p default      # General projects
+# Use default profile (automatic) or specify custom
+copytree                 # Uses default profile
+copytree -p mycustom     # Use custom profile
 ```
 
 ### AI Features
@@ -287,7 +288,7 @@ copytree/
 │   ├── transforms/      # File transformers
 │   └── utils/          # Utility functions
 ├── config/             # Default configurations
-├── profiles/           # Built-in profiles
+├── profiles/           # Example custom profiles (user-created)
 ├── docs/               # Documentation
 └── tests/              # Test suites
 ```
@@ -333,7 +334,7 @@ COPYTREE_PERFORMANCE=true copytree /path/to/project
 
 ## 🎯 Creating Profiles with AI Assistance
 
-CopyTree profiles can be created or refined using AI assistants like Claude Code:
+CopyTree includes a default profile that works for most projects. You can also create custom profiles using AI assistants like Claude Code:
 
 ```bash
 # Create a profile in one conversation
@@ -344,13 +345,13 @@ then walk through an iterative process to create an optimal profile."
 # Or build a .copytreeignore file instead
 claude -p "Please create a .copytreeignore file for this project.  
 Start by running \`copytree copy:docs --display\` to review ignore rules,  
-then iteratively refine the defaults."
+then create project-specific exclusions."
 ```
 
 The `copytree copy:docs --display` step provides the AI with CopyTree's documentation to ensure accurate profile creation without hallucinated options.
 
 ```bash
-# Validate the YAML profile
+# Validate the custom YAML profile
 copytree profile:validate myprofile      # Returns 0 if valid
 ```
 

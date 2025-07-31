@@ -17,7 +17,7 @@ CopyTree is a sophisticated CLI tool for intelligently copying and transforming 
 - **Memory-efficient streaming** for large files
 - **Comprehensive CLI** with intuitive commands and options
 - **Multiple output formats** (XML, JSON, clipboard, file)
-- **Built-in profiles** for Default, Laravel, and SvelteKit projects
+- **Default profile only** - Framework auto-detection removed, uses default profile for all projects
 - **Caching system** for AI responses and transformations
 - **Error recovery** and graceful degradation
 

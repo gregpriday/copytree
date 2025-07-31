@@ -14,22 +14,16 @@ copytree [path] [options]
 ### Profile Options
 
 #### `--profile=<name>`, `-p <name>`
-Apply a named profile for file selection.
-
-**Default:** `default`
+Apply a custom profile for file selection (required).
 
 **Examples:**
 ```bash
-copytree --profile default
-copytree -p default
+copytree --profile mycustom
+copytree -p mycustom
 ```
 
-#### `--no-profile`
-Skip profile loading entirely, include all files.
-
-```bash
-copytree --no-profile
-```
+#### Note: Profile Required
+A custom profile is now required for all operations. Create profiles in `~/.copytree/profiles/` or `.copytree/`.
 
 ### Filter Options
 
@@ -288,13 +282,10 @@ copytree https://github.com/facebook/react
 
 ### Using Profiles
 ```bash
-# Use default profile
-copytree
+# Use custom profile (required)
+copytree --profile mycustom
 
-# Explicitly specify default profile
-copytree --profile default
-
-# List available profiles
+# List available custom profiles
 copytree profile:list
 ```
 
