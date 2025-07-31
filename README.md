@@ -11,6 +11,7 @@ A powerful Node.js CLI tool that transforms codebases into structured, AI-friend
 - **15+ File Transformers** - PDF text extraction, image OCR/descriptions, code summaries
 - **Multiple Output Formats** - XML, JSON, tree view, and markdown
 - **Profile System** - Customizable profile system with sensible defaults
+- **Custom Instructions** - Include context-specific instructions for AI analysis
 - **External Sources** - Include files from GitHub repos or other directories
 - **Character Limiting** - Stay within AI context windows automatically
 
@@ -93,6 +94,16 @@ copytree -c main            # Files changed from main branch
 
 # Combine filters
 copytree -m
+```
+
+### Custom Instructions
+```bash
+# Use custom instructions for specific analysis
+copytree --instructions react-review
+copytree --instructions api-docs
+
+# Disable instructions entirely
+copytree --no-instructions
 ```
 
 ### Profile Usage

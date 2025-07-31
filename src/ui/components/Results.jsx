@@ -62,6 +62,11 @@ const Results = ({ results, output, format, showOutput = false }) => {
 				{ color: 'yellow', bold: true },
 				`Output (${format}):`
 			),
+			results && results.instructions && React.createElement(
+				Text,
+				{ color: 'gray' },
+				'Instructions: included'
+			),
 			React.createElement(
 				Box,
 				{ borderStyle: 'single', borderColor: 'gray', padding: 1 },

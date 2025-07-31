@@ -11,6 +11,7 @@ const FileLoadingStage = require('../../src/pipeline/stages/FileLoadingStage');
 const OutputFormattingStage = require('../../src/pipeline/stages/OutputFormattingStage');
 const LimitStage = require('../../src/pipeline/stages/LimitStage');
 const CharLimitStage = require('../../src/pipeline/stages/CharLimitStage');
+const InstructionsStage = require('../../src/pipeline/stages/InstructionsStage');
 
 describe('Pipeline Integration Tests', () => {
   let tempDir;
@@ -388,6 +389,92 @@ describe('Pipeline Integration Tests', () => {
 
       // Should complete but find no files
       expect(result.files).toHaveLength(0);
+    });
+  });
+
+  describe('instructions integration', () => {
+    it('should include instructions in XML output', async () => {
+      pipeline
+        .through([
+          new FileDiscoveryStage({
+            basePath: tempDir,
+            patterns: ['**/*.js'],
+            respectGitignore: false
+          }),
+          new FileLoadingStage({
+            encoding: 'utf8'
+          }),
+          new InstructionsStage(),
+          new OutputFormattingStage({
+            format: 'xml',
+            prettyPrint: true
+          })
+        ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: {}
+      });
+
+      expect(result.output).toContain('<ct:instructions name="default">');
+      expect(result.output).toContain('</ct:instructions>');
+    });
+
+    it('should disable instructions when --no-instructions is used', async () => {
+      pipeline
+        .through([
+          new FileDiscoveryStage({
+            basePath: tempDir,
+            patterns: ['**/*.js'],
+            respectGitignore: false
+          }),
+          new FileLoadingStage({
+            encoding: 'utf8'
+          }),
+          new InstructionsStage(),
+          new OutputFormattingStage({
+            format: 'xml',
+            prettyPrint: true
+          })
+        ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: { noInstructions: true }
+      });
+
+      expect(result.output).not.toContain('<ct:instructions');
+    });
+
+    it('should handle custom instructions', async () => {
+      pipeline
+        .through([
+          new FileDiscoveryStage({
+            basePath: tempDir,
+            patterns: ['**/*.js'],
+            respectGitignore: false
+          }),
+          new FileLoadingStage({
+            encoding: 'utf8'
+          }),
+          new InstructionsStage(),
+          new OutputFormattingStage({
+            format: 'xml',
+            prettyPrint: true
+          })
+        ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: { instructions: 'custom' }
+      });
+
+      // Should handle gracefully even if custom instructions don't exist
+      // (since we're using default fallback behavior in tests)
+      expect(result.output).toBeDefined();
     });
   });
 

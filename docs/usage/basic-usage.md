@@ -145,6 +145,19 @@ copytree --stream | gzip > project.xml.gz
 copytree --stream | some-analysis-tool
 ```
 
+### 5. Instructions Control
+
+```bash
+# Disable instructions in output
+copytree --no-instructions
+
+# Use custom instructions
+copytree --instructions custom
+
+# Use default instructions (explicit)
+copytree --instructions default
+```
+
 ## Output Formats
 
 ### XML (Default)

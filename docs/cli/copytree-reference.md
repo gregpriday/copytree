@@ -239,6 +239,23 @@ Skip caching for external sources (GitHub repos).
 copytree https://github.com/user/repo --no-cache
 ```
 
+### Instructions Options
+
+#### `--no-instructions`
+Disable including instructions in output.
+
+```bash
+copytree --no-instructions
+```
+
+#### `--instructions=<name>`
+Use custom instructions set (default: default).
+
+```bash
+copytree --instructions custom
+copytree --instructions default
+```
+
 #### `--verbose`, `-v`
 Show detailed progress information.
 

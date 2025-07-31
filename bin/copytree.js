@@ -51,6 +51,8 @@ program
   .option('--dedupe', 'Remove duplicate files')
   .option('--always <patterns...>', 'Always include these patterns')
   .option('--no-cache', 'Disable caching for AI operations')
+  .option('--no-instructions', 'Disable including instructions in output')
+  .option('--instructions <name>', 'Use custom instructions set (default: default)')
   .action(async (path, options) => {
     render(React.createElement(App, {
       command: 'copy',

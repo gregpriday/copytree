@@ -66,6 +66,33 @@ function validateCopytreeConfig(config, warnings) {
 }
 
 /**
+ * Validate instructions configuration
+ */
+async function validateInstructionsConfig(config, warnings) {
+  const InstructionsLoader = require('../services/InstructionsLoader');
+  
+  try {
+    const instructionsLoader = new InstructionsLoader();
+    const defaultInstructions = config.defaultInstructions || 'default';
+    
+    // Check if default instructions exist
+    const exists = await instructionsLoader.exists(defaultInstructions);
+    if (!exists) {
+      warnings.push(`Default instructions '${defaultInstructions}' not found`);
+    }
+    
+    // List available instructions
+    const available = await instructionsLoader.list();
+    if (available.length === 0) {
+      warnings.push('No instructions files found in app or user directories');
+    }
+    
+  } catch (error) {
+    warnings.push(`Failed to validate instructions: ${error.message}`);
+  }
+}
+
+/**
  * Validate cache configuration
  */
 function validateCacheConfig(config, warnings) {

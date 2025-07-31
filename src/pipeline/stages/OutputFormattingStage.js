@@ -79,17 +79,10 @@ class OutputFormattingStage extends Stage {
       xml += `    <ct:directoryStructure>${directoryStructure}</ct:directoryStructure>\n`;
     }
     
-    // Load instructions.md from project root
-    const instructionsPath = path.join(__dirname, '..', '..', 'templates', 'instructions.md');
-    let instructionsContent = '';
-    try {
-      instructionsContent = await fs.readFile(instructionsPath, 'utf8');
-    } catch (error) {
-      // Handle file not found or read error gracefully
-      console.warn('Warning: instructions.md not found or could not be read. Skipping <ct:instructions>.');
-    }
-    if (instructionsContent) {
-      xml += `    <ct:instructions>${instructionsContent}</ct:instructions>\n`;
+    // Add instructions if present (loaded by InstructionsStage)
+    if (input.instructions) {
+      const nameAttr = input.instructionsName ? ` name="${input.instructionsName}"` : '';
+      xml += `    <ct:instructions${nameAttr}>${input.instructions}</ct:instructions>\n`;
     }
     
     xml += '  </ct:metadata>\n';
@@ -150,7 +143,10 @@ class OutputFormattingStage extends Stage {
         fileCount: input.files.length,
         totalSize: this.calculateTotalSize(input.files),
         profile: input.profile?.name || 'default',
-        directoryStructure: this.generateDirectoryStructure(input.files)
+        directoryStructure: this.generateDirectoryStructure(input.files),
+        ...(input.instructions && { 
+          instructions: input.instructions
+        })
       },
       files: input.files.filter(f => f !== null).map(file => {
         const fileObj = {
