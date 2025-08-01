@@ -36,7 +36,13 @@ class InstructionsStage extends Stage {
       
       // Load instructions
       this.log(`Loading instructions: ${instructionsName}`, 'debug');
-      const instructionsContent = await this.instructionsLoader.load(instructionsName);
+      let instructionsContent;
+      try {
+        instructionsContent = await this.instructionsLoader.load(instructionsName);
+      } catch (error) {
+        this.log(`Instructions '${instructionsName}' not found, continuing without instructions: ${error.message}`, 'warn');
+        return input;
+      }
       
       if (!instructionsContent) {
         this.log(`No instructions content found for: ${instructionsName}`, 'warn');
