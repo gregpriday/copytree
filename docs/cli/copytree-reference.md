@@ -14,23 +14,16 @@ copytree [path] [options]
 ### Profile Options
 
 #### `--profile=<name>`, `-p <name>`
-Apply a named profile for file selection.
-
-**Default:** `auto` (auto-detects based on project type)
+Apply a custom profile for file selection (required).
 
 **Examples:**
 ```bash
-copytree --profile laravel
-copytree -p react
-copytree --profile=python
+copytree --profile mycustom
+copytree -p mycustom
 ```
 
-#### `--no-profile`
-Skip profile loading entirely, include all files.
-
-```bash
-copytree --no-profile
-```
+#### Note: Profile Required
+A custom profile is now required for all operations. Create profiles in `~/.copytree/profiles/` or `.copytree/`.
 
 ### Filter Options
 
@@ -240,6 +233,23 @@ Skip caching for external sources (GitHub repos).
 copytree https://github.com/user/repo --no-cache
 ```
 
+### Instructions Options
+
+#### `--no-instructions`
+Disable including instructions in output.
+
+```bash
+copytree --no-instructions
+```
+
+#### `--instructions=<name>`
+Use custom instructions set (default: default).
+
+```bash
+copytree --instructions custom
+copytree --instructions default
+```
+
 #### `--verbose`, `-v`
 Show detailed progress information.
 
@@ -272,13 +282,10 @@ copytree https://github.com/facebook/react
 
 ### Using Profiles
 ```bash
-# Auto-detect profile
-copytree
+# Use custom profile (required)
+copytree --profile mycustom
 
-# Use specific profile
-copytree --profile laravel
-
-# List available profiles
+# List available custom profiles
 copytree profile:list
 ```
 

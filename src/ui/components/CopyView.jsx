@@ -171,6 +171,7 @@ const CopyView = () => {
 		const TransformStage = require('../../pipeline/stages/TransformStage');
 		const CharLimitStage = require('../../pipeline/stages/CharLimitStage');
 		const DeduplicateFilesStage = require('../../pipeline/stages/DeduplicateFilesStage');
+		const InstructionsStage = require('../../pipeline/stages/InstructionsStage');
 		const OutputFormattingStage = require('../../pipeline/stages/OutputFormattingStage');
 		
 		// 1. File Discovery
@@ -218,7 +219,10 @@ const CopyView = () => {
 		// 11. Deduplicate
 		stages.push(DeduplicateFilesStage);
 		
-		// 12. Output Formatting
+		// 12. Instructions Stage (load instructions unless disabled)
+		stages.push(InstructionsStage);
+		
+		// 13. Output Formatting
 		stages.push(OutputFormattingStage);
 		
 		return stages;

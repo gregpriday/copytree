@@ -35,17 +35,17 @@ This profile:
 
 ### 1. Profile Loading
 
-When you run CopyTree, it loads profiles in this order:
+CopyTree uses the default profile automatically, or you can specify a custom one:
 
 ```bash
-# Auto-detect profile based on project
+# Use default profile (automatic)
 copytree
 
-# Use specific profile
-copytree --profile react
+# Explicitly specify default profile
+copytree --profile default
 
-# Skip profile loading
-copytree --no-profile
+# Use custom profile
+copytree --profile mycustom
 ```
 
 ### 2. File Selection Process
@@ -162,23 +162,9 @@ rules:
   - exclude: "src/legacy/**"
 ```
 
-## Profile Auto-Detection
+## Default Profile
 
-CopyTree automatically detects your project type by looking for:
-
-### Node.js Projects
-- `package.json` with dependencies
-- Common frameworks: React, Vue, Angular, Express
-
-### Framework Detection
-```javascript
-// Detection priority:
-1. React: presence of "react" in dependencies
-2. Vue: presence of "vue" in dependencies
-3. Angular: presence of "@angular/core"
-4. Express: presence of "express"
-5. Generic Node.js: presence of package.json
-```
+CopyTree includes a default profile that works for most projects. Framework auto-detection has been removed - all projects use the default profile unless you specify a custom one.
 
 ## Common Use Cases
 
@@ -232,8 +218,8 @@ rules:
 CopyTree searches for profiles in:
 
 1. **Built-in profiles**: Shipped with CopyTree
+   - Default profile works for all project types
    - Located in the package installation
-   - Examples: react, vue, nodejs, api, docs
 
 2. **Project profiles**: `.copytree/` directory
    - Custom profiles for your project
@@ -319,7 +305,7 @@ copytree profile:validate my-profile
 
 ## Next Steps
 
-- [Built-in Profiles](./builtin-profiles.md) - Explore available profiles
+- [Profile Creation Guide](./profile-creation-guide.md) - Create custom profiles
 - [Creating Profiles](./profile-creation-guide.md) - Build custom profiles
 - [Advanced Features](./profile-advanced.md) - External sources and more
 - [Examples](./profile-examples.md) - Real-world configurations

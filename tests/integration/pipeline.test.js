@@ -11,6 +11,7 @@ const FileLoadingStage = require('../../src/pipeline/stages/FileLoadingStage');
 const OutputFormattingStage = require('../../src/pipeline/stages/OutputFormattingStage');
 const LimitStage = require('../../src/pipeline/stages/LimitStage');
 const CharLimitStage = require('../../src/pipeline/stages/CharLimitStage');
+const InstructionsStage = require('../../src/pipeline/stages/InstructionsStage');
 
 describe('Pipeline Integration Tests', () => {
   let tempDir;
@@ -128,7 +129,7 @@ describe('Pipeline Integration Tests', () => {
       });
 
       expect(result.output).toContain('<ct:directory');
-      expect(result.output).toContain('<ct:file path="index.js"');
+      expect(result.output).toContain('<ct:file path="@index.js"');
       expect(result.output).toContain('console.log("Hello");');
       expect(result.output).toContain('</ct:directory>');
     });
@@ -250,7 +251,7 @@ describe('Pipeline Integration Tests', () => {
         options: {}
       });
 
-      expect(result.output.length).toBeLessThan(700); // Account for XML wrapper
+      expect(result.output.length).toBeLessThan(1600); // Account for XML wrapper and instructions
       expect(result.output).toContain('truncated due to character limit');
     });
   });
@@ -388,6 +389,92 @@ describe('Pipeline Integration Tests', () => {
 
       // Should complete but find no files
       expect(result.files).toHaveLength(0);
+    });
+  });
+
+  describe('instructions integration', () => {
+    it('should include instructions in XML output', async () => {
+      pipeline
+        .through([
+          new FileDiscoveryStage({
+            basePath: tempDir,
+            patterns: ['**/*.js'],
+            respectGitignore: false
+          }),
+          new FileLoadingStage({
+            encoding: 'utf8'
+          }),
+          new InstructionsStage(),
+          new OutputFormattingStage({
+            format: 'xml',
+            prettyPrint: true
+          })
+        ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: {}
+      });
+
+      expect(result.output).toContain('<ct:instructions name="default">');
+      expect(result.output).toContain('</ct:instructions>');
+    });
+
+    it('should disable instructions when --no-instructions is used', async () => {
+      pipeline
+        .through([
+          new FileDiscoveryStage({
+            basePath: tempDir,
+            patterns: ['**/*.js'],
+            respectGitignore: false
+          }),
+          new FileLoadingStage({
+            encoding: 'utf8'
+          }),
+          new InstructionsStage(),
+          new OutputFormattingStage({
+            format: 'xml',
+            prettyPrint: true
+          })
+        ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: { noInstructions: true }
+      });
+
+      expect(result.output).not.toContain('<ct:instructions');
+    });
+
+    it('should handle custom instructions', async () => {
+      pipeline
+        .through([
+          new FileDiscoveryStage({
+            basePath: tempDir,
+            patterns: ['**/*.js'],
+            respectGitignore: false
+          }),
+          new FileLoadingStage({
+            encoding: 'utf8'
+          }),
+          new InstructionsStage(),
+          new OutputFormattingStage({
+            format: 'xml',
+            prettyPrint: true
+          })
+        ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: { instructions: 'custom' }
+      });
+
+      // Should handle gracefully even if custom instructions don't exist
+      // (since we're using default fallback behavior in tests)
+      expect(result.output).toBeDefined();
     });
   });
 

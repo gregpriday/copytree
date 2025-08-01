@@ -218,7 +218,11 @@ async function setupPipelineStages(basePath, profile, options) {
     }));
   }
   
-  // 10. Output Formatting Stage
+  // 10. Instructions Stage (load instructions unless disabled)
+  const InstructionsStage = require('../pipeline/stages/InstructionsStage');
+  stages.push(new InstructionsStage());
+  
+  // 11. Output Formatting Stage
   // Determine output format (default to tree if --only-tree is used)
   const outputFormat = options.format || (options.onlyTree ? 'tree' : (profile.output?.format || 'xml'));
   

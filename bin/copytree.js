@@ -26,7 +26,7 @@ program
 program
   .command('copy [path]', { isDefault: true })
   .description('Copy directory structure to XML with customizable profiles and filters')
-  .option('-p, --profile <name>', 'Use a predefined profile (default: auto-detect)')
+  .option('-p, --profile <name>', 'Use a predefined profile (default: default)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
@@ -51,6 +51,8 @@ program
   .option('--dedupe', 'Remove duplicate files')
   .option('--always <patterns...>', 'Always include these patterns')
   .option('--no-cache', 'Disable caching for AI operations')
+  .option('--no-instructions', 'Disable including instructions in output')
+  .option('--instructions <name>', 'Use custom instructions set (default: default)')
   .action(async (path, options) => {
     render(React.createElement(App, {
       command: 'copy',

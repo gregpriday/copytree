@@ -128,6 +128,17 @@ class ProfileError extends CopyTreeError {
 }
 
 /**
+ * Instructions error
+ */
+class InstructionsError extends CopyTreeError {
+  constructor(message, instructionsName, details = {}) {
+    super(message, 'INSTRUCTIONS_ERROR', { instructionsName, ...details });
+    this.name = 'InstructionsError';
+    this.instructionsName = instructionsName;
+  }
+}
+
+/**
  * Handle errors consistently
  */
 function handleError(error, options = {}) {
@@ -178,5 +189,6 @@ module.exports = {
   TransformError,
   GitError,
   ProfileError,
+  InstructionsError,
   handleError
 };

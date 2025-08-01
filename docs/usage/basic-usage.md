@@ -33,43 +33,43 @@ copytree --display
 
 ## Understanding Profiles
 
-Profiles are the heart of CopyTree's intelligent file selection.
+Profiles are the heart of CopyTree's intelligent file selection. All profiles must be custom-created.
 
-### Auto-Detection
+### Custom Profile Required
 
-By default, CopyTree auto-detects your project type:
+CopyTree requires a custom profile to be specified:
 
 ```bash
-# Auto-detects Laravel, React, Django, etc.
-copytree
+# Custom profile required
+copytree --profile mycustom
 ```
 
-### Using Specific Profiles
+### Using Custom Profiles
 
-Override auto-detection with a specific profile:
+Specify your custom profile:
 
 ```bash
-# Use Laravel profile
-copytree --profile laravel
+# Use custom React profile
+copytree --profile my-react
 
-# Use React profile
-copytree --profile react
+# Use custom API profile
+copytree --profile api-docs
 
-# See all available profiles
+# See all available custom profiles
 copytree profile:list
 ```
 
-### Common Built-in Profiles
+### Example Custom Profiles
 
-- `laravel` - Laravel PHP framework
-- `react` - React applications
-- `vue` - Vue.js applications
-- `django` - Django Python framework
-- `nodejs` - Generic Node.js projects
-- `api` - API-focused files
-- `docs` - Documentation files only
-- `minimal` - Essential code files
-- `full` - All files (respecting .gitignore)
+Create custom profiles such as:
+- `my-laravel` - Laravel PHP framework setup
+- `react-app` - React applications
+- `vue-project` - Vue.js applications
+- `django-api` - Django Python framework
+- `nodejs-api` - Generic Node.js projects
+- `api-docs` - API-focused files
+- `docs-only` - Documentation files only
+- `minimal-js` - Essential code files
 
 ## File Selection Methods
 
@@ -145,6 +145,19 @@ copytree --stream | gzip > project.xml.gz
 copytree --stream | some-analysis-tool
 ```
 
+### 5. Instructions Control
+
+```bash
+# Disable instructions in output
+copytree --no-instructions
+
+# Use custom instructions
+copytree --instructions custom
+
+# Use default instructions (explicit)
+copytree --instructions default
+```
+
 ## Output Formats
 
 ### XML (Default)
@@ -202,10 +215,10 @@ project/
 
 ```bash
 # Copy project for AI analysis
-copytree --profile react
+copytree --profile my-react
 
 # Copy with transformations
-copytree --transform
+copytree --profile my-react --transform
 ```
 
 ### 2. Code Review Preparation
@@ -225,13 +238,13 @@ copytree --git-status
 
 ```bash
 # Copy for documentation
-copytree --profile docs
+copytree --profile docs-only
 
 # Copy with file info
-copytree --file-size --line-numbers
+copytree --profile mycustom --file-size --line-numbers
 
 # Tree structure only
-copytree --only-tree
+copytree --profile mycustom --only-tree
 ```
 
 ### 4. Debugging Support

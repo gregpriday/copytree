@@ -1,6 +1,6 @@
 # Profile Creation Guide
 
-This guide walks you through creating custom profiles for CopyTree manually.
+CopyTree includes a default profile that works for most projects. This guide walks you through creating custom profiles when you need project-specific configurations.
 
 ## Quick Start
 
@@ -480,19 +480,14 @@ rules:
 Create variants:
 
 ```yaml
-# .copytree/base.yml
-name: base
-rules:
-  - include: "src/**/*.js"
-
 # .copytree/dev.yml
-extends: base
+extends: default
 rules:
   - include: "tests/**"
   - include: "docs/**"
 
 # .copytree/prod.yml
-extends: base
+extends: default
 rules:
   - exclude: "**/*.test.js"
   - exclude: "docs/**"

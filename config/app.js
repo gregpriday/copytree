@@ -27,6 +27,9 @@ module.exports = {
   outputEncoding: 'utf8',
   prettyPrint: env('COPYTREE_PRETTY_PRINT', true),
   
+  // Instructions settings
+  defaultInstructions: env('COPYTREE_DEFAULT_INSTRUCTIONS', 'default'),
+  
   // Error handling
   exitOnError: env('COPYTREE_EXIT_ON_ERROR', true),
   verboseErrors: env('COPYTREE_VERBOSE_ERRORS', false),

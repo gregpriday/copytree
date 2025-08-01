@@ -1,6 +1,7 @@
 const Stage = require('../Stage');
 const { create } = require('xmlbuilder2');
 const path = require('path');
+const fs = require('fs-extra');
 
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
@@ -19,7 +20,7 @@ class OutputFormattingStage extends Stage {
     
     switch (this.format) {
       case 'xml':
-        output = this.formatAsXML(input);
+        output = await this.formatAsXML(input);
         break;
       case 'json':
         output = this.formatAsJSON(input);
@@ -41,7 +42,7 @@ class OutputFormattingStage extends Stage {
     };
   }
 
-  formatAsXML(input) {
+  async formatAsXML(input) {
     // Manual XML construction to avoid any escaping
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
     xml += `<ct:directory path="${input.basePath}">\n`;
@@ -78,6 +79,12 @@ class OutputFormattingStage extends Stage {
       xml += `    <ct:directoryStructure>${directoryStructure}</ct:directoryStructure>\n`;
     }
     
+    // Add instructions if present (loaded by InstructionsStage)
+    if (input.instructions) {
+      const nameAttr = input.instructionsName ? ` name="${input.instructionsName}"` : '';
+      xml += `    <ct:instructions${nameAttr}>${input.instructions}</ct:instructions>\n`;
+    }
+    
     xml += '  </ct:metadata>\n';
     xml += '  <ct:files>\n';
     
@@ -85,7 +92,7 @@ class OutputFormattingStage extends Stage {
     for (const file of input.files) {
       if (file === null) continue; // Skip files that were filtered out
       
-      xml += `    <ct:file path="${file.path}" size="${file.size}"`;
+      xml += `    <ct:file path="@${file.path}" size="${file.size}"`;
       
       if (file.modified) {
         const modifiedDate = file.modified instanceof Date 
@@ -136,7 +143,10 @@ class OutputFormattingStage extends Stage {
         fileCount: input.files.length,
         totalSize: this.calculateTotalSize(input.files),
         profile: input.profile?.name || 'default',
-        directoryStructure: this.generateDirectoryStructure(input.files)
+        directoryStructure: this.generateDirectoryStructure(input.files),
+        ...(input.instructions && { 
+          instructions: input.instructions
+        })
       },
       files: input.files.filter(f => f !== null).map(file => {
         const fileObj = {

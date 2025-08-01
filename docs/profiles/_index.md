@@ -7,11 +7,8 @@ Profiles are at the heart of CopyTree's intelligent file selection system. They 
 ### [Profile Overview](./profile-overview.md)
 Introduction to the profile system, how it works, and key concepts.
 
-### [Built-in Profiles](./builtin-profiles.md)
-Complete list of pre-configured profiles for popular frameworks and use cases.
-
 ### [Profile Creation Guide](./profile-creation-guide.md)
-Step-by-step guide to creating custom profiles for your projects.
+Step-by-step guide to creating custom profiles for specific project needs.
 
 ### [Profile Examples](./profile-examples.md)
 Real-world examples of profile configurations for various scenarios.
@@ -27,15 +24,17 @@ Complete reference for all available file transformers and their options.
 
 ## 🚀 Quick Start
 
-### Using a Built-in Profile
+### Using Profiles
 
 ```bash
-# Auto-detect profile based on project
+# Use default profile (automatic)
 copytree
 
-# Use specific profile
-copytree --profile react
-copytree --profile laravel
+# Explicitly specify default profile
+copytree --profile default
+
+# Use custom profile
+copytree --profile mycustom
 
 # List all available profiles
 copytree profile:list
@@ -72,42 +71,41 @@ Profiles are YAML files with:
 ### Profile Locations
 
 CopyTree looks for profiles in:
-1. Built-in profiles (shipped with CopyTree)
+1. Built-in profiles (includes default profile)
 2. Project profiles (`.copytree/` in your project)
 3. User profiles (`~/.copytree/profiles/`)
 
 ### Profile Selection
 
-1. **Auto-detection**: CopyTree examines your project structure
-2. **Explicit selection**: Use `--profile` option
-3. **Fallback**: Uses 'default' profile if no match
+1. **Default profile**: Uses default profile when no `--profile` option specified
+2. **No framework detection**: No longer auto-detects Laravel, React, etc.
+3. **Custom profiles**: Use `--profile` option to specify custom profiles
 
 ## 💡 Common Use Cases
 
-### Framework-Specific Development
+### Profile Usage Examples
 
 ```bash
-# React development
-copytree --profile react
+# Use default profile (works for all project types)
+copytree
 
-# Laravel API
-copytree --profile laravel
-
-# Django project
-copytree --profile django
+# Create custom profiles for specific needs
+copytree --profile my-react
+copytree --profile api-docs
+copytree --profile minimal
 ```
 
 ### Task-Specific Profiles
 
 ```bash
-# Documentation only
-copytree --profile docs
+# Documentation only (custom)
+copytree --profile docs-only
 
-# API endpoints
-copytree --profile api
+# API endpoints (custom) 
+copytree --profile api-endpoints
 
-# Minimal code review
-copytree --profile minimal
+# Minimal code review (custom)
+copytree --profile minimal-review
 ```
 
 ### Custom Workflows

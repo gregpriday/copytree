@@ -70,6 +70,41 @@ describe('Command Integration Tests', () => {
       await fs.writeFile(path.join(testProjectDir, 'src/index.js'), 'console.log("Hello World");');
       await fs.writeFile(path.join(testProjectDir, 'src/utils.js'), 'module.exports = { helper: () => {} };');
       await fs.writeFile(path.join(testProjectDir, 'test.txt'), 'This is a test file.');
+      
+      // Create test profile for integration tests
+      await fsPromises.mkdir(path.join(testProjectDir, '.copytree'), { recursive: true });
+      const testProfile = `name: test-profile
+description: Test profile for integration tests
+version: 1.0.0
+
+include:
+  - "**/*"
+
+exclude:
+  - ".git/**"
+  - "node_modules/**"
+  - "*.log"
+
+options:
+  respectGitignore: true
+  includeHidden: false
+  followSymlinks: false
+  maxFileSize: 10485760
+  maxTotalSize: 104857600
+  maxFileCount: 10000
+
+transformers:
+  file-loader:
+    enabled: true
+  binary:
+    enabled: true
+
+output:
+  format: xml
+  includeMetadata: true
+  addLineNumbers: false
+  prettyPrint: true`;
+      await fs.writeFile(path.join(testProjectDir, '.copytree/test-profile.yml'), testProfile);
     } catch (error) {
       console.error('Error in beforeEach:', error);
       console.error('TempDir:', tempDir);

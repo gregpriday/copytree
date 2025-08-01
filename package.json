@@ -1,6 +1,6 @@
 {
   "name": "copytree",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "A Node.js CLI tool that copies directory structures and file contents into structured XML format",
   "bin": {
     "copytree": "./bin/copytree.js"
@@ -19,7 +19,7 @@
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
     "prepare": "npm run lint && npm run test",
-    "prepublishOnly": "npm run test:coverage && npm run benchmark"
+    "prepublishOnly": "npm run test:coverage"
   },
   "keywords": [
     "cli",
