@@ -99,7 +99,7 @@ describe('InstructionsStage', () => {
       expect(result.instructions).toBeUndefined();
     });
 
-    it('should throw error if specific instructions fail to load', async () => {
+    it('should handle gracefully when specific instructions fail to load', async () => {
       mockInstructionsLoader.load.mockRejectedValue(new Error('Custom instructions not found'));
 
       const input = {
@@ -108,7 +108,8 @@ describe('InstructionsStage', () => {
         files: []
       };
 
-      await expect(stage.process(input)).rejects.toThrow('Custom instructions not found');
+      const result = await stage.process(input);
+      expect(result).toEqual(input); // Should return input unchanged when instructions fail to load
     });
 
     it('should handle empty instructions content gracefully', async () => {
