@@ -14,13 +14,14 @@ const React = require('react');
 const { render } = require('ink');
 const { Command } = require('commander');
 const App = require('../src/ui/App.js');
+const pkg = require('../package.json');
 
 const program = new Command();
 
 program
   .name('copytree')
   .description('Copy directory structures and file contents into structured XML format')
-  .version('1.0.0');
+  .version(pkg.version);
 
 // 1. Main copy command (default)
 program
