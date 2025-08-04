@@ -1,6 +1,6 @@
-const fs = require('fs-extra');
-const path = require('path');
-const { logger } = require('../utils/logger');
+import fs from 'fs-extra';
+import path from 'path';
+import { logger } from '../utils/logger.js';
 
 /**
  * ProfileGuesser - Always returns default profile
@@ -108,4 +108,4 @@ class ProfileGuesser {
 
 }
 
-module.exports = ProfileGuesser;
+export default ProfileGuesser;

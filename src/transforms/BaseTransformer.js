@@ -1,9 +1,9 @@
-const { TransformError } = require('../utils/errors');
-const { config } = require('../config/ConfigManager');
-const { logger } = require('../utils/logger');
-const { CacheService } = require('../services/CacheService');
-const crypto = require('crypto');
-const path = require('path');
+import { TransformError } from '../utils/errors.js';
+import { config } from '../config/ConfigManager.js';
+import { logger } from '../utils/logger.js';
+import { CacheService } from '../services/CacheService.js';
+import crypto from 'crypto';
+import path from 'path';
 
 /**
  * Base class for all file transformers
@@ -280,4 +280,4 @@ class BaseTransformer {
   }
 }
 
-module.exports = BaseTransformer;
+export default BaseTransformer;

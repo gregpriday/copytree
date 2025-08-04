@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const { AIService } = require('../../services/AIService');
+import BaseTransformer from '../BaseTransformer.js';
+import { AIService } from '../../services/AIService.js';
 
 /**
  * AI Summary Transformer - Uses AI to generate summaries of files
@@ -115,4 +115,4 @@ class AISummaryTransformer extends BaseTransformer {
   }
 }
 
-module.exports = AISummaryTransformer;
+export default AISummaryTransformer;

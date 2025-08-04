@@ -1,7 +1,7 @@
-const chalk = require('chalk');
-const ora = require('ora');
-const { config } = require('../config/ConfigManager');
-const EventEmitter = require('events');
+import chalk from 'chalk';
+import ora from 'ora';
+import { config } from '../config/ConfigManager.js';
+import { EventEmitter } from 'events';
 
 class Logger extends EventEmitter {
   constructor(options = {}) {
@@ -331,13 +331,14 @@ class Logger extends EventEmitter {
 const defaultLogger = new Logger();
 
 // Export both the class and a default instance
-module.exports = {
+export {
   Logger,
-  logger: defaultLogger,
-  // Convenience methods
-  info: defaultLogger.info.bind(defaultLogger),
-  success: defaultLogger.success.bind(defaultLogger),
-  warn: defaultLogger.warn.bind(defaultLogger),
-  error: defaultLogger.error.bind(defaultLogger),
-  debug: defaultLogger.debug.bind(defaultLogger),
+  defaultLogger as logger,
 };
+
+// Convenience method exports
+export const info = defaultLogger.info.bind(defaultLogger);
+export const success = defaultLogger.success.bind(defaultLogger);
+export const warn = defaultLogger.warn.bind(defaultLogger);
+export const error = defaultLogger.error.bind(defaultLogger);
+export const debug = defaultLogger.debug.bind(defaultLogger);

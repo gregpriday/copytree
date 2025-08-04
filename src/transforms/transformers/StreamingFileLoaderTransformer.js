@@ -1,6 +1,6 @@
-const BaseTransformer = require('../BaseTransformer');
-const fs = require('fs-extra');
-const { Readable } = require('stream');
+import BaseTransformer from '../BaseTransformer.js';
+import fs from 'fs-extra';
+import { Readable } from 'stream';
 
 /**
  * Streaming File Loader Transformer - Loads file content using streams
@@ -182,4 +182,4 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
   }
 }
 
-module.exports = StreamingFileLoaderTransformer;
+export default StreamingFileLoaderTransformer;

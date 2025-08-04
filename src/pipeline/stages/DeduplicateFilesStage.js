@@ -1,6 +1,6 @@
-const crypto = require('crypto');
-const Stage = require('../Stage');
-const { logger } = require('../../utils/logger');
+import crypto from 'crypto';
+import Stage from '../Stage.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Deduplicate files stage - Remove duplicate files based on content hash
@@ -130,4 +130,4 @@ class DeduplicateFilesStage extends Stage {
   }
 }
 
-module.exports = DeduplicateFilesStage;
+export default DeduplicateFilesStage;

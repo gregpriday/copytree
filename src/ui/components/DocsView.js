@@ -1,7 +1,6 @@
-const React = require('react');
-const { useEffect, useState } = React;
+import React, { useEffect, useState } from 'react';
 
-// Use dynamic import for ESM-only ink in CommonJS context
+// Use dynamic import for ESM-only ink
 let Box, Text;
 (async () => {
   try {
@@ -17,10 +16,10 @@ let Box, Text;
   Box = undefined;
   Text = undefined;
 });
-const { useAppContext } = require('../contexts/AppContext.js');
-const fs = require('fs-extra');
-const path = require('path');
-// Use dynamic import for ESM-only clipboardy inside async contexts (no top-level require)
+import { useAppContext } from '../contexts/AppContext.js';
+import fs from 'fs-extra';
+import path from 'path';
+// Use dynamic import for ESM-only clipboardy inside async contexts
 
 const TopicsList = ({ topics }) => {
   if (!topics || topics.length === 0) {
@@ -640,4 +639,4 @@ transformers:
   return docs[topic] || null;
 }
 
-module.exports = DocsView;
+export default DocsView;

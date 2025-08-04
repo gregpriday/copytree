@@ -1,5 +1,5 @@
-const EventEmitter = require('events');
-const { config } = require('../config/ConfigManager');
+import { EventEmitter } from 'events';
+import { config } from '../config/ConfigManager.js';
 
 class Pipeline extends EventEmitter {
   constructor(options = {}) {
@@ -247,4 +247,4 @@ class Pipeline extends EventEmitter {
   }
 }
 
-module.exports = Pipeline;
+export default Pipeline;

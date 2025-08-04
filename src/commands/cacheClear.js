@@ -1,7 +1,7 @@
-const { CacheService } = require('../services/CacheService');
-const { logger } = require('../utils/logger');
-const { config } = require('../config/ConfigManager');
-const { CommandError } = require('../utils/errors');
+import { CacheService } from '../services/CacheService.js';
+import { logger } from '../utils/logger.js';
+import { config } from '../config/ConfigManager.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Clear cache command
@@ -23,8 +23,8 @@ async function clearCommand(_options = {}) {
 async function showCacheStatus() {
   try {
     const cache = new CacheService();
-    const fs = require('fs-extra');
-    const path = require('path');
+    const fs = await import('fs-extra');
+    const path = await import('path');
     
     const status = {
       enabled: config().get('cache.enabled', true),
@@ -67,4 +67,4 @@ async function showCacheStatus() {
   }
 }
 
-module.exports = clearCommand;
+export default clearCommand;

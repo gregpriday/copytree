@@ -1,6 +1,6 @@
-const { env } = require('../src/config/ConfigManager');
+import { env } from '../src/config/ConfigManager.js';
 
-module.exports = {
+export default {
   // Application metadata
   name: env('APP_NAME', 'CopyTree'),
   version: '1.0.0',

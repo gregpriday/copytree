@@ -1,8 +1,8 @@
-const Stage = require('../Stage');
-const fastGlob = require('fast-glob');
-const { minimatch } = require('minimatch');
-const fs = require('fs-extra');
-const path = require('path');
+import Stage from '../Stage.js';
+import fastGlob from 'fast-glob';
+import { minimatch } from 'minimatch';
+import fs from 'fs-extra';
+import path from 'path';
 
 class FileDiscoveryStage extends Stage {
   constructor(options = {}) {
@@ -193,4 +193,4 @@ class FileDiscoveryStage extends Stage {
   }
 }
 
-module.exports = FileDiscoveryStage;
+export default FileDiscoveryStage;

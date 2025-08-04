@@ -1,8 +1,8 @@
-const simpleGit = require('simple-git');
-const path = require('path');
-const { GitError } = require('./errors');
-const { logger } = require('./logger');
-const { createCache } = require('./helpers');
+import simpleGit from 'simple-git';
+import path from 'path';
+import { GitError } from './errors.js';
+import { logger } from './logger.js';
+import { createCache } from './helpers.js';
 
 /**
  * Git utilities for file filtering and status
@@ -271,4 +271,4 @@ class GitUtils {
   }
 }
 
-module.exports = GitUtils;
+export default GitUtils;

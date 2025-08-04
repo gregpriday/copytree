@@ -1,6 +1,6 @@
-const React = require('react');
+import React from 'react';
 
-// Use dynamic import for ESM-only ink in CommonJS context
+// Use dynamic import for ESM-only ink
 let Static, Box, Text;
 (async () => {
   try {
@@ -69,4 +69,4 @@ const StaticLog = ({ logs }) => {
   );
 };
 
-module.exports = StaticLog;
+export default StaticLog;

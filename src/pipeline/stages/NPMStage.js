@@ -1,7 +1,7 @@
-const Stage = require('../Stage');
-const path = require('path');
-const fs = require('fs-extra');
-const { logger } = require('../../utils/logger');
+import Stage from '../Stage.js';
+import path from 'path';
+import fs from 'fs-extra';
+import { logger } from '../../utils/logger.js';
 
 /**
  * NPM stage - Include NPM package instruction files from node_modules directory
@@ -206,4 +206,4 @@ class NPMStage extends Stage {
   }
 }
 
-module.exports = NPMStage;
+export default NPMStage;

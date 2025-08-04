@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const { AIService } = require('../../services/AIService');
+import BaseTransformer from '../BaseTransformer.js';
+import { AIService } from '../../services/AIService.js';
 
 /**
  * Batch AI Summary Transformer - Processes multiple files in a single AI request
@@ -236,4 +236,4 @@ ${file.content.substring(0, 10000)} // Truncated if needed
   }
 }
 
-module.exports = BatchAISummaryTransformer;
+export default BatchAISummaryTransformer;

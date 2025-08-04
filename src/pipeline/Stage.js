@@ -1,4 +1,4 @@
-const { config } = require('../config/ConfigManager');
+import { config } from '../config/ConfigManager.js';
 
 /**
  * Base class for pipeline stages
@@ -156,4 +156,4 @@ class Stage {
   }
 }
 
-module.exports = Stage;
+export default Stage;

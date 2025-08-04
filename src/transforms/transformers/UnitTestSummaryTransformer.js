@@ -1,6 +1,6 @@
-const BaseTransformer = require('../BaseTransformer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const path = require('path');
+import BaseTransformer from '../BaseTransformer.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import path from 'path';
 
 /**
  * Unit test summary transformer using Gemini API
@@ -240,4 +240,4 @@ Keep the summary concise (3-5 sentences plus bullet points for scenarios).`;
   }
 }
 
-module.exports = UnitTestSummaryTransformer;
+export default UnitTestSummaryTransformer;

@@ -1,6 +1,6 @@
-const { env } = require('../src/config/ConfigManager');
+import { env } from '../src/config/ConfigManager.js';
 
-module.exports = {
+export default {
   // Global excluded directories (always excluded regardless of location)
   globalExcludedDirectories: [
     // Version control

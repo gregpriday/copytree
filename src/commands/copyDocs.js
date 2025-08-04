@@ -1,8 +1,8 @@
-const fs = require('fs-extra');
-const path = require('path');
-const clipboardy = require('clipboardy');
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
+import fs from 'fs-extra';
+import path from 'path';
+import clipboardy from 'clipboardy';
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Copy docs command - Copy framework/library documentation
@@ -534,4 +534,4 @@ transformers:
   return docs[topic] || null;
 }
 
-module.exports = copyDocsCommand;
+export default copyDocsCommand;

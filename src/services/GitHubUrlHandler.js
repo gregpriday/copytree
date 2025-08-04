@@ -1,10 +1,10 @@
-const { execSync } = require('child_process');
-const crypto = require('crypto');
-const path = require('path');
-const fs = require('fs-extra');
-const os = require('os');
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
+import { execSync } from 'child_process';
+import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs-extra';
+import os from 'os';
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Handles GitHub URLs by cloning/updating repositories and managing cache
@@ -296,4 +296,4 @@ class GitHubUrlHandler {
   }
 }
 
-module.exports = GitHubUrlHandler;
+export default GitHubUrlHandler;

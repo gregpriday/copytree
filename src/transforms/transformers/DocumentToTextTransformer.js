@@ -1,8 +1,8 @@
-const BaseTransformer = require('../BaseTransformer');
-const { execSync } = require('child_process');
-const path = require('path');
-const fs = require('fs-extra');
-const os = require('os');
+import BaseTransformer from '../BaseTransformer.js';
+import { execSync } from 'child_process';
+import path from 'path';
+import fs from 'fs-extra';
+import os from 'os';
 
 /**
  * Document to text transformer using Pandoc
@@ -159,4 +159,4 @@ class DocumentToTextTransformer extends BaseTransformer {
   }
 }
 
-module.exports = DocumentToTextTransformer;
+export default DocumentToTextTransformer;

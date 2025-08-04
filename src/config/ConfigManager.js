@@ -1,7 +1,12 @@
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
-const _ = require('lodash');
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+import _ from 'lodash';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 
 class ConfigManager {
   constructor() {
@@ -9,35 +14,36 @@ class ConfigManager {
     this.configPath = path.join(__dirname, '../../config');
     this.userConfigPath = path.join(os.homedir(), '.copytree');
     
-    this.loadConfiguration();
+    // Load configuration asynchronously
+    this.loadConfiguration().catch(console.error);
   }
 
-  loadConfiguration() {
+  async loadConfiguration() {
     // 1. Load default configuration files
-    this.loadDefaults();
+    await this.loadDefaults();
     
     // 2. Load user configuration overrides
-    this.loadUserConfig();
+    await this.loadUserConfig();
     
     // 3. Apply environment variable overrides
     this.applyEnvironmentOverrides();
   }
 
-  loadDefaults() {
+  async loadDefaults() {
     const configFiles = fs.readdirSync(this.configPath).filter((file) => file.endsWith('.js'));
     
     for (const file of configFiles) {
       const configName = path.basename(file, '.js');
       try {
-        const configModule = require(path.join(this.configPath, file));
-        this.config[configName] = configModule;
+        const configModule = await import(path.join(this.configPath, file));
+        this.config[configName] = configModule.default || configModule;
       } catch (error) {
         console.error(`Failed to load config ${configName}:`, error.message);
       }
     }
   }
 
-  loadUserConfig() {
+  async loadUserConfig() {
     if (!fs.existsSync(this.userConfigPath)) {
       return;
     }
@@ -54,8 +60,10 @@ class ConfigManager {
         if (file.endsWith('.json')) {
           userConfig = fs.readJsonSync(filePath);
         } else {
-          delete require.cache[require.resolve(filePath)];
-          userConfig = require(filePath);
+          // Use dynamic import for ES modules
+          const moduleUrl = `file://${filePath}?t=${Date.now()}`; // Add timestamp to bypass cache
+          const configModule = await import(moduleUrl);
+          userConfig = configModule.default || configModule;
         }
         
         // Deep merge with existing config
@@ -156,27 +164,27 @@ class ConfigManager {
   /**
    * Reload configuration
    */
-  reload() {
+  async reload() {
     this.config = {};
-    this.loadConfiguration();
+    await this.loadConfiguration();
   }
 }
 
 // Singleton instance
 let instance = null;
 
-module.exports = {
-  ConfigManager,
-  config() {
-    if (!instance) {
-      instance = new ConfigManager();
-    }
-    return instance;
-  },
-  env(key, defaultValue) {
-    if (!instance) {
-      instance = new ConfigManager();
-    }
-    return instance.env(key, defaultValue);
-  },
-};
+export { ConfigManager };
+
+export function config() {
+  if (!instance) {
+    instance = new ConfigManager();
+  }
+  return instance;
+}
+
+export function env(key, defaultValue) {
+  if (!instance) {
+    instance = new ConfigManager();
+  }
+  return instance.env(key, defaultValue);
+}

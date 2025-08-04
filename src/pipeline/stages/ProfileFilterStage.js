@@ -1,5 +1,5 @@
-const Stage = require('../Stage');
-const { minimatch } = require('minimatch');
+import Stage from '../Stage.js';
+import { minimatch } from 'minimatch';
 
 class ProfileFilterStage extends Stage {
   constructor(options = {}) {
@@ -61,4 +61,4 @@ class ProfileFilterStage extends Stage {
   }
 }
 
-module.exports = ProfileFilterStage;
+export default ProfileFilterStage;

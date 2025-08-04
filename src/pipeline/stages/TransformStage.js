@@ -1,14 +1,16 @@
-const Stage = require('../Stage');
-const { CacheService } = require('../../services/CacheService');
-const { generateTransformCacheKey } = require('../../utils/fileHash');
-const path = require('path');
+import Stage from '../Stage.js';
+import { CacheService } from '../../services/CacheService.js';
+import { generateTransformCacheKey } from '../../utils/fileHash.js';
+import path from 'path';
+import appConfig from '../../../config/app.js';
+import { logger } from '../../utils/logger.js';
 
 class TransformStage extends Stage {
   constructor(options = {}) {
     super(options);
     this.registry = options.registry;
     this.transformerConfig = options.transformers || {};
-    this.maxConcurrency = options.maxConcurrency || require('../../../config/app').maxConcurrency || 5;
+    this.maxConcurrency = options.maxConcurrency || appConfig.maxConcurrency || 5;
     this.noCache = options.noCache;
     
     // Initialize cache for transformations (disabled if noCache is true)
@@ -30,7 +32,7 @@ class TransformStage extends Stage {
     const startTime = Date.now();
     let transformCount = 0;
     let errorCount = 0;
-    const { logger } = require('../../utils/logger');
+    // logger is already imported at the top
 
     // Import p-limit dynamically to handle ES module
     let limit;
@@ -39,7 +41,7 @@ class TransformStage extends Stage {
       limit = pLimit(this.maxConcurrency);
     } catch (_error) {
       // Fallback to older p-limit version syntax
-      const pLimit = require('p-limit');
+      const pLimit = await import('p-limit');
       limit = pLimit.default ? pLimit.default(this.maxConcurrency) : pLimit(this.maxConcurrency);
     }
     
@@ -247,4 +249,4 @@ class TransformStage extends Stage {
   }
 }
 
-module.exports = TransformStage;
+export default TransformStage;

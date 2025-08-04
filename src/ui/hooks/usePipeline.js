@@ -1,6 +1,5 @@
-const React = require('react');
-const { useEffect, useRef, useCallback } = React;
-const { useAppContext } = require('../contexts/AppContext.js');
+import React, { useEffect, useRef, useCallback } from 'react';
+import { useAppContext } from '../contexts/AppContext.js';
 
 const usePipeline = () => {
   const { updateState, addLog } = useAppContext();
@@ -177,4 +176,4 @@ const usePipeline = () => {
   return { runPipeline };
 };
 
-module.exports = usePipeline;
+export default usePipeline;

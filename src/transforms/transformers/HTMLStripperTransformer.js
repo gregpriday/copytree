@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const path = require('path');
+import BaseTransformer from '../BaseTransformer.js';
+import path from 'path';
 
 /**
  * HTML stripper transformer
@@ -156,4 +156,4 @@ class HTMLStripperTransformer extends BaseTransformer {
   }
 }
 
-module.exports = HTMLStripperTransformer;
+export default HTMLStripperTransformer;

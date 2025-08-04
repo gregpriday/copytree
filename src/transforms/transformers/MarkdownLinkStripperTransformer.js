@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const path = require('path');
+import BaseTransformer from '../BaseTransformer.js';
+import path from 'path';
 
 /**
  * Markdown link stripper transformer
@@ -122,4 +122,4 @@ class MarkdownLinkStripperTransformer extends BaseTransformer {
   }
 }
 
-module.exports = MarkdownLinkStripperTransformer;
+export default MarkdownLinkStripperTransformer;

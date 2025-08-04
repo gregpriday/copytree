@@ -1,4 +1,4 @@
-const Stage = require('../Stage');
+import Stage from '../Stage.js';
 
 class CharLimitStage extends Stage {
   constructor(options = {}) {
@@ -67,4 +67,4 @@ class CharLimitStage extends Stage {
   }
 }
 
-module.exports = CharLimitStage;
+export default CharLimitStage;

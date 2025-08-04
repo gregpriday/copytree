@@ -1,10 +1,10 @@
-const fastGlob = require('fast-glob');
-const { minimatch } = require('minimatch');
-const fs = require('fs-extra');
-const path = require('path');
-const { config } = require('../config/ConfigManager');
-const { FileSystemError } = require('./errors');
-const { logger } = require('./logger');
+import fastGlob from 'fast-glob';
+import { minimatch } from 'minimatch';
+import fs from 'fs-extra';
+import path from 'path';
+import { config } from '../config/ConfigManager.js';
+import { FileSystemError } from './errors.js';
+import { logger } from './logger.js';
 
 class FileDiscovery {
   constructor(options = {}) {
@@ -289,4 +289,4 @@ class FileDiscovery {
   }
 }
 
-module.exports = FileDiscovery;
+export default FileDiscovery;

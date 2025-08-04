@@ -1,7 +1,7 @@
-const crypto = require('crypto');
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
+import crypto from 'crypto';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
 
 /**
  * Utility helper functions
@@ -286,7 +286,7 @@ function timestamp() {
   return new Date().toISOString();
 }
 
-module.exports = {
+export {
   hash,
   shortHash,
   sleep,

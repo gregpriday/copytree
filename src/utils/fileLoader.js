@@ -1,6 +1,6 @@
-const fs = require('fs-extra');
-const path = require('path');
-const { logger } = require('./logger');
+import fs from 'fs-extra';
+import path from 'path';
+import { logger } from './logger.js';
 
 /**
  * File loader utility for loading files from a directory
@@ -223,4 +223,4 @@ class FileLoader {
   }
 }
 
-module.exports = FileLoader;
+export default FileLoader;

@@ -2,8 +2,13 @@
 // The mock is defined in setup-mocks.js and provides static methods
 // that are used by transformer tests
 
-// Note: We need to require this AFTER jest has set up the mocks
-const AIService = require('../../../src/services/AIService');
+// Use dynamic import for module under test
+let AIService;
+
+beforeAll(async () => {
+  const aiServiceModule = await import('../../../src/services/AIService.js');
+  AIService = aiServiceModule.default;
+});
 
 describe('AIService Mock', () => {
   it('should be properly mocked', () => {

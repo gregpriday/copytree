@@ -2,12 +2,21 @@
 jest.mock('fs-extra');
 
 // Mock config before importing ConfigManager
-jest.mock('../../../src/config', () => require('../../mocks/config'));
+jest.mock('../../../src/config.js', () => import('../../mocks/config.js'));
 
-const { config, env } = require('../../../src/config/ConfigManager');
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
+// Static imports for Node.js modules
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+
+// Use dynamic import for module under test
+let config, env;
+
+beforeAll(async () => {
+  const configManagerModule = await import('../../../src/config/ConfigManager.js');
+  config = configManagerModule.config;
+  env = configManagerModule.env;
+});
 
 describe('ConfigManager', () => {
   let tempDir;

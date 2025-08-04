@@ -1,6 +1,6 @@
-const Stage = require('../Stage');
-const fs = require('fs-extra');
-const path = require('path');
+import Stage from '../Stage.js';
+import fs from 'fs-extra';
+import path from 'path';
 
 class FileLoadingStage extends Stage {
   constructor(options = {}) {
@@ -125,4 +125,4 @@ class FileLoadingStage extends Stage {
   }
 }
 
-module.exports = FileLoadingStage;
+export default FileLoadingStage;

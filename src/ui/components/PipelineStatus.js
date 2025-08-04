@@ -1,23 +1,13 @@
-const React = require('react');
-
-// Use dynamic import for ESM-only ink in CommonJS context
-let Box, Text;
-(async () => {
-  try {
-    const ink = await import('ink');
-    Box = ink.Box;
-    Text = ink.Text;
-  } catch (error) {
-    // Defer error until first usage attempt
-    Box = undefined;
-    Text = undefined;
-  }
-})().catch(() => {
-  Box = undefined;
-  Text = undefined;
-});
+import React from 'react';
+import useInk from '../hooks/useInk.js';
 
 const PipelineStatus = ({ currentStage, isLoading, message, progress }) => {
+  const { components, loading } = useInk();
+
+  if (loading || !components?.Text) {
+    return null;
+  }
+
   if (!isLoading && !currentStage) {
     return null;
   }
@@ -37,10 +27,10 @@ const PipelineStatus = ({ currentStage, isLoading, message, progress }) => {
   const progressText = progress > 0 ? ` (${Math.round(progress)}%)` : '';
 	
   return React.createElement(
-    Text,
+    components.Text,
     { color: isLoading ? 'blue' : 'green' },
     icon + displayMessage + progressText,
   );
 };
 
-module.exports = PipelineStatus;
+export default PipelineStatus;

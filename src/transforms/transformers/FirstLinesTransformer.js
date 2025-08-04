@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const path = require('path');
+import BaseTransformer from '../BaseTransformer.js';
+import path from 'path';
 
 /**
  * First lines transformer
@@ -111,4 +111,4 @@ class FirstLinesTransformer extends BaseTransformer {
   }
 }
 
-module.exports = FirstLinesTransformer;
+export default FirstLinesTransformer;

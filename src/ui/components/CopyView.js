@@ -1,40 +1,39 @@
-const React = require('react');
-const { useEffect, useState } = React;
-const { useAppContext } = require('../contexts/AppContext.js');
+import React, { useEffect, useState } from 'react';
+import { useAppContext } from '../contexts/AppContext.js';
 
-// Use dynamic import for ESM-only ink in CommonJS context
+// Use dynamic import for ESM-only ink with proper loading state
 let Box, Text, Newline;
-(async () => {
+let inkLoaded = false;
+const inkLoadPromise = (async () => {
   try {
     const ink = await import('ink');
     Box = ink.Box;
     Text = ink.Text;
     Newline = ink.Newline;
+    inkLoaded = true;
   } catch (error) {
     // Defer error until first usage attempt
     Box = undefined;
     Text = undefined;
     Newline = undefined;
+    console.error('Failed to load Ink components:', error);
   }
-})().catch(() => {
-  Box = undefined;
-  Text = undefined;
-  Newline = undefined;
-});
-const usePipeline = require('../hooks/usePipeline');
+})();
+import usePipeline from '../hooks/usePipeline.js';
 
-const PipelineStatus = require('./PipelineStatus.jsx');
-const Results = require('./Results.jsx');
-const SummaryTable = require('./SummaryTable.jsx');
-const StaticLog = require('./StaticLog.jsx');
+import PipelineStatus from './PipelineStatus.js';
+import Results from './Results.js';
+import SummaryTable from './SummaryTable.js';
+import StaticLog from './StaticLog.js';
 
-const Pipeline = require('../../pipeline/Pipeline');
-const ProfileLoader = require('../../profiles/ProfileLoader');
-const GitHubUrlHandler = require('../../services/GitHubUrlHandler');
-const { CommandError } = require('../../utils/errors');
-const fs = require('fs-extra');
-const path = require('path');
-const Clipboard = require('../../utils/clipboard');
+import Pipeline from '../../pipeline/Pipeline.js';
+import ProfileLoader from '../../profiles/ProfileLoader.js';
+import GitHubUrlHandler from '../../services/GitHubUrlHandler.js';
+import { CommandError } from '../../utils/errors.js';
+import fs from 'fs-extra';
+import path from 'path';
+import Clipboard from '../../utils/clipboard.js';
+import os from 'os';
 
 const CopyView = () => {
   const { 
@@ -54,6 +53,14 @@ const CopyView = () => {
   const { runPipeline } = usePipeline();
   const [output, setOutput] = useState(null);
   const [processingStarted, setProcessingStarted] = useState(false);
+  const [inkReady, setInkReady] = useState(inkLoaded);
+
+  // Wait for Ink components to load
+  useEffect(() => {
+    if (!inkLoaded) {
+      inkLoadPromise.then(() => setInkReady(true));
+    }
+  }, []);
 
   useEffect(() => {
     if (processingStarted || !targetPath) return;
@@ -179,19 +186,19 @@ const CopyView = () => {
     const stages = [];
 		
     // Import stage classes
-    const FileDiscoveryStage = require('../../pipeline/stages/FileDiscoveryStage');
-    const ProfileFilterStage = require('../../pipeline/stages/ProfileFilterStage');
-    const GitFilterStage = require('../../pipeline/stages/GitFilterStage'); 
-    const ExternalSourceStage = require('../../pipeline/stages/ExternalSourceStage');
-    const LimitStage = require('../../pipeline/stages/LimitStage');
-    const SortFilesStage = require('../../pipeline/stages/SortFilesStage');
-    const AlwaysIncludeStage = require('../../pipeline/stages/AlwaysIncludeStage');
-    const FileLoadingStage = require('../../pipeline/stages/FileLoadingStage');
-    const TransformStage = require('../../pipeline/stages/TransformStage');
-    const CharLimitStage = require('../../pipeline/stages/CharLimitStage');
-    const DeduplicateFilesStage = require('../../pipeline/stages/DeduplicateFilesStage');
-    const InstructionsStage = require('../../pipeline/stages/InstructionsStage');
-    const OutputFormattingStage = require('../../pipeline/stages/OutputFormattingStage');
+    const { default: FileDiscoveryStage } = await import('../../pipeline/stages/FileDiscoveryStage.js');
+    const { default: ProfileFilterStage } = await import('../../pipeline/stages/ProfileFilterStage.js');
+    const { default: GitFilterStage } = await import('../../pipeline/stages/GitFilterStage.js'); 
+    const { default: ExternalSourceStage } = await import('../../pipeline/stages/ExternalSourceStage.js');
+    const { default: LimitStage } = await import('../../pipeline/stages/LimitStage.js');
+    const { default: SortFilesStage } = await import('../../pipeline/stages/SortFilesStage.js');
+    const { default: AlwaysIncludeStage } = await import('../../pipeline/stages/AlwaysIncludeStage.js');
+    const { default: FileLoadingStage } = await import('../../pipeline/stages/FileLoadingStage.js');
+    const { default: TransformStage } = await import('../../pipeline/stages/TransformStage.js');
+    const { default: CharLimitStage } = await import('../../pipeline/stages/CharLimitStage.js');
+    const { default: DeduplicateFilesStage } = await import('../../pipeline/stages/DeduplicateFilesStage.js');
+    const { default: InstructionsStage } = await import('../../pipeline/stages/InstructionsStage.js');
+    const { default: OutputFormattingStage } = await import('../../pipeline/stages/OutputFormattingStage.js');
 		
     // 1. File Discovery
     stages.push(FileDiscoveryStage);
@@ -283,7 +290,7 @@ const CopyView = () => {
     if (options.asReference) {
       const format = options.format || 'xml';
       const extension = format === 'json' ? 'json' : 'xml';
-      const tempFile = path.join(require('os').tmpdir(), `copytree-${Date.now()}.${extension}`);
+      const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, outputResult.content, 'utf8');
 			
       try {
@@ -317,7 +324,7 @@ const CopyView = () => {
         // If clipboard fails, save to temporary file
         const format = options.format || 'xml';
         const extension = format === 'json' ? 'json' : 'xml';
-        const tempFile = path.join(require('os').tmpdir(), `copytree-${Date.now()}.${extension}`);
+        const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
         await fs.writeFile(tempFile, outputResult.content, 'utf8');
         destination = tempFile;
         action = 'saved';
@@ -347,6 +354,11 @@ const CopyView = () => {
       isLoading: false,
     });
   };
+
+  // Don't render until Ink components are loaded
+  if (!inkReady) {
+    return React.createElement('div', null, 'Loading...');
+  }
 
   if (error) {
     return React.createElement(
@@ -391,4 +403,4 @@ const CopyView = () => {
   );
 };
 
-module.exports = CopyView;
+export default CopyView;

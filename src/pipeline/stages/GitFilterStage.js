@@ -1,6 +1,6 @@
-const Stage = require('../Stage');
-const GitUtils = require('../../utils/GitUtils');
-const path = require('path');
+import Stage from '../Stage.js';
+import GitUtils from '../../utils/GitUtils.js';
+import path from 'path';
 
 /**
  * Git filter stage - filters files based on git status
@@ -104,4 +104,4 @@ class GitFilterStage extends Stage {
   }
 }
 
-module.exports = GitFilterStage;
+export default GitFilterStage;

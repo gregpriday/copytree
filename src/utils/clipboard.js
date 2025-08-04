@@ -1,8 +1,8 @@
-const { execSync } = require('child_process');
-const process = require('process');
-const url = require('url');
-const path = require('path');
-const { logger } = require('./logger');
+import { execSync } from 'child_process';
+import process from 'process';
+import url from 'url';
+import path from 'path';
+import { logger } from './logger.js';
 
 /**
  * Enhanced clipboard utilities with file reference support
@@ -106,4 +106,4 @@ class Clipboard {
   }
 }
 
-module.exports = Clipboard;
+export default Clipboard;

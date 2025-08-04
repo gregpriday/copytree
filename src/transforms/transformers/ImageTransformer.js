@@ -1,7 +1,7 @@
-const BaseTransformer = require('../BaseTransformer');
-const fs = require('fs-extra');
-const path = require('path');
-const Tesseract = require('tesseract.js');
+import BaseTransformer from '../BaseTransformer.js';
+import fs from 'fs-extra';
+import path from 'path';
+import Tesseract from 'tesseract.js';
 
 /**
  * Image transformer - extracts text from images using OCR
@@ -31,7 +31,8 @@ class ImageTransformer extends BaseTransformer {
       
       // If content is base64, write to temp file
       if (!imagePath && file.content && file.encoding === 'base64') {
-        const tempDir = require('os').tmpdir();
+        const { tmpdir } = await import('os');
+        const tempDir = tmpdir();
         tempFile = path.join(tempDir, `copytree-img-${Date.now()}${path.extname(file.path)}`);
         const buffer = Buffer.from(file.content, 'base64');
         await fs.writeFile(tempFile, buffer);
@@ -178,4 +179,4 @@ class ImageTransformer extends BaseTransformer {
   }
 }
 
-module.exports = ImageTransformer;
+export default ImageTransformer;

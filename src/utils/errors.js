@@ -177,7 +177,7 @@ function handleError(error, options = {}) {
 // Alias for consistency with BaseProvider
 const ProviderError = AIProviderError;
 
-module.exports = {
+export {
   CopyTreeError,
   CommandError,
   FileSystemError,

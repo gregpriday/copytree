@@ -1,28 +1,41 @@
 #!/usr/bin/env node
 
+// Note: Removed ESM loader since we don't use JSX files directly
+
 // Note: Removed @babel/register for better performance
 
 // Suppress dotenv console output
 const originalLog = console.log;
 console.log = () => {};
-const path = require('path');
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Load .env from the project directory (copytree root)
-require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 console.log = originalLog;
 
-const React = require('react');
-// Use dynamic import for ESM-only ink in CommonJS context
+import React from 'react';
+// Use dynamic import for ESM-only ink
 let render;
+let App;
 (async () => {
   const ink = await import('ink');
   render = ink.render;
+  const appModule = await import('../src/ui/App.js');
+  App = appModule.default;
 })().catch((_e) => {
   // Defer error until first render attempt
   render = undefined;
+  App = undefined;
 });
-const { Command } = require('commander');
-const App = require('../src/ui/App.js');
-const pkg = require('../package.json');
+import { Command } from 'commander';
+import { readFileSync } from 'fs';
+
+const pkg = JSON.parse(readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 
 const program = new Command();
 
@@ -63,9 +76,11 @@ program
   .option('--no-instructions', 'Disable including instructions in output')
   .option('--instructions <name>', 'Use custom instructions set (default: default)')
   .action(async (path, options) => {
-    if (!render) {
+    if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
+      const appModule = await import('../src/ui/App.js');
+      App = appModule.default;
     }
     render(React.createElement(App, {
       command: 'copy',
@@ -80,9 +95,11 @@ program
   .description('List all available profiles')
   .option('--json', 'Output as JSON')
   .action(async (options) => {
-    if (!render) {
+    if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
+      const appModule = await import('../src/ui/App.js');
+      App = appModule.default;
     }
     render(React.createElement(App, {
       command: 'profile:list',
@@ -97,9 +114,11 @@ program
   .description('Validate profile syntax and structure')
   .option('--all', 'Validate all profiles')
   .action(async (profile, options) => {
-    if (!render) {
+    if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
+      const appModule = await import('../src/ui/App.js');
+      App = appModule.default;
     }
     render(React.createElement(App, {
       command: 'profile:validate',
@@ -116,9 +135,11 @@ program
   .option('-o, --output <file>', 'Output file instead of clipboard')
   .option('--no-clipboard', 'Display to console instead of clipboard')
   .action(async (options) => {
-    if (!render) {
+    if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
+      const appModule = await import('../src/ui/App.js');
+      App = appModule.default;
     }
     render(React.createElement(App, {
       command: 'copy:docs',
@@ -132,9 +153,11 @@ program
   .command('config:validate')
   .description('Validate application configuration')
   .action(async () => {
-    if (!render) {
+    if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
+      const appModule = await import('../src/ui/App.js');
+      App = appModule.default;
     }
     render(React.createElement(App, {
       command: 'config:validate',
@@ -155,9 +178,11 @@ program
   .option('--status', 'Show cache status after clearing')
   .option('-v, --verbose', 'Show verbose output')
   .action(async (options) => {
-    if (!render) {
+    if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
+      const appModule = await import('../src/ui/App.js');
+      App = appModule.default;
     }
     render(React.createElement(App, {
       command: 'cache:clear',
@@ -171,9 +196,11 @@ program
   .command('install:copytree')
   .description('Set up CopyTree environment and configuration')
   .action(async () => {
-    if (!render) {
+    if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
+      const appModule = await import('../src/ui/App.js');
+      App = appModule.default;
     }
     render(React.createElement(App, {
       command: 'install:copytree',

@@ -1,6 +1,6 @@
-const { env } = require('../src/config/ConfigManager');
+import { env } from '../src/config/ConfigManager.js';
 
-module.exports = {
+export default {
   // State directory
   path: env('STATE_PATH', '.copytree-state'),
   

@@ -1,5 +1,5 @@
-const { performance } = require('perf_hooks');
-const { logger } = require('./logger');
+import { performance } from 'perf_hooks';
+import { logger } from './logger.js';
 
 /**
  * Performance monitoring utilities
@@ -250,10 +250,10 @@ function formatBytes(bytes) {
  */
 const globalMonitor = new PerformanceMonitor();
 
-module.exports = {
+export {
   PerformanceMonitor,
   measureMethod,
   measureFunction,
   formatBytes,
-  monitor: globalMonitor,
+  globalMonitor as monitor,
 };

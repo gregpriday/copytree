@@ -1,10 +1,10 @@
-const fs = require('fs-extra');
-const path = require('path');
-const yaml = require('js-yaml');
-const joi = require('joi');
-const { ProfileError } = require('../utils/errors');
-const { logger } = require('../utils/logger');
-const { config } = require('../config/ConfigManager');
+import fs from 'fs-extra';
+import path from 'path';
+import yaml from 'js-yaml';
+import joi from 'joi';
+import { ProfileError } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
+import { config } from '../config/ConfigManager.js';
 
 /**
  * Profile loader and manager
@@ -17,16 +17,27 @@ class ProfileLoader {
     this.config = config();
     
     // Profile directories
-    this.builtInProfilesDir = path.join(__dirname, '../../profiles');
-    this.userProfilesDir = path.join(
-      require('os').homedir(),
-      '.copytree',
-      'profiles',
-    );
+    this.builtInProfilesDir = path.join(import.meta.dirname, '../../profiles');
+    this.userProfilesDir = null; // Will be set on first access
     this.projectProfilesDir = path.join(process.cwd(), '.copytree');
     
     // Cache for loaded profiles
     this.profileCache = new Map();
+  }
+
+  /**
+   * Get user profiles directory (lazy initialization)
+   */
+  async getUserProfilesDir() {
+    if (!this.userProfilesDir) {
+      const os = await import('os');
+      this.userProfilesDir = path.join(
+        os.homedir(),
+        '.copytree',
+        'profiles',
+      );
+    }
+    return this.userProfilesDir;
   }
 
   /**
@@ -105,6 +116,7 @@ class ProfileLoader {
     }
 
     // Search for profile by name
+    const userProfilesDir = await this.getUserProfilesDir();
     const searchPaths = [
       // Current directory .copytree folder has highest priority
       path.join(process.cwd(), '.copytree', `${profileNameOrPath}.yml`),
@@ -112,9 +124,9 @@ class ProfileLoader {
       path.join(process.cwd(), '.copytree', `${profileNameOrPath}.json`),
       
       // User profiles in home directory
-      path.join(this.userProfilesDir, `${profileNameOrPath}.yml`),
-      path.join(this.userProfilesDir, `${profileNameOrPath}.yaml`),
-      path.join(this.userProfilesDir, `${profileNameOrPath}.json`),
+      path.join(userProfilesDir, `${profileNameOrPath}.yml`),
+      path.join(userProfilesDir, `${profileNameOrPath}.yaml`),
+      path.join(userProfilesDir, `${profileNameOrPath}.json`),
       
       // Built-in profiles (default only)
       path.join(this.builtInProfilesDir, `${profileNameOrPath}.yml`),
@@ -350,8 +362,9 @@ class ProfileLoader {
     };
 
     // Load from all sources
+    const userProfilesDir = await this.getUserProfilesDir();
     await addProfilesFromDir(this.projectProfilesDir, 'project');
-    await addProfilesFromDir(this.userProfilesDir, 'user');
+    await addProfilesFromDir(userProfilesDir, 'user');
     await addProfilesFromDir(this.builtInProfilesDir, 'built-in');
 
     return profiles;
@@ -405,4 +418,4 @@ class ProfileLoader {
   }
 }
 
-module.exports = ProfileLoader;
+export default ProfileLoader;

@@ -1,5 +1,5 @@
-const Stage = require('../Stage');
-const path = require('path');
+import Stage from '../Stage.js';
+import path from 'path';
 
 /**
  * Sort files stage - Sort files by various criteria
@@ -177,4 +177,4 @@ class SortFilesStage extends Stage {
   }
 }
 
-module.exports = SortFilesStage;
+export default SortFilesStage;

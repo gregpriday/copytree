@@ -1,5 +1,5 @@
-const Stage = require('../Stage');
-const path = require('path');
+import Stage from '../Stage.js';
+import path from 'path';
 
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
@@ -314,4 +314,4 @@ class OutputFormattingStage extends Stage {
   }
 }
 
-module.exports = OutputFormattingStage;
+export default OutputFormattingStage;

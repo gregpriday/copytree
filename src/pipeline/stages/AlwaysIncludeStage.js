@@ -1,7 +1,7 @@
-const Stage = require('../Stage');
-const minimatch = require('minimatch');
-const path = require('path');
-const { logger } = require('../../utils/logger');
+import Stage from '../Stage.js';
+import { minimatch } from 'minimatch';
+import path from 'path';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Always include stage - Ensures specific files are always included regardless of other filters
@@ -107,4 +107,4 @@ class AlwaysIncludeStage extends Stage {
   }
 }
 
-module.exports = AlwaysIncludeStage;
+export default AlwaysIncludeStage;

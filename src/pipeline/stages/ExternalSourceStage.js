@@ -1,9 +1,9 @@
-const path = require('path');
-const fs = require('fs-extra');
-const Stage = require('../Stage');
-const GitHubUrlHandler = require('../../services/GitHubUrlHandler');
-const FileLoader = require('../../utils/fileLoader');
-const { logger } = require('../../utils/logger');
+import path from 'path';
+import fs from 'fs-extra';
+import Stage from '../Stage.js';
+import GitHubUrlHandler from '../../services/GitHubUrlHandler.js';
+import FileLoader from '../../utils/fileLoader.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * External source stage - Include files from external sources (GitHub, local paths)
@@ -159,4 +159,4 @@ class ExternalSourceStage extends Stage {
   }
 }
 
-module.exports = ExternalSourceStage;
+export default ExternalSourceStage;

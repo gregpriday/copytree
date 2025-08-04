@@ -5,9 +5,17 @@ jest.mock('fs-extra');
 // Set NODE_ENV to avoid pdf-parse debug mode
 process.env.NODE_ENV = 'test';
 
-const PDFTransformer = require('../../../src/transforms/transformers/PDFTransformer');
-const pdfParse = require('pdf-parse');
-const fs = require('fs-extra');
+// Static imports
+import pdfParse from 'pdf-parse';
+import fs from 'fs-extra';
+
+// Use dynamic import for module under test
+let PDFTransformer;
+
+beforeAll(async () => {
+  const pdfTransformerModule = await import('../../../src/transforms/transformers/PDFTransformer.js');
+  PDFTransformer = pdfTransformerModule.default;
+});
 
 describe('PDFTransformer', () => {
   let transformer;

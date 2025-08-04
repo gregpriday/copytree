@@ -1,6 +1,6 @@
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
-// const ProfileLoader = require('../profiles/ProfileLoader'); // Currently unused
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
+// import ProfileLoader from '../profiles/ProfileLoader.js'; // Currently unused
 
 /**
  * Profile validate command - Validate profile syntax and structure
@@ -29,4 +29,4 @@ async function profileValidateCommand(profile, _options) {
   }
 }
 
-module.exports = profileValidateCommand;
+export default profileValidateCommand;

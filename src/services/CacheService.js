@@ -1,8 +1,9 @@
-const fs = require('fs-extra');
-const path = require('path');
-const crypto = require('crypto');
-const { config } = require('../config/ConfigManager');
-const { logger } = require('../utils/logger');
+import fs from 'fs-extra';
+import path from 'path';
+import crypto from 'crypto';
+import os from 'os';
+import { config } from '../config/ConfigManager.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Simple file-based cache service
@@ -20,7 +21,6 @@ class CacheService {
     
     // If no path from config, use home directory cache
     if (!configPath) {
-      const os = require('os');
       configPath = path.join(os.homedir(), '.copytree', 'cache');
     }
     
@@ -357,12 +357,10 @@ class CacheService {
 // Delay creation of defaultCache to avoid initialization order issues
 let defaultCache = null;
 
-module.exports = {
-  CacheService,
-  get cache() {
-    if (!defaultCache) {
-      defaultCache = new CacheService();
-    }
-    return defaultCache;
-  },
-};
+export { CacheService };
+export function getCache() {
+  if (!defaultCache) {
+    defaultCache = new CacheService();
+  }
+  return defaultCache;
+}

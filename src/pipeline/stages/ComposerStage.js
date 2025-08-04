@@ -1,7 +1,7 @@
-const Stage = require('../Stage');
-const path = require('path');
-const fs = require('fs-extra');
-const { logger } = require('../../utils/logger');
+import Stage from '../Stage.js';
+import path from 'path';
+import fs from 'fs-extra';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Composer stage - Include PHP package instruction files from vendor directory
@@ -141,4 +141,4 @@ class ComposerStage extends Stage {
   }
 }
 
-module.exports = ComposerStage;
+export default ComposerStage;

@@ -1,7 +1,6 @@
-const React = require('react');
-const { useEffect, useState } = React;
+import React, { useEffect, useState } from 'react';
 
-// Use dynamic import for ESM-only ink in CommonJS context
+// Use dynamic import for ESM-only ink
 let Box, Text;
 (async () => {
   try {
@@ -17,13 +16,13 @@ let Box, Text;
   Box = undefined;
   Text = undefined;
 });
-const { useAppContext } = require('../contexts/AppContext.js');
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
-const { execSync } = require('child_process');
-const inquirer = require('inquirer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+import { useAppContext } from '../contexts/AppContext.js';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+import { execSync } from 'child_process';
+import inquirer from 'inquirer';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const InstallStep = ({ step, isActive, isCompleted }) => {
   const getIcon = () => {
@@ -604,4 +603,4 @@ async function setupGeminiApiKey() {
   }
 }
 
-module.exports = InstallView;
+export default InstallView;

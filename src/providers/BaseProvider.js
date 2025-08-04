@@ -1,6 +1,7 @@
-const { config } = require('../config/ConfigManager');
-const { logger } = require('../utils/logger');
-const { ProviderError } = require('../utils/errors');
+import crypto from 'crypto';
+import { config } from '../config/ConfigManager.js';
+import { logger } from '../utils/logger.js';
+import { ProviderError } from '../utils/errors.js';
 
 /**
  * Base class for AI provider (Gemini only)
@@ -148,7 +149,6 @@ class BaseProvider {
    * @returns {string} Cache key
    */
   getCacheKey(options) {
-    const crypto = require('crypto');
     const data = {
       provider: this.name,
       model: this.model,
@@ -216,4 +216,4 @@ class BaseProvider {
   }
 }
 
-module.exports = BaseProvider;
+export default BaseProvider;

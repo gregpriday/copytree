@@ -1,5 +1,4 @@
-const React = require('react');
-const { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } = React;
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 
 const AppContext = createContext();
 
@@ -152,7 +151,4 @@ const useAppContext = () => {
   return context;
 };
 
-module.exports = {
-  AppProvider,
-  useAppContext,
-};
+export { AppProvider, useAppContext };

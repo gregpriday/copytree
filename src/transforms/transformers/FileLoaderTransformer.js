@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const fs = require('fs-extra');
+import BaseTransformer from '../BaseTransformer.js';
+import fs from 'fs-extra';
 
 /**
  * Default file loader transformer
@@ -71,4 +71,4 @@ class FileLoaderTransformer extends BaseTransformer {
   }
 }
 
-module.exports = FileLoaderTransformer;
+export default FileLoaderTransformer;

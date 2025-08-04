@@ -1,7 +1,10 @@
-const path = require('path');
-const os = require('os');
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
 
-module.exports = {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default {
   defaultExclusions: [
     'node_modules',
     '.git',

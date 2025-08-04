@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const path = require('path');
+import BaseTransformer from '../BaseTransformer.js';
+import path from 'path';
 
 /**
  * Binary file transformer
@@ -74,7 +74,7 @@ class BinaryTransformer extends BaseTransformer {
    * @returns {Promise<Object>} Transformed file
    */
   async transformToBase64(file) {
-    const fs = require('fs-extra');
+    const fs = await import('fs-extra');
     
     try {
       // Check size limit for base64 encoding
@@ -182,4 +182,4 @@ class BinaryTransformer extends BaseTransformer {
   }
 }
 
-module.exports = BinaryTransformer;
+export default BinaryTransformer;

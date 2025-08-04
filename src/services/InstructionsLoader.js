@@ -1,7 +1,11 @@
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
-const { logger } = require('../utils/logger');
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
+import { logger } from '../utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Instructions loader and manager
@@ -57,9 +61,9 @@ class InstructionsLoader {
         }
       } 
       else {
-        const InstructionsError = require('../utils/errors').InstructionsError || 
-                                 require('../utils/errors').CopyTreeError;
-        throw new InstructionsError(
+        const { InstructionsError, CopyTreeError } = await import('../utils/errors.js');
+        const ErrorClass = InstructionsError || CopyTreeError;
+        throw new ErrorClass(
           `Instructions '${name}' not found`,
           name,
           { 
@@ -154,4 +158,4 @@ class InstructionsLoader {
   }
 }
 
-module.exports = InstructionsLoader;
+export default InstructionsLoader;

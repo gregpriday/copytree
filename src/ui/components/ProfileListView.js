@@ -1,7 +1,6 @@
-const React = require('react');
-const { useEffect, useState } = React;
+import React, { useEffect, useState } from 'react';
 
-// Use dynamic import for ESM-only ink in CommonJS context
+// Use dynamic import for ESM-only ink
 let Box, Text, Newline;
 (async () => {
   try {
@@ -20,8 +19,8 @@ let Box, Text, Newline;
   Text = undefined;
   Newline = undefined;
 });
-const { useAppContext } = require('../contexts/AppContext.js');
-const ProfileLoader = require('../../profiles/ProfileLoader');
+import { useAppContext } from '../contexts/AppContext.js';
+import ProfileLoader from '../../profiles/ProfileLoader.js';
 
 const ProfileGroup = ({ title, profiles, color }) => {
   if (!profiles || profiles.length === 0) {
@@ -211,4 +210,4 @@ const ProfileListView = () => {
   );
 };
 
-module.exports = ProfileListView;
+export default ProfileListView;

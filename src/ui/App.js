@@ -1,8 +1,7 @@
-const React = require('react');
-const { useEffect } = React;
-const { AppProvider, useAppContext } = require('./contexts/AppContext.js');
+import React, { useEffect } from 'react';
+import { AppProvider, useAppContext } from './contexts/AppContext.js';
 
-// Use dynamic import for ESM-only ink in CommonJS context
+// Use dynamic import for ESM-only ink
 let Text;
 (async () => {
   try {
@@ -16,11 +15,11 @@ let Text;
   Text = undefined;
 });
 
-const CopyView = require('./components/CopyView.jsx');
-const ProfileListView = require('./components/ProfileListView.jsx');
-const ValidationView = require('./components/ValidationView.jsx');
-const DocsView = require('./components/DocsView.jsx');
-const InstallView = require('./components/InstallView.jsx');
+import CopyView from './components/CopyView.js';
+import ProfileListView from './components/ProfileListView.js';
+import ValidationView from './components/ValidationView.js';
+import DocsView from './components/DocsView.js';
+import InstallView from './components/InstallView.js';
 
 const AppContent = () => {
   const { command, updateState } = useAppContext();
@@ -28,8 +27,10 @@ const AppContent = () => {
   const renderView = () => {
     if (!command) {
       // Ensure Text is available
-      const TextComponent = Text || ((props) => React.createElement('div', null, props.children));
-      return React.createElement(TextComponent, null, 'Loading...');
+      if (!Text) {
+        return null; // Don't render anything if Text component isn't loaded yet
+      }
+      return React.createElement(Text, null, 'Loading...');
     }
 
     switch (command) {
@@ -51,8 +52,10 @@ const AppContent = () => {
       return React.createElement(InstallView);
     default: {
       // Ensure Text is available
-      const TextComponent = Text || ((props) => React.createElement('div', null, props.children));
-      return React.createElement(TextComponent, { color: 'red' }, `Unknown command: ${command}`);
+      if (!Text) {
+        return null; // Don't render anything if Text component isn't loaded yet
+      }
+      return React.createElement(Text, { color: 'red' }, `Unknown command: ${command}`);
     }
     }
   };
@@ -82,4 +85,4 @@ const AppInitializer = ({ command, path, options }) => {
   return React.createElement(AppContent);
 };
 
-module.exports = App;
+export default App;

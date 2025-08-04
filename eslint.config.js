@@ -1,11 +1,11 @@
-const js = require('@eslint/js');
+import js from '@eslint/js';
 
-module.exports = [
+export default [
   js.configs.recommended,
   {
     languageOptions: {
       ecmaVersion: 2021,
-      sourceType: 'commonjs',
+      sourceType: 'module',
       globals: {
         node: true,
         es2021: true,
@@ -16,9 +16,11 @@ module.exports = [
         __dirname: true,
         __filename: true,
         global: true,
-        module: true,
-        require: true,
-        exports: true,
+        module: false,
+        require: false,
+        exports: false,
+        import: true,
+        export: true,
         setTimeout: true,
         clearTimeout: true,
         setInterval: true,

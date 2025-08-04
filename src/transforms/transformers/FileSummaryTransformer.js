@@ -1,6 +1,6 @@
-const BaseTransformer = require('../BaseTransformer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const path = require('path');
+import BaseTransformer from '../BaseTransformer.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import path from 'path';
 
 /**
  * File summary transformer using Gemini API
@@ -183,4 +183,4 @@ ${content}`;
   }
 }
 
-module.exports = FileSummaryTransformer;
+export default FileSummaryTransformer;

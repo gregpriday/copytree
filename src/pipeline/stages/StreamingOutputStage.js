@@ -1,7 +1,7 @@
-const Stage = require('../Stage');
-const { Transform } = require('stream');
+import Stage from '../Stage.js';
+import { Transform } from 'stream';
 // const { create } = require('xmlbuilder2'); // Currently unused
-const path = require('path');
+import path from 'path';
 
 /**
  * Streaming output stage for handling large outputs
@@ -357,4 +357,4 @@ class StreamingOutputStage extends Stage {
   }
 }
 
-module.exports = StreamingOutputStage;
+export default StreamingOutputStage;

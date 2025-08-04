@@ -1,7 +1,7 @@
-const BaseTransformer = require('../BaseTransformer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const path = require('path');
-const fs = require('fs-extra');
+import BaseTransformer from '../BaseTransformer.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import path from 'path';
+import fs from 'fs-extra';
 
 /**
  * Image description transformer using Gemini Vision API
@@ -153,4 +153,4 @@ ${description}
   }
 }
 
-module.exports = ImageDescriptionTransformer;
+export default ImageDescriptionTransformer;

@@ -1,6 +1,6 @@
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
-// const ProfileLoader = require('../profiles/ProfileLoader'); // Currently unused
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
+// import ProfileLoader from '../profiles/ProfileLoader.js'; // Currently unused
 
 /**
  * Profile list command - List all available profiles
@@ -15,4 +15,4 @@ async function profileListCommand(_options) {
   };
 }
 
-module.exports = profileListCommand;
+export default profileListCommand;

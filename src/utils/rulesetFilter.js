@@ -1,5 +1,5 @@
-const minimatch = require('minimatch');
-const path = require('path');
+import minimatch from 'minimatch';
+import path from 'path';
 
 /**
  * Advanced rule-based file filtering
@@ -206,4 +206,4 @@ class RulesetFilter {
   }
 }
 
-module.exports = RulesetFilter;
+export default RulesetFilter;

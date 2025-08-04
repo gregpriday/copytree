@@ -1,5 +1,5 @@
-const crypto = require('crypto');
-const fs = require('fs-extra');
+import crypto from 'crypto';
+import fs from 'fs-extra';
 
 /**
  * Generate a hash for file content
@@ -47,7 +47,7 @@ function generateTransformCacheKey(file, transformerName, options = {}) {
   return hashContent(JSON.stringify(components));
 }
 
-module.exports = {
+export {
   hashFile,
   hashContent,
   generateTransformCacheKey,

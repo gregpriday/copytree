@@ -1,8 +1,8 @@
-const GeminiProvider = require('../providers/GeminiProvider');
-const { CacheService } = require('./CacheService');
-const { config } = require('../config/ConfigManager');
-const { logger } = require('../utils/logger');
-const { retry } = require('../utils/helpers');
+import GeminiProvider from '../providers/GeminiProvider.js';
+import { CacheService } from './CacheService.js';
+import { config } from '../config/ConfigManager.js';
+import { logger } from '../utils/logger.js';
+import { retry } from '../utils/helpers.js';
 
 /**
  * AI Service - Handles all AI operations using Gemini
@@ -212,12 +212,10 @@ Summary:`;
 // Export singleton instance and class
 let defaultAI = null;
 
-module.exports = {
-  AIService,
-  get ai() {
-    if (!defaultAI) {
-      defaultAI = new AIService();
-    }
-    return defaultAI;
-  },
-};
+export { AIService };
+export function getAI() {
+  if (!defaultAI) {
+    defaultAI = new AIService();
+  }
+  return defaultAI;
+}

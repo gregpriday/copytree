@@ -18,10 +18,10 @@ describe('App Component', () => {
 
 	test('UI components can be required without errors', () => {
 		expect(() => {
-			const PipelineStatus = require('../../../../src/ui/components/PipelineStatus.jsx');
-			const Results = require('../../../../src/ui/components/Results.jsx');
-			const SummaryTable = require('../../../../src/ui/components/SummaryTable.jsx');
-			const StaticLog = require('../../../../src/ui/components/StaticLog.jsx');
+			const PipelineStatus = require('../../../../src/ui/components/PipelineStatus.js');
+			const Results = require('../../../../src/ui/components/Results.js');
+			const SummaryTable = require('../../../../src/ui/components/SummaryTable.js');
+			const StaticLog = require('../../../../src/ui/components/StaticLog.js');
 			
 			expect(typeof PipelineStatus).toBe('function');
 			expect(typeof Results).toBe('function');

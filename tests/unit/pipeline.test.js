@@ -1,24 +1,37 @@
-const Pipeline = require('../../src/pipeline/Pipeline');
-const Stage = require('../../src/pipeline/Stage');
+// Use dynamic imports for modules under test
+let Pipeline, Stage;
+let AddOneStage, MultiplyByTwoStage, ErrorStage;
 
-// Mock stages for testing
-class AddOneStage extends Stage {
-  async process(input) {
-    return input + 1;
+beforeAll(async () => {
+  const pipelineModule = await import('../../src/pipeline/Pipeline.js');
+  const stageModule = await import('../../src/pipeline/Stage.js');
+  
+  Pipeline = pipelineModule.default;
+  Stage = stageModule.default;
+  
+  // Mock stages for testing
+  class AddOneStageImpl extends Stage {
+    async process(input) {
+      return input + 1;
+    }
   }
-}
 
-class MultiplyByTwoStage extends Stage {
-  async process(input) {
-    return input * 2;
+  class MultiplyByTwoStageImpl extends Stage {
+    async process(input) {
+      return input * 2;
+    }
   }
-}
 
-class ErrorStage extends Stage {
-  async process(input) {
-    throw new Error('Test error');
+  class ErrorStageImpl extends Stage {
+    async process(input) {
+      throw new Error('Test error');
+    }
   }
-}
+  
+  AddOneStage = AddOneStageImpl;
+  MultiplyByTwoStage = MultiplyByTwoStageImpl;
+  ErrorStage = ErrorStageImpl;
+});
 
 describe('Pipeline', () => {
   let pipeline;

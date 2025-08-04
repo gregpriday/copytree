@@ -1,9 +1,9 @@
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
-const { execSync } = require('child_process');
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+import { execSync } from 'child_process';
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Install copytree command - Set up CopyTree environment and configuration
@@ -321,4 +321,4 @@ output:
   return { created };
 }
 
-module.exports = installCopytreeCommand;
+export default installCopytreeCommand;

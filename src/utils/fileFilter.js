@@ -1,7 +1,7 @@
-const { minimatch } = require('minimatch');
-const fs = require('fs-extra');
-const path = require('path');
-const config = require('../config');
+import { minimatch } from 'minimatch';
+import fs from 'fs-extra';
+import path from 'path';
+import config from '../config/index.js';
 
 class FileFilter {
   constructor(basePath = '.') {
@@ -144,4 +144,4 @@ class FileFilter {
   }
 }
 
-module.exports = FileFilter;
+export default FileFilter;

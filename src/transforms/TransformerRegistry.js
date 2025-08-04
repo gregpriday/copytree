@@ -1,5 +1,5 @@
-const { TransformError } = require('../utils/errors');
-const { logger } = require('../utils/logger');
+import { TransformError } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Registry for file transformers
@@ -172,17 +172,17 @@ class TransformerRegistry {
    * Create default registry with standard transformers
    * @static
    */
-  static createDefault() {
+  static async createDefault() {
     const registry = new TransformerRegistry();
     
-    // Register default transformers
-    const FileLoaderTransformer = require('./transformers/FileLoaderTransformer');
-    const MarkdownTransformer = require('./transformers/MarkdownTransformer');
-    const CSVTransformer = require('./transformers/CSVTransformer');
-    const BinaryTransformer = require('./transformers/BinaryTransformer');
-    const PDFTransformer = require('./transformers/PDFTransformer');
-    const ImageTransformer = require('./transformers/ImageTransformer');
-    const AISummaryTransformer = require('./transformers/AISummaryTransformer');
+    // Register default transformers - using dynamic imports for better ESM compatibility
+    const { default: FileLoaderTransformer } = await import('./transformers/FileLoaderTransformer.js');
+    const { default: MarkdownTransformer } = await import('./transformers/MarkdownTransformer.js');
+    const { default: CSVTransformer } = await import('./transformers/CSVTransformer.js');
+    const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
+    const { default: PDFTransformer } = await import('./transformers/PDFTransformer.js');
+    const { default: ImageTransformer } = await import('./transformers/ImageTransformer.js');
+    const { default: AISummaryTransformer } = await import('./transformers/AISummaryTransformer.js');
     
     registry.register('file-loader', new FileLoaderTransformer(), {
       isDefault: true,
@@ -231,4 +231,4 @@ class TransformerRegistry {
   }
 }
 
-module.exports = TransformerRegistry;
+export default TransformerRegistry;

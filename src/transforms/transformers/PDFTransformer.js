@@ -1,6 +1,6 @@
-const BaseTransformer = require('../BaseTransformer');
-const fs = require('fs-extra');
-const pdf = require('pdf-parse');
+import BaseTransformer from '../BaseTransformer.js';
+import fs from 'fs-extra';
+import pdf from 'pdf-parse';
 
 /**
  * PDF transformer - extracts text from PDF files
@@ -151,4 +151,4 @@ class PDFTransformer extends BaseTransformer {
   }
 }
 
-module.exports = PDFTransformer;
+export default PDFTransformer;

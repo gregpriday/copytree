@@ -1,6 +1,6 @@
-const React = require('react');
+import React from 'react';
 
-// Use dynamic import for ESM-only ink in CommonJS context
+// Use dynamic import for ESM-only ink
 let Box, Text, Newline;
 (async () => {
   try {
@@ -101,4 +101,4 @@ const Results = ({ results, output, format, showOutput = false }) => {
   return null;
 };
 
-module.exports = Results;
+export default Results;

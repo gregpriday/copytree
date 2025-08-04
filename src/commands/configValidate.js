@@ -1,5 +1,5 @@
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Config validate command - Validate application configuration
@@ -52,7 +52,7 @@ function validateCopytreeConfig(config, warnings) {
  * Validate instructions configuration
  */
 async function validateInstructionsConfig(config, warnings) {
-  const InstructionsLoader = require('../services/InstructionsLoader');
+  const { default: InstructionsLoader } = await import('../services/InstructionsLoader.js');
   
   try {
     const instructionsLoader = new InstructionsLoader();
@@ -116,4 +116,4 @@ function displayConfigObject(obj, indent = '') {
   }
 }
 
-module.exports = configValidateCommand;
+export default configValidateCommand;

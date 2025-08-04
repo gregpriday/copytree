@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const fs = require('fs-extra');
+import BaseTransformer from '../BaseTransformer.js';
+import fs from 'fs-extra';
 
 /**
  * CSV transformer
@@ -222,4 +222,4 @@ class CSVTransformer extends BaseTransformer {
   }
 }
 
-module.exports = CSVTransformer;
+export default CSVTransformer;

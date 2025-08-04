@@ -83,4 +83,4 @@ config.env = (key, defaultValue = null) => {
   return process.env[key] || defaultValue;
 };
 
-module.exports = config;
+export default config;

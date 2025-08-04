@@ -1,6 +1,6 @@
-const BaseTransformer = require('../BaseTransformer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const path = require('path');
+import BaseTransformer from '../BaseTransformer.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import path from 'path';
 
 /**
  * SVG description transformer using Gemini API
@@ -177,4 +177,4 @@ Keep the description concise but technical (2-3 paragraphs).`;
   }
 }
 
-module.exports = SvgDescriptionTransformer;
+export default SvgDescriptionTransformer;

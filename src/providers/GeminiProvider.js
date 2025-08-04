@@ -1,5 +1,6 @@
-const BaseProvider = require('./BaseProvider');
-const { ProviderError } = require('../utils/errors');
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import BaseProvider from './BaseProvider.js';
+import { ProviderError } from '../utils/errors.js';
 
 /**
  * Google Gemini provider implementation
@@ -13,7 +14,6 @@ class GeminiProvider extends BaseProvider {
     this.timeout = options.timeout || this.config.get('ai.gemini.timeout', 60000);
     
     // Initialize Google AI SDK
-    const { GoogleGenerativeAI } = require('@google/generative-ai');
     this.client = new GoogleGenerativeAI(this.apiKey);
     
     // Get the model
@@ -211,4 +211,4 @@ class GeminiProvider extends BaseProvider {
   }
 }
 
-module.exports = GeminiProvider;
+export default GeminiProvider;

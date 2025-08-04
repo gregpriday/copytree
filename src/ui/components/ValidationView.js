@@ -1,7 +1,6 @@
-const React = require('react');
-const { useEffect, useState } = React;
+import React, { useEffect, useState } from 'react';
 
-// Use dynamic import for ESM-only ink in CommonJS context
+// Use dynamic import for ESM-only ink
 let Box, Text;
 (async () => {
   try {
@@ -17,10 +16,10 @@ let Box, Text;
   Box = undefined;
   Text = undefined;
 });
-const { useAppContext } = require('../contexts/AppContext.js');
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
+import { useAppContext } from '../contexts/AppContext.js';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
 
 const ValidationStep = ({ step, isActive, isCompleted }) => {
   const getIcon = () => {
@@ -145,7 +144,7 @@ const ValidationView = ({ successMessage, type }) => {
   }, [command, options, type, successMessage, updateState]);
 
   const runCacheValidation = async () => {
-    const { CacheService } = require('../../services/CacheService');
+    const { CacheService } = await import('../../services/CacheService.js');
     const cacheService = new CacheService();
     let totalCleared = 0;
 
@@ -201,8 +200,8 @@ const ValidationView = ({ successMessage, type }) => {
   };
 
   const runProfileValidation = async () => {
-    const ProfileLoader = require('../../profiles/ProfileLoader');
-    const { ProfileError } = require('../../utils/errors');
+    const { default: ProfileLoader } = await import('../../profiles/ProfileLoader.js');
+    const { ProfileError } = await import('../../utils/errors.js');
 		
     const profileName = options.profile || options.args?.[0] || 'default';
     const profileLoader = new ProfileLoader();
@@ -293,7 +292,7 @@ const ValidationView = ({ successMessage, type }) => {
   };
 
   const runConfigValidation = async () => {
-    const { config, ConfigManager } = require('../../config/ConfigManager');
+    const { config, ConfigManager } = await import('../../config/ConfigManager.js');
     const configManager = config();
     const validationWarnings = [];
 
@@ -528,4 +527,4 @@ const ValidationView = ({ successMessage, type }) => {
   );
 };
 
-module.exports = ValidationView;
+export default ValidationView;
