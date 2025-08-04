@@ -1,6 +1,5 @@
 const React = require('react');
 const { useEffect, useState } = React;
-const { Box, Text, Newline } = require('ink');
 const { useAppContext } = require('../contexts/AppContext.js');
 const usePipeline = require('../hooks/usePipeline');
 
@@ -17,7 +16,7 @@ const fs = require('fs-extra');
 const path = require('path');
 const Clipboard = require('../../utils/clipboard');
 
-const CopyView = () => {
+const CopyView = ({ renderInk }) => {
   const { 
     path: targetPath, 
     options, 
@@ -331,15 +330,15 @@ const CopyView = () => {
 
   if (error) {
     return React.createElement(
-      Box,
+      renderInk.Box,
       { flexDirection: 'column' },
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: 'red', bold: true },
         '✗ Error:',
       ),
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: 'red' },
         error.message,
       ),
@@ -347,26 +346,29 @@ const CopyView = () => {
   }
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column' },
     React.createElement(PipelineStatus, {
       currentStage,
       isLoading,
       progress,
+      renderInk,
     }),
-    React.createElement(StaticLog, { logs }),
+    React.createElement(StaticLog, { logs, renderInk }),
     showResults && React.createElement(
-      Box,
+      renderInk.Box,
       { flexDirection: 'column' },
       React.createElement(Results, {
         results,
         output,
         format: options.format || 'xml',
         showOutput: options.display,
+        renderInk,
       }),
       React.createElement(SummaryTable, {
         stats,
         duration: stats.duration,
+        renderInk,
       }),
     ),
   );

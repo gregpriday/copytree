@@ -1,7 +1,6 @@
 const React = require('react');
-const { Static, Box, Text } = require('ink');
 
-const LogEntry = ({ log }) => {
+const LogEntry = ({ log, renderInk }) => {
   const getColor = (type) => {
     switch (type) {
     case 'success': return 'green';
@@ -23,30 +22,30 @@ const LogEntry = ({ log }) => {
   };
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     null,
     React.createElement(
-      Text,
+      renderInk.Text,
       { color: getColor(log.type), marginRight: 1 },
       getIcon(log.type),
     ),
     React.createElement(
-      Text,
+      renderInk.Text,
       null,
       log.message,
     ),
   );
 };
 
-const StaticLog = ({ logs }) => {
+const StaticLog = ({ logs, renderInk }) => {
   if (!logs || logs.length === 0) {
     return null;
   }
 
   return React.createElement(
-    Static,
+    renderInk.Static,
     { items: logs },
-    (log, index) => React.createElement(LogEntry, { key: index, log }),
+    (log, index) => React.createElement(LogEntry, { key: index, log, renderInk }),
   );
 };
 

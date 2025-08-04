@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Note: Removed @babel/register for better performance
+require('@babel/register');
 
 // Suppress dotenv console output
 const originalLog = console.log;
@@ -11,15 +11,6 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 console.log = originalLog;
 
 const React = require('react');
-// Use dynamic import for ESM-only ink in CommonJS context
-let render;
-(async () => {
-  const ink = await import('ink');
-  render = ink.render;
-})().catch((_e) => {
-  // Defer error until first render attempt
-  render = undefined;
-});
 const { Command } = require('commander');
 const App = require('../src/ui/App.js');
 const pkg = require('../package.json');
@@ -51,7 +42,6 @@ program
   .option('--with-line-numbers', 'Add line numbers to file content')
   .option('-t, --only-tree', 'Include only the directory tree, not file contents')
   .option('--info', 'Show info table')
-  .option('--show-size', 'Show file sizes')
   .option('--with-git-status', 'Include git status in output')
   .option('-r, --as-reference', 'Generate reference documentation')
   .option('--validate', 'Validate profile without executing')
@@ -63,14 +53,12 @@ program
   .option('--no-instructions', 'Disable including instructions in output')
   .option('--instructions <name>', 'Use custom instructions set (default: default)')
   .action(async (path, options) => {
-    if (!render) {
-      const ink = await import('ink');
-      render = ink.render;
-    }
+    const { render } = await import('ink');
     render(React.createElement(App, {
       command: 'copy',
       path: path || '.',
       options,
+      renderInk: render,
     }));
   });
 
@@ -80,14 +68,12 @@ program
   .description('List all available profiles')
   .option('--json', 'Output as JSON')
   .action(async (options) => {
-    if (!render) {
-      const ink = await import('ink');
-      render = ink.render;
-    }
+    const { render } = await import('ink');
     render(React.createElement(App, {
       command: 'profile:list',
       path: null,
       options,
+      renderInk: render,
     }));
   });
 
@@ -97,14 +83,12 @@ program
   .description('Validate profile syntax and structure')
   .option('--all', 'Validate all profiles')
   .action(async (profile, options) => {
-    if (!render) {
-      const ink = await import('ink');
-      render = ink.render;
-    }
+    const { render } = await import('ink');
     render(React.createElement(App, {
       command: 'profile:validate',
       path: null,
       options: { ...options, profile },
+      renderInk: render,
     }));
   });
 
@@ -116,14 +100,12 @@ program
   .option('-o, --output <file>', 'Output file instead of clipboard')
   .option('--no-clipboard', 'Display to console instead of clipboard')
   .action(async (options) => {
-    if (!render) {
-      const ink = await import('ink');
-      render = ink.render;
-    }
+    const { render } = await import('ink');
     render(React.createElement(App, {
       command: 'copy:docs',
       path: null,
       options,
+      renderInk: render,
     }));
   });
 
@@ -132,14 +114,12 @@ program
   .command('config:validate')
   .description('Validate application configuration')
   .action(async () => {
-    if (!render) {
-      const ink = await import('ink');
-      render = ink.render;
-    }
+    const { render } = await import('ink');
     render(React.createElement(App, {
       command: 'config:validate',
       path: null,
       options: {},
+      renderInk: render,
     }));
   });
 
@@ -155,14 +135,12 @@ program
   .option('--status', 'Show cache status after clearing')
   .option('-v, --verbose', 'Show verbose output')
   .action(async (options) => {
-    if (!render) {
-      const ink = await import('ink');
-      render = ink.render;
-    }
+    const { render } = await import('ink');
     render(React.createElement(App, {
       command: 'cache:clear',
       path: null,
       options,
+      renderInk: render,
     }));
   });
 
@@ -171,14 +149,12 @@ program
   .command('install:copytree')
   .description('Set up CopyTree environment and configuration')
   .action(async () => {
-    if (!render) {
-      const ink = await import('ink');
-      render = ink.render;
-    }
+    const { render } = await import('ink');
     render(React.createElement(App, {
       command: 'install:copytree',
       path: null,
       options: {},
+      renderInk: render,
     }));
   });
 
