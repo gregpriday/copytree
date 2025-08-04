@@ -1,6 +1,5 @@
 const fs = require('fs-extra');
 const path = require('path');
-const { globby } = require('globby');
 const { logger } = require('./logger');
 
 /**
@@ -21,6 +20,9 @@ class FileLoader {
     const { include = ['**/*'], exclude = [] } = patterns;
     
     try {
+      // Dynamic import for ESM-only globby
+      const { globby } = await import('globby');
+      
       // Get file paths using globby
       const filePaths = await globby(include, {
         cwd: this.basePath,

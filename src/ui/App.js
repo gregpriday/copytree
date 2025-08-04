@@ -1,7 +1,20 @@
 const React = require('react');
 const { useEffect } = React;
-const { Text } = require('ink');
 const { AppProvider, useAppContext } = require('./contexts/AppContext.js');
+
+// Use dynamic import for ESM-only ink in CommonJS context
+let Text;
+(async () => {
+  try {
+    const ink = await import('ink');
+    Text = ink.Text;
+  } catch (error) {
+    // Defer error until first usage attempt
+    Text = undefined;
+  }
+})().catch(() => {
+  Text = undefined;
+});
 
 const CopyView = require('./components/CopyView.jsx');
 const ProfileListView = require('./components/ProfileListView.jsx');
@@ -14,7 +27,9 @@ const AppContent = () => {
 
   const renderView = () => {
     if (!command) {
-      return React.createElement(Text, null, 'Loading...');
+      // Ensure Text is available
+      const TextComponent = Text || ((props) => React.createElement('div', null, props.children));
+      return React.createElement(TextComponent, null, 'Loading...');
     }
 
     switch (command) {
@@ -34,8 +49,11 @@ const AppContent = () => {
       return React.createElement(DocsView);
     case 'install:copytree':
       return React.createElement(InstallView);
-    default:
-      return React.createElement(Text, { color: 'red' }, `Unknown command: ${command}`);
+    default: {
+      // Ensure Text is available
+      const TextComponent = Text || ((props) => React.createElement('div', null, props.children));
+      return React.createElement(TextComponent, { color: 'red' }, `Unknown command: ${command}`);
+    }
     }
   };
 

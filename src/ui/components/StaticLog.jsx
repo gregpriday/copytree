@@ -1,5 +1,24 @@
 const React = require('react');
-const { Static, Box, Text } = require('ink');
+
+// Use dynamic import for ESM-only ink in CommonJS context
+let Static, Box, Text;
+(async () => {
+  try {
+    const ink = await import('ink');
+    Static = ink.Static;
+    Box = ink.Box;
+    Text = ink.Text;
+  } catch (error) {
+    // Defer error until first usage attempt
+    Static = undefined;
+    Box = undefined;
+    Text = undefined;
+  }
+})().catch(() => {
+  Static = undefined;
+  Box = undefined;
+  Text = undefined;
+});
 
 const LogEntry = ({ log }) => {
   const getColor = (type) => {

@@ -1,6 +1,25 @@
 const React = require('react');
 const { useEffect, useState } = React;
-const { Box, Text, Newline } = require('ink');
+
+// Use dynamic import for ESM-only ink in CommonJS context
+let Box, Text, Newline;
+(async () => {
+  try {
+    const ink = await import('ink');
+    Box = ink.Box;
+    Text = ink.Text;
+    Newline = ink.Newline;
+  } catch (error) {
+    // Defer error until first usage attempt
+    Box = undefined;
+    Text = undefined;
+    Newline = undefined;
+  }
+})().catch(() => {
+  Box = undefined;
+  Text = undefined;
+  Newline = undefined;
+});
 const { useAppContext } = require('../contexts/AppContext.js');
 const ProfileLoader = require('../../profiles/ProfileLoader');
 

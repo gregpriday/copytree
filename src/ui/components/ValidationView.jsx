@@ -1,6 +1,22 @@
 const React = require('react');
 const { useEffect, useState } = React;
-const { Box, Text } = require('ink');
+
+// Use dynamic import for ESM-only ink in CommonJS context
+let Box, Text;
+(async () => {
+  try {
+    const ink = await import('ink');
+    Box = ink.Box;
+    Text = ink.Text;
+  } catch (error) {
+    // Defer error until first usage attempt
+    Box = undefined;
+    Text = undefined;
+  }
+})().catch(() => {
+  Box = undefined;
+  Text = undefined;
+});
 const { useAppContext } = require('../contexts/AppContext.js');
 const fs = require('fs-extra');
 const path = require('path');
