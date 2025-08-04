@@ -18,8 +18,7 @@
     "lint:fix": "eslint src/ bin/ --ext .js,.jsx --fix",
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
-    "prepare": "npm run lint && npm run test",
-    "prepublishOnly": "npm run test:coverage"
+    "prepublishOnly": "npm run lint && npm run test"
   },
   "keywords": [
     "cli",
@@ -53,7 +52,7 @@
     "fs-extra": "^11.3.0",
     "glob": "^11.0.3",
     "globby": "^14.1.0",
-    "ink": "^3.2.0",
+    "ink": "^4.0.0",
     "ink-spinner": "^2.0.0",
     "inquirer": "^12.2.0",
     "joi": "^17.13.3",
@@ -64,7 +63,7 @@
     "ora": "^5.4.1",
     "p-limit": "^6.2.0",
     "pdf-parse": "^1.1.1",
-    "react": "^17.0.2",
+    "react": "^18.2.0",
     "simple-git": "^3.28.0",
     "tesseract.js": "^6.0.1",
     "xmlbuilder2": "^3.1.1"

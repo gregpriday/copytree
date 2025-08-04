@@ -4,7 +4,7 @@ const { Box, Text } = require('ink');
 const { useAppContext } = require('../contexts/AppContext.js');
 const fs = require('fs-extra');
 const path = require('path');
-const clipboardy = require('clipboardy');
+// Use dynamic import for ESM-only clipboardy inside async contexts (no top-level require)
 
 const TopicsList = ({ topics }) => {
 	if (!topics || topics.length === 0) {
@@ -108,6 +108,8 @@ const DocsView = () => {
 						await fs.writeFile(options.output, docContent, 'utf8');
 						action = `Documentation written to ${options.output}`;
 					} else if (options.clipboard !== false) {
+						// Dynamically import ESM-only clipboardy inside async function
+						const { default: clipboardy } = await import('clipboardy');
 						await clipboardy.write(docContent);
 						action = `Documentation for "${topic}" copied to clipboard`;
 					} else {

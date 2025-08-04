@@ -14,6 +14,7 @@ class Clipboard {
    * @returns {Promise<void>}
    */
   static async copyText(text) {
+    // Dynamically import ESM-only clipboardy inside async function to avoid ERR_REQUIRE_ESM in CJS
     const { default: clipboardy } = await import('clipboardy');
     return await clipboardy.write(text);
   }
