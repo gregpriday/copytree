@@ -1,16 +1,15 @@
 const React = require('react');
-const { Box, Text } = require('ink');
 
-const StatRow = ({ label, value, color = 'white' }) => {
+const StatRow = ({ label, value, color = 'white', renderInk }) => {
   return React.createElement(
-    Box,
+    renderInk.Box,
     { justifyContent: 'space-between', width: 40 },
-    React.createElement(Text, null, label + ':'),
-    React.createElement(Text, { color }, value),
+    React.createElement(renderInk.Text, null, label + ':'),
+    React.createElement(renderInk.Text, { color }, value),
   );
 };
 
-const SummaryTable = ({ stats, duration }) => {
+const SummaryTable = ({ stats, duration, renderInk }) => {
   if (!stats || Object.keys(stats).length === 0) {
     return null;
   }
@@ -28,7 +27,7 @@ const SummaryTable = ({ stats, duration }) => {
   };
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { 
       flexDirection: 'column', 
       marginTop: 1,
@@ -37,7 +36,7 @@ const SummaryTable = ({ stats, duration }) => {
       padding: 1,
     },
     React.createElement(
-      Text,
+      renderInk.Text,
       { color: 'yellow', bold: true, marginBottom: 1 },
       'Summary',
     ),
@@ -46,36 +45,42 @@ const SummaryTable = ({ stats, duration }) => {
 			  label: 'Files processed',
 			  value: stats.filesProcessed.toString(),
 			  color: 'green',
+			  renderInk,
 			}),
     stats.directoriesProcessed !== undefined &&
 			React.createElement(StatRow, {
 			  label: 'Directories processed',
 			  value: stats.directoriesProcessed.toString(),
 			  color: 'cyan',
+			  renderInk,
 			}),
     stats.filesTransformed !== undefined &&
 			React.createElement(StatRow, {
 			  label: 'Files transformed',
 			  value: stats.filesTransformed.toString(),
 			  color: 'magenta',
+			  renderInk,
 			}),
     stats.totalSize !== undefined &&
 			React.createElement(StatRow, {
 			  label: 'Total size',
 			  value: formatBytes(stats.totalSize),
 			  color: 'blue',
+			  renderInk,
 			}),
     stats.outputSize !== undefined &&
 			React.createElement(StatRow, {
 			  label: 'Output size',
 			  value: formatBytes(stats.outputSize),
 			  color: 'blue',
+			  renderInk,
 			}),
     duration &&
 			React.createElement(StatRow, {
 			  label: 'Duration',
 			  value: formatDuration(duration),
 			  color: 'yellow',
+			  renderInk,
 			}),
   );
 };

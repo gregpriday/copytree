@@ -1,12 +1,11 @@
 const React = require('react');
 const { useEffect, useState } = React;
-const { Box, Text } = require('ink');
 const { useAppContext } = require('../contexts/AppContext.js');
 const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
 
-const ValidationStep = ({ step, isActive, isCompleted }) => {
+const ValidationStep = ({ step, isActive, isCompleted, renderInk }) => {
   const getIcon = () => {
     if (isCompleted) {
       return step.status === 'success' ? '✓' : 
@@ -32,32 +31,32 @@ const ValidationStep = ({ step, isActive, isCompleted }) => {
   };
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { marginBottom: 0 },
     React.createElement(
-      Text,
+      renderInk.Text,
       { color: getColor() },
       `${getIcon()} ${step.name}: ${step.details || ''}`,
     ),
   );
 };
 
-const WarningsList = ({ warnings }) => {
+const WarningsList = ({ warnings, renderInk }) => {
   if (!warnings || warnings.length === 0) {
     return null;
   }
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column', marginTop: 1 },
     React.createElement(
-      Text,
+      renderInk.Text,
       { color: 'yellow', bold: true },
       '⚠ Warnings:',
     ),
     ...warnings.map((warning, index) =>
       React.createElement(
-        Text,
+        renderInk.Text,
         { key: index, color: 'yellow', marginLeft: 2 },
         `- ${warning}`,
       ),
@@ -65,21 +64,21 @@ const WarningsList = ({ warnings }) => {
   );
 };
 
-const ValidationDetails = ({ details, command }) => {
+const ValidationDetails = ({ details, command, renderInk }) => {
   if (!details) {
     return null;
   }
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column', marginTop: 1 },
     React.createElement(
-      Text,
+      renderInk.Text,
       { bold: true, color: 'yellow' },
       command === 'profile:validate' ? 'Profile Details:' : 'Configuration Details:',
     ),
     React.createElement(
-      Box,
+      renderInk.Box,
       { marginLeft: 2, flexDirection: 'column', marginTop: 1 },
       ...Object.entries(details).map(([key, value]) => {
         // Handle different value types
@@ -91,7 +90,7 @@ const ValidationDetails = ({ details, command }) => {
         }
 
         return React.createElement(
-          Text,
+          renderInk.Text,
           { key },
           `${key}: ${displayValue}`,
         );
@@ -100,7 +99,7 @@ const ValidationDetails = ({ details, command }) => {
   );
 };
 
-const ValidationView = ({ successMessage, type }) => {
+const ValidationView = ({ successMessage, type, renderInk }) => {
   const { command, options, updateState } = useAppContext();
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState([]);
@@ -361,10 +360,10 @@ const ValidationView = ({ successMessage, type }) => {
       if (value) {
         envVarsSet++;
         if (config.type === 'number' && isNaN(parseInt(value))) {
-          validationWarnings.push(`${envVar} should be a number, got: ${value}`);
+          warnings.push(`${envVar} should be a number, got: ${value}`);
         }
       } else if (config.type === 'ai' && envVar.includes('API_KEY')) {
-        validationWarnings.push(`${envVar} not set - AI features will not work`);
+        warnings.push(`${envVar} not set - AI features will not work`);
       }  
     }
 
@@ -451,20 +450,20 @@ const ValidationView = ({ successMessage, type }) => {
 
   if (error) {
     return React.createElement(
-      Box,
+      renderInk.Box,
       { flexDirection: 'column' },
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: 'red', bold: true },
         '✗ Validation Failed',
       ),
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: 'red' },
         command === 'profile:validate' ? 'Failed to load profile' : error,
       ),
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: 'red' },
         error,
       ),
@@ -477,30 +476,31 @@ const ValidationView = ({ successMessage, type }) => {
     (warnings.length === 0 ? 'green' : 'yellow') : 'gray';
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column' },
     React.createElement(
-      Text,
+      renderInk.Text,
       { bold: true, color: 'yellow' },
       type === 'cache' ? 'Cache Clearing Progress:' :
         command === 'profile:validate' ? `Validating profile: ${options.profile || options.args?.[0] || 'default'}` :
           'Validating CopyTree Configuration',
     ),
-    React.createElement(Box, { marginTop: 1 }, null),
+    React.createElement(renderInk.Box, { marginTop: 1 }, null),
     ...steps.map((step, index) =>
       React.createElement(ValidationStep, {
         key: index,
         step,
         isActive: currentStep === index,
         isCompleted: currentStep > index || isCompleted,
+        renderInk,
       }),
     ),
-    React.createElement(WarningsList, { warnings }),
+    React.createElement(WarningsList, { warnings, renderInk }),
     isCompleted && React.createElement(
-      Box,
+      renderInk.Box,
       { marginTop: 1 },
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: finalColor, bold: true },
         `${finalStatus} ${validationResult?.message || 'Validation completed'}`,
       ),
@@ -508,6 +508,7 @@ const ValidationView = ({ successMessage, type }) => {
     React.createElement(ValidationDetails, { 
       details: validationResult?.details, 
       command, 
+      renderInk,
     }),
   );
 };

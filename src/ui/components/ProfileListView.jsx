@@ -1,33 +1,32 @@
 const React = require('react');
 const { useEffect, useState } = React;
-const { Box, Text, Newline } = require('ink');
 const { useAppContext } = require('../contexts/AppContext.js');
 const ProfileLoader = require('../../profiles/ProfileLoader');
 
-const ProfileGroup = ({ title, profiles, color }) => {
+const ProfileGroup = ({ title, profiles, color, renderInk }) => {
   if (!profiles || profiles.length === 0) {
     return null;
   }
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column', marginBottom: 1 },
     React.createElement(
-      Text,
+      renderInk.Text,
       { color, bold: true },
       title + ':',
     ),
     ...profiles.map((profile) =>
       React.createElement(
-        Box,
+        renderInk.Box,
         { key: profile.name, marginLeft: 2 },
         React.createElement(
-          Text,
+          renderInk.Text,
           { bold: true },
           profile.name.padEnd(20),
         ),
         React.createElement(
-          Text,
+          renderInk.Text,
           { dimColor: true },
           profile.description || 'No description',
         ),
@@ -36,45 +35,45 @@ const ProfileGroup = ({ title, profiles, color }) => {
   );
 };
 
-const ProfileDetails = ({ profiles }) => {
+const ProfileDetails = ({ profiles, renderInk }) => {
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column', marginTop: 1 },
     React.createElement(
-      Text,
+      renderInk.Text,
       { bold: true, color: 'yellow' },
       'Profile Details:',
     ),
-    React.createElement(Newline),
+    React.createElement(renderInk.Newline),
     ...profiles.map((profile) =>
       React.createElement(
-        Box,
+        renderInk.Box,
         { key: profile.name, flexDirection: 'column', marginBottom: 1 },
         React.createElement(
-          Text,
+          renderInk.Text,
           { bold: true },
           profile.name + ':',
         ),
         React.createElement(
-          Box,
+          renderInk.Box,
           { marginLeft: 2, flexDirection: 'column' },
           React.createElement(
-            Text,
+            renderInk.Text,
             null,
             `Description: ${profile.description || 'No description'}`,
           ),
           React.createElement(
-            Text,
+            renderInk.Text,
             null,
             `Source: ${profile.source}`,
           ),
           React.createElement(
-            Text,
+            renderInk.Text,
             null,
             `Path: ${profile.path}`,
           ),
           profile.version && React.createElement(
-            Text,
+            renderInk.Text,
             null,
             `Version: ${profile.version}`,
           ),
@@ -84,7 +83,7 @@ const ProfileDetails = ({ profiles }) => {
   );
 };
 
-const ProfileListView = () => {
+const ProfileListView = ({ renderInk }) => {
   const { options, updateState } = useAppContext();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +108,7 @@ const ProfileListView = () => {
 
   if (loading) {
     return React.createElement(
-      Text,
+      renderInk.Text,
       { color: 'blue' },
       'Loading profiles...',
     );
@@ -117,7 +116,7 @@ const ProfileListView = () => {
 
   if (error) {
     return React.createElement(
-      Text,
+      renderInk.Text,
       { color: 'red' },
       `Error loading profiles: ${error}`,
     );
@@ -125,25 +124,25 @@ const ProfileListView = () => {
 
   if (profiles.length === 0) {
     return React.createElement(
-      Box,
+      renderInk.Box,
       { flexDirection: 'column' },
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: 'yellow' },
         'No profiles found.',
       ),
-      React.createElement(Newline),
+      React.createElement(renderInk.Newline),
       React.createElement(
-        Text,
+        renderInk.Text,
         { bold: true },
         'Profile search locations:',
       ),
       React.createElement(
-        Box,
+        renderInk.Box,
         { marginLeft: 2, flexDirection: 'column' },
-        React.createElement(Text, null, 'Project: .copytree/'),
-        React.createElement(Text, null, 'User: ~/.copytree/profiles/'),
-        React.createElement(Text, null, 'Built-in: (included with copytree)'),
+        React.createElement(renderInk.Text, null, 'Project: .copytree/'),
+        React.createElement(renderInk.Text, null, 'User: ~/.copytree/profiles/'),
+        React.createElement(renderInk.Text, null, 'Built-in: (included with copytree)'),
       ),
     );
   }
@@ -160,35 +159,38 @@ const ProfileListView = () => {
   });
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column' },
     React.createElement(
-      Text,
+      renderInk.Text,
       { bold: true, color: 'yellow' },
       'Available Profiles:',
     ),
-    React.createElement(Newline),
+    React.createElement(renderInk.Newline),
     React.createElement(ProfileGroup, {
       title: 'Built-in Profiles',
       profiles: grouped['built-in'],
       color: 'blue',
+      renderInk,
     }),
     React.createElement(ProfileGroup, {
       title: 'User Profiles',
       profiles: grouped['user'],
       color: 'green',
+      renderInk,
     }),
     React.createElement(ProfileGroup, {
       title: 'Project Profiles',
       profiles: grouped['project'],
       color: 'magenta',
+      renderInk,
     }),
     React.createElement(
-      Text,
+      renderInk.Text,
       { dimColor: true },
       'To use a profile: copytree --profile <name>',
     ),
-    options.verbose && React.createElement(ProfileDetails, { profiles }),
+    options.verbose && React.createElement(ProfileDetails, { profiles, renderInk }),
   );
 };
 

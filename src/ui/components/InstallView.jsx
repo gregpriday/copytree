@@ -1,6 +1,5 @@
 const React = require('react');
 const { useEffect, useState } = React;
-const { Box, Text } = require('ink');
 const { useAppContext } = require('../contexts/AppContext.js');
 const fs = require('fs-extra');
 const path = require('path');
@@ -9,7 +8,7 @@ const { execSync } = require('child_process');
 const inquirer = require('inquirer');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-const InstallStep = ({ step, isActive, isCompleted }) => {
+const InstallStep = ({ step, isActive, isCompleted, renderInk }) => {
   const getIcon = () => {
     if (isCompleted) {
       return step.status === 'success' ? '✓' : 
@@ -33,43 +32,43 @@ const InstallStep = ({ step, isActive, isCompleted }) => {
   };
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { marginBottom: 0 },
     React.createElement(
-      Text,
+      renderInk.Text,
       { color: getColor() },
       `${getIcon()} ${step.name}: ${step.details || ''}`,
     ),
   );
 };
 
-const NextSteps = () => {
+const NextSteps = ({ renderInk }) => {
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column', marginTop: 1 },
     React.createElement(
-      Text,
+      renderInk.Text,
       { bold: true, color: 'yellow' },
       'Next Steps:',
     ),
     React.createElement(
-      Box,
+      renderInk.Box,
       { marginTop: 1, flexDirection: 'column', marginLeft: 2 },
-      React.createElement(Text, null, '1. Create your first profile:'),
+      React.createElement(renderInk.Text, null, '1. Create your first profile:'),
       React.createElement(
-        Text,
+        renderInk.Text,
         { dimColor: true, marginLeft: 2 },
         'copytree profile:create',
       ),
-      React.createElement(Text, { marginTop: 1 }, '2. Run copytree on your project:'),
+      React.createElement(renderInk.Text, { marginTop: 1 }, '2. Run copytree on your project:'),
       React.createElement(
-        Text,
+        renderInk.Text,
         { dimColor: true, marginLeft: 2 },
         'copytree --profile default',
       ),
-      React.createElement(Text, { marginTop: 1 }, '3. Use AI-powered transformers:'),
+      React.createElement(renderInk.Text, { marginTop: 1 }, '3. Use AI-powered transformers:'),
       React.createElement(
-        Text,
+        renderInk.Text,
         { dimColor: true, marginLeft: 2 },
         'copytree --transform',
       ),
@@ -77,7 +76,7 @@ const NextSteps = () => {
   );
 };
 
-const InstallView = () => {
+const InstallView = ({ renderInk }) => {
   const { updateState } = useAppContext();
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState([]);
@@ -176,15 +175,15 @@ const InstallView = () => {
 
   if (error) {
     return React.createElement(
-      Box,
+      renderInk.Box,
       { flexDirection: 'column' },
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: 'red', bold: true },
         '✗ Installation Failed',
       ),
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: 'red' },
         error,
       ),
@@ -192,38 +191,39 @@ const InstallView = () => {
   }
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column' },
     React.createElement(
-      Text,
+      renderInk.Text,
       { bold: true, color: 'yellow' },
       'CopyTree Installation Setup',
     ),
-    React.createElement(Box, { marginTop: 1 }, null),
+    React.createElement(renderInk.Box, { marginTop: 1 }, null),
     React.createElement(
-      Text,
+      renderInk.Text,
       { bold: true },
       'Installation Summary:',
     ),
-    React.createElement(Box, { marginTop: 1 }, null),
+    React.createElement(renderInk.Box, { marginTop: 1 }, null),
     ...steps.map((step, index) =>
       React.createElement(InstallStep, {
         key: index,
         step,
         isActive: currentStep === index,
         isCompleted: currentStep > index || isCompleted,
+        renderInk,
       }),
     ),
     isCompleted && React.createElement(
-      Box,
+      renderInk.Box,
       { marginTop: 1 },
       React.createElement(
-        Text,
+        renderInk.Text,
         { color: 'green', bold: true },
         `✓ Installation completed in ${duration}ms`,
       ),
     ),
-    isCompleted && React.createElement(NextSteps),
+    isCompleted && React.createElement(NextSteps, { renderInk }),
   );
 };
 

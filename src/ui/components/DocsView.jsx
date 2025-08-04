@@ -1,45 +1,44 @@
 const React = require('react');
 const { useEffect, useState } = React;
-const { Box, Text } = require('ink');
 const { useAppContext } = require('../contexts/AppContext.js');
 const fs = require('fs-extra');
 const path = require('path');
 // Use dynamic import for ESM-only clipboardy inside async contexts (no top-level require)
 
-const TopicsList = ({ topics }) => {
+const TopicsList = ({ topics, renderInk }) => {
   if (!topics || topics.length === 0) {
     return null;
   }
 
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column' },
     React.createElement(
-      Text,
+      renderInk.Text,
       { bold: true, color: 'yellow' },
       'Available Documentation Topics:',
     ),
-    React.createElement(Box, { marginTop: 1 }, null),
+    React.createElement(renderInk.Box, { marginTop: 1 }, null),
     ...topics.map((section) => 
       React.createElement(
-        Box,
+        renderInk.Box,
         { key: section.title, flexDirection: 'column', marginBottom: 1 },
         React.createElement(
-          Text,
+          renderInk.Text,
           { color: section.color, bold: true },
           section.title + ':',
         ),
         ...section.items.map((item) =>
           React.createElement(
-            Box,
+            renderInk.Box,
             { key: item.name, marginLeft: 2 },
             React.createElement(
-              Text,
+              renderInk.Text,
               { bold: true },
               item.name.padEnd(20),
             ),
             React.createElement(
-              Text,
+              renderInk.Text,
               { dimColor: true },
               item.description,
             ),
@@ -48,31 +47,31 @@ const TopicsList = ({ topics }) => {
       ),
     ),
     React.createElement(
-      Text,
+      renderInk.Text,
       { dimColor: true, marginTop: 1 },
       'Usage: copytree copy:docs --topic <name>',
     ),
   );
 };
 
-const DocContent = ({ content, stats, action }) => {
+const DocContent = ({ content, stats, action, renderInk }) => {
   return React.createElement(
-    Box,
+    renderInk.Box,
     { flexDirection: 'column' },
     React.createElement(
-      Text,
+      renderInk.Text,
       { color: 'green', bold: true },
       `✓ ${action}`,
     ),
     stats && React.createElement(
-      Text,
+      renderInk.Text,
       { dimColor: true },
       `${stats.lines} lines, ${stats.characters} characters`,
     ),
   );
 };
 
-const DocsView = () => {
+const DocsView = ({ renderInk }) => {
   const { options, updateState } = useAppContext();
   const [loading, setLoading] = useState(true);
   const [topics, setTopics] = useState([]);
@@ -131,7 +130,7 @@ const DocsView = () => {
 
   if (loading) {
     return React.createElement(
-      Text,
+      renderInk.Text,
       { color: 'blue' },
       'Loading documentation...',
     );
@@ -139,14 +138,14 @@ const DocsView = () => {
 
   if (error) {
     return React.createElement(
-      Text,
+      renderInk.Text,
       { color: 'red' },
       `Error: ${error}`,
     );
   }
 
   if (topics.length > 0) {
-    return React.createElement(TopicsList, { topics });
+    return React.createElement(TopicsList, { topics, renderInk });
   }
 
   if (result) {
@@ -154,11 +153,12 @@ const DocsView = () => {
       content: result.content,
       stats: result.stats,
       action: result.action,
+      renderInk,
     });
   }
 
   return React.createElement(
-    Text,
+    renderInk.Text,
     { color: 'yellow' },
     'No documentation found',
   );
@@ -285,340 +285,13 @@ async function getTopicDescription(filePath) {
  */
 function getBuiltInDocumentation(topic) {
   const docs = {
-    profiles: `# CopyTree Profile System
+    profiles: `# CopyTree Profile System\n\n## Overview\n\nProfiles in CopyTree allow you to create reusable configurations for different project types. They control which files are included, how they're transformed, and what output format is used.\n\n## Profile Structure\n\n\`\`\`yaml\nname: my-profile\ndescription: Description of what this profile does\nversion: 1.0.0\n\n# File selection\ninclude:\n  - "src/**/*"\n  - "*.json"\nexclude:\n  - "**/node_modules/**"\n  - "**/*.test.js"\n\n# Options\noptions:\n  includeHidden: false\n  followSymlinks: false\n  respectGitignore: true\n  maxFileSize: 10485760  # 10MB\n  maxFileCount: 10000\n\n# Transformers\ntransformers:\n  markdown:\n    enabled: true\n    options:\n      mode: strip\n  images:\n    enabled: true\n    options:\n      mode: description\n\n# Output settings\noutput:\n  format: xml\n  includeMetadata: true\n  addLineNumbers: false\n\`\`\`\n\n## Using Profiles\n\n\`\`\`bash\n# Use a built-in profile\ncopytree --profile laravel\n\n# Use a custom profile\ncopytree --profile ./my-profile.yml\n\n# Create a new profile\ncopytree profile:create\n\`\`\`\n\n## Profile Locations\n\nProfiles are searched in this order:\n1. Project directory: \`.copytree/\`\n2. User directory: \`~/.copytree/profiles/\`\n3. Built-in profiles\n\n## Built-in Profiles\n\n- **default**: General-purpose profile\n- **laravel**: Optimized for Laravel projects\n- **sveltekit**: Optimized for SvelteKit projects\n- **minimal**: Minimal output with key files only\n`,
 
-## Overview
+    transformers: `# CopyTree Transformers\n\n## Overview\n\nTransformers modify file content before it's included in the output. They can compress, summarize, or convert files to more suitable formats.\n\n## Available Transformers\n\n### Text Transformers\n\n1. **FileLoader** - Default transformer, loads file content as-is\n2. **Markdown** - Strip formatting, links, or convert to plain text\n3. **CSV** - Show preview rows or full content\n4. **FirstLines** - Show only first N lines of files\n5. **HTMLStripper** - Convert HTML to plain text\n6. **MarkdownLinkStripper** - Remove links from markdown\n\n### AI-Powered Transformers\n\n1. **AISummary** - Generate summaries using AI\n2. **FileSummary** - Summarize any text file\n3. **UnitTestSummary** - Specialized summaries for test files\n4. **ImageDescription** - Describe images using vision AI\n5. **SvgDescription** - Analyze and describe SVG files\n\n### Document Transformers\n\n1. **PDF** - Extract text from PDF files\n2. **DocumentToText** - Convert Word/ODT to text (requires Pandoc)\n\n### Binary Transformers\n\n1. **Binary** - Replace binary content with placeholder\n2. **Image** - Handle images (placeholder or AI description)\n\n## Configuring Transformers\n\nIn profiles:\n\`\`\`yaml\ntransformers:\n  markdown:\n    enabled: true\n    options:\n      mode: strip  # strip, plain, or original\n  \n  images:\n    enabled: true\n    options:\n      mode: description  # placeholder or description\n  \n  firstlines:\n    enabled: true\n    options:\n      lineCount: 50\n\`\`\`\n\n## Custom Transformers\n\nCreate custom transformers by extending BaseTransformer:\n\n\`\`\`javascript\nclass MyTransformer extends BaseTransformer {\n  async doTransform(file) {\n    // Transform logic\n    return {\n      ...file,\n      content: transformedContent,\n      transformed: true\n    };\n  }\n}\n\`\`\`\n`,
 
-Profiles in CopyTree allow you to create reusable configurations for different project types. They control which files are included, how they're transformed, and what output format is used.
+    pipeline: `# CopyTree Pipeline Architecture\n\n## Overview\n\nThe pipeline is the core processing processing engine that transforms a directory into structured output. It uses a series of stages to discover, filter, transform, and format files.\n\n## Pipeline Stages\n\n### 1. FileDiscoveryStage\nDiscovers all files in the target directory based on include patterns.\n\n### 2. ProfileFilterStage  \nApplies profile-based filtering rules (include/exclude patterns).\n\n### 3. GitFilterStage\nFilters files based on Git status (modified, staged, etc.) if requested.\n\n### 4. AIFilterStage\nUses AI to intelligently filter files based on natural language queries.\n\n### 5. ExternalSourceStage\nIncludes files from external sources (GitHub repos, other directories).\n\n### 6. DeduplicateFilesStage\nRemoves duplicate files based on content hash.\n\n### 7. SortFilesStage\nSorts files by path, size, date, or other criteria.\n\n### 8. TransformStage\nApplies transformers to modify file content.\n\n### 9. CharLimitStage\nEnsures output stays within character limits.\n\n### 10. OutputFormattingStage\nFormats the final output (XML, JSON, or tree format).\n\n## Creating Custom Stages\n\n\`\`\`javascript\nclass MyStage extends Stage {\n  async process(input) {\n    const { files } = input;\n    \n    // Process files\n    const processedFiles = files.map(file => {\n      // Stage logic\n      return modifiedFile;\n    });\n    \n    return {\n      ...input,\n      files: processedFiles\n    };\n  }\n}\n\`\`\`\n\n## Pipeline Configuration\n\nConfigure pipeline in profiles:\n\`\`\`yaml\npipeline:\n  stages:\n    - FileDiscoveryStage\n    - ProfileFilterStage\n    - MyCustomStage\n    - TransformStage\n    - OutputFormattingStage\n\`\`\`\n`,
 
-## Profile Structure
-
-\`\`\`yaml
-name: my-profile
-description: Description of what this profile does
-version: 1.0.0
-
-# File selection
-include:
-  - "src/**/*"
-  - "*.json"
-exclude:
-  - "**/node_modules/**"
-  - "**/*.test.js"
-
-# Options
-options:
-  includeHidden: false
-  followSymlinks: false
-  respectGitignore: true
-  maxFileSize: 10485760  # 10MB
-  maxFileCount: 10000
-
-# Transformers
-transformers:
-  markdown:
-    enabled: true
-    options:
-      mode: strip
-  images:
-    enabled: true
-    options:
-      mode: description
-
-# Output settings
-output:
-  format: xml
-  includeMetadata: true
-  addLineNumbers: false
-\`\`\`
-
-## Using Profiles
-
-\`\`\`bash
-# Use a built-in profile
-copytree --profile laravel
-
-# Use a custom profile
-copytree --profile ./my-profile.yml
-
-# Create a new profile
-copytree profile:create
-\`\`\`
-
-## Profile Locations
-
-Profiles are searched in this order:
-1. Project directory: \`.copytree/\`
-2. User directory: \`~/.copytree/profiles/\`
-3. Built-in profiles
-
-## Built-in Profiles
-
-- **default**: General-purpose profile
-- **laravel**: Optimized for Laravel projects
-- **sveltekit**: Optimized for SvelteKit projects
-- **minimal**: Minimal output with key files only
-`,
-
-    transformers: `# CopyTree Transformers
-
-## Overview
-
-Transformers modify file content before it's included in the output. They can compress, summarize, or convert files to more suitable formats.
-
-## Available Transformers
-
-### Text Transformers
-
-1. **FileLoader** - Default transformer, loads file content as-is
-2. **Markdown** - Strip formatting, links, or convert to plain text
-3. **CSV** - Show preview rows or full content
-4. **FirstLines** - Show only first N lines of files
-5. **HTMLStripper** - Convert HTML to plain text
-6. **MarkdownLinkStripper** - Remove links from markdown
-
-### AI-Powered Transformers
-
-1. **AISummary** - Generate summaries using AI
-2. **FileSummary** - Summarize any text file
-3. **UnitTestSummary** - Specialized summaries for test files
-4. **ImageDescription** - Describe images using vision AI
-5. **SvgDescription** - Analyze and describe SVG files
-
-### Document Transformers
-
-1. **PDF** - Extract text from PDF files
-2. **DocumentToText** - Convert Word/ODT to text (requires Pandoc)
-
-### Binary Transformers
-
-1. **Binary** - Replace binary content with placeholder
-2. **Image** - Handle images (placeholder or AI description)
-
-## Configuring Transformers
-
-In profiles:
-\`\`\`yaml
-transformers:
-  markdown:
-    enabled: true
-    options:
-      mode: strip  # strip, plain, or original
-  
-  images:
-    enabled: true
-    options:
-      mode: description  # placeholder or description
-  
-  firstlines:
-    enabled: true
-    options:
-      lineCount: 50
-\`\`\`
-
-## Custom Transformers
-
-Create custom transformers by extending BaseTransformer:
-
-\`\`\`javascript
-class MyTransformer extends BaseTransformer {
-  async doTransform(file) {
-    // Transform logic
-    return {
-      ...file,
-      content: transformedContent,
-      transformed: true
-    };
-  }
-}
-\`\`\`
-`,
-
-    pipeline: `# CopyTree Pipeline Architecture
-
-## Overview
-
-The pipeline is the core processing engine that transforms a directory into structured output. It uses a series of stages to discover, filter, transform, and format files.
-
-## Pipeline Stages
-
-### 1. FileDiscoveryStage
-Discovers all files in the target directory based on include patterns.
-
-### 2. ProfileFilterStage  
-Applies profile-based filtering rules (include/exclude patterns).
-
-### 3. GitFilterStage
-Filters files based on Git status (modified, staged, etc.) if requested.
-
-### 4. AIFilterStage
-Uses AI to intelligently filter files based on natural language queries.
-
-### 5. ExternalSourceStage
-Includes files from external sources (GitHub repos, other directories).
-
-### 6. DeduplicateFilesStage
-Removes duplicate files based on content hash.
-
-### 7. SortFilesStage
-Sorts files by path, size, date, or other criteria.
-
-### 8. TransformStage
-Applies transformers to modify file content.
-
-### 9. CharLimitStage
-Ensures output stays within character limits.
-
-### 10. OutputFormattingStage
-Formats the final output (XML, JSON, or tree format).
-
-## Creating Custom Stages
-
-\`\`\`javascript
-class MyStage extends Stage {
-  async process(input) {
-    const { files } = input;
-    
-    // Process files
-    const processedFiles = files.map(file => {
-      // Stage logic
-      return modifiedFile;
-    });
-    
-    return {
-      ...input,
-      files: processedFiles
-    };
-  }
-}
-\`\`\`
-
-## Pipeline Configuration
-
-Configure pipeline in profiles:
-\`\`\`yaml
-pipeline:
-  stages:
-    - FileDiscoveryStage
-    - ProfileFilterStage
-    - MyCustomStage
-    - TransformStage
-    - OutputFormattingStage
-\`\`\`
-`,
-
-    configuration: `# CopyTree Configuration Guide
-
-## Configuration Hierarchy
-
-CopyTree uses a hierarchical configuration system:
-
-1. Default configuration (built-in)
-2. User configuration (~/.copytree/config.yml)
-3. Project configuration (.copytree/config.yml)
-4. Environment variables
-5. Command-line arguments
-
-## Configuration File Format
-
-\`\`\`yaml
-# ~/.copytree/config.yml
-
-# Application settings
-app:
-  debug: false
-  quiet: false
-  colors: true
-
-# Cache settings
-cache:
-  enabled: true
-  directory: ~/.copytree/cache
-  transformations:
-    enabled: true
-    ttl: 86400  # 24 hours
-
-# AI settings
-ai:
-  provider: gemini
-  model: gemini-2.5-flash
-  temperature: 0.3
-  maxTokens: 1000
-
-# Output defaults
-output:
-  format: xml
-  prettyPrint: true
-  includeMetadata: true
-  
-# Git integration
-git:
-  respectGitignore: true
-  includeUntracked: false
-\`\`\`
-
-## Environment Variables
-
-\`\`\`bash
-# API Keys
-export GEMINI_API_KEY=your-key-here
-export OPENAI_API_KEY=your-key-here
-
-# Paths
-export COPYTREE_CONFIG=~/custom-config.yml
-export COPYTREE_CACHE_DIR=~/custom-cache
-
-# Behavior
-export COPYTREE_DEBUG=true
-export COPYTREE_NO_COLOR=true
-\`\`\`
-
-## Validating Configuration
-
-\`\`\`bash
-# Validate all configuration
-copytree config:validate
-
-# Validate specific section
-copytree config:validate --section ai
-\`\`\`
-
-## Common Configuration Patterns
-
-### For Large Projects
-\`\`\`yaml
-output:
-  charLimit: 500000
-  
-options:
-  maxFileSize: 1048576  # 1MB per file
-  maxFileCount: 5000
-\`\`\`
-
-### For Documentation
-\`\`\`yaml
-transformers:
-  markdown:
-    enabled: true
-    options:
-      mode: original
-      
-output:
-  format: markdown
-\`\`\`
-
-### For Code Review
-\`\`\`yaml
-git:
-  filterMode: modified
-  
-transformers:
-  firstlines:
-    enabled: true
-    options:
-      lineCount: 100
-\`\`\`
-`,
+    configuration: `# CopyTree Configuration Guide\n\n## Configuration Hierarchy\n\nCopyTree uses a hierarchical configuration system:\n\n1. Default configuration (built-in)\n2. User configuration (~/.copytree/config.yml)\n3. Project configuration (.copytree/config.yml)\n4. Environment variables\n5. Command-line arguments\n\n## Configuration File Format\n\n\`\`\`yaml\n# ~/.copytree/config.yml\n\n# Application settings\napp:\n  debug: false\n  quiet: false\n  colors: true\n\n# Cache settings\ncache:\n  enabled: true\n  directory: ~/.copytree/cache\n  transformations:\n    enabled: true\n    ttl: 86400  # 24 hours\n\n# AI settings\nai:\n  provider: gemini\n  model: gemini-2.5-flash\n  temperature: 0.3\n  maxTokens: 1000\n\n# Output defaults\noutput:\n  format: xml\n  prettyPrint: true\n  includeMetadata: true\n  \n# Git integration\ngit:\n  respectGitignore: true\n  includeUntracked: false\n\`\`\`\n\n## Environment Variables\n\n\`\`\`bash\n# API Keys\nexport GEMINI_API_KEY=your-key-here\nexport OPENAI_API_KEY=your-key-here\n\n# Paths\nexport COPYTREE_CONFIG=~/custom-config.yml\nexport COPYTREE_CACHE_DIR=~/custom-cache\n\n# Behavior\nexport COPYTREE_DEBUG=true\nexport COPYTREE_NO_COLOR=true\n\`\`\`\n\n## Validating Configuration\n\n\`\`\`bash\n# Validate all configuration\ncopytree config:validate\n\n# Validate specific section\ncopytree config:validate --section ai\n\`\`\`\n\n## Common Configuration Patterns\n\n### For Large Projects\n\`\`\`yaml\noutput:\n  charLimit: 500000\n  \noptions:\n  maxFileSize: 1048576  # 1MB per file\n  maxFileCount: 5000\n\`\`\`\n\n### For Documentation\n\`\`\`yaml\ntransformers:\n  markdown:\n    enabled: true\n    options:\n      mode: original\n      \noutput:\n  format: markdown\n\`\`\`\n\n### For Code Review\n\`\`\`yaml\ngit:\n  filterMode: modified\n  \ntransformers:\n  firstlines:\n    enabled: true\n    options:\n      lineCount: 100\n\`\`\`\n`,
   };
 
   return docs[topic] || null;
