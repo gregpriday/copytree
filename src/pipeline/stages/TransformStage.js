@@ -1,21 +1,23 @@
-const Stage = require('../Stage');
-const { CacheService } = require('../../services/CacheService');
-const { generateTransformCacheKey } = require('../../utils/fileHash');
-const path = require('path');
+import Stage from '../Stage.js';
+import { CacheService } from '../../services/CacheService.js';
+import { generateTransformCacheKey } from '../../utils/fileHash.js';
+import path from 'path';
+import appConfig from '../../../config/app.js';
+import { logger } from '../../utils/logger.js';
 
 class TransformStage extends Stage {
   constructor(options = {}) {
     super(options);
     this.registry = options.registry;
     this.transformerConfig = options.transformers || {};
-    this.maxConcurrency = options.maxConcurrency || require('../../../config/app').maxConcurrency || 5;
+    this.maxConcurrency = options.maxConcurrency || appConfig.maxConcurrency || 5;
     this.noCache = options.noCache;
     
     // Initialize cache for transformations (disabled if noCache is true)
     // Only create cache if not disabled
     this.cache = options.noCache ? null : (options.cache || CacheService.create('transformations', {
       enabled: options.cacheEnabled ?? true,
-      defaultTtl: 86400 // 24 hours
+      defaultTtl: 86400, // 24 hours
     }));
   }
 
@@ -30,16 +32,16 @@ class TransformStage extends Stage {
     const startTime = Date.now();
     let transformCount = 0;
     let errorCount = 0;
-    const { logger } = require('../../utils/logger');
+    // logger is already imported at the top
 
     // Import p-limit dynamically to handle ES module
     let limit;
     try {
       const pLimit = (await import('p-limit')).default;
       limit = pLimit(this.maxConcurrency);
-    } catch (error) {
+    } catch (_error) {
       // Fallback to older p-limit version syntax
-      const pLimit = require('p-limit');
+      const pLimit = await import('p-limit');
       limit = pLimit.default ? pLimit.default(this.maxConcurrency) : pLimit(this.maxConcurrency);
     }
     
@@ -79,7 +81,7 @@ class TransformStage extends Stage {
     let completedCount = 0;
 
     // Process files with active transform display
-    const transformPromises = files.map(file => 
+    const transformPromises = files.map((file) => 
       limit(async () => {
         // Check if this file is cached
         if (cachedResults.has(file)) {
@@ -87,7 +89,7 @@ class TransformStage extends Stage {
         }
         
         // Find the transform info for this file
-        const transformInfo = filesToTransform.find(t => t.file === file);
+        const transformInfo = filesToTransform.find((t) => t.file === file);
         if (!transformInfo) {
           return file; // No transformation needed
         }
@@ -118,7 +120,7 @@ class TransformStage extends Stage {
             // Update display
             completedCount++;
             if (showMultiLine) {
-              activeFiles = activeFiles.filter(f => f !== filename);
+              activeFiles = activeFiles.filter((f) => f !== filename);
               updateTransformDisplay();
             }
             
@@ -132,7 +134,7 @@ class TransformStage extends Stage {
           
           // Update display on error
           if (showMultiLine) {
-            activeFiles = activeFiles.filter(f => f !== filename);
+            activeFiles = activeFiles.filter((f) => f !== filename);
             updateTransformDisplay();
           }
           
@@ -140,10 +142,10 @@ class TransformStage extends Stage {
             ...file,
             content: `[Transform error: ${error.message}]`,
             error: error.message,
-            transformed: false
+            transformed: false,
           };
         }
-      })
+      }),
     );
     
     // Helper function to update the multi-line display
@@ -164,7 +166,7 @@ class TransformStage extends Stage {
       logger.updateSpinner(`Transforming (${completedCount}/${activeTransforms})`);
       
       // Write active files
-      activeFiles.slice(0, this.maxConcurrency).forEach(file => {
+      activeFiles.slice(0, this.maxConcurrency).forEach((file) => {
         process.stdout.write(`\n  → ${file}`);
       });
     };
@@ -202,7 +204,7 @@ class TransformStage extends Stage {
 
     this.log(
       `Transformed ${transformCount} files (${errorCount} errors) in ${this.getElapsedTime(startTime)}`,
-      'info'
+      'info',
     );
 
     return {
@@ -211,8 +213,8 @@ class TransformStage extends Stage {
       stats: {
         ...input.stats,
         transformedCount: transformCount,
-        transformErrors: errorCount
-      }
+        transformErrors: errorCount,
+      },
     };
   }
 
@@ -240,11 +242,11 @@ class TransformStage extends Stage {
       }
       
       return transformer;
-    } catch (error) {
+    } catch (_error) {
       // No transformer found, return null
       return null;
     }
   }
 }
 
-module.exports = TransformStage;
+export default TransformStage;

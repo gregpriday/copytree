@@ -179,8 +179,8 @@ describe('TransformerRegistry', () => {
   });
 
   describe('createDefault', () => {
-    test('should create registry with default transformers', () => {
-      const defaultRegistry = TransformerRegistry.createDefault();
+    test('should create registry with default transformers', async () => {
+      const defaultRegistry = await TransformerRegistry.createDefault();
       
       // Should have loaded some default transformers
       expect(defaultRegistry.transformers.size).toBeGreaterThan(0);

@@ -1,6 +1,6 @@
-const BaseTransformer = require('../BaseTransformer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const path = require('path');
+import BaseTransformer from '../BaseTransformer.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import path from 'path';
 
 /**
  * SVG description transformer using Gemini API
@@ -19,7 +19,7 @@ class SvgDescriptionTransformer extends BaseTransformer {
     } else {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       this.model = this.genAI.getGenerativeModel({ 
-        model: options.model || this.config.get('ai.gemini.model')
+        model: options.model || this.config.get('ai.gemini.model'),
       });
     }
   }
@@ -47,8 +47,8 @@ class SvgDescriptionTransformer extends BaseTransformer {
         transformedBy: this.constructor.name,
         metadata: {
           originalSize: size,
-          skippedReason: 'size_limit_exceeded'
-        }
+          skippedReason: 'size_limit_exceeded',
+        },
       };
     }
 
@@ -88,13 +88,13 @@ Keep the description concise but technical (2-3 paragraphs).`;
         metadata: {
           ...svgInfo,
           originalSize: size,
-          model: this.model.model
-        }
+          model: this.model.model,
+        },
       };
     } catch (error) {
       this.logger.error('Failed to generate SVG description', {
         file: file.path,
-        error: error.message
+        error: error.message,
       });
 
       // Return SVG content with error message
@@ -105,8 +105,8 @@ Keep the description concise but technical (2-3 paragraphs).`;
         transformedBy: this.constructor.name,
         metadata: {
           originalSize: size,
-          error: error.message
-        }
+          error: error.message,
+        },
       };
     }
   }
@@ -121,7 +121,7 @@ Keep the description concise but technical (2-3 paragraphs).`;
       hasScript: false,
       width: null,
       height: null,
-      viewBox: null
+      viewBox: null,
     };
 
     try {
@@ -157,17 +157,17 @@ Keep the description concise but technical (2-3 paragraphs).`;
     const dimensions = svgInfo.width && svgInfo.height 
       ? ` (${svgInfo.width} × ${svgInfo.height})` 
       : svgInfo.viewBox 
-      ? ` (viewBox: ${svgInfo.viewBox})`
-      : '';
+        ? ` (viewBox: ${svgInfo.viewBox})`
+        : '';
     
     let output = `[SVG: ${filename}${dimensions} - ${svgInfo.elementCount} elements]\n\n`;
     output += `${description}\n\n`;
     
     if (svgInfo.hasAnimation) {
-      output += `⚠️ Contains animations\n`;
+      output += '⚠️ Contains animations\n';
     }
     if (svgInfo.hasScript) {
-      output += `⚠️ Contains scripts\n`;
+      output += '⚠️ Contains scripts\n';
     }
     
     output += `\n--- Original SVG Code ---\n${originalContent}`;
@@ -177,4 +177,4 @@ Keep the description concise but technical (2-3 paragraphs).`;
   }
 }
 
-module.exports = SvgDescriptionTransformer;
+export default SvgDescriptionTransformer;

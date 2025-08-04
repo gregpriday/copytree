@@ -1,5 +1,5 @@
-const { TransformError } = require('../utils/errors');
-const { logger } = require('../utils/logger');
+import { TransformError } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Registry for file transformers
@@ -28,12 +28,12 @@ class TransformerRegistry {
     this.transformers.set(name, {
       transformer,
       options,
-      priority: options.priority || 0
+      priority: options.priority || 0,
     });
 
     // Register extensions
     if (options.extensions) {
-      options.extensions.forEach(ext => {
+      options.extensions.forEach((ext) => {
         const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`;
         if (!this.extensionMap.has(normalizedExt)) {
           this.extensionMap.set(normalizedExt, []);
@@ -44,7 +44,7 @@ class TransformerRegistry {
 
     // Register MIME types
     if (options.mimeTypes) {
-      options.mimeTypes.forEach(mimeType => {
+      options.mimeTypes.forEach((mimeType) => {
         if (!this.mimeTypeMap.has(mimeType)) {
           this.mimeTypeMap.set(mimeType, []);
         }
@@ -96,7 +96,7 @@ class TransformerRegistry {
     const uniqueNames = [...new Set(transformerNames)];
     if (uniqueNames.length > 0) {
       const sorted = uniqueNames
-        .map(name => ({ name, ...this.transformers.get(name) }))
+        .map((name) => ({ name, ...this.transformers.get(name) }))
         .sort((a, b) => b.priority - a.priority);
       
       return this.get(sorted[0].name);
@@ -110,7 +110,7 @@ class TransformerRegistry {
     throw new TransformError(
       `No transformer found for file: ${file.path}`,
       'unknown',
-      file.path
+      file.path,
     );
   }
 
@@ -137,7 +137,7 @@ class TransformerRegistry {
       mimeTypes: Array.from(this.mimeTypeMap.entries())
         .filter(([_, names]) => names.includes(name))
         .map(([mime]) => mime),
-      isDefault: this.defaultTransformer === name
+      isDefault: this.defaultTransformer === name,
     }));
   }
 
@@ -146,7 +146,7 @@ class TransformerRegistry {
    * @returns {Array} Array of transformer instances
    */
   getAllTransformers() {
-    return Array.from(this.transformers.values()).map(entry => entry.transformer);
+    return Array.from(this.transformers.values()).map((entry) => entry.transformer);
   }
 
   /**
@@ -172,63 +172,63 @@ class TransformerRegistry {
    * Create default registry with standard transformers
    * @static
    */
-  static createDefault() {
+  static async createDefault() {
     const registry = new TransformerRegistry();
     
-    // Register default transformers
-    const FileLoaderTransformer = require('./transformers/FileLoaderTransformer');
-    const MarkdownTransformer = require('./transformers/MarkdownTransformer');
-    const CSVTransformer = require('./transformers/CSVTransformer');
-    const BinaryTransformer = require('./transformers/BinaryTransformer');
-    const PDFTransformer = require('./transformers/PDFTransformer');
-    const ImageTransformer = require('./transformers/ImageTransformer');
-    const AISummaryTransformer = require('./transformers/AISummaryTransformer');
+    // Register default transformers - using dynamic imports for better ESM compatibility
+    const { default: FileLoaderTransformer } = await import('./transformers/FileLoaderTransformer.js');
+    const { default: MarkdownTransformer } = await import('./transformers/MarkdownTransformer.js');
+    const { default: CSVTransformer } = await import('./transformers/CSVTransformer.js');
+    const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
+    const { default: PDFTransformer } = await import('./transformers/PDFTransformer.js');
+    const { default: ImageTransformer } = await import('./transformers/ImageTransformer.js');
+    const { default: AISummaryTransformer } = await import('./transformers/AISummaryTransformer.js');
     
     registry.register('file-loader', new FileLoaderTransformer(), {
       isDefault: true,
-      priority: 0
+      priority: 0,
     });
 
     registry.register('markdown', new MarkdownTransformer(), {
       extensions: [], // Must be explicitly enabled - not applied automatically
-      priority: 10
+      priority: 10,
     });
 
     registry.register('csv', new CSVTransformer(), {
       extensions: [], // Must be explicitly enabled - not applied automatically
       mimeTypes: [], // Must be explicitly enabled - not applied automatically
-      priority: 10
+      priority: 10,
     });
 
     registry.register('pdf', new PDFTransformer(), {
       extensions: ['.pdf'],
       mimeTypes: ['application/pdf'],
-      priority: 15
+      priority: 15,
     });
 
     registry.register('image', new ImageTransformer(), {
       extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp'],
       mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff', 'image/webp'],
-      priority: 15
+      priority: 15,
     });
 
     registry.register('binary', new BinaryTransformer(), {
       extensions: [
         '.doc', '.docx', '.xls', '.xlsx',
         '.zip', '.tar', '.gz', '.rar', '.7z',
-        '.exe', '.dll', '.so', '.dylib'
+        '.exe', '.dll', '.so', '.dylib',
       ],
-      priority: 5
+      priority: 5,
     });
     
     // AI Summary transformer (optional, not enabled by default)
     registry.register('ai-summary', new AISummaryTransformer(), {
       extensions: [], // Must be explicitly enabled
-      priority: 20
+      priority: 20,
     });
 
     return registry;
   }
 }
 
-module.exports = TransformerRegistry;
+export default TransformerRegistry;

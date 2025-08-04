@@ -1,4 +1,10 @@
-const SortFilesStage = require('../../../../src/pipeline/stages/SortFilesStage');
+// Use dynamic import for module under test
+let SortFilesStage;
+
+beforeAll(async () => {
+  const sortFilesStageModule = await import('../../../../src/pipeline/stages/SortFilesStage.js');
+  SortFilesStage = sortFilesStageModule.default;
+});
 
 describe('SortFilesStage', () => {
   let stage;

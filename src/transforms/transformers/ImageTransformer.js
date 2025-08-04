@@ -1,7 +1,7 @@
-const BaseTransformer = require('../BaseTransformer');
-const fs = require('fs-extra');
-const path = require('path');
-const Tesseract = require('tesseract.js');
+import BaseTransformer from '../BaseTransformer.js';
+import fs from 'fs-extra';
+import path from 'path';
+import Tesseract from 'tesseract.js';
 
 /**
  * Image transformer - extracts text from images using OCR
@@ -13,7 +13,7 @@ class ImageTransformer extends BaseTransformer {
     this.description = 'Extracts text from images using OCR and provides metadata';
     this.supportedExtensions = [
       '.jpg', '.jpeg', '.png', '.gif', '.bmp', 
-      '.tiff', '.tif', '.webp'
+      '.tiff', '.tif', '.webp',
     ];
     this.enableOCR = options.enableOCR ?? true;
     this.language = options.language || 'eng';
@@ -31,7 +31,8 @@ class ImageTransformer extends BaseTransformer {
       
       // If content is base64, write to temp file
       if (!imagePath && file.content && file.encoding === 'base64') {
-        const tempDir = require('os').tmpdir();
+        const { tmpdir } = await import('os');
+        const tempDir = tmpdir();
         tempFile = path.join(tempDir, `copytree-img-${Date.now()}${path.extname(file.path)}`);
         const buffer = Buffer.from(file.content, 'base64');
         await fs.writeFile(tempFile, buffer);
@@ -43,7 +44,7 @@ class ImageTransformer extends BaseTransformer {
           ...file,
           content: '[Image file - no path available for OCR]',
           transformed: false,
-          transformedBy: this.constructor.name
+          transformedBy: this.constructor.name,
         };
       }
 
@@ -92,7 +93,7 @@ class ImageTransformer extends BaseTransformer {
         originalContent: file.content,
         transformed: true,
         transformedBy: this.constructor.name,
-        isImage: true
+        isImage: true,
       };
     } catch (error) {
       this.logger.error(`Failed to process image ${file.path}: ${error.message}`);
@@ -102,7 +103,7 @@ class ImageTransformer extends BaseTransformer {
         content: `[Error processing image: ${error.message}]`,
         transformed: false,
         transformedBy: this.constructor.name,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -125,18 +126,18 @@ class ImageTransformer extends BaseTransformer {
       return {
         text: data.text,
         confidence: data.confidence,
-        blocks: data.blocks?.map(block => ({
+        blocks: data.blocks?.map((block) => ({
           text: block.text,
           confidence: block.confidence,
-          bbox: block.bbox
-        }))
+          bbox: block.bbox,
+        })),
       };
     } catch (error) {
       this.logger.warn(`OCR failed for ${imagePath}: ${error.message}`);
       return {
         text: '',
         confidence: 0,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -156,7 +157,7 @@ class ImageTransformer extends BaseTransformer {
       '.bmp': 'Bitmap Image',
       '.tiff': 'TIFF Image',
       '.tif': 'TIFF Image',
-      '.webp': 'WebP Image'
+      '.webp': 'WebP Image',
     };
     
     return typeMap[ext] || 'Image';
@@ -178,4 +179,4 @@ class ImageTransformer extends BaseTransformer {
   }
 }
 
-module.exports = ImageTransformer;
+export default ImageTransformer;

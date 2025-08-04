@@ -1,10 +1,10 @@
-const { execSync } = require('child_process');
-const crypto = require('crypto');
-const path = require('path');
-const fs = require('fs-extra');
-const os = require('os');
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
+import { execSync } from 'child_process';
+import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs-extra';
+import os from 'os';
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Handles GitHub URLs by cloning/updating repositories and managing cache
@@ -27,7 +27,7 @@ class GitHubUrlHandler {
    * Parse GitHub URL to extract repository, branch, and subpath
    */
   parseUrl() {
-    const pattern = /^https:\/\/github\.com\/([^\/]+\/[^\/]+)(?:\/tree\/([^\/]+))?(?:\/(.*?))?$/;
+    const pattern = /^https:\/\/github\.com\/([^/]+\/[^/]+)(?:\/tree\/([^/]+))?(?:\/(.*?))?$/;
     const matches = this.url.match(pattern);
     
     if (!matches) {
@@ -71,7 +71,7 @@ class GitHubUrlHandler {
         // Clean up any partial directory if it exists without .git
         if (fs.existsSync(this.repoDir)) {
           logger.warn('Found incomplete repository cache, removing...', { 
-            cacheDir: this.repoDir 
+            cacheDir: this.repoDir, 
           });
           fs.rmSync(this.repoDir, { recursive: true, force: true });
         }
@@ -90,7 +90,7 @@ class GitHubUrlHandler {
     } catch (error) {
       logger.error('Failed to get files from GitHub', { 
         url: this.url, 
-        error: error.message 
+        error: error.message, 
       });
       throw error;
     }
@@ -110,7 +110,7 @@ class GitHubUrlHandler {
     // Clean up existing directory if it exists
     if (fs.existsSync(this.repoDir)) {
       logger.warn('Repository cache already exists, removing...', { 
-        cacheDir: this.repoDir 
+        cacheDir: this.repoDir, 
       });
       fs.rmSync(this.repoDir, { recursive: true, force: true });
     }
@@ -120,31 +120,31 @@ class GitHubUrlHandler {
     try {
       logger.info('Cloning repository', { 
         repo: this.repoUrl, 
-        branch: this.branch 
+        branch: this.branch, 
       });
       
       execSync(command, { stdio: 'pipe' });
       
       logger.info('Repository cloned successfully', { 
         repo: this.repoUrl,
-        cacheDir: this.repoDir 
+        cacheDir: this.repoDir, 
       });
     } catch (error) {
       // Handle specific errors
       if (error.message.includes('Authentication failed')) {
         throw new CommandError(
           'GitHub authentication failed. Repository may be private.',
-          'github-auth'
+          'github-auth',
         );
       } else if (error.message.includes('not found')) {
         throw new CommandError(
           `Repository not found: ${this.repoUrl}`,
-          'github-not-found'
+          'github-not-found',
         );
       } else {
         throw new CommandError(
           `Failed to clone repository: ${error.message}`,
-          'github-clone'
+          'github-clone',
         );
       }
     }
@@ -157,7 +157,7 @@ class GitHubUrlHandler {
     try {
       logger.info('Updating repository', { 
         repo: this.repoUrl, 
-        cacheDir: this.repoDir 
+        cacheDir: this.repoDir, 
       });
       
       // Fetch latest changes
@@ -167,8 +167,8 @@ class GitHubUrlHandler {
       const behindCount = parseInt(
         execSync(`git rev-list HEAD..origin/${this.branch} --count`, { 
           cwd: this.repoDir,
-          encoding: 'utf8'
-        }).trim()
+          encoding: 'utf8',
+        }).trim(),
       );
 
       if (behindCount > 0) {
@@ -187,7 +187,7 @@ class GitHubUrlHandler {
       }
     } catch (error) {
       logger.warn('Failed to update repository, re-cloning', { 
-        error: error.message 
+        error: error.message, 
       });
       
       // Re-clone on failure
@@ -203,7 +203,7 @@ class GitHubUrlHandler {
     try {
       const output = execSync(`git ls-remote --symref ${this.repoUrl} HEAD`, {
         encoding: 'utf8',
-        stdio: 'pipe'
+        stdio: 'pipe',
       });
       
       const match = output.match(/ref: refs\/heads\/([^\s]+)\s+HEAD/);
@@ -213,7 +213,7 @@ class GitHubUrlHandler {
       return branch;
     } catch (error) {
       logger.warn('Failed to detect default branch, using "main"', { 
-        error: error.message 
+        error: error.message, 
       });
       return 'main';
     }
@@ -229,7 +229,7 @@ class GitHubUrlHandler {
       exists: fs.existsSync(this.repoDir),
       repository: this.repoUrl,
       branch: this.branch,
-      subPath: this.subPath
+      subPath: this.subPath,
     };
   }
 
@@ -258,13 +258,13 @@ class GitHubUrlHandler {
         commitCount: parseInt(
           execSync('git rev-list --count HEAD', { 
             cwd: this.repoDir, 
-            encoding: 'utf8' 
-          }).trim()
+            encoding: 'utf8', 
+          }).trim(),
         ),
         currentCommit: execSync('git rev-parse HEAD', { 
           cwd: this.repoDir, 
-          encoding: 'utf8' 
-        }).trim().substring(0, 7)
+          encoding: 'utf8', 
+        }).trim().substring(0, 7),
       };
 
       return stats;
@@ -296,4 +296,4 @@ class GitHubUrlHandler {
   }
 }
 
-module.exports = GitHubUrlHandler;
+export default GitHubUrlHandler;

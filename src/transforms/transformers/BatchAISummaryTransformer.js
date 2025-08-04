@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const { AIService } = require('../../services/AIService');
+import BaseTransformer from '../BaseTransformer.js';
+import { AIService } from '../../services/AIService.js';
 
 /**
  * Batch AI Summary Transformer - Processes multiple files in a single AI request
@@ -10,7 +10,7 @@ class BatchAISummaryTransformer extends BaseTransformer {
     this.description = 'Generates AI-powered summaries of multiple files in batches';
     this.supportedExtensions = options.extensions || [
       '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.go', '.rs', '.cpp', '.c',
-      '.php', '.rb', '.swift', '.kt', '.scala', '.r', '.m', '.h', '.cs'
+      '.php', '.rb', '.swift', '.kt', '.scala', '.r', '.m', '.h', '.cs',
     ];
     this.maxFileSize = options.maxFileSize || 50 * 1024; // 50KB per file
     this.batchSize = options.batchSize || 5; // Process 5 files at a time
@@ -33,7 +33,7 @@ class BatchAISummaryTransformer extends BaseTransformer {
         ...file,
         content: `[File too large for AI summary: ${this.formatBytes(file.size)}]`,
         transformed: false,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     }
 
@@ -42,7 +42,7 @@ class BatchAISummaryTransformer extends BaseTransformer {
       return {
         ...file,
         transformed: false,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     }
 
@@ -65,7 +65,7 @@ class BatchAISummaryTransformer extends BaseTransformer {
       originalContent: file.content,
       transformed: true,
       transformedBy: this.constructor.name,
-      aiSummary: summary
+      aiSummary: summary,
     };
   }
 
@@ -113,13 +113,13 @@ class BatchAISummaryTransformer extends BaseTransformer {
       this.logger.debug(`Processing batch of ${batchItems.length} files for AI summary`);
       
       // Create batch prompt
-      const batchPrompt = this.createBatchPrompt(batchItems.map(item => item.file));
+      const batchPrompt = this.createBatchPrompt(batchItems.map((item) => item.file));
       
       // Get batch summary
       const response = await this.ai.complete({
         prompt: batchPrompt,
         temperature: 0.3,
-        maxTokens: 2000
+        maxTokens: 2000,
       });
       
       // Parse response and resolve promises
@@ -134,7 +134,7 @@ class BatchAISummaryTransformer extends BaseTransformer {
       this.logger.error(`Batch AI summary failed: ${error.message}`);
       
       // Reject all promises in batch
-      batchItems.forEach(item => {
+      batchItems.forEach((item) => {
         item.reject(error);
       });
     }
@@ -215,7 +215,7 @@ ${file.content.substring(0, 10000)} // Truncated if needed
       '.r': 'R',
       '.m': 'Objective-C',
       '.h': 'C/C++ Header',
-      '.cs': 'C#'
+      '.cs': 'C#',
     };
     
     return languageMap[ext] || 'Unknown';
@@ -236,4 +236,4 @@ ${file.content.substring(0, 10000)} // Truncated if needed
   }
 }
 
-module.exports = BatchAISummaryTransformer;
+export default BatchAISummaryTransformer;

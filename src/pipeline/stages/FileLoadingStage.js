@@ -1,6 +1,6 @@
-const Stage = require('../Stage');
-const fs = require('fs-extra');
-const path = require('path');
+import Stage from '../Stage.js';
+import fs from 'fs-extra';
+import path from 'path';
 
 class FileLoadingStage extends Stage {
   constructor(options = {}) {
@@ -14,14 +14,14 @@ class FileLoadingStage extends Stage {
     const startTime = Date.now();
 
     const filesWithContent = await Promise.all(
-      input.files.map(file => this.loadFileContent(file))
+      input.files.map((file) => this.loadFileContent(file)),
     );
 
     this.log(`Loaded file contents in ${this.getElapsedTime(startTime)}`, 'info');
 
     return {
       ...input,
-      files: filesWithContent
+      files: filesWithContent,
     };
   }
 
@@ -39,7 +39,7 @@ class FileLoadingStage extends Stage {
         ...file,
         content,
         isBinary: false,
-        encoding: this.encoding
+        encoding: this.encoding,
       };
     } catch (error) {
       this.log(`Error loading ${file.path}: ${error.message}`, 'warn');
@@ -48,7 +48,7 @@ class FileLoadingStage extends Stage {
         ...file,
         content: `[Error loading file: ${error.message}]`,
         error: error.message,
-        isBinary: false
+        isBinary: false,
       };
     }
   }
@@ -61,7 +61,7 @@ class FileLoadingStage extends Stage {
         '.exe', '.dll', '.so', '.dylib', '.bin',
         '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico',
         '.mp3', '.mp4', '.avi', '.mov', '.pdf',
-        '.zip', '.tar', '.gz', '.rar', '.7z'
+        '.zip', '.tar', '.gz', '.rar', '.7z',
       ];
       
       if (binaryExtensions.includes(ext)) {
@@ -80,26 +80,26 @@ class FileLoadingStage extends Stage {
       }
       
       return false;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
 
   handleBinaryFile(file) {
     switch (this.binaryAction) {
-      case 'skip':
-        return null;
+    case 'skip':
+      return null;
         
-      case 'base64':
-        return this.loadBinaryAsBase64(file);
+    case 'base64':
+      return this.loadBinaryAsBase64(file);
         
-      case 'placeholder':
-      default:
-        return {
-          ...file,
-          content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
-          isBinary: true
-        };
+    case 'placeholder':
+    default:
+      return {
+        ...file,
+        content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
+        isBinary: true,
+      };
     }
   }
 
@@ -112,17 +112,17 @@ class FileLoadingStage extends Stage {
         ...file,
         content: base64,
         isBinary: true,
-        encoding: 'base64'
+        encoding: 'base64',
       };
     } catch (error) {
       return {
         ...file,
         content: `[Error loading binary file: ${error.message}]`,
         error: error.message,
-        isBinary: true
+        isBinary: true,
       };
     }
   }
 }
 
-module.exports = FileLoadingStage;
+export default FileLoadingStage;

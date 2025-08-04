@@ -1,7 +1,7 @@
-const crypto = require('crypto');
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
+import crypto from 'crypto';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
 
 /**
  * Utility helper functions
@@ -25,7 +25,7 @@ function shortHash(str) {
  * Sleep for a specified number of milliseconds
  */
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -37,7 +37,7 @@ async function retry(fn, options = {}) {
     initialDelay = 1000,
     maxDelay = 10000,
     backoffMultiplier = 2,
-    shouldRetry = (error) => true
+    shouldRetry = (error) => true,
   } = options;
 
   let lastError;
@@ -124,7 +124,7 @@ function isBinaryExtension(filePath) {
     'zip', 'tar', 'gz', 'rar', '7z', 'bz2',
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
     'ttf', 'otf', 'woff', 'woff2', 'eot',
-    'db', 'sqlite', 'sqlite3'
+    'db', 'sqlite', 'sqlite3',
   ]);
 
   const ext = getExtension(filePath).toLowerCase();
@@ -182,7 +182,7 @@ function parseSize(sizeStr) {
     KB: 1024,
     MB: 1024 * 1024,
     GB: 1024 * 1024 * 1024,
-    TB: 1024 * 1024 * 1024 * 1024
+    TB: 1024 * 1024 * 1024 * 1024,
   };
 
   const match = sizeStr.toString().match(/^(\d+(?:\.\d+)?)\s*([KMGT]?B)?$/i);
@@ -246,7 +246,7 @@ function createCache(ttl = 3600000) {
     set(key, value) {
       cache.set(key, {
         value,
-        expiry: Date.now() + ttl
+        expiry: Date.now() + ttl,
       });
     },
 
@@ -260,7 +260,7 @@ function createCache(ttl = 3600000) {
 
     size() {
       return cache.size;
-    }
+    },
   };
 }
 
@@ -273,10 +273,10 @@ function escapeXml(str) {
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
-    "'": '&apos;'
+    '\'': '&apos;',
   };
 
-  return str.replace(/[&<>"']/g, char => xmlEscapes[char]);
+  return str.replace(/[&<>"']/g, (char) => xmlEscapes[char]);
 }
 
 /**
@@ -286,7 +286,7 @@ function timestamp() {
   return new Date().toISOString();
 }
 
-module.exports = {
+export {
   hash,
   shortHash,
   sleep,
@@ -306,5 +306,5 @@ module.exports = {
   debounce,
   createCache,
   escapeXml,
-  timestamp
+  timestamp,
 };

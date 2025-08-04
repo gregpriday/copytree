@@ -1,6 +1,6 @@
 const React = require('react');
 const { render } = require('ink-testing-library');
-const SummaryTable = require('../../../../src/ui/components/SummaryTable.jsx');
+const SummaryTable = require('../../../../src/ui/components/SummaryTable.js');
 
 describe('SummaryTable Component', () => {
 	test('renders null when no stats provided', () => {

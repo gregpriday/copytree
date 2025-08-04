@@ -1,34 +1,17 @@
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
-const joi = require('joi');
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
-const { config, ConfigManager } = require('../config/ConfigManager');
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Config validate command - Validate application configuration
  * (Now handled by ValidationView component)
  */
-async function configValidateCommand(options = {}) {
-  try {
-    // All validation is now handled by the ValidationView component
-    // This function is kept for backward compatibility
-    return {
-      success: true,
-      message: 'Validation handled by UI component'
-    };
-    
-  } catch (error) {
-    logger.error('Failed to validate configuration', { 
-      error: error.message,
-      stack: error.stack 
-    });
-    throw new CommandError(
-      `Failed to validate configuration: ${error.message}`,
-      'config:validate'
-    );
-  }
+async function configValidateCommand(_options = {}) {
+  // All validation is now handled by the ValidationView component
+  // This function is kept for backward compatibility
+  return {
+    success: true,
+    message: 'Validation handled by UI component',
+  };
 }
 
 /**
@@ -69,7 +52,7 @@ function validateCopytreeConfig(config, warnings) {
  * Validate instructions configuration
  */
 async function validateInstructionsConfig(config, warnings) {
-  const InstructionsLoader = require('../services/InstructionsLoader');
+  const { default: InstructionsLoader } = await import('../services/InstructionsLoader.js');
   
   try {
     const instructionsLoader = new InstructionsLoader();
@@ -116,7 +99,7 @@ function displayConfigObject(obj, indent = '') {
     } else if (Array.isArray(value)) {
       console.log(`${indent}${key}: [${value.length} items]`);
       if (value.length > 0 && value.length <= 5) {
-        value.forEach(item => {
+        value.forEach((item) => {
           console.log(`${indent}  - ${item}`);
         });
       }
@@ -133,4 +116,4 @@ function displayConfigObject(obj, indent = '') {
   }
 }
 
-module.exports = configValidateCommand;
+export default configValidateCommand;

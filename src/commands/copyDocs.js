@@ -1,8 +1,8 @@
-const fs = require('fs-extra');
-const path = require('path');
-const clipboardy = require('clipboardy');
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
+import fs from 'fs-extra';
+import path from 'path';
+import clipboardy from 'clipboardy';
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Copy docs command - Copy framework/library documentation
@@ -27,7 +27,7 @@ async function copyDocsCommand(options) {
     if (!docContent) {
       throw new CommandError(
         `Documentation not found for topic: ${topic}`,
-        'copy:docs'
+        'copy:docs',
       );
     }
     
@@ -45,17 +45,17 @@ async function copyDocsCommand(options) {
       content: docContent,
       stats: {
         lines: docContent.split('\n').length,
-        characters: docContent.length
+        characters: docContent.length,
       },
       action: options.output ? `Documentation written to ${options.output}` :
-              options.clipboard !== false ? `Documentation for "${topic}" copied to clipboard` :
-              'Documentation displayed'
+        options.clipboard !== false ? `Documentation for "${topic}" copied to clipboard` :
+          'Documentation displayed',
     };
     
   } catch (error) {
     logger.error('Copy docs command failed', { 
       error: error.message,
-      stack: error.stack 
+      stack: error.stack, 
     });
     
     if (error instanceof CommandError) {
@@ -64,7 +64,7 @@ async function copyDocsCommand(options) {
     
     throw new CommandError(
       `Failed to copy documentation: ${error.message}`,
-      'copy:docs'
+      'copy:docs',
     );
   }
 }
@@ -86,7 +86,7 @@ async function listAvailableTopics(docsDir) {
         const name = path.basename(file, '.md');
         frameworkItems.push({
           name,
-          description: 'Framework-specific documentation'
+          description: 'Framework-specific documentation',
         });
       }
     }
@@ -95,7 +95,7 @@ async function listAvailableTopics(docsDir) {
       topics.push({
         title: 'Frameworks',
         color: 'blue',
-        items: frameworkItems
+        items: frameworkItems,
       });
     }
   }
@@ -118,7 +118,7 @@ async function listAvailableTopics(docsDir) {
       topics.push({
         title: 'Topics',
         color: 'green',
-        items: topicItems
+        items: topicItems,
       });
     }
   }
@@ -131,8 +131,8 @@ async function listAvailableTopics(docsDir) {
       { name: 'profiles', description: 'Profile system documentation' },
       { name: 'transformers', description: 'File transformer documentation' },
       { name: 'pipeline', description: 'Pipeline architecture documentation' },
-      { name: 'configuration', description: 'Configuration guide' }
-    ]
+      { name: 'configuration', description: 'Configuration guide' },
+    ],
   });
 
   return topics;
@@ -146,7 +146,7 @@ async function loadDocumentation(docsDir, topic) {
   const locations = [
     path.join(docsDir, 'frameworks', `${topic}.md`),
     path.join(docsDir, 'topics', `${topic}.md`),
-    path.join(docsDir, `${topic}.md`)
+    path.join(docsDir, `${topic}.md`),
   ];
   
   for (const location of locations) {
@@ -185,7 +185,7 @@ async function getTopicDescription(filePath) {
     }
     
     return 'Documentation available';
-  } catch (error) {
+  } catch (_error) {
     return 'Documentation available';
   }
 }
@@ -528,10 +528,10 @@ transformers:
     options:
       lineCount: 100
 \`\`\`
-`
+`,
   };
   
   return docs[topic] || null;
 }
 
-module.exports = copyDocsCommand;
+export default copyDocsCommand;

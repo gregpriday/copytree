@@ -67,13 +67,13 @@ function env(key, defaultValue = null) {
 // Singleton instance
 let instance = null;
 
-module.exports = {
-  ConfigManager,
-  config() {
-    if (!instance) {
-      instance = new ConfigManager();
-    }
-    return instance;
-  },
-  env
-};
+export { ConfigManager };
+
+export function config() {
+  if (!instance) {
+    instance = new ConfigManager();
+  }
+  return instance;
+}
+
+export { env };

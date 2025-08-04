@@ -10,8 +10,16 @@ const mockConfig = {
   })
 };
 
-const BinaryTransformer = require('../../../src/transforms/transformers/BinaryTransformer');
-const fs = require('fs-extra');
+// Static import
+import fs from 'fs-extra';
+
+// Use dynamic import for module under test
+let BinaryTransformer;
+
+beforeAll(async () => {
+  const binaryTransformerModule = await import('../../../src/transforms/transformers/BinaryTransformer.js');
+  BinaryTransformer = binaryTransformerModule.default;
+});
 
 describe('BinaryTransformer', () => {
   let transformer;

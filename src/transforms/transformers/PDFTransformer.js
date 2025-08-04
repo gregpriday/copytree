@@ -1,6 +1,6 @@
-const BaseTransformer = require('../BaseTransformer');
-const fs = require('fs-extra');
-const pdf = require('pdf-parse');
+import BaseTransformer from '../BaseTransformer.js';
+import fs from 'fs-extra';
+import pdf from 'pdf-parse';
 
 /**
  * PDF transformer - extracts text from PDF files
@@ -32,7 +32,7 @@ class PDFTransformer extends BaseTransformer {
           content: '[PDF file - unable to parse content]',
           transformed: false,
           transformedBy: this.constructor.name,
-          error: 'Invalid content format for PDF'
+          error: 'Invalid content format for PDF',
         };
       }
     } else if (file.absolutePath) {
@@ -44,7 +44,7 @@ class PDFTransformer extends BaseTransformer {
           content: `[Error loading PDF: ${error.message}]`,
           transformed: false,
           transformedBy: this.constructor.name,
-          error: error.message
+          error: error.message,
         };
       }
     } else {
@@ -52,7 +52,7 @@ class PDFTransformer extends BaseTransformer {
         ...file,
         content: '[PDF file - no content available]',
         transformed: false,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     }
 
@@ -63,14 +63,14 @@ class PDFTransformer extends BaseTransformer {
         // Disable some features for better performance
         pagerender: (pageData) => {
           return pageData.getTextContent()
-            .then(textContent => {
+            .then((textContent) => {
               let text = '';
               for (const item of textContent.items) {
                 text += item.str + ' ';
               }
               return text;
             });
-        }
+        },
       });
 
       // Build output
@@ -110,8 +110,8 @@ class PDFTransformer extends BaseTransformer {
         metadata: {
           pages: data.numpages,
           info: data.info,
-          version: data.version
-        }
+          version: data.version,
+        },
       };
     } catch (error) {
       this.logger.error(`Failed to parse PDF ${file.path}: ${error.message}`);
@@ -121,7 +121,7 @@ class PDFTransformer extends BaseTransformer {
         content: `[Error parsing PDF: ${error.message}]`,
         transformed: false,
         transformedBy: this.constructor.name,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -151,4 +151,4 @@ class PDFTransformer extends BaseTransformer {
   }
 }
 
-module.exports = PDFTransformer;
+export default PDFTransformer;

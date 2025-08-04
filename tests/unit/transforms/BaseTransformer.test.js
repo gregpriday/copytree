@@ -1,8 +1,15 @@
-const BaseTransformer = require('../../../src/transforms/BaseTransformer');
-const { TransformError } = require('../../../src/utils/errors');
+import { TransformError } from '../../../src/utils/errors.js';
+
+// Use dynamic import for module under test
+let BaseTransformer;
+
+beforeAll(async () => {
+  const baseTransformerModule = await import('../../../src/transforms/BaseTransformer.js');
+  BaseTransformer = baseTransformerModule.default;
+});
 
 // Mock CacheService (other mocks are in setup-mocks.js)
-jest.mock('../../../src/services/CacheService', () => ({
+jest.mock('../../../src/services/CacheService.js', () => ({
   CacheService: {
     create: jest.fn(() => ({
       get: jest.fn(() => null),
@@ -11,17 +18,23 @@ jest.mock('../../../src/services/CacheService', () => ({
   }
 }));
 
-// Test implementation of BaseTransformer
-class TestTransformer extends BaseTransformer {
-  async doTransform(file) {
-    return {
-      ...file,
-      content: `transformed: ${file.content}`,
-      transformed: true,
-      transformedBy: 'TestTransformer'
-    };
+// Test implementation of BaseTransformer - defined in beforeAll
+let TestTransformer;
+
+beforeAll(async () => {
+  // Also define the test transformer after BaseTransformer is loaded
+  class TestTransformerImpl extends BaseTransformer {
+    async doTransform(file) {
+      return {
+        ...file,
+        content: `transformed: ${file.content}`,
+        transformed: true,
+        transformedBy: 'TestTransformer'
+      };
+    }
   }
-}
+  TestTransformer = TestTransformerImpl;
+});
 
 describe('BaseTransformer', () => {
   let transformer;
@@ -213,7 +226,7 @@ describe('BaseTransformer', () => {
     test('should return transformer metadata', () => {
       const metadata = transformer.getMetadata();
       
-      expect(metadata.name).toBe('TestTransformer');
+      expect(metadata.name).toBe('TestTransformerImpl');
       expect(metadata.options).toEqual({});
     });
   });

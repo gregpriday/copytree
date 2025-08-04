@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const fs = require('fs-extra');
+import BaseTransformer from '../BaseTransformer.js';
+import fs from 'fs-extra';
 
 /**
  * Default file loader transformer
@@ -27,15 +27,16 @@ class FileLoaderTransformer extends BaseTransformer {
         const binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
         
         switch (binaryAction) {
-          case 'base64':
-            const buffer = await fs.readFile(file.absolutePath);
-            content = buffer.toString('base64');
-            break;
-          case 'skip':
-            return null;
-          case 'placeholder':
-          default:
-            content = this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]');
+        case 'base64': {
+          const buffer = await fs.readFile(file.absolutePath);
+          content = buffer.toString('base64');
+          break;
+        }
+        case 'skip':
+          return null;
+        case 'placeholder':
+        default:
+          content = this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]');
         }
       } else {
         // Load text content
@@ -46,7 +47,7 @@ class FileLoaderTransformer extends BaseTransformer {
         ...file,
         content,
         transformed: false,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     } catch (error) {
       this.logger.error(`Failed to load ${file.path}: ${error.message}`);
@@ -56,7 +57,7 @@ class FileLoaderTransformer extends BaseTransformer {
         content: `[Error loading file: ${error.message}]`,
         error: error.message,
         transformed: false,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     }
   }
@@ -70,4 +71,4 @@ class FileLoaderTransformer extends BaseTransformer {
   }
 }
 
-module.exports = FileLoaderTransformer;
+export default FileLoaderTransformer;

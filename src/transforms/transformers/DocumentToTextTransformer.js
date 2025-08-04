@@ -1,8 +1,8 @@
-const BaseTransformer = require('../BaseTransformer');
-const { execSync } = require('child_process');
-const path = require('path');
-const fs = require('fs-extra');
-const os = require('os');
+import BaseTransformer from '../BaseTransformer.js';
+import { execSync } from 'child_process';
+import path from 'path';
+import fs from 'fs-extra';
+import os from 'os';
 
 /**
  * Document to text transformer using Pandoc
@@ -57,8 +57,8 @@ class DocumentToTextTransformer extends BaseTransformer {
         transformedBy: this.constructor.name,
         metadata: {
           originalSize: size,
-          skippedReason: 'size_limit_exceeded'
-        }
+          skippedReason: 'size_limit_exceeded',
+        },
       };
     }
 
@@ -84,12 +84,12 @@ class DocumentToTextTransformer extends BaseTransformer {
         '-t', 'plain',
         '--wrap=none',
         '--strip-comments',
-        `"${tempInput}"`
+        `"${tempInput}"`,
       ].join(' ');
 
       const textContent = execSync(command, {
         encoding: 'utf8',
-        maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer
       });
 
       return {
@@ -100,13 +100,13 @@ class DocumentToTextTransformer extends BaseTransformer {
         metadata: {
           originalSize: size,
           originalFormat: inputFormat,
-          convertedSize: Buffer.byteLength(textContent)
-        }
+          convertedSize: Buffer.byteLength(textContent),
+        },
       };
     } catch (error) {
       this.logger.error('Failed to convert document', {
         file: file.path,
-        error: error.message
+        error: error.message,
       });
 
       // Return error message
@@ -117,8 +117,8 @@ class DocumentToTextTransformer extends BaseTransformer {
         transformedBy: this.constructor.name,
         metadata: {
           originalSize: size,
-          error: error.message
-        }
+          error: error.message,
+        },
       };
     } finally {
       // Clean up temp files
@@ -142,7 +142,7 @@ class DocumentToTextTransformer extends BaseTransformer {
       '.rtf': 'rtf',
       '.epub': 'epub',
       '.html': 'html',
-      '.htm': 'html'
+      '.htm': 'html',
     };
     return formatMap[ext] || 'markdown';
   }
@@ -159,4 +159,4 @@ class DocumentToTextTransformer extends BaseTransformer {
   }
 }
 
-module.exports = DocumentToTextTransformer;
+export default DocumentToTextTransformer;

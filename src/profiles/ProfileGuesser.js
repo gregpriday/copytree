@@ -1,6 +1,6 @@
-const fs = require('fs-extra');
-const path = require('path');
-const { logger } = require('../utils/logger');
+import fs from 'fs-extra';
+import path from 'path';
+import { logger } from '../utils/logger.js';
 
 /**
  * ProfileGuesser - Always returns default profile
@@ -36,7 +36,7 @@ class ProfileGuesser {
       hasCI: await this.hasAnyFile(['.github/workflows', '.gitlab-ci.yml', '.circleci', 'Jenkinsfile']),
       hasTests: await this.hasAnyDirectory(['test', 'tests', '__tests__', 'spec']),
       hasDocs: await this.hasAnyDirectory(['docs', 'documentation']),
-      packageManagers: []
+      packageManagers: [],
     };
 
     // Detect languages (for informational purposes only)
@@ -69,7 +69,7 @@ class ProfileGuesser {
         // Handle glob patterns
         const files = await fs.readdir(this.projectPath);
         const pattern = new RegExp(fileName.replace('*', '.*'));
-        if (files.some(f => pattern.test(f))) {
+        if (files.some((f) => pattern.test(f))) {
           return true;
         }
       } else {
@@ -108,4 +108,4 @@ class ProfileGuesser {
 
 }
 
-module.exports = ProfileGuesser;
+export default ProfileGuesser;

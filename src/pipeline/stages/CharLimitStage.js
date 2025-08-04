@@ -1,4 +1,4 @@
-const Stage = require('../Stage');
+import Stage from '../Stage.js';
 
 class CharLimitStage extends Stage {
   constructor(options = {}) {
@@ -36,7 +36,7 @@ class CharLimitStage extends Stage {
           ...file,
           content: truncatedContent + '\n\n... truncated due to character limit ...',
           originalLength: contentLength,
-          truncated: true
+          truncated: true,
         });
         
         totalChars += truncatedContent.length;
@@ -50,7 +50,7 @@ class CharLimitStage extends Stage {
 
     this.log(
       `Character limit applied: ${totalChars.toLocaleString()} chars used, ${truncatedFiles} truncated, ${skippedFiles} skipped in ${this.getElapsedTime(startTime)}`,
-      'info'
+      'info',
     );
 
     return {
@@ -61,10 +61,10 @@ class CharLimitStage extends Stage {
         totalCharacters: totalChars,
         characterLimit: this.limit,
         truncatedFiles,
-        skippedFiles
-      }
+        skippedFiles,
+      },
     };
   }
 }
 
-module.exports = CharLimitStage;
+export default CharLimitStage;

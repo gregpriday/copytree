@@ -2,7 +2,7 @@
 // This file sets up mocks that need to be available before any modules are loaded
 
 // Mock ConfigManager
-jest.mock('../src/config/ConfigManager', () => {
+jest.mock('../src/config/ConfigManager.js', () => {
   const mockConfigData = {
     copytree: {
       maxFileSize: 10 * 1024 * 1024,
@@ -155,12 +155,12 @@ const createMockLogger = () => {
 
 const mockLogger = createMockLogger();
 
-jest.mock('../src/utils/logger', () => ({
+jest.mock('../src/utils/logger.js', () => ({
   logger: mockLogger
 }));
 
 // Mock AIService to prevent API key validation at load time
-jest.mock('../src/services/AIService', () => {
+jest.mock('../src/services/AIService.js', () => {
   return {
     summarizeFile: jest.fn().mockResolvedValue('Mocked file summary'),
     describeImage: jest.fn().mockResolvedValue('Mocked image description'),

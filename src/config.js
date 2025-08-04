@@ -1,7 +1,10 @@
-const path = require('path');
-const os = require('os');
+import path from 'path';
+import os from 'os';
+import { fileURLToPath } from 'url';
 
-module.exports = {
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default {
   defaultExclusions: [
     'node_modules',
     '.git',
@@ -21,7 +24,7 @@ module.exports = {
     '*.log',
     '*.lock',
     '.DS_Store',
-    'Thumbs.db'
+    'Thumbs.db',
   ],
   
   supportedTransformers: {
@@ -32,7 +35,7 @@ module.exports = {
     '.gif': 'image',
     '.bmp': 'image',
     '.md': 'markdown',
-    '.mdx': 'markdown'
+    '.mdx': 'markdown',
   },
   
   maxFileSize: process.env.MAX_FILE_SIZE ? parseInt(process.env.MAX_FILE_SIZE) : 10 * 1024 * 1024, // 10MB default
@@ -53,5 +56,5 @@ module.exports = {
   
   getCacheDir() {
     return path.join(this.configDir, 'cache');
-  }
+  },
 };

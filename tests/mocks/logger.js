@@ -6,9 +6,9 @@ const createMockLogger = () => ({
   debug: jest.fn(),
   verbose: jest.fn(),
   silly: jest.fn(),
-  child: jest.fn(function() { return this; })
+  child: jest.fn(() => createMockLogger())
 });
 
 const logger = createMockLogger();
 
-module.exports = { logger };
+export { logger };

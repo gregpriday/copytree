@@ -1,6 +1,6 @@
-const BaseTransformer = require('../BaseTransformer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const path = require('path');
+import BaseTransformer from '../BaseTransformer.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import path from 'path';
 
 /**
  * Unit test summary transformer using Gemini API
@@ -19,7 +19,7 @@ class UnitTestSummaryTransformer extends BaseTransformer {
       '**/test_*.py',
       '**/*Test.java',
       '**/*Spec.rb',
-      '**/*.test.php'
+      '**/*.test.php',
     ];
     this.maxFileSize = options.maxFileSize || 100 * 1024; // 100KB default
     this.apiKey = options.apiKey || process.env.GEMINI_API_KEY;
@@ -29,7 +29,7 @@ class UnitTestSummaryTransformer extends BaseTransformer {
     } else {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       this.model = this.genAI.getGenerativeModel({ 
-        model: options.model || this.config.get('ai.gemini.model')
+        model: options.model || this.config.get('ai.gemini.model'),
       });
     }
     
@@ -63,10 +63,10 @@ class UnitTestSummaryTransformer extends BaseTransformer {
       /^test_.*\.py$/,
       /Test\.(java|cs|php)$/,
       /Spec\.(rb|scala)$/,
-      /test\.go$/
+      /test\.go$/,
     ];
     
-    return patterns.some(pattern => pattern.test(filename));
+    return patterns.some((pattern) => pattern.test(filename));
   }
 
   /**
@@ -118,13 +118,13 @@ Keep the summary concise (3-5 sentences plus bullet points for scenarios).`;
           ...testInfo,
           originalSize: content.length,
           truncated: content.length > maxLength,
-          model: this.model.model
-        }
+          model: this.model.model,
+        },
       };
     } catch (error) {
       this.logger.error('Failed to generate test summary', {
         file: file.path,
-        error: error.message
+        error: error.message,
       });
 
       // Return basic test info on error
@@ -136,8 +136,8 @@ Keep the summary concise (3-5 sentences plus bullet points for scenarios).`;
         transformedBy: this.constructor.name,
         metadata: {
           ...testInfo,
-          error: error.message
-        }
+          error: error.message,
+        },
       };
     }
   }
@@ -151,7 +151,7 @@ Keep the summary concise (3-5 sentences plus bullet points for scenarios).`;
       testCount: 0,
       describeBlocks: 0,
       hasSetup: false,
-      hasTeardown: false
+      hasTeardown: false,
     };
 
     // Detect testing framework
@@ -177,7 +177,7 @@ Keep the summary concise (3-5 sentences plus bullet points for scenarios).`;
       /\btest\(/g,
       /\bdef test_/g,
       /@Test/g,
-      /\bscenario\(/g
+      /\bscenario\(/g,
     ];
 
     for (const pattern of testPatterns) {
@@ -240,4 +240,4 @@ Keep the summary concise (3-5 sentences plus bullet points for scenarios).`;
   }
 }
 
-module.exports = UnitTestSummaryTransformer;
+export default UnitTestSummaryTransformer;

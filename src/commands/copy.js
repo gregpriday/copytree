@@ -1,14 +1,13 @@
-const Pipeline = require('../pipeline/Pipeline');
-const ProfileLoader = require('../profiles/ProfileLoader');
-const FileDiscovery = require('../utils/FileDiscovery');
-const TransformerRegistry = require('../transforms/TransformerRegistry');
-const { logger } = require('../utils/logger');
-const { CommandError, handleError } = require('../utils/errors');
-const { config } = require('../config/ConfigManager');
-const Clipboard = require('../utils/clipboard');
-const fs = require('fs-extra');
-const path = require('path');
-const GitHubUrlHandler = require('../services/GitHubUrlHandler');
+import Pipeline from '../pipeline/Pipeline.js';
+import ProfileLoader from '../profiles/ProfileLoader.js';
+import TransformerRegistry from '../transforms/TransformerRegistry.js';
+import { logger } from '../utils/logger.js';
+import { CommandError, handleError } from '../utils/errors.js';
+import { config } from '../config/ConfigManager.js';
+import Clipboard from '../utils/clipboard.js';
+import fs from 'fs-extra';
+import path from 'path';
+import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
 
 /**
  * Main copy command implementation
@@ -47,7 +46,7 @@ async function copyCommand(targetPath = '.', options = {}) {
     // 4. Initialize pipeline with stages
     const pipeline = new Pipeline({
       continueOnError: true,
-      emitProgress: true
+      emitProgress: true,
     });
     
     // Setup pipeline stages
@@ -59,7 +58,7 @@ async function copyCommand(targetPath = '.', options = {}) {
       basePath,
       profile,
       options,
-      startTime
+      startTime,
     });
     
     // 6. Prepare output
@@ -90,7 +89,7 @@ async function copyCommand(targetPath = '.', options = {}) {
     logger.stopSpinner();
     handleError(error, {
       exit: true,
-      verbose: options.verbose || config().get('app.verboseErrors', false)
+      verbose: options.verbose || config().get('app.verboseErrors', false),
     });
   }
 }
@@ -117,7 +116,7 @@ async function loadProfile(profileLoader, profileName, options) {
     overrides.transformers = overrides.transformers || {};
     overrides.transformers.binary = {
       enabled: true,
-      options: { action: 'include' }
+      options: { action: 'include' },
     };
   }
   
@@ -125,7 +124,7 @@ async function loadProfile(profileLoader, profileName, options) {
   let profile;
   try {
     profile = await profileLoader.load(profileName, overrides);
-  } catch (error) {
+  } catch (_error) {
     // Fallback to default profile
     logger.warn(`Failed to load profile '${profileName}', using default`);
     profile = ProfileLoader.createDefault();
@@ -141,7 +140,7 @@ async function setupPipelineStages(basePath, profile, options) {
   const stages = [];
   
   // 1. File Discovery Stage
-  const FileDiscoveryStage = require('../pipeline/stages/FileDiscoveryStage');
+  const { default: FileDiscoveryStage } = await import('../pipeline/stages/FileDiscoveryStage.js');
   stages.push(new FileDiscoveryStage({
     basePath,
     patterns: profile.include || ['**/*'],
@@ -150,76 +149,76 @@ async function setupPipelineStages(basePath, profile, options) {
     followSymlinks: profile.options?.followSymlinks ?? false,
     maxFileSize: profile.options?.maxFileSize,
     maxTotalSize: profile.options?.maxTotalSize,
-    maxFileCount: profile.options?.maxFileCount
+    maxFileCount: profile.options?.maxFileCount,
   }));
   
   // 2. Git Filter Stage (if --modified or --changed is used)
   if (options.modified || options.changed) {
-    const GitFilterStage = require('../pipeline/stages/GitFilterStage');
+    const { default: GitFilterStage } = await import('../pipeline/stages/GitFilterStage.js');
     stages.push(new GitFilterStage({
       basePath,
       modified: options.modified,
       changed: options.changed,
-      withGitStatus: options.withGitStatus
+      withGitStatus: options.withGitStatus,
     }));
   }
   
   // 3. Profile Filter Stage (applies exclude patterns)
-  const ProfileFilterStage = require('../pipeline/stages/ProfileFilterStage');
+  const { default: ProfileFilterStage } = await import('../pipeline/stages/ProfileFilterStage.js');
   stages.push(new ProfileFilterStage({
     exclude: profile.exclude || [],
-    filter: profile.filter || []
+    filter: profile.filter || [],
   }));
   
   // 4. Always Include Stage (if --always option is used)
   if (options.always) {
-    const AlwaysIncludeStage = require('../pipeline/stages/AlwaysIncludeStage');
+    const { default: AlwaysIncludeStage } = await import('../pipeline/stages/AlwaysIncludeStage.js');
     stages.push(new AlwaysIncludeStage({
-      patterns: Array.isArray(options.always) ? options.always : [options.always]
+      patterns: Array.isArray(options.always) ? options.always : [options.always],
     }));
   }
   
   // 5. External Source Stage (if external sources are configured)
   if (profile.external && profile.external.length > 0) {
-    const ExternalSourceStage = require('../pipeline/stages/ExternalSourceStage');
+    const { default: ExternalSourceStage } = await import('../pipeline/stages/ExternalSourceStage.js');
     stages.push(new ExternalSourceStage(profile.external));
   }
   
   // 6. Limit Stage (if --head option is used)
   if (options.head) {
-    const LimitStage = require('../pipeline/stages/LimitStage');
+    const { default: LimitStage } = await import('../pipeline/stages/LimitStage.js');
     stages.push(new LimitStage({
-      limit: parseInt(options.head)
+      limit: parseInt(options.head),
     }));
   }
   
   // 7. File Loading Stage (skip if --only-tree)
   if (!options.onlyTree) {
-    const FileLoadingStage = require('../pipeline/stages/FileLoadingStage');
+    const { default: FileLoadingStage } = await import('../pipeline/stages/FileLoadingStage.js');
     stages.push(new FileLoadingStage({
-      encoding: 'utf8'
+      encoding: 'utf8',
     }));
     
     // 8. Transformer Stage
-    const TransformStage = require('../pipeline/stages/TransformStage');
-    const registry = TransformerRegistry.createDefault();
+    const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
+    const registry = await TransformerRegistry.createDefault();
     stages.push(new TransformStage({
       registry,
       transformers: profile.transformers || {},
-      noCache: options.noCache
+      noCache: options.noCache,
     }));
   }
   
   // 9. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
-    const CharLimitStage = require('../pipeline/stages/CharLimitStage');
+    const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(new CharLimitStage({
-      limit: parseInt(options.charLimit)
+      limit: parseInt(options.charLimit),
     }));
   }
   
   // 10. Instructions Stage (load instructions unless disabled)
-  const InstructionsStage = require('../pipeline/stages/InstructionsStage');
+  const { default: InstructionsStage } = await import('../pipeline/stages/InstructionsStage.js');
   stages.push(new InstructionsStage());
   
   // 11. Output Formatting Stage
@@ -228,29 +227,29 @@ async function setupPipelineStages(basePath, profile, options) {
   
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
-    const StreamingOutputStage = require('../pipeline/stages/StreamingOutputStage');
-    const fs = require('fs');
+    const { default: StreamingOutputStage } = await import('../pipeline/stages/StreamingOutputStage.js');
+    const fsSync = await import('fs');
     
     let outputStream = process.stdout;
     if (options.output) {
-      outputStream = fs.createWriteStream(options.output);
+      outputStream = fsSync.createWriteStream(options.output);
     }
     
     stages.push(new StreamingOutputStage({
       format: outputFormat,
       addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
       prettyPrint: profile.output?.prettyPrint ?? true,
-      outputStream
+      outputStream,
     }));
   } else {
-    const OutputFormattingStage = require('../pipeline/stages/OutputFormattingStage');
+    const { default: OutputFormattingStage } = await import('../pipeline/stages/OutputFormattingStage.js');
     stages.push(new OutputFormattingStage({
       format: outputFormat,
       addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
       prettyPrint: profile.output?.prettyPrint ?? true,
       includeMetadata: profile.output?.includeMetadata ?? true,
       showSize: options.showSize,
-      onlyTree: options.onlyTree
+      onlyTree: options.onlyTree,
     }));
   }
   
@@ -271,7 +270,7 @@ async function prepareOutput(result, options) {
       type: 'streamed',
       fileCount,
       totalSize,
-      outputPath: options.output
+      outputPath: options.output,
     };
   }
   
@@ -289,7 +288,7 @@ async function prepareOutput(result, options) {
     type: 'normal',
     output,
     outputSize,
-    fileCount
+    fileCount,
   };
 }
 
@@ -312,13 +311,14 @@ async function displayOutput(outputResult, options) {
   if (options.asReference) {
     const format = options.format || 'xml';
     const extension = format === 'json' ? 'json' : 'xml';
-    const tempFile = path.join(require('os').tmpdir(), `copytree-${Date.now()}.${extension}`);
+    const os = await import('os');
+    const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
     await fs.writeFile(tempFile, output, 'utf8');
     
     try {
       await Clipboard.copyFileReference(tempFile);
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${path.basename(tempFile)}`);
-    } catch (error) {
+    } catch (_error) {
       logger.warn('Failed to copy reference to clipboard');
       logger.info(`Output saved to: ${tempFile}`);
       logger.info(`${fileCount} files [${logger.formatBytes(outputSize)}]`);
@@ -351,11 +351,12 @@ async function displayOutput(outputResult, options) {
     try {
       await Clipboard.copyText(output);
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
-    } catch (error) {
+    } catch (_error) {
       // If clipboard fails, save to temporary file
       const format = options.format || 'xml';
       const extension = format === 'json' ? 'json' : 'xml';
-      const tempFile = path.join(require('os').tmpdir(), `copytree-${Date.now()}.${extension}`);
+      const os = await import('os');
+      const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, output, 'utf8');
       logger.warn(`Failed to copy to clipboard. Output saved to: ${tempFile}`);
       logger.info(`${fileCount} files [${logger.formatBytes(outputSize)}]`);
@@ -392,4 +393,4 @@ function showSummary(result, startTime) {
   }
 }
 
-module.exports = copyCommand;
+export default copyCommand;

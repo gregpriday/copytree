@@ -1,17 +1,33 @@
 // Unmock fs-extra for integration tests
 jest.unmock('fs-extra');
 
-const Pipeline = require('../../src/pipeline/Pipeline');
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
-const FileDiscoveryStage = require('../../src/pipeline/stages/FileDiscoveryStage');
-const ProfileFilterStage = require('../../src/pipeline/stages/ProfileFilterStage');
-const FileLoadingStage = require('../../src/pipeline/stages/FileLoadingStage');
-const OutputFormattingStage = require('../../src/pipeline/stages/OutputFormattingStage');
-const LimitStage = require('../../src/pipeline/stages/LimitStage');
-const CharLimitStage = require('../../src/pipeline/stages/CharLimitStage');
-const InstructionsStage = require('../../src/pipeline/stages/InstructionsStage');
+// Static imports for Node.js modules
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+
+// Use dynamic imports for modules under test
+let Pipeline, FileDiscoveryStage, ProfileFilterStage, FileLoadingStage, OutputFormattingStage, LimitStage, CharLimitStage, InstructionsStage;
+
+beforeAll(async () => {
+  const pipelineModule = await import('../../src/pipeline/Pipeline.js');
+  const fileDiscoveryStageModule = await import('../../src/pipeline/stages/FileDiscoveryStage.js');
+  const profileFilterStageModule = await import('../../src/pipeline/stages/ProfileFilterStage.js');
+  const fileLoadingStageModule = await import('../../src/pipeline/stages/FileLoadingStage.js');
+  const outputFormattingStageModule = await import('../../src/pipeline/stages/OutputFormattingStage.js');
+  const limitStageModule = await import('../../src/pipeline/stages/LimitStage.js');
+  const charLimitStageModule = await import('../../src/pipeline/stages/CharLimitStage.js');
+  const instructionsStageModule = await import('../../src/pipeline/stages/InstructionsStage.js');
+  
+  Pipeline = pipelineModule.default;
+  FileDiscoveryStage = fileDiscoveryStageModule.default;
+  ProfileFilterStage = profileFilterStageModule.default;
+  FileLoadingStage = fileLoadingStageModule.default;
+  OutputFormattingStage = outputFormattingStageModule.default;
+  LimitStage = limitStageModule.default;
+  CharLimitStage = charLimitStageModule.default;
+  InstructionsStage = instructionsStageModule.default;
+});
 
 describe('Pipeline Integration Tests', () => {
   let tempDir;

@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const fs = require('fs-extra');
+import BaseTransformer from '../BaseTransformer.js';
+import fs from 'fs-extra';
 
 /**
  * CSV transformer
@@ -27,7 +27,7 @@ class CSVTransformer extends BaseTransformer {
         ...file,
         content: content || '',
         transformed: false,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     }
 
@@ -44,8 +44,8 @@ class CSVTransformer extends BaseTransformer {
           totalRows: transformed.totalRows,
           displayedRows: transformed.displayedRows,
           columns: transformed.columns,
-          delimiter: transformed.delimiter
-        }
+          delimiter: transformed.delimiter,
+        },
       };
     } catch (error) {
       this.logger.warn(`Failed to parse CSV ${file.path}: ${error.message}`);
@@ -59,7 +59,7 @@ class CSVTransformer extends BaseTransformer {
         originalContent: content,
         transformed: true,
         transformedBy: this.constructor.name,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -71,7 +71,7 @@ class CSVTransformer extends BaseTransformer {
    * @returns {Object} Transformed content and metadata
    */
   transformCSV(content, filePath = '') {
-    const lines = content.split('\n').filter(line => line.trim());
+    const lines = content.split('\n').filter((line) => line.trim());
     
     if (lines.length === 0) {
       return {
@@ -79,7 +79,7 @@ class CSVTransformer extends BaseTransformer {
         totalRows: 0,
         displayedRows: 0,
         columns: 0,
-        delimiter: null
+        delimiter: null,
       };
     }
 
@@ -87,19 +87,19 @@ class CSVTransformer extends BaseTransformer {
     const delimiter = this.detectDelimiter(lines[0], filePath);
     
     // Parse rows
-    const rows = lines.map(line => this.parseCSVLine(line, delimiter));
+    const rows = lines.map((line) => this.parseCSVLine(line, delimiter));
     const totalRows = rows.length;
     const displayRows = rows.slice(0, this.maxRows + 1); // +1 for header
     
     // Format as table
     const columnWidths = this.calculateColumnWidths(displayRows);
     const formattedRows = displayRows.map((row, index) => 
-      this.formatRow(row, columnWidths, index === 0)
+      this.formatRow(row, columnWidths, index === 0),
     );
 
     // Add separator after header
     if (formattedRows.length > 1) {
-      const separator = columnWidths.map(width => '-'.repeat(width)).join('-+-');
+      const separator = columnWidths.map((width) => '-'.repeat(width)).join('-+-');
       formattedRows.splice(1, 0, separator);
     }
 
@@ -114,7 +114,7 @@ class CSVTransformer extends BaseTransformer {
       totalRows: totalRows - 1, // Exclude header
       displayedRows: Math.min(this.maxRows, totalRows - 1),
       columns: rows[0]?.length || 0,
-      delimiter
+      delimiter,
     };
   }
 
@@ -134,9 +134,9 @@ class CSVTransformer extends BaseTransformer {
 
     // Count occurrences of common delimiters
     const delimiters = [',', '\t', ';', '|'];
-    const counts = delimiters.map(delim => ({
+    const counts = delimiters.map((delim) => ({
       delimiter: delim,
-      count: (firstLine.match(new RegExp(delim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length
+      count: (firstLine.match(new RegExp(delim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length,
     }));
 
     // Return delimiter with highest count
@@ -186,17 +186,17 @@ class CSVTransformer extends BaseTransformer {
   calculateColumnWidths(rows) {
     if (rows.length === 0) return [];
     
-    const columnCount = Math.max(...rows.map(row => row.length));
+    const columnCount = Math.max(...rows.map((row) => row.length));
     const widths = new Array(columnCount).fill(0);
     
-    rows.forEach(row => {
+    rows.forEach((row) => {
       row.forEach((cell, index) => {
         widths[index] = Math.max(widths[index], cell.length);
       });
     });
     
     // Cap maximum width
-    return widths.map(width => Math.min(width, 30));
+    return widths.map((width) => Math.min(width, 30));
   }
 
   /**
@@ -222,4 +222,4 @@ class CSVTransformer extends BaseTransformer {
   }
 }
 
-module.exports = CSVTransformer;
+export default CSVTransformer;

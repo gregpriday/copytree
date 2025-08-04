@@ -1,5 +1,5 @@
-const BaseTransformer = require('../BaseTransformer');
-const marked = require('marked');
+import BaseTransformer from '../BaseTransformer.js';
+import marked from 'marked';
 
 /**
  * Markdown transformer
@@ -18,7 +18,7 @@ class MarkdownTransformer extends BaseTransformer {
     let content = file.content;
     
     if (content === undefined && file.absolutePath) {
-      const fs = require('fs-extra');
+      const fs = await import('fs-extra');
       content = await fs.readFile(file.absolutePath, 'utf8');
     }
 
@@ -27,20 +27,20 @@ class MarkdownTransformer extends BaseTransformer {
         ...file,
         content: content || '',
         transformed: false,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     }
 
     let transformedContent;
     
     switch (this.mode) {
-      case 'html':
-        transformedContent = this.convertToHtml(content);
-        break;
-      case 'strip':
-      default:
-        transformedContent = this.stripMarkdown(content);
-        break;
+    case 'html':
+      transformedContent = this.convertToHtml(content);
+      break;
+    case 'strip':
+    default:
+      transformedContent = this.stripMarkdown(content);
+      break;
     }
 
     return {
@@ -49,7 +49,7 @@ class MarkdownTransformer extends BaseTransformer {
       originalContent: content,
       transformed: true,
       transformedBy: this.constructor.name,
-      transformMode: this.mode
+      transformMode: this.mode,
     };
   }
 
@@ -107,7 +107,7 @@ class MarkdownTransformer extends BaseTransformer {
     return marked.parse(content, {
       gfm: true,
       breaks: true,
-      sanitize: false
+      sanitize: false,
     });
   }
 
@@ -117,4 +117,4 @@ class MarkdownTransformer extends BaseTransformer {
   }
 }
 
-module.exports = MarkdownTransformer;
+export default MarkdownTransformer;

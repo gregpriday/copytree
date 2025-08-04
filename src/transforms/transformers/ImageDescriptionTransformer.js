@@ -1,7 +1,7 @@
-const BaseTransformer = require('../BaseTransformer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const path = require('path');
-const fs = require('fs-extra');
+import BaseTransformer from '../BaseTransformer.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import path from 'path';
+import fs from 'fs-extra';
 
 /**
  * Image description transformer using Gemini Vision API
@@ -20,7 +20,7 @@ class ImageDescriptionTransformer extends BaseTransformer {
     } else {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       this.model = this.genAI.getGenerativeModel({ 
-        model: options.model || this.config.get('ai.gemini.model')
+        model: options.model || this.config.get('ai.gemini.model'),
       });
     }
     
@@ -49,8 +49,8 @@ class ImageDescriptionTransformer extends BaseTransformer {
         transformedBy: this.constructor.name,
         metadata: {
           originalSize: size,
-          skippedReason: 'size_limit_exceeded'
-        }
+          skippedReason: 'size_limit_exceeded',
+        },
       };
     }
 
@@ -83,9 +83,9 @@ Keep the description concise but informative (2-3 paragraphs).`;
         {
           inlineData: {
             mimeType: mimeType,
-            data: base64Image
-          }
-        }
+            data: base64Image,
+          },
+        },
       ]);
 
       const description = result.response.text();
@@ -98,13 +98,13 @@ Keep the description concise but informative (2-3 paragraphs).`;
         metadata: {
           originalSize: size,
           mimeType: mimeType,
-          model: this.model.model
-        }
+          model: this.model.model,
+        },
       };
     } catch (error) {
       this.logger.error('Failed to generate image description', {
         file: file.path,
-        error: error.message
+        error: error.message,
       });
 
       // Return placeholder on error
@@ -115,8 +115,8 @@ Keep the description concise but informative (2-3 paragraphs).`;
         transformedBy: this.constructor.name,
         metadata: {
           originalSize: size,
-          error: error.message
-        }
+          error: error.message,
+        },
       };
     }
   }
@@ -132,7 +132,7 @@ Keep the description concise but informative (2-3 paragraphs).`;
       '.png': 'image/png',
       '.gif': 'image/gif',
       '.webp': 'image/webp',
-      '.bmp': 'image/bmp'
+      '.bmp': 'image/bmp',
     };
     return mimeTypes[ext] || 'image/jpeg';
   }
@@ -153,4 +153,4 @@ ${description}
   }
 }
 
-module.exports = ImageDescriptionTransformer;
+export default ImageDescriptionTransformer;

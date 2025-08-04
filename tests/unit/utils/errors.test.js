@@ -1,15 +1,21 @@
-const {
-  CopyTreeError,
-  CommandError,
-  ConfigurationError,
-  FileSystemError,
-  ProfileError,
-  TransformError,
-  AIProviderError,
-  GitError,
-  ValidationError,
-  PipelineError
-} = require('../../../src/utils/errors');
+// Use dynamic import for module under test
+let CopyTreeError, CommandError, ConfigurationError, FileSystemError, ProfileError, TransformError, AIProviderError, GitError, ValidationError, PipelineError;
+
+beforeAll(async () => {
+  const errorsModule = await import('../../../src/utils/errors.js');
+  ({
+    CopyTreeError,
+    CommandError,
+    ConfigurationError,
+    FileSystemError,
+    ProfileError,
+    TransformError,
+    AIProviderError,
+    GitError,
+    ValidationError,
+    PipelineError
+  } = errorsModule);
+});
 
 describe('Error Classes', () => {
   describe('CopyTreeError', () => {

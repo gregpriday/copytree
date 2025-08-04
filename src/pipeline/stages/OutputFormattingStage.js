@@ -1,7 +1,5 @@
-const Stage = require('../Stage');
-const { create } = require('xmlbuilder2');
-const path = require('path');
-const fs = require('fs-extra');
+import Stage from '../Stage.js';
+import path from 'path';
 
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
@@ -19,17 +17,17 @@ class OutputFormattingStage extends Stage {
     let output;
     
     switch (this.format) {
-      case 'xml':
-        output = await this.formatAsXML(input);
-        break;
-      case 'json':
-        output = this.formatAsJSON(input);
-        break;
-      case 'tree':
-        output = this.formatAsTree(input);
-        break;
-      default:
-        throw new Error(`Unknown output format: ${this.format}`);
+    case 'xml':
+      output = await this.formatAsXML(input);
+      break;
+    case 'json':
+      output = this.formatAsJSON(input);
+      break;
+    case 'tree':
+      output = this.formatAsTree(input);
+      break;
+    default:
+      throw new Error(`Unknown output format: ${this.format}`);
     }
 
     this.log(`Formatted output in ${this.getElapsedTime(startTime)}`, 'info');
@@ -38,7 +36,7 @@ class OutputFormattingStage extends Stage {
       ...input,
       output,
       outputFormat: this.format,
-      outputSize: Buffer.byteLength(output, 'utf8')
+      outputSize: Buffer.byteLength(output, 'utf8'),
     };
   }
 
@@ -102,7 +100,7 @@ class OutputFormattingStage extends Stage {
       }
       
       if (file.isBinary) {
-        xml += ` binary="true"`;
+        xml += ' binary="true"';
         if (file.encoding) {
           xml += ` encoding="${file.encoding}"`;
         }
@@ -145,16 +143,16 @@ class OutputFormattingStage extends Stage {
         profile: input.profile?.name || 'default',
         directoryStructure: this.generateDirectoryStructure(input.files),
         ...(input.instructions && { 
-          instructions: input.instructions
-        })
+          instructions: input.instructions,
+        }),
       },
-      files: input.files.filter(f => f !== null).map(file => {
+      files: input.files.filter((f) => f !== null).map((file) => {
         const fileObj = {
           path: file.path,
           size: file.size,
           modified: file.modified,
           isBinary: file.isBinary,
-          encoding: file.encoding
+          encoding: file.encoding,
         };
         
         // Add content unless --only-tree is set
@@ -165,7 +163,7 @@ class OutputFormattingStage extends Stage {
         }
         
         return fileObj;
-      })
+      }),
     };
 
     const prettyPrint = this.config.get('app.prettyPrint', true);
@@ -174,8 +172,9 @@ class OutputFormattingStage extends Stage {
 
   formatAsTree(input) {
     const lines = [];
-    const indent = this.config.get('copytree.treeIndent', '  ');
-    const connectors = this.config.get('copytree.treeConnectors');
+    // Tree formatting options (currently using defaults)
+    // const indent = this.config.get('copytree.treeIndent', '  ');
+    // const connectors = this.config.get('copytree.treeConnectors');
     
     lines.push(input.basePath);
     lines.push('');
@@ -210,7 +209,7 @@ class OutputFormattingStage extends Stage {
           current[part] = {
             isFile: true,
             size: file.size,
-            content: file.content
+            content: file.content,
           };
         } else {
           // It's a directory
@@ -225,7 +224,7 @@ class OutputFormattingStage extends Stage {
     return tree;
   }
 
-  renderTree(node, lines, prefix, isLast) {
+  renderTree(node, lines, prefix, _isLast) {
     const entries = Object.entries(node).sort(([a], [b]) => {
       // Directories first, then files
       const aIsFile = node[a].isFile;
@@ -275,7 +274,7 @@ class OutputFormattingStage extends Stage {
   }
 
   generateDirectoryStructure(files) {
-    const validFiles = files.filter(f => f !== null);
+    const validFiles = files.filter((f) => f !== null);
     if (validFiles.length === 0) return '';
     
     // Build tree structure
@@ -288,7 +287,7 @@ class OutputFormattingStage extends Stage {
     return lines.join('\n');
   }
   
-  renderDirectoryTree(node, lines, prefix, isRoot) {
+  renderDirectoryTree(node, lines, prefix, _isRoot) {
     const entries = Object.entries(node).sort(([a], [b]) => {
       // Directories first, then files
       const aIsFile = node[a].isFile;
@@ -315,4 +314,4 @@ class OutputFormattingStage extends Stage {
   }
 }
 
-module.exports = OutputFormattingStage;
+export default OutputFormattingStage;

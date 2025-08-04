@@ -1,7 +1,7 @@
-const Stage = require('../Stage');
-const path = require('path');
-const fs = require('fs-extra');
-const { logger } = require('../../utils/logger');
+import Stage from '../Stage.js';
+import path from 'path';
+import fs from 'fs-extra';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Composer stage - Include PHP package instruction files from vendor directory
@@ -25,7 +25,7 @@ class ComposerStage extends Stage {
     }
     
     // Find composer.json in the files
-    const composerJson = files.find(f => f.name === 'composer.json' && f.relativePath === 'composer.json');
+    const composerJson = files.find((f) => f.name === 'composer.json' && f.relativePath === 'composer.json');
     
     if (!composerJson) {
       this.log('No composer.json found, skipping composer stage', 'debug');
@@ -59,18 +59,18 @@ class ComposerStage extends Stage {
               stats: await fs.stat(fullPath),
               isComposerInstruction: true,
               package: packageName,
-              type: 'text'
+              type: 'text',
             });
             
             logger.debug('Found composer package instruction file', {
               package: packageName,
-              path: instructionPath
+              path: instructionPath,
             });
           } catch (error) {
             logger.warn('Failed to read composer instruction file', {
               package: packageName,
               path: instructionPath,
-              error: error.message
+              error: error.message,
             });
           }
         }
@@ -86,14 +86,14 @@ class ComposerStage extends Stage {
       
     } catch (error) {
       logger.error('Failed to process composer.json', {
-        error: error.message
+        error: error.message,
       });
       // Don't fail the pipeline for composer errors
     }
     
     return {
       ...input,
-      files: [...files, ...instructionFiles]
+      files: [...files, ...instructionFiles],
     };
   }
 
@@ -105,7 +105,7 @@ class ComposerStage extends Stage {
     
     // Get packages from require
     if (composerData.require && typeof composerData.require === 'object') {
-      Object.keys(composerData.require).forEach(packageName => {
+      Object.keys(composerData.require).forEach((packageName) => {
         // Skip PHP version and extensions
         if (!packageName.startsWith('php') && !packageName.startsWith('ext-')) {
           packages.push(packageName);
@@ -115,7 +115,7 @@ class ComposerStage extends Stage {
     
     // Get packages from require-dev
     if (composerData['require-dev'] && typeof composerData['require-dev'] === 'object') {
-      Object.keys(composerData['require-dev']).forEach(packageName => {
+      Object.keys(composerData['require-dev']).forEach((packageName) => {
         if (!packages.includes(packageName)) {
           packages.push(packageName);
         }
@@ -141,4 +141,4 @@ class ComposerStage extends Stage {
   }
 }
 
-module.exports = ComposerStage;
+export default ComposerStage;

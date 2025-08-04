@@ -1,7 +1,7 @@
-const { env } = require('../src/config/ConfigManager');
-const appConfig = require('../src/config');
+import { env } from '../src/config/ConfigManager.js';
+import appConfig from '../src/config.js';
 
-module.exports = {
+export default {
   // Cache driver
   driver: env('CACHE_DRIVER', 'file'), // file, memory, redis
   

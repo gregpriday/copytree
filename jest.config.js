@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   testEnvironment: 'node',
   
   // Test file patterns
@@ -31,12 +31,12 @@ module.exports = {
     }
   },
   
-  // Module paths
+  // Module paths - keep mocks for ESM
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '^.*/config/ConfigManager$': '<rootDir>/tests/mocks/ConfigManager.js',
-    '^.*/utils/logger$': '<rootDir>/tests/mocks/logger.js',
-    '^.*/config$': '<rootDir>/tests/mocks/config.js'
+    '^@/(.*)$': '<rootDir>/src/$1.js',
+    '^.*/config/ConfigManager\\.js$': '<rootDir>/tests/mocks/ConfigManager.js',
+    '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
+    '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js'
   },
   
   // Module directories
@@ -46,7 +46,7 @@ module.exports = {
   setupFiles: ['<rootDir>/tests/setup-mocks.js'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   
-  // Transform files
+  // Transform files for ESM
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest'
   },

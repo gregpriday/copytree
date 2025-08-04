@@ -1,5 +1,5 @@
-const Stage = require('../Stage');
-const { minimatch } = require('minimatch');
+import Stage from '../Stage.js';
+import { minimatch } from 'minimatch';
 
 class ProfileFilterStage extends Stage {
   constructor(options = {}) {
@@ -9,13 +9,13 @@ class ProfileFilterStage extends Stage {
   }
 
   async process(input) {
-    this.log(`Applying profile filters`, 'debug');
+    this.log('Applying profile filters', 'debug');
     const startTime = Date.now();
 
     const originalCount = input.files.length;
     
     // Filter files
-    const filteredFiles = input.files.filter(file => {
+    const filteredFiles = input.files.filter((file) => {
       // Check if file should be always included
       if (this.filter.length > 0) {
         let matched = false;
@@ -47,7 +47,7 @@ class ProfileFilterStage extends Stage {
     
     this.log(
       `Filtered ${excludedCount} files (${filteredFiles.length} remaining) in ${this.getElapsedTime(startTime)}`,
-      'info'
+      'info',
     );
 
     return {
@@ -55,10 +55,10 @@ class ProfileFilterStage extends Stage {
       files: filteredFiles,
       stats: {
         ...input.stats,
-        excludedByProfile: excludedCount
-      }
+        excludedByProfile: excludedCount,
+      },
     };
   }
 }
 
-module.exports = ProfileFilterStage;
+export default ProfileFilterStage;

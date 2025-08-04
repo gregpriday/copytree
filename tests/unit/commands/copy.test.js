@@ -1,23 +1,21 @@
-const copy = require('../../../src/commands/copy');
-const Pipeline = require('../../../src/pipeline/Pipeline');
-const ProfileLoader = require('../../../src/profiles/ProfileLoader');
-const ProfileGuesser = require('../../../src/profiles/ProfileGuesser');
-const AIService = require('../../../src/services/AIService');
-const fs = require('fs-extra');
-const Clipboard = require('../../../src/utils/clipboard');
-const ora = require('ora');
+// Import static dependencies
+import fs from 'fs-extra';
+import ora from 'ora';
+
+// Use dynamic imports for modules under test
+let copy, Pipeline, ProfileLoader, ProfileGuesser, AIService, Clipboard;
 
 // Mock all dependencies
-jest.mock('../../../src/pipeline/Pipeline');
-jest.mock('../../../src/profiles/ProfileLoader');
-jest.mock('../../../src/profiles/ProfileGuesser');
-jest.mock('../../../src/services/AIService');
+jest.mock('../../../src/pipeline/Pipeline.js');
+jest.mock('../../../src/profiles/ProfileLoader.js');
+jest.mock('../../../src/profiles/ProfileGuesser.js');
+jest.mock('../../../src/services/AIService.js');
 jest.mock('fs-extra');
-jest.mock('../../../src/utils/clipboard');
+jest.mock('../../../src/utils/clipboard.js');
 jest.mock('ora');
 
 // Mock logger
-jest.mock('../../../src/utils/logger', () => ({
+jest.mock('../../../src/utils/logger.js', () => ({
   logger: {
     startSpinner: jest.fn(),
     updateSpinner: jest.fn(),
@@ -32,7 +30,7 @@ jest.mock('../../../src/utils/logger', () => ({
 }));
 
 // Mock error handling to prevent process.exit
-jest.mock('../../../src/utils/errors', () => ({
+jest.mock('../../../src/utils/errors.js', () => ({
   CommandError: class CommandError extends Error {
     constructor(message, code) {
       super(message);
@@ -45,19 +43,19 @@ jest.mock('../../../src/utils/errors', () => ({
 }));
 
 // Mock stage classes
-jest.mock('../../../src/pipeline/stages/FileDiscoveryStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/ProfileFilterStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/FileLoadingStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/OutputFormattingStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/TransformStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/GitFilterStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/ExternalSourceStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/LimitStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/CharLimitStage', () => jest.fn());
-jest.mock('../../../src/pipeline/stages/StreamingOutputStage', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/FileDiscoveryStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/ProfileFilterStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/FileLoadingStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/OutputFormattingStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/TransformStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/GitFilterStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/ExternalSourceStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/LimitStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/CharLimitStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/StreamingOutputStage.js', () => jest.fn());
 
 // Mock TransformerRegistry
-jest.mock('../../../src/transforms/TransformerRegistry', () => ({
+jest.mock('../../../src/transforms/TransformerRegistry.js', () => ({
   create: jest.fn(() => ({
     register: jest.fn(),
     get: jest.fn(),
@@ -75,8 +73,27 @@ describe('copy command', () => {
   let mockSpinner;
   let consoleLogSpy;
   let consoleErrorSpy;
-  const { logger } = require('../../../src/utils/logger');
-  const { handleError } = require('../../../src/utils/errors');
+  let logger, handleError;
+  
+  beforeAll(async () => {
+    const copyModule = await import('../../../src/commands/copy.js');
+    const pipelineModule = await import('../../../src/pipeline/Pipeline.js');
+    const profileLoaderModule = await import('../../../src/profiles/ProfileLoader.js');
+    const profileGuesserModule = await import('../../../src/profiles/ProfileGuesser.js');
+    const aiServiceModule = await import('../../../src/services/AIService.js');
+    const clipboardModule = await import('../../../src/utils/clipboard.js');
+    const loggerModule = await import('../../../src/utils/logger.js');
+    const errorsModule = await import('../../../src/utils/errors.js');
+    
+    copy = copyModule.default;
+    Pipeline = pipelineModule.default;
+    ProfileLoader = profileLoaderModule.default;
+    ProfileGuesser = profileGuesserModule.default;
+    AIService = aiServiceModule.default;
+    Clipboard = clipboardModule.default;
+    logger = loggerModule.logger;
+    handleError = errorsModule.handleError;
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();

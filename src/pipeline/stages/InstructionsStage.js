@@ -1,6 +1,6 @@
-const Stage = require('../Stage');
-const InstructionsLoader = require('../../services/InstructionsLoader');
-const { config } = require('../../config/ConfigManager');
+import Stage from '../Stage.js';
+import InstructionsLoader from '../../services/InstructionsLoader.js';
+import { config } from '../../config/ConfigManager.js';
 
 /**
  * Instructions Stage - Loads and adds instructions to pipeline input
@@ -55,7 +55,7 @@ class InstructionsStage extends Stage {
       const result = {
         ...input,
         instructions: instructionsContent,
-        instructionsName: instructionsName
+        instructionsName: instructionsName,
       };
 
       this.log(`Successfully loaded instructions '${instructionsName}' in ${this.getElapsedTime(startTime)}`, 'info');
@@ -104,4 +104,4 @@ class InstructionsStage extends Stage {
   }
 }
 
-module.exports = InstructionsStage;
+export default InstructionsStage;

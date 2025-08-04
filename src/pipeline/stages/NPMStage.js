@@ -1,7 +1,7 @@
-const Stage = require('../Stage');
-const path = require('path');
-const fs = require('fs-extra');
-const { logger } = require('../../utils/logger');
+import Stage from '../Stage.js';
+import path from 'path';
+import fs from 'fs-extra';
+import { logger } from '../../utils/logger.js';
 
 /**
  * NPM stage - Include NPM package instruction files from node_modules directory
@@ -25,7 +25,7 @@ class NPMStage extends Stage {
     }
     
     // Find package.json in the files
-    const packageJson = files.find(f => f.name === 'package.json' && f.relativePath === 'package.json');
+    const packageJson = files.find((f) => f.name === 'package.json' && f.relativePath === 'package.json');
     
     if (!packageJson) {
       this.log('No package.json found, skipping NPM stage', 'debug');
@@ -59,18 +59,18 @@ class NPMStage extends Stage {
               stats: await fs.stat(fullPath),
               isNpmInstruction: true,
               package: packageName,
-              type: 'text'
+              type: 'text',
             });
             
             logger.debug('Found NPM package instruction file', {
               package: packageName,
-              path: instructionPath
+              path: instructionPath,
             });
           } catch (error) {
             logger.warn('Failed to read NPM instruction file', {
               package: packageName,
               path: instructionPath,
-              error: error.message
+              error: error.message,
             });
           }
         }
@@ -105,18 +105,18 @@ class NPMStage extends Stage {
                       stats: await fs.stat(fullPath),
                       isNpmInstruction: true,
                       package: fullPackageName,
-                      type: 'text'
+                      type: 'text',
                     });
                     
                     logger.debug('Found scoped NPM package instruction file', {
                       package: fullPackageName,
-                      path: instructionPath
+                      path: instructionPath,
                     });
                   } catch (error) {
                     logger.warn('Failed to read scoped NPM instruction file', {
                       package: fullPackageName,
                       path: instructionPath,
-                      error: error.message
+                      error: error.message,
                     });
                   }
                 }
@@ -136,14 +136,14 @@ class NPMStage extends Stage {
       
     } catch (error) {
       logger.error('Failed to process package.json', {
-        error: error.message
+        error: error.message,
       });
       // Don't fail the pipeline for NPM errors
     }
     
     return {
       ...input,
-      files: [...files, ...instructionFiles]
+      files: [...files, ...instructionFiles],
     };
   }
 
@@ -155,14 +155,14 @@ class NPMStage extends Stage {
     
     // Get packages from dependencies
     if (packageData.dependencies && typeof packageData.dependencies === 'object') {
-      Object.keys(packageData.dependencies).forEach(packageName => {
+      Object.keys(packageData.dependencies).forEach((packageName) => {
         packages.push(packageName);
       });
     }
     
     // Get packages from devDependencies
     if (packageData.devDependencies && typeof packageData.devDependencies === 'object') {
-      Object.keys(packageData.devDependencies).forEach(packageName => {
+      Object.keys(packageData.devDependencies).forEach((packageName) => {
         if (!packages.includes(packageName)) {
           packages.push(packageName);
         }
@@ -171,7 +171,7 @@ class NPMStage extends Stage {
     
     // Get packages from peerDependencies
     if (packageData.peerDependencies && typeof packageData.peerDependencies === 'object') {
-      Object.keys(packageData.peerDependencies).forEach(packageName => {
+      Object.keys(packageData.peerDependencies).forEach((packageName) => {
         if (!packages.includes(packageName)) {
           packages.push(packageName);
         }
@@ -180,7 +180,7 @@ class NPMStage extends Stage {
     
     // Get packages from optionalDependencies
     if (packageData.optionalDependencies && typeof packageData.optionalDependencies === 'object') {
-      Object.keys(packageData.optionalDependencies).forEach(packageName => {
+      Object.keys(packageData.optionalDependencies).forEach((packageName) => {
         if (!packages.includes(packageName)) {
           packages.push(packageName);
         }
@@ -206,4 +206,4 @@ class NPMStage extends Stage {
   }
 }
 
-module.exports = NPMStage;
+export default NPMStage;

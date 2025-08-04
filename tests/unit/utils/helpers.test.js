@@ -1,28 +1,34 @@
-const {
-  hash,
-  shortHash,
-  sleep,
-  retry,
-  ensureDir,
-  getTempDir,
-  cleanupTempDir,
-  isPathInside,
-  normalizePath,
-  getExtension,
-  isBinaryExtension,
-  truncate,
-  formatBytes,
-  formatDuration,
-  parseSize,
-  chunk,
-  debounce,
-  createCache,
-  escapeXml,
-  timestamp
-} = require('../../../src/utils/helpers');
+// Static import for fs-extra (mocked)
+import fs from 'fs-extra';
 
-// Import fs-extra at the top for mocking
-const fs = require('fs-extra');
+// Use dynamic import for module under test
+let hash, shortHash, sleep, retry, ensureDir, getTempDir, cleanupTempDir, isPathInside, normalizePath, getExtension, isBinaryExtension, truncate, formatBytes, formatDuration, parseSize, chunk, debounce, createCache, escapeXml, timestamp;
+
+beforeAll(async () => {
+  const helpersModule = await import('../../../src/utils/helpers.js');
+  ({
+    hash,
+    shortHash,
+    sleep,
+    retry,
+    ensureDir,
+    getTempDir,
+    cleanupTempDir,
+    isPathInside,
+    normalizePath,
+    getExtension,
+    isBinaryExtension,
+    truncate,
+    formatBytes,
+    formatDuration,
+    parseSize,
+    chunk,
+    debounce,
+    createCache,
+    escapeXml,
+    timestamp
+  } = helpersModule);
+});
 
 describe('Helper Functions', () => {
   describe('formatBytes', () => {

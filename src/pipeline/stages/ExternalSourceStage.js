@@ -1,9 +1,9 @@
-const path = require('path');
-const fs = require('fs-extra');
-const Stage = require('../Stage');
-const GitHubUrlHandler = require('../../services/GitHubUrlHandler');
-const FileLoader = require('../../utils/fileLoader');
-const { logger } = require('../../utils/logger');
+import path from 'path';
+import fs from 'fs-extra';
+import Stage from '../Stage.js';
+import GitHubUrlHandler from '../../services/GitHubUrlHandler.js';
+import FileLoader from '../../utils/fileLoader.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * External source stage - Include files from external sources (GitHub, local paths)
@@ -39,7 +39,7 @@ class ExternalSourceStage extends Stage {
       } catch (error) {
         logger.error('Failed to process external source', {
           source: item.source,
-          error: error.message
+          error: error.message,
         });
         
         if (!item.optional) {
@@ -56,7 +56,7 @@ class ExternalSourceStage extends Stage {
     // Merge external files with input files
     return {
       ...input,
-      files: [...files, ...externalFiles]
+      files: [...files, ...externalFiles],
     };
   }
 
@@ -80,7 +80,7 @@ class ExternalSourceStage extends Stage {
       
       logger.info('Processing GitHub source', {
         url: source,
-        cachePath: sourcePath
+        cachePath: sourcePath,
       });
     } else {
       // Handle local paths
@@ -95,18 +95,18 @@ class ExternalSourceStage extends Stage {
     const fileLoader = new FileLoader({
       basePath: sourcePath,
       includeHidden: false,
-      followSymlinks: false
+      followSymlinks: false,
     });
     
     // Use rules as include patterns if provided, otherwise include all
     const includePatterns = rules && rules.length > 0 ? rules : ['**/*'];
     const sourceFiles = await fileLoader.loadFiles({
       include: includePatterns,
-      exclude: ['**/.git/**', '**/node_modules/**']
+      exclude: ['**/.git/**', '**/node_modules/**'],
     });
     
     // Remap paths with destination prefix
-    const remappedFiles = sourceFiles.map(file => {
+    const remappedFiles = sourceFiles.map((file) => {
       // Get the relative path from the file object
       const relativePath = file.relativePath || file.path || '';
       const newPath = destination 
@@ -121,7 +121,7 @@ class ExternalSourceStage extends Stage {
         content: file.content, // Include the content!
         isExternal: true,
         externalSource: source,
-        externalDestination: destination
+        externalDestination: destination,
       };
     });
     
@@ -159,4 +159,4 @@ class ExternalSourceStage extends Stage {
   }
 }
 
-module.exports = ExternalSourceStage;
+export default ExternalSourceStage;

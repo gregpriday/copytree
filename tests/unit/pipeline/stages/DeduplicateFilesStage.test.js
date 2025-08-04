@@ -1,5 +1,13 @@
-const DeduplicateFilesStage = require('../../../../src/pipeline/stages/DeduplicateFilesStage');
-const crypto = require('crypto');
+// Static import for Node.js modules
+import crypto from 'crypto';
+
+// Use dynamic import for module under test
+let DeduplicateFilesStage;
+
+beforeAll(async () => {
+  const deduplicateFilesStageModule = await import('../../../../src/pipeline/stages/DeduplicateFilesStage.js');
+  DeduplicateFilesStage = deduplicateFilesStageModule.default;
+});
 
 describe('DeduplicateFilesStage', () => {
   let stage;

@@ -1,4 +1,4 @@
-const Stage = require('../Stage');
+import Stage from '../Stage.js';
 
 class LimitStage extends Stage {
   constructor(options = {}) {
@@ -24,10 +24,10 @@ class LimitStage extends Stage {
       stats: {
         ...input.stats,
         truncated: true,
-        truncatedCount
-      }
+        truncatedCount,
+      },
     };
   }
 }
 
-module.exports = LimitStage;
+export default LimitStage;

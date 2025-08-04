@@ -1,7 +1,15 @@
-const InstructionsLoader = require('../../../src/services/InstructionsLoader');
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
+// Static imports for Node.js modules
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+
+// Use dynamic import for module under test
+let InstructionsLoader;
+
+beforeAll(async () => {
+  const instructionsLoaderModule = await import('../../../src/services/InstructionsLoader.js');
+  InstructionsLoader = instructionsLoaderModule.default;
+});
 
 // Mock fs-extra
 jest.mock('fs-extra');

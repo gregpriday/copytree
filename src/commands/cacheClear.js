@@ -1,31 +1,19 @@
-const { CacheService } = require('../services/CacheService');
-const { logger } = require('../utils/logger');
-const { config } = require('../config/ConfigManager');
-const { CommandError, handleError } = require('../utils/errors');
+import { CacheService } from '../services/CacheService.js';
+import { logger } from '../utils/logger.js';
+import { config } from '../config/ConfigManager.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Clear cache command
  * (Now handled by ValidationView component)
  */
-async function clearCommand(options = {}) {
-  try {
-    // All cache clearing is now handled by the ValidationView component
-    // This function is kept for backward compatibility
-    return {
-      success: true,
-      message: 'Cache clearing handled by UI component'
-    };
-    
-  } catch (error) {
-    logger.error('Cache clear command failed', { 
-      error: error.message,
-      stack: error.stack 
-    });
-    throw new CommandError(
-      `Failed to clear cache: ${error.message}`,
-      'cache:clear'
-    );
-  }
+async function clearCommand(_options = {}) {
+  // All cache clearing is now handled by the ValidationView component
+  // This function is kept for backward compatibility
+  return {
+    success: true,
+    message: 'Cache clearing handled by UI component',
+  };
 }
 
 /**
@@ -35,8 +23,8 @@ async function clearCommand(options = {}) {
 async function showCacheStatus() {
   try {
     const cache = new CacheService();
-    const fs = require('fs-extra');
-    const path = require('path');
+    const fs = await import('fs-extra');
+    const path = await import('path');
     
     const status = {
       enabled: config().get('cache.enabled', true),
@@ -49,13 +37,13 @@ async function showCacheStatus() {
         ai: 0,
         git: 0,
         profile: 0,
-        other: 0
-      }
+        other: 0,
+      },
     };
     
     if (config().get('cache.driver') === 'file' && await fs.pathExists(cache.cachePath)) {
       const files = await fs.readdir(cache.cachePath);
-      const cacheFiles = files.filter(f => f.endsWith(cache.extension));
+      const cacheFiles = files.filter((f) => f.endsWith(cache.extension));
       
       status.entries = cacheFiles.length;
       
@@ -79,4 +67,4 @@ async function showCacheStatus() {
   }
 }
 
-module.exports = clearCommand;
+export default clearCommand;

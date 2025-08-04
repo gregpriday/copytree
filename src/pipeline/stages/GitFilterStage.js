@@ -1,6 +1,6 @@
-const Stage = require('../Stage');
-const GitUtils = require('../../utils/GitUtils');
-const path = require('path');
+import Stage from '../Stage.js';
+import GitUtils from '../../utils/GitUtils.js';
+import path from 'path';
 
 /**
  * Git filter stage - filters files based on git status
@@ -52,27 +52,27 @@ class GitFilterStage extends Stage {
 
       // Filter files if git filtering is active
       if (this.modified || this.changed) {
-        const gitFileSet = new Set(gitFiles.map(f => path.normalize(f)));
+        const gitFileSet = new Set(gitFiles.map((f) => path.normalize(f)));
         
-        filteredFiles = input.files.filter(file => {
+        filteredFiles = input.files.filter((file) => {
           const normalizedPath = path.normalize(file.path);
           return gitFileSet.has(normalizedPath) || gitFileSet.has(file.path);
         });
 
         this.log(
           `Filtered to ${filteredFiles.length} files (from ${input.files.length}) based on git status`,
-          'info'
+          'info',
         );
       }
 
       // Add git status to files if requested
       if (this.includeGitStatus) {
-        const filePaths = filteredFiles.map(f => f.path);
+        const filePaths = filteredFiles.map((f) => f.path);
         const statuses = await this.gitUtils.getFileStatuses(filePaths);
         
-        filteredFiles = filteredFiles.map(file => ({
+        filteredFiles = filteredFiles.map((file) => ({
           ...file,
-          gitStatus: statuses[file.path] || 'unknown'
+          gitStatus: statuses[file.path] || 'unknown',
         }));
       }
 
@@ -81,7 +81,7 @@ class GitFilterStage extends Stage {
         branch: await this.gitUtils.getCurrentBranch(),
         lastCommit: await this.gitUtils.getLastCommit(),
         hasUncommittedChanges: await this.gitUtils.hasUncommittedChanges(),
-        filterType: this.modified ? 'modified' : this.changed ? `changed:${this.changed}` : null
+        filterType: this.modified ? 'modified' : this.changed ? `changed:${this.changed}` : null,
       };
 
       this.log(`Git filtering completed in ${this.getElapsedTime(startTime)}`, 'info');
@@ -92,8 +92,8 @@ class GitFilterStage extends Stage {
         gitMetadata,
         stats: {
           ...input.stats,
-          gitFiltered: input.files.length - filteredFiles.length
-        }
+          gitFiltered: input.files.length - filteredFiles.length,
+        },
       };
     } catch (error) {
       this.log(`Git filtering error: ${error.message}`, 'error');
@@ -104,4 +104,4 @@ class GitFilterStage extends Stage {
   }
 }
 
-module.exports = GitFilterStage;
+export default GitFilterStage;

@@ -1,4 +1,4 @@
-const { config } = require('../config/ConfigManager');
+import { config } from '../config/ConfigManager.js';
 
 /**
  * Base class for pipeline stages
@@ -21,7 +21,7 @@ class Stage {
    * @param {*} input - Input data from previous stage
    * @returns {Promise<*>} - Processed output for next stage
    */
-  async process(input) {
+  async process(_input) {
     throw new Error(`Stage ${this.name} must implement process() method`);
   }
 
@@ -31,7 +31,7 @@ class Stage {
    * @returns {boolean} - True if valid
    * @throws {Error} - If validation fails
    */
-  validate(input) {
+  validate(_input) {
     return true;
   }
 
@@ -41,7 +41,7 @@ class Stage {
    * @param {*} input - Input that caused the error
    * @returns {*} - Recovery value or rethrows
    */
-  async handleError(error, input) {
+  async handleError(error, _input) {
     throw error;
   }
 
@@ -57,7 +57,7 @@ class Stage {
         stage: this.name,
         message,
         level,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
@@ -66,19 +66,19 @@ class Stage {
       const prefix = `[${this.name}]`;
       
       switch (level) {
-        case 'error':
-          console.error(prefix, message);
-          break;
-        case 'warn':
-          console.warn(prefix, message);
-          break;
-        case 'debug':
-          if (this.config.get('app.debug')) {
-            console.log(prefix, '[DEBUG]', message);
-          }
-          break;
-        default:
-          console.log(prefix, message);
+      case 'error':
+        console.error(prefix, message);
+        break;
+      case 'warn':
+        console.warn(prefix, message);
+        break;
+      case 'debug':
+        if (this.config.get('app.debug')) {
+          console.log(prefix, '[DEBUG]', message);
+        }
+        break;
+      default:
+        console.log(prefix, message);
       }
     }
   }
@@ -94,7 +94,7 @@ class Stage {
         stage: this.name,
         progress,
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
   }
@@ -117,7 +117,7 @@ class Stage {
         count: this.fileEventCount,
         lastFile: filePath,
         action,
-        timestamp: now
+        timestamp: now,
       });
       this.lastFileEventTime = now;
     }
@@ -156,4 +156,4 @@ class Stage {
   }
 }
 
-module.exports = Stage;
+export default Stage;

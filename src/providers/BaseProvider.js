@@ -1,6 +1,7 @@
-const { config } = require('../config/ConfigManager');
-const { logger } = require('../utils/logger');
-const { ProviderError } = require('../utils/errors');
+import crypto from 'crypto';
+import { config } from '../config/ConfigManager.js';
+import { logger } from '../utils/logger.js';
+import { ProviderError } from '../utils/errors.js';
 
 /**
  * Base class for AI provider (Gemini only)
@@ -48,14 +49,14 @@ class BaseProvider {
     if (!this.apiKey) {
       throw new ProviderError(
         'API key not found for Gemini. Set GEMINI_API_KEY environment variable.',
-        this.name
+        this.name,
       );
     }
     
     if (!this.model) {
       throw new ProviderError(
         'Default model not configured for Gemini',
-        this.name
+        this.name,
       );
     }
   }
@@ -71,7 +72,7 @@ class BaseProvider {
    * @returns {Promise<Object>} Response object
    * @abstract
    */
-  async complete(options) {
+  async complete(_options) {
     throw new Error('complete() must be implemented by subclass');
   }
 
@@ -85,7 +86,7 @@ class BaseProvider {
    * @returns {Promise<Object>} Response object
    * @abstract
    */
-  async chat(options) {
+  async chat(_options) {
     throw new Error('chat() must be implemented by subclass');
   }
 
@@ -112,7 +113,7 @@ class BaseProvider {
       throw new ProviderError(
         `Stream processing failed: ${error.message}`,
         this.name,
-        { originalError: error }
+        { originalError: error },
       );
     }
     
@@ -125,7 +126,7 @@ class BaseProvider {
    * @returns {string} Extracted content
    * @abstract
    */
-  extractContentFromChunk(chunk) {
+  extractContentFromChunk(_chunk) {
     throw new Error('extractContentFromChunk() must be implemented by subclass');
   }
 
@@ -138,7 +139,7 @@ class BaseProvider {
       name: this.name,
       model: this.model,
       maxTokens: this.maxTokens,
-      temperature: this.temperature
+      temperature: this.temperature,
     };
   }
 
@@ -148,14 +149,13 @@ class BaseProvider {
    * @returns {string} Cache key
    */
   getCacheKey(options) {
-    const crypto = require('crypto');
     const data = {
       provider: this.name,
       model: this.model,
       prompt: options.prompt || '',
       messages: options.messages || [],
       temperature: options.temperature || this.temperature,
-      maxTokens: options.maxTokens || this.maxTokens
+      maxTokens: options.maxTokens || this.maxTokens,
     };
     
     return crypto
@@ -193,7 +193,7 @@ class BaseProvider {
     throw new ProviderError(message, this.name, {
       code,
       originalError: error,
-      operation
+      operation,
     });
   }
 
@@ -216,4 +216,4 @@ class BaseProvider {
   }
 }
 
-module.exports = BaseProvider;
+export default BaseProvider;

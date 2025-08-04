@@ -1,8 +1,16 @@
 // Mock minimatch before requiring the stage
 jest.mock('minimatch', () => jest.fn());
 
-const AlwaysIncludeStage = require('../../../../src/pipeline/stages/AlwaysIncludeStage');
-const minimatch = require('minimatch');
+// Static import for mocked modules
+import minimatch from 'minimatch';
+
+// Use dynamic import for module under test
+let AlwaysIncludeStage;
+
+beforeAll(async () => {
+  const alwaysIncludeStageModule = await import('../../../../src/pipeline/stages/AlwaysIncludeStage.js');
+  AlwaysIncludeStage = alwaysIncludeStageModule.default;
+});
 
 describe('AlwaysIncludeStage', () => {
   let stage;

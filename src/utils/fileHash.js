@@ -1,5 +1,5 @@
-const crypto = require('crypto');
-const fs = require('fs-extra');
+import crypto from 'crypto';
+import fs from 'fs-extra';
 
 /**
  * Generate a hash for file content
@@ -12,7 +12,7 @@ async function hashFile(filePath, algorithm = 'sha256') {
   const stream = fs.createReadStream(filePath);
   
   return new Promise((resolve, reject) => {
-    stream.on('data', data => hash.update(data));
+    stream.on('data', (data) => hash.update(data));
     stream.on('end', () => resolve(hash.digest('hex')));
     stream.on('error', reject);
   });
@@ -41,14 +41,14 @@ function generateTransformCacheKey(file, transformerName, options = {}) {
     size: file.stats?.size || 0,
     mtime: file.stats?.mtime?.getTime() || 0,
     transformer: transformerName,
-    options: JSON.stringify(options, Object.keys(options).sort())
+    options: JSON.stringify(options, Object.keys(options).sort()),
   };
   
   return hashContent(JSON.stringify(components));
 }
 
-module.exports = {
+export {
   hashFile,
   hashContent,
-  generateTransformCacheKey
+  generateTransformCacheKey,
 };

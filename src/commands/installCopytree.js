@@ -1,15 +1,15 @@
-const fs = require('fs-extra');
-const path = require('path');
-const os = require('os');
-const { execSync } = require('child_process');
-const { logger } = require('../utils/logger');
-const { CommandError } = require('../utils/errors');
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
+import { execSync } from 'child_process';
+import { logger } from '../utils/logger.js';
+import { CommandError } from '../utils/errors.js';
 
 /**
  * Install copytree command - Set up CopyTree environment and configuration
  * (Now handled by InstallView component)
  */
-async function installCopytreeCommand(options = {}) {
+async function installCopytreeCommand(_options = {}) {
   const startTime = Date.now();
   
   try {
@@ -20,7 +20,7 @@ async function installCopytreeCommand(options = {}) {
     steps.push({
       name: 'Create directories',
       status: 'success',
-      details: `Created ${directories.length} directories`
+      details: `Created ${directories.length} directories`,
     });
     
     // Step 2: Copy default configuration
@@ -28,7 +28,7 @@ async function installCopytreeCommand(options = {}) {
     steps.push({
       name: 'Copy default configuration',
       status: configFiles.copied ? 'success' : 'skipped',
-      details: configFiles.message
+      details: configFiles.message,
     });
     
     // Step 3: Set up environment file
@@ -36,7 +36,7 @@ async function installCopytreeCommand(options = {}) {
     steps.push({
       name: 'Set up environment',
       status: envSetup.created ? 'success' : 'skipped',
-      details: envSetup.message
+      details: envSetup.message,
     });
     
     // Step 4: Check dependencies
@@ -44,7 +44,7 @@ async function installCopytreeCommand(options = {}) {
     steps.push({
       name: 'Check dependencies',
       status: deps.allGood ? 'success' : 'warning',
-      details: deps.message
+      details: deps.message,
     });
     
     // Step 5: Create example profiles
@@ -52,7 +52,7 @@ async function installCopytreeCommand(options = {}) {
     steps.push({
       name: 'Create example profiles',
       status: profiles.created > 0 ? 'success' : 'skipped',
-      details: `Created ${profiles.created} example profiles`
+      details: `Created ${profiles.created} example profiles`,
     });
     
     const duration = Date.now() - startTime;
@@ -60,17 +60,17 @@ async function installCopytreeCommand(options = {}) {
     return {
       steps,
       duration,
-      success: true
+      success: true,
     };
     
   } catch (error) {
     logger.error('Installation failed', { 
       error: error.message,
-      stack: error.stack 
+      stack: error.stack, 
     });
     throw new CommandError(
       `Installation failed: ${error.message}`,
-      'install:copytree'
+      'install:copytree',
     );
   }
 }
@@ -87,7 +87,7 @@ async function createDirectories() {
     path.join(homeDir, '.copytree', 'cache', 'ai'),
     path.join(homeDir, '.copytree', 'cache', 'transforms'),
     path.join(homeDir, '.copytree', 'external-sources'),
-    path.join(homeDir, '.copytree', 'logs')
+    path.join(homeDir, '.copytree', 'logs'),
   ];
   
   const created = [];
@@ -113,7 +113,7 @@ async function copyDefaultConfig() {
   if (await fs.pathExists(userConfigPath)) {
     return {
       copied: false,
-      message: 'User config already exists'
+      message: 'User config already exists',
     };
   }
   
@@ -153,7 +153,7 @@ git:
   
   return {
     copied: true,
-    message: `Created ${userConfigPath}`
+    message: `Created ${userConfigPath}`,
   };
 }
 
@@ -167,7 +167,7 @@ async function setupEnvironment() {
   if (await fs.pathExists(envPath)) {
     return {
       created: false,
-      message: 'Environment file already exists'
+      message: 'Environment file already exists',
     };
   }
   
@@ -189,7 +189,7 @@ GEMINI_API_KEY=
   
   return {
     created: true,
-    message: `Created ${envPath}`
+    message: `Created ${envPath}`,
   };
 }
 
@@ -204,7 +204,7 @@ async function checkDependencies() {
   try {
     execSync('git --version', { stdio: 'ignore' });
     checks.push('Git');
-  } catch (error) {
+  } catch (_error) {
     missing.push('Git (required for git integration features)');
   }
   
@@ -212,7 +212,7 @@ async function checkDependencies() {
   try {
     execSync('pandoc --version', { stdio: 'ignore' });
     checks.push('Pandoc');
-  } catch (error) {
+  } catch (_error) {
     // Optional dependency
   }
   
@@ -226,13 +226,13 @@ async function checkDependencies() {
   if (missing.length > 0) {
     return {
       allGood: false,
-      message: `Missing: ${missing.join(', ')}`
+      message: `Missing: ${missing.join(', ')}`,
     };
   }
   
   return {
     allGood: true,
-    message: `All dependencies found`
+    message: 'All dependencies found',
   };
 }
 
@@ -321,4 +321,4 @@ output:
   return { created };
 }
 
-module.exports = installCopytreeCommand;
+export default installCopytreeCommand;
