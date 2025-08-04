@@ -27,20 +27,20 @@ class MarkdownTransformer extends BaseTransformer {
         ...file,
         content: content || '',
         transformed: false,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     }
 
     let transformedContent;
     
     switch (this.mode) {
-      case 'html':
-        transformedContent = this.convertToHtml(content);
-        break;
-      case 'strip':
-      default:
-        transformedContent = this.stripMarkdown(content);
-        break;
+    case 'html':
+      transformedContent = this.convertToHtml(content);
+      break;
+    case 'strip':
+    default:
+      transformedContent = this.stripMarkdown(content);
+      break;
     }
 
     return {
@@ -49,7 +49,7 @@ class MarkdownTransformer extends BaseTransformer {
       originalContent: content,
       transformed: true,
       transformedBy: this.constructor.name,
-      transformMode: this.mode
+      transformMode: this.mode,
     };
   }
 
@@ -107,7 +107,7 @@ class MarkdownTransformer extends BaseTransformer {
     return marked.parse(content, {
       gfm: true,
       breaks: true,
-      sanitize: false
+      sanitize: false,
     });
   }
 

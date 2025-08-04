@@ -30,18 +30,18 @@ class AlwaysIncludeStage extends Stage {
     this.log(`Processing ${this.alwaysPatterns.length} always-include pattern(s)`, 'info');
     
     // Mark files that match always patterns
-    const processedFiles = files.map(file => {
+    const processedFiles = files.map((file) => {
       if (this.matchesAlwaysPatterns(file)) {
         alwaysIncludeCount++;
         
         logger.debug('File marked as always-include', {
           path: file.relativePath,
-          patterns: this.alwaysPatterns
+          patterns: this.alwaysPatterns,
         });
         
         return {
           ...file,
-          alwaysInclude: true
+          alwaysInclude: true,
         };
       }
       
@@ -54,7 +54,7 @@ class AlwaysIncludeStage extends Stage {
     return {
       ...input,
       files: processedFiles,
-      alwaysPatterns: this.alwaysPatterns
+      alwaysPatterns: this.alwaysPatterns,
     };
   }
 
@@ -71,7 +71,7 @@ class AlwaysIncludeStage extends Stage {
         if (minimatch(filePath, pattern, { 
           matchBase: true,
           dot: true,
-          nocase: process.platform === 'win32'
+          nocase: process.platform === 'win32',
         })) {
           return true;
         }

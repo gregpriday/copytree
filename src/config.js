@@ -21,7 +21,7 @@ module.exports = {
     '*.log',
     '*.lock',
     '.DS_Store',
-    'Thumbs.db'
+    'Thumbs.db',
   ],
   
   supportedTransformers: {
@@ -32,7 +32,7 @@ module.exports = {
     '.gif': 'image',
     '.bmp': 'image',
     '.md': 'markdown',
-    '.mdx': 'markdown'
+    '.mdx': 'markdown',
   },
   
   maxFileSize: process.env.MAX_FILE_SIZE ? parseInt(process.env.MAX_FILE_SIZE) : 10 * 1024 * 1024, // 10MB default
@@ -53,5 +53,5 @@ module.exports = {
   
   getCacheDir() {
     return path.join(this.configDir, 'cache');
-  }
+  },
 };

@@ -69,16 +69,16 @@ class FileFilter {
       this.patterns.push({
         pattern,
         isNegated,
-        original: trimmed
+        original: trimmed,
       });
     }
   }
   
   addPatterns(patterns) {
     if (Array.isArray(patterns)) {
-      patterns.forEach(p => this.addPattern(p));
+      patterns.forEach((p) => this.addPattern(p));
     } else if (typeof patterns === 'string') {
-      patterns.split('\n').forEach(p => this.addPattern(p.trim()));
+      patterns.split('\n').forEach((p) => this.addPattern(p.trim()));
     }
   }
   
@@ -106,7 +106,7 @@ class FileFilter {
     this.patterns.push({
       pattern: cleanPattern,
       isNegated,
-      original: pattern
+      original: pattern,
     });
   }
   
@@ -121,7 +121,7 @@ class FileFilter {
       const options = {
         dot: true,
         matchBase: true,
-        nocase: process.platform === 'win32'
+        nocase: process.platform === 'win32',
       };
       
       if (minimatch(relativePath, pattern, options)) {
@@ -133,7 +133,7 @@ class FileFilter {
   }
   
   filter(files) {
-    return files.filter(file => !this.shouldIgnore(file));
+    return files.filter((file) => !this.shouldIgnore(file));
   }
   
   createChildFilter(subPath) {

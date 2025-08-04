@@ -40,7 +40,7 @@ class BaseTransformer {
       
       this.cache = CacheService.create('transform', {
         enabled: this.config.get(`${specificConfig}.enabled`, this.cacheEnabled),
-        defaultTtl: this.config.get(`${specificConfig}.ttl`, this.cacheTTL)
+        defaultTtl: this.config.get(`${specificConfig}.ttl`, this.cacheTTL),
       });
     }
   }
@@ -93,7 +93,7 @@ class BaseTransformer {
         `Transform failed: ${error.message}`,
         this.constructor.name,
         file ? file.path : undefined,
-        { originalError: error }
+        { originalError: error },
       );
     }
   }
@@ -144,7 +144,7 @@ class BaseTransformer {
       file.path,
       file.size || 0,
       file.modified ? file.modified.getTime() : 0,
-      JSON.stringify(this.options)
+      JSON.stringify(this.options),
     ];
     
     return crypto
@@ -169,7 +169,7 @@ class BaseTransformer {
       return {
         ...file,
         ...cached,
-        fromCache: true
+        fromCache: true,
       };
     }
     
@@ -195,7 +195,7 @@ class BaseTransformer {
         transformed: result.transformed,
         transformedBy: result.transformedBy,
         metadata: result.metadata,
-        error: result.error
+        error: result.error,
       };
       
       await this.cache.set(cacheKey, cacheData, this.cacheTTL);
@@ -220,7 +220,7 @@ class BaseTransformer {
       name: this.constructor.name,
       description: this.description || 'No description available',
       supportedExtensions: this.supportedExtensions || [],
-      options: this.options
+      options: this.options,
     };
   }
 

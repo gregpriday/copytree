@@ -20,7 +20,7 @@ class CopyTreeError extends Error {
       code: this.code,
       details: this.details,
       timestamp: this.timestamp,
-      stack: this.stack
+      stack: this.stack,
     };
   }
 }
@@ -145,14 +145,14 @@ function handleError(error, options = {}) {
   const { 
     exit = true, 
     verbose = false,
-    logger = console.error 
+    logger = console.error, 
   } = options;
 
   // Convert to CopyTreeError if not already
   if (!(error instanceof CopyTreeError)) {
     error = new CopyTreeError(error.message, 'UNKNOWN_ERROR', {
       originalError: error.name,
-      originalStack: error.stack
+      originalStack: error.stack,
     });
   }
 
@@ -190,5 +190,5 @@ module.exports = {
   GitError,
   ProfileError,
   InstructionsError,
-  handleError
+  handleError,
 };

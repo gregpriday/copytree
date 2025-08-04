@@ -17,13 +17,13 @@ class AIService {
     
     this.provider = new GeminiProvider({
       model: modelName,
-      ...options
+      ...options,
     });
     
     // Initialize cache if enabled
     if (this.config.get('ai.cache.enabled', true)) {
       this.cache = CacheService.create('ai', {
-        defaultTtl: this.config.get('ai.cache.ttl', 86400)
+        defaultTtl: this.config.get('ai.cache.ttl', 86400),
       });
     }
     
@@ -32,7 +32,7 @@ class AIService {
       maxAttempts: this.config.get('ai.retry.maxAttempts', 3),
       initialDelay: this.config.get('ai.retry.initialDelay', 1000),
       maxDelay: this.config.get('ai.retry.maxDelay', 10000),
-      backoffMultiplier: this.config.get('ai.retry.backoffMultiplier', 2)
+      backoffMultiplier: this.config.get('ai.retry.backoffMultiplier', 2),
     };
   }
 
@@ -56,7 +56,7 @@ class AIService {
     // Make request with retry
     const response = await retry(
       () => this.provider.complete(options),
-      this.retryOptions
+      this.retryOptions,
     );
     
     // Cache successful responses
@@ -88,7 +88,7 @@ class AIService {
     // Make request with retry
     const response = await retry(
       () => this.provider.chat(options),
-      this.retryOptions
+      this.retryOptions,
     );
     
     // Cache successful responses
@@ -143,7 +143,7 @@ class AIService {
       ...options,
       temperature: options.temperature ?? taskConfig.temperature,
       maxTokens: options.maxTokens ?? taskConfig.maxTokens,
-      stream: options.stream ?? taskConfig.stream
+      stream: options.stream ?? taskConfig.stream,
     };
     
     // Use the appropriate method
@@ -172,7 +172,7 @@ Summary:`;
 
     const response = await this.performTask('codeDescription', {
       prompt,
-      ...options
+      ...options,
     });
     
     return response.content;
@@ -204,7 +204,7 @@ Summary:`;
     return new AIService({
       temperature: taskConfig.temperature,
       maxTokens: taskConfig.maxTokens,
-      ...options
+      ...options,
     });
   }
 }
@@ -219,5 +219,5 @@ module.exports = {
       defaultAI = new AIService();
     }
     return defaultAI;
-  }
+  },
 };

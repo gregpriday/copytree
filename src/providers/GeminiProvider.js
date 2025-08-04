@@ -35,7 +35,7 @@ class GeminiProvider extends BaseProvider {
         temperature: options.temperature ?? this.temperature,
         maxOutputTokens: options.maxTokens || this.maxTokens,
         topP: options.topP ?? this.config.get('ai.defaults.topP', 0.95),
-        topK: options.topK ?? this.config.get('ai.defaults.topK', 40)
+        topK: options.topK ?? this.config.get('ai.defaults.topK', 40),
       };
 
       this.logger.debug(`Sending completion request to Gemini: ${this.model}`);
@@ -43,7 +43,7 @@ class GeminiProvider extends BaseProvider {
       if (options.stream) {
         const result = await this.modelInstance.generateContentStream({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          generationConfig
+          generationConfig,
         });
         
         return { stream: result.stream, model: this.model };
@@ -51,7 +51,7 @@ class GeminiProvider extends BaseProvider {
 
       const result = await this.modelInstance.generateContent({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig
+        generationConfig,
       });
 
       const response = await result.response;
@@ -60,7 +60,7 @@ class GeminiProvider extends BaseProvider {
       return {
         content: text,
         model: this.model,
-        finishReason: response.candidates?.[0]?.finishReason
+        finishReason: response.candidates?.[0]?.finishReason,
       };
     } catch (error) {
       this.handleError(error, 'completion');
@@ -81,7 +81,7 @@ class GeminiProvider extends BaseProvider {
         temperature: options.temperature ?? this.temperature,
         maxOutputTokens: options.maxTokens || this.maxTokens,
         topP: options.topP ?? this.config.get('ai.defaults.topP', 0.95),
-        topK: options.topK ?? this.config.get('ai.defaults.topK', 40)
+        topK: options.topK ?? this.config.get('ai.defaults.topK', 40),
       };
 
       this.logger.debug(`Sending chat request to Gemini: ${this.model}`);
@@ -89,7 +89,7 @@ class GeminiProvider extends BaseProvider {
       if (options.stream) {
         const chat = this.modelInstance.startChat({
           history: contents.slice(0, -1),
-          generationConfig
+          generationConfig,
         });
         
         const result = await chat.sendMessageStream(contents[contents.length - 1].parts[0].text);
@@ -99,7 +99,7 @@ class GeminiProvider extends BaseProvider {
 
       const chat = this.modelInstance.startChat({
         history: contents.slice(0, -1),
-        generationConfig
+        generationConfig,
       });
 
       const result = await chat.sendMessage(contents[contents.length - 1].parts[0].text);
@@ -109,7 +109,7 @@ class GeminiProvider extends BaseProvider {
       return {
         content: text,
         model: this.model,
-        finishReason: response.candidates?.[0]?.finishReason
+        finishReason: response.candidates?.[0]?.finishReason,
       };
     } catch (error) {
       this.handleError(error, 'chat');
@@ -140,7 +140,7 @@ class GeminiProvider extends BaseProvider {
         
         contents.push({
           role,
-          parts: [{ text }]
+          parts: [{ text }],
         });
       }
     }
@@ -170,7 +170,7 @@ class GeminiProvider extends BaseProvider {
       'chat',
       'streaming',
       'systemPrompt',
-      'multiModal'
+      'multiModal',
     ];
   }
 
@@ -184,25 +184,25 @@ class GeminiProvider extends BaseProvider {
       throw new ProviderError(
         'Invalid Gemini API key',
         this.name,
-        { code: 'INVALID_API_KEY', operation }
+        { code: 'INVALID_API_KEY', operation },
       );
     } else if (error.status === 429 || error.message?.includes('quota')) {
       throw new ProviderError(
         'Gemini rate limit or quota exceeded',
         this.name,
-        { code: 'RATE_LIMIT', operation }
+        { code: 'RATE_LIMIT', operation },
       );
     } else if (error.status === 503) {
       throw new ProviderError(
         'Gemini service unavailable',
         this.name,
-        { code: 'SERVICE_UNAVAILABLE', operation }
+        { code: 'SERVICE_UNAVAILABLE', operation },
       );
     } else if (error.message?.includes('safety')) {
       throw new ProviderError(
         'Content blocked by Gemini safety filters',
         this.name,
-        { code: 'SAFETY_FILTER', operation }
+        { code: 'SAFETY_FILTER', operation },
       );
     }
     

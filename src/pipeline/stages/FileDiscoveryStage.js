@@ -47,8 +47,8 @@ class FileDiscoveryStage extends Stage {
       stats: {
         totalFiles: files.length,
         filteredFiles: filteredFiles.length,
-        excludedFiles: files.length - filteredFiles.length
-      }
+        excludedFiles: files.length - filteredFiles.length,
+      },
     };
   }
 
@@ -105,7 +105,7 @@ class FileDiscoveryStage extends Stage {
       this.gitignorePatterns.push({
         pattern,
         isNegated,
-        original: trimmed
+        original: trimmed,
       });
     }
   }
@@ -118,11 +118,11 @@ class FileDiscoveryStage extends Stage {
     if (this.respectGitignore) {
       // Add global excluded directories
       const globalExcludedDirs = this.config.get('copytree.globalExcludedDirectories', []);
-      ignorePatterns.push(...globalExcludedDirs.map(dir => `**/${dir}/**`));
+      ignorePatterns.push(...globalExcludedDirs.map((dir) => `**/${dir}/**`));
       
       // Add base path excluded directories (only at root)
       const basePathExcludedDirs = this.config.get('copytree.basePathExcludedDirectories', []);
-      ignorePatterns.push(...basePathExcludedDirs.map(dir => `${dir}/**`));
+      ignorePatterns.push(...basePathExcludedDirs.map((dir) => `${dir}/**`));
       
       // Add global excluded files
       const globalExcludedFiles = this.config.get('copytree.globalExcludedFiles', []);
@@ -151,17 +151,17 @@ class FileDiscoveryStage extends Stage {
       stats: true,
       ignore: ignorePatterns,
       // Use stream for large directories
-      concurrency: this.options.maxConcurrency || 100
+      concurrency: this.options.maxConcurrency || 100,
     };
 
     const entries = await fastGlob(this.patterns, globOptions);
 
-    return entries.map(entry => ({
+    return entries.map((entry) => ({
       path: entry.path || entry,
       absolutePath: path.join(this.basePath, entry.path || entry),
       size: entry.stats?.size || 0,
       modified: entry.stats?.mtime || null,
-      stats: entry.stats
+      stats: entry.stats,
     }));
   }
 
@@ -170,7 +170,7 @@ class FileDiscoveryStage extends Stage {
       return files;
     }
 
-    return files.filter(file => !this.shouldIgnore(file.path));
+    return files.filter((file) => !this.shouldIgnore(file.path));
   }
 
   shouldIgnore(filePath) {
@@ -181,7 +181,7 @@ class FileDiscoveryStage extends Stage {
       const options = {
         dot: true,
         matchBase: true,
-        nocase: process.platform === 'win32'
+        nocase: process.platform === 'win32',
       };
       
       if (minimatch(filePath, pattern, options)) {

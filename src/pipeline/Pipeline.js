@@ -11,7 +11,7 @@ class Pipeline extends EventEmitter {
       emitProgress: options.emitProgress ?? config().get('pipeline.emitProgress', true),
       parallel: options.parallel ?? false,
       maxConcurrency: options.maxConcurrency ?? config().get('app.maxConcurrency', 5),
-      ...options
+      ...options,
     };
     
     this.stats = {
@@ -19,7 +19,7 @@ class Pipeline extends EventEmitter {
       endTime: null,
       stagesCompleted: 0,
       stagesFailed: 0,
-      errors: []
+      errors: [],
     };
   }
 
@@ -51,7 +51,7 @@ class Pipeline extends EventEmitter {
     this.emit('pipeline:start', {
       input,
       stages: this.stages.length,
-      options: this.options
+      options: this.options,
     });
 
     let result = input;
@@ -67,7 +67,7 @@ class Pipeline extends EventEmitter {
       
       this.emit('pipeline:complete', {
         result,
-        stats: this.getStats()
+        stats: this.getStats(),
       });
       
       return result;
@@ -76,7 +76,7 @@ class Pipeline extends EventEmitter {
       
       this.emit('pipeline:error', {
         error,
-        stats: this.getStats()
+        stats: this.getStats(),
       });
       
       throw error;
@@ -98,7 +98,7 @@ class Pipeline extends EventEmitter {
         this.emit('stage:start', {
           stage: stageName,
           index: i,
-          input: result
+          input: result,
         });
         
         // Determine what type of stage we have
@@ -128,7 +128,7 @@ class Pipeline extends EventEmitter {
         this.emit('stage:complete', {
           stage: stageName,
           index: i,
-          output: result
+          output: result,
         });
         
       } catch (error) {
@@ -136,13 +136,13 @@ class Pipeline extends EventEmitter {
         this.stats.errors.push({
           stage: stageName,
           error: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
         
         this.emit('stage:error', {
           stage: stageName,
           index: i,
-          error
+          error,
         });
         
         if (!this.options.continueOnError) {
@@ -167,7 +167,7 @@ class Pipeline extends EventEmitter {
       const batch = chunks.slice(i, i + this.options.maxConcurrency);
       
       const batchResults = await Promise.all(
-        batch.map(async (chunk, index) => {
+        batch.map(async (chunk, _index) => {
           try {
             return await this._processSequential(chunk);
           } catch (error) {
@@ -176,7 +176,7 @@ class Pipeline extends EventEmitter {
             }
             return null;
           }
-        })
+        }),
       );
       
       results.push(...batchResults);
@@ -206,7 +206,7 @@ class Pipeline extends EventEmitter {
       duration: this.stats.endTime ? this.stats.endTime - this.stats.startTime : (Date.now() - this.stats.startTime),
       successRate: (this.stats.stagesCompleted + this.stats.stagesFailed) > 0 
         ? this.stats.stagesCompleted / (this.stats.stagesCompleted + this.stats.stagesFailed)
-        : 1
+        : 1,
     };
   }
 
@@ -240,9 +240,9 @@ class Pipeline extends EventEmitter {
           },
           async thenReturn() {
             return await self.process(passable);
-          }
+          },
         };
-      }
+      },
     };
   }
 }

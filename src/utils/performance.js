@@ -10,7 +10,7 @@ class PerformanceMonitor {
       enabled: options.enabled ?? process.env.NODE_ENV !== 'production',
       logThreshold: options.logThreshold ?? 1000, // Log operations over 1s
       memoryThreshold: options.memoryThreshold ?? 50 * 1024 * 1024, // 50MB
-      ...options
+      ...options,
     };
     
     this.timers = new Map();
@@ -26,7 +26,7 @@ class PerformanceMonitor {
     
     this.timers.set(name, {
       startTime: performance.now(),
-      startMemory: process.memoryUsage()
+      startMemory: process.memoryUsage(),
     });
   }
 
@@ -49,7 +49,7 @@ class PerformanceMonitor {
     const memoryDelta = {
       rss: endMemory.rss - timer.startMemory.rss,
       heapUsed: endMemory.heapUsed - timer.startMemory.heapUsed,
-      heapTotal: endMemory.heapTotal - timer.startMemory.heapTotal
+      heapTotal: endMemory.heapTotal - timer.startMemory.heapTotal,
     };
 
     const result = {
@@ -57,7 +57,7 @@ class PerformanceMonitor {
       duration: Math.round(duration * 100) / 100,
       memory: memoryDelta,
       metadata,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     // Store metric
@@ -111,8 +111,8 @@ class PerformanceMonitor {
       return null;
     }
 
-    const durations = measurements.map(m => m.duration);
-    const memoryUsages = measurements.map(m => m.memory.heapUsed);
+    const durations = measurements.map((m) => m.duration);
+    const memoryUsages = measurements.map((m) => m.memory.heapUsed);
 
     return {
       name,
@@ -121,15 +121,15 @@ class PerformanceMonitor {
         min: Math.min(...durations),
         max: Math.max(...durations),
         avg: durations.reduce((sum, d) => sum + d, 0) / durations.length,
-        total: durations.reduce((sum, d) => sum + d, 0)
+        total: durations.reduce((sum, d) => sum + d, 0),
       },
       memory: {
         min: Math.min(...memoryUsages),
         max: Math.max(...memoryUsages),
         avg: memoryUsages.reduce((sum, m) => sum + m, 0) / memoryUsages.length,
-        total: memoryUsages.reduce((sum, m) => sum + m, 0)
+        total: memoryUsages.reduce((sum, m) => sum + m, 0),
       },
-      measurements: measurements.slice(-10) // Last 10 measurements
+      measurements: measurements.slice(-10), // Last 10 measurements
     };
   }
 
@@ -165,7 +165,7 @@ class PerformanceMonitor {
       startTimer: (name) => this.startTimer(`${prefix}.${name}`),
       endTimer: (name, metadata) => this.endTimer(`${prefix}.${name}`, metadata),
       measure: (name, fn, metadata) => this.measure(`${prefix}.${name}`, fn, metadata),
-      measureOnly: (name, fn, metadata) => this.measureOnly(`${prefix}.${name}`, fn, metadata)
+      measureOnly: (name, fn, metadata) => this.measureOnly(`${prefix}.${name}`, fn, metadata),
     };
   }
 
@@ -182,14 +182,14 @@ class PerformanceMonitor {
         heapTotal: memory.heapTotal,
         heapUsed: memory.heapUsed,
         external: memory.external,
-        arrayBuffers: memory.arrayBuffers
+        arrayBuffers: memory.arrayBuffers,
       },
       cpu: {
         user: cpu.user,
-        system: cpu.system
+        system: cpu.system,
       },
       uptime: process.uptime(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -255,5 +255,5 @@ module.exports = {
   measureMethod,
   measureFunction,
   formatBytes,
-  monitor: globalMonitor
+  monitor: globalMonitor,
 };

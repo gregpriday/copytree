@@ -15,7 +15,7 @@ class TransformStage extends Stage {
     // Only create cache if not disabled
     this.cache = options.noCache ? null : (options.cache || CacheService.create('transformations', {
       enabled: options.cacheEnabled ?? true,
-      defaultTtl: 86400 // 24 hours
+      defaultTtl: 86400, // 24 hours
     }));
   }
 
@@ -37,7 +37,7 @@ class TransformStage extends Stage {
     try {
       const pLimit = (await import('p-limit')).default;
       limit = pLimit(this.maxConcurrency);
-    } catch (error) {
+    } catch (_error) {
       // Fallback to older p-limit version syntax
       const pLimit = require('p-limit');
       limit = pLimit.default ? pLimit.default(this.maxConcurrency) : pLimit(this.maxConcurrency);
@@ -79,7 +79,7 @@ class TransformStage extends Stage {
     let completedCount = 0;
 
     // Process files with active transform display
-    const transformPromises = files.map(file => 
+    const transformPromises = files.map((file) => 
       limit(async () => {
         // Check if this file is cached
         if (cachedResults.has(file)) {
@@ -87,7 +87,7 @@ class TransformStage extends Stage {
         }
         
         // Find the transform info for this file
-        const transformInfo = filesToTransform.find(t => t.file === file);
+        const transformInfo = filesToTransform.find((t) => t.file === file);
         if (!transformInfo) {
           return file; // No transformation needed
         }
@@ -118,7 +118,7 @@ class TransformStage extends Stage {
             // Update display
             completedCount++;
             if (showMultiLine) {
-              activeFiles = activeFiles.filter(f => f !== filename);
+              activeFiles = activeFiles.filter((f) => f !== filename);
               updateTransformDisplay();
             }
             
@@ -132,7 +132,7 @@ class TransformStage extends Stage {
           
           // Update display on error
           if (showMultiLine) {
-            activeFiles = activeFiles.filter(f => f !== filename);
+            activeFiles = activeFiles.filter((f) => f !== filename);
             updateTransformDisplay();
           }
           
@@ -140,10 +140,10 @@ class TransformStage extends Stage {
             ...file,
             content: `[Transform error: ${error.message}]`,
             error: error.message,
-            transformed: false
+            transformed: false,
           };
         }
-      })
+      }),
     );
     
     // Helper function to update the multi-line display
@@ -164,7 +164,7 @@ class TransformStage extends Stage {
       logger.updateSpinner(`Transforming (${completedCount}/${activeTransforms})`);
       
       // Write active files
-      activeFiles.slice(0, this.maxConcurrency).forEach(file => {
+      activeFiles.slice(0, this.maxConcurrency).forEach((file) => {
         process.stdout.write(`\n  → ${file}`);
       });
     };
@@ -202,7 +202,7 @@ class TransformStage extends Stage {
 
     this.log(
       `Transformed ${transformCount} files (${errorCount} errors) in ${this.getElapsedTime(startTime)}`,
-      'info'
+      'info',
     );
 
     return {
@@ -211,8 +211,8 @@ class TransformStage extends Stage {
       stats: {
         ...input.stats,
         transformedCount: transformCount,
-        transformErrors: errorCount
-      }
+        transformErrors: errorCount,
+      },
     };
   }
 
@@ -240,7 +240,7 @@ class TransformStage extends Stage {
       }
       
       return transformer;
-    } catch (error) {
+    } catch (_error) {
       // No transformer found, return null
       return null;
     }

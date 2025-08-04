@@ -1,6 +1,5 @@
 const Pipeline = require('../pipeline/Pipeline');
 const ProfileLoader = require('../profiles/ProfileLoader');
-const FileDiscovery = require('../utils/FileDiscovery');
 const TransformerRegistry = require('../transforms/TransformerRegistry');
 const { logger } = require('../utils/logger');
 const { CommandError, handleError } = require('../utils/errors');
@@ -47,7 +46,7 @@ async function copyCommand(targetPath = '.', options = {}) {
     // 4. Initialize pipeline with stages
     const pipeline = new Pipeline({
       continueOnError: true,
-      emitProgress: true
+      emitProgress: true,
     });
     
     // Setup pipeline stages
@@ -59,7 +58,7 @@ async function copyCommand(targetPath = '.', options = {}) {
       basePath,
       profile,
       options,
-      startTime
+      startTime,
     });
     
     // 6. Prepare output
@@ -90,7 +89,7 @@ async function copyCommand(targetPath = '.', options = {}) {
     logger.stopSpinner();
     handleError(error, {
       exit: true,
-      verbose: options.verbose || config().get('app.verboseErrors', false)
+      verbose: options.verbose || config().get('app.verboseErrors', false),
     });
   }
 }
@@ -117,7 +116,7 @@ async function loadProfile(profileLoader, profileName, options) {
     overrides.transformers = overrides.transformers || {};
     overrides.transformers.binary = {
       enabled: true,
-      options: { action: 'include' }
+      options: { action: 'include' },
     };
   }
   
@@ -125,7 +124,7 @@ async function loadProfile(profileLoader, profileName, options) {
   let profile;
   try {
     profile = await profileLoader.load(profileName, overrides);
-  } catch (error) {
+  } catch (_error) {
     // Fallback to default profile
     logger.warn(`Failed to load profile '${profileName}', using default`);
     profile = ProfileLoader.createDefault();
@@ -150,7 +149,7 @@ async function setupPipelineStages(basePath, profile, options) {
     followSymlinks: profile.options?.followSymlinks ?? false,
     maxFileSize: profile.options?.maxFileSize,
     maxTotalSize: profile.options?.maxTotalSize,
-    maxFileCount: profile.options?.maxFileCount
+    maxFileCount: profile.options?.maxFileCount,
   }));
   
   // 2. Git Filter Stage (if --modified or --changed is used)
@@ -160,7 +159,7 @@ async function setupPipelineStages(basePath, profile, options) {
       basePath,
       modified: options.modified,
       changed: options.changed,
-      withGitStatus: options.withGitStatus
+      withGitStatus: options.withGitStatus,
     }));
   }
   
@@ -168,14 +167,14 @@ async function setupPipelineStages(basePath, profile, options) {
   const ProfileFilterStage = require('../pipeline/stages/ProfileFilterStage');
   stages.push(new ProfileFilterStage({
     exclude: profile.exclude || [],
-    filter: profile.filter || []
+    filter: profile.filter || [],
   }));
   
   // 4. Always Include Stage (if --always option is used)
   if (options.always) {
     const AlwaysIncludeStage = require('../pipeline/stages/AlwaysIncludeStage');
     stages.push(new AlwaysIncludeStage({
-      patterns: Array.isArray(options.always) ? options.always : [options.always]
+      patterns: Array.isArray(options.always) ? options.always : [options.always],
     }));
   }
   
@@ -189,7 +188,7 @@ async function setupPipelineStages(basePath, profile, options) {
   if (options.head) {
     const LimitStage = require('../pipeline/stages/LimitStage');
     stages.push(new LimitStage({
-      limit: parseInt(options.head)
+      limit: parseInt(options.head),
     }));
   }
   
@@ -197,7 +196,7 @@ async function setupPipelineStages(basePath, profile, options) {
   if (!options.onlyTree) {
     const FileLoadingStage = require('../pipeline/stages/FileLoadingStage');
     stages.push(new FileLoadingStage({
-      encoding: 'utf8'
+      encoding: 'utf8',
     }));
     
     // 8. Transformer Stage
@@ -206,7 +205,7 @@ async function setupPipelineStages(basePath, profile, options) {
     stages.push(new TransformStage({
       registry,
       transformers: profile.transformers || {},
-      noCache: options.noCache
+      noCache: options.noCache,
     }));
   }
   
@@ -214,7 +213,7 @@ async function setupPipelineStages(basePath, profile, options) {
   if (options.charLimit) {
     const CharLimitStage = require('../pipeline/stages/CharLimitStage');
     stages.push(new CharLimitStage({
-      limit: parseInt(options.charLimit)
+      limit: parseInt(options.charLimit),
     }));
   }
   
@@ -240,7 +239,7 @@ async function setupPipelineStages(basePath, profile, options) {
       format: outputFormat,
       addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
       prettyPrint: profile.output?.prettyPrint ?? true,
-      outputStream
+      outputStream,
     }));
   } else {
     const OutputFormattingStage = require('../pipeline/stages/OutputFormattingStage');
@@ -250,7 +249,7 @@ async function setupPipelineStages(basePath, profile, options) {
       prettyPrint: profile.output?.prettyPrint ?? true,
       includeMetadata: profile.output?.includeMetadata ?? true,
       showSize: options.showSize,
-      onlyTree: options.onlyTree
+      onlyTree: options.onlyTree,
     }));
   }
   
@@ -271,7 +270,7 @@ async function prepareOutput(result, options) {
       type: 'streamed',
       fileCount,
       totalSize,
-      outputPath: options.output
+      outputPath: options.output,
     };
   }
   
@@ -289,7 +288,7 @@ async function prepareOutput(result, options) {
     type: 'normal',
     output,
     outputSize,
-    fileCount
+    fileCount,
   };
 }
 
@@ -318,7 +317,7 @@ async function displayOutput(outputResult, options) {
     try {
       await Clipboard.copyFileReference(tempFile);
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${path.basename(tempFile)}`);
-    } catch (error) {
+    } catch (_error) {
       logger.warn('Failed to copy reference to clipboard');
       logger.info(`Output saved to: ${tempFile}`);
       logger.info(`${fileCount} files [${logger.formatBytes(outputSize)}]`);
@@ -351,7 +350,7 @@ async function displayOutput(outputResult, options) {
     try {
       await Clipboard.copyText(output);
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
-    } catch (error) {
+    } catch (_error) {
       // If clipboard fails, save to temporary file
       const format = options.format || 'xml';
       const extension = format === 'json' ? 'json' : 'xml';

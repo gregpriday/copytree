@@ -82,20 +82,20 @@ class FirstLinesTransformer extends BaseTransformer {
           shownLines: firstLines.length,
           truncated: remainingLines > 0,
           lineCount: this.lineCount,
-          skipEmptyLines: this.skipEmptyLines
-        }
+          skipEmptyLines: this.skipEmptyLines,
+        },
       };
     } catch (error) {
       this.logger.error('Failed to extract first lines', {
         file: file.path,
-        error: error.message
+        error: error.message,
       });
 
       // Return original content on error
       return {
         ...file,
         transformed: false,
-        error: error.message
+        error: error.message,
       };
     }
   }

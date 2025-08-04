@@ -29,30 +29,30 @@ class SortFilesStage extends Stage {
       let compareValue = 0;
       
       switch (this.sortBy) {
-        case 'size':
-          compareValue = this.compareBySize(a, b);
-          break;
+      case 'size':
+        compareValue = this.compareBySize(a, b);
+        break;
           
-        case 'modified':
-          compareValue = this.compareByModified(a, b);
-          break;
+      case 'modified':
+        compareValue = this.compareByModified(a, b);
+        break;
           
-        case 'name':
-          compareValue = this.compareByName(a, b);
-          break;
+      case 'name':
+        compareValue = this.compareByName(a, b);
+        break;
           
-        case 'extension':
-          compareValue = this.compareByExtension(a, b);
-          break;
+      case 'extension':
+        compareValue = this.compareByExtension(a, b);
+        break;
           
-        case 'depth':
-          compareValue = this.compareByDepth(a, b);
-          break;
+      case 'depth':
+        compareValue = this.compareByDepth(a, b);
+        break;
           
-        case 'path':
-        default:
-          compareValue = this.compareByPath(a, b);
-          break;
+      case 'path':
+      default:
+        compareValue = this.compareByPath(a, b);
+        break;
       }
       
       // Apply sort order
@@ -64,7 +64,7 @@ class SortFilesStage extends Stage {
     
     return {
       ...input,
-      files: sorted
+      files: sorted,
     };
   }
 
@@ -74,7 +74,7 @@ class SortFilesStage extends Stage {
   compareByPath(a, b) {
     return a.relativePath.localeCompare(b.relativePath, undefined, {
       numeric: true,
-      sensitivity: 'base'
+      sensitivity: 'base',
     });
   }
 
@@ -117,7 +117,7 @@ class SortFilesStage extends Stage {
     
     return nameA.localeCompare(nameB, undefined, {
       numeric: true,
-      sensitivity: 'base'
+      sensitivity: 'base',
     });
   }
 

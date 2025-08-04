@@ -43,21 +43,21 @@ class DeduplicateFilesStage extends Stage {
         duplicates.push({
           file: file.path || file.relativePath,
           duplicateOf: original.path || original.relativePath,
-          size: file.size || file.stats?.size || 0
+          size: file.size || file.stats?.size || 0,
         });
         
         // Emit deduplication event
         if (context && context.emit) {
           context.emit('file:deduplicated', {
             original: original.path || original.relativePath,
-            duplicate: file.path || file.relativePath
+            duplicate: file.path || file.relativePath,
           });
         }
         
         logger.debug('Found duplicate file', {
           file: file.path || file.relativePath,
           original: original.path || original.relativePath,
-          hash
+          hash,
         });
       } else {
         // First occurrence of this content
@@ -73,12 +73,12 @@ class DeduplicateFilesStage extends Stage {
       
       this.log(
         `Removed ${duplicates.length} duplicate file(s) (${this.formatBytes(totalDuplicateSize)}) in ${elapsed}`,
-        'info'
+        'info',
       );
       
       // Log details if debug is enabled
       if (this.config.get('app.debug')) {
-        duplicates.forEach(dup => {
+        duplicates.forEach((dup) => {
           this.log(`  - ${dup.file} (duplicate of ${dup.duplicateOf})`, 'debug');
         });
       }

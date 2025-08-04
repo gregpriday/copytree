@@ -65,8 +65,8 @@ class InstructionsLoader {
           { 
             searchPaths: [userPath, appPath],
             userDir: this.userDir,
-            appDir: this.appDir
-          }
+            appDir: this.appDir,
+          },
         );
       }
 
@@ -149,7 +149,7 @@ class InstructionsLoader {
   getCacheStats() {
     return {
       size: this.instructionsCache.size,
-      keys: Array.from(this.instructionsCache.keys())
+      keys: Array.from(this.instructionsCache.keys()),
     };
   }
 }

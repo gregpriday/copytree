@@ -1,6 +1,6 @@
 const Stage = require('../Stage');
 const { Transform } = require('stream');
-const { create } = require('xmlbuilder2');
+// const { create } = require('xmlbuilder2'); // Currently unused
 const path = require('path');
 
 /**
@@ -42,7 +42,7 @@ class StreamingOutputStage extends Stage {
     return {
       ...input,
       streamed: true,
-      outputFormat: this.format
+      outputFormat: this.format,
     };
   }
 
@@ -63,7 +63,7 @@ class StreamingOutputStage extends Stage {
       writableObjectMode: true,
       transform: (chunk, encoding, callback) => {
         callback(null, chunk);
-      }
+      },
     });
 
     // Write XML header and metadata
@@ -116,7 +116,7 @@ class StreamingOutputStage extends Stage {
       }
       
       if (file.isBinary) {
-        xml += ` binary="true"`;
+        xml += ' binary="true"';
         if (file.encoding) {
           xml += ` encoding="${file.encoding}"`;
         }
@@ -158,7 +158,7 @@ class StreamingOutputStage extends Stage {
       writableObjectMode: true,
       transform: (chunk, encoding, callback) => {
         callback(null, chunk);
-      }
+      },
     });
 
     let isFirst = true;
@@ -200,7 +200,7 @@ class StreamingOutputStage extends Stage {
         encoding: file.encoding,
         content: this.addLineNumbers && !file.isBinary 
           ? this.addLineNumbersToContent(file.content)
-          : file.content
+          : file.content,
       };
       
       json += '    ' + JSON.stringify(fileObj, null, this.prettyPrint ? 2 : 0)
@@ -228,7 +228,7 @@ class StreamingOutputStage extends Stage {
       writableObjectMode: true,
       transform: (chunk, encoding, callback) => {
         callback(null, chunk);
-      }
+      },
     });
 
     // For tree format, we need to collect all files first
@@ -271,7 +271,7 @@ class StreamingOutputStage extends Stage {
         
         // Small delay to prevent overwhelming the stream
         if (input.files.indexOf(file) % 100 === 0) {
-          await new Promise(resolve => setImmediate(resolve));
+          await new Promise((resolve) => setTimeout(resolve, 0));
         }
       }
     }
@@ -316,7 +316,7 @@ class StreamingOutputStage extends Stage {
         if (i === parts.length - 1) {
           current[part] = {
             isFile: true,
-            size: file.size
+            size: file.size,
           };
         } else {
           if (!current[part]) {
@@ -330,7 +330,7 @@ class StreamingOutputStage extends Stage {
     return tree;
   }
 
-  renderTree(node, lines, prefix, isLast) {
+  renderTree(node, lines, prefix, _isLast) {
     const entries = Object.entries(node).sort(([a], [b]) => {
       const aIsFile = node[a].isFile;
       const bIsFile = node[b].isFile;

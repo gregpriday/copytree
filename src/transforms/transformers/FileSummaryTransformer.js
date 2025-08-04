@@ -20,7 +20,7 @@ class FileSummaryTransformer extends BaseTransformer {
     } else {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
       this.model = this.genAI.getGenerativeModel({ 
-        model: options.model || this.config.get('ai.gemini.model')
+        model: options.model || this.config.get('ai.gemini.model'),
       });
     }
     
@@ -75,13 +75,13 @@ class FileSummaryTransformer extends BaseTransformer {
           originalSize: content.length,
           fileType: fileType,
           truncated: content.length > this.maxInputTokens * 4,
-          model: this.model.model
-        }
+          model: this.model.model,
+        },
       };
     } catch (error) {
       this.logger.error('Failed to generate file summary', {
         file: file.path,
-        error: error.message
+        error: error.message,
       });
 
       // Return truncated content on error
@@ -95,8 +95,8 @@ class FileSummaryTransformer extends BaseTransformer {
         transformed: true,
         transformedBy: this.constructor.name,
         metadata: {
-          error: error.message
-        }
+          error: error.message,
+        },
       };
     }
   }
@@ -135,7 +135,7 @@ class FileSummaryTransformer extends BaseTransformer {
       '.sh': 'shell',
       '.sql': 'sql',
       '.dockerfile': 'dockerfile',
-      '.makefile': 'makefile'
+      '.makefile': 'makefile',
     };
 
     return typeMap[ext] || file.type || 'unknown';
@@ -159,7 +159,7 @@ class FileSummaryTransformer extends BaseTransformer {
       'markdown': 'Summarize the document content and main topics.',
       'yaml': 'Describe the configuration structure and key settings.',
       'dockerfile': 'Describe the base image and main build steps.',
-      'sql': 'Describe the database operations or schema.'
+      'sql': 'Describe the database operations or schema.',
     };
 
     const typeSpecific = typePrompts[fileType] || '';

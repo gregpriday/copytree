@@ -65,7 +65,7 @@ class RulesetFilter {
     return minimatch(filePath, pattern, {
       matchBase: true,
       dot: true,
-      nocase: process.platform === 'win32'
+      nocase: process.platform === 'win32',
     });
   }
 
@@ -104,33 +104,33 @@ class RulesetFilter {
    */
   getFieldValue(file, field) {
     switch (field) {
-      case 'path':
-      case 'relativePath':
-        return file.relativePath;
+    case 'path':
+    case 'relativePath':
+      return file.relativePath;
         
-      case 'folder':
-      case 'directory':
-        return path.dirname(file.relativePath);
+    case 'folder':
+    case 'directory':
+      return path.dirname(file.relativePath);
         
-      case 'filename':
-      case 'name':
-        return path.basename(file.relativePath);
+    case 'filename':
+    case 'name':
+      return path.basename(file.relativePath);
         
-      case 'extension':
-      case 'ext':
-        return path.extname(file.relativePath).toLowerCase();
+    case 'extension':
+    case 'ext':
+      return path.extname(file.relativePath).toLowerCase();
         
-      case 'size':
-        return file.stats?.size || 0;
+    case 'size':
+      return file.stats?.size || 0;
         
-      case 'content':
-        return file.content?.toString() || '';
+    case 'content':
+      return file.content?.toString() || '';
         
-      case 'type':
-        return file.type || 'unknown';
+    case 'type':
+      return file.type || 'unknown';
         
-      default:
-        return file[field];
+    default:
+      return file[field];
     }
   }
 
@@ -142,56 +142,56 @@ class RulesetFilter {
     const compareValue = condition.value || condition.val;
     
     switch (operator) {
-      case '=':
-      case '==':
-      case 'equals':
-        return value === compareValue;
+    case '=':
+    case '==':
+    case 'equals':
+      return value === compareValue;
         
-      case '!=':
-      case 'not':
-      case 'notEquals':
-        return value !== compareValue;
+    case '!=':
+    case 'not':
+    case 'notEquals':
+      return value !== compareValue;
         
-      case 'contains':
-      case 'includes':
-        return String(value).includes(String(compareValue));
+    case 'contains':
+    case 'includes':
+      return String(value).includes(String(compareValue));
         
-      case 'startsWith':
-      case 'begins':
-        return String(value).startsWith(String(compareValue));
+    case 'startsWith':
+    case 'begins':
+      return String(value).startsWith(String(compareValue));
         
-      case 'endsWith':
-      case 'ends':
-        return String(value).endsWith(String(compareValue));
+    case 'endsWith':
+    case 'ends':
+      return String(value).endsWith(String(compareValue));
         
-      case 'regex':
-      case 'matches':
-        return new RegExp(compareValue).test(String(value));
+    case 'regex':
+    case 'matches':
+      return new RegExp(compareValue).test(String(value));
         
-      case '>':
-      case 'gt':
-        return Number(value) > Number(compareValue);
+    case '>':
+    case 'gt':
+      return Number(value) > Number(compareValue);
         
-      case '>=':
-      case 'gte':
-        return Number(value) >= Number(compareValue);
+    case '>=':
+    case 'gte':
+      return Number(value) >= Number(compareValue);
         
-      case '<':
-      case 'lt':
-        return Number(value) < Number(compareValue);
+    case '<':
+    case 'lt':
+      return Number(value) < Number(compareValue);
         
-      case '<=':
-      case 'lte':
-        return Number(value) <= Number(compareValue);
+    case '<=':
+    case 'lte':
+      return Number(value) <= Number(compareValue);
         
-      case 'in':
-        return Array.isArray(compareValue) && compareValue.includes(value);
+    case 'in':
+      return Array.isArray(compareValue) && compareValue.includes(value);
         
-      case 'notIn':
-        return Array.isArray(compareValue) && !compareValue.includes(value);
+    case 'notIn':
+      return Array.isArray(compareValue) && !compareValue.includes(value);
         
-      default:
-        return false;
+    default:
+      return false;
     }
   }
 
@@ -202,7 +202,7 @@ class RulesetFilter {
     if (!Array.isArray(rules)) {
       return rules ? [rules] : [];
     }
-    return rules.filter(rule => rule !== null && rule !== undefined);
+    return rules.filter((rule) => rule !== null && rule !== undefined);
   }
 }
 

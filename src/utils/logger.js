@@ -11,7 +11,7 @@ class Logger extends EventEmitter {
       silent: options.silent || false,
       prefix: options.prefix || 'CopyTree',
       useInkEvents: options.useInkEvents || false, // New option for Ink integration
-      ...options
+      ...options,
     };
     
     this.spinner = null;
@@ -25,7 +25,7 @@ class Logger extends EventEmitter {
       this.emit('log', {
         type: 'info',
         message: typeof message === 'string' ? message : JSON.stringify(message),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -42,7 +42,7 @@ class Logger extends EventEmitter {
       this.emit('log', {
         type: 'success',
         message: typeof message === 'string' ? message : JSON.stringify(message),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -59,7 +59,7 @@ class Logger extends EventEmitter {
       this.emit('log', {
         type: 'warning',
         message: typeof message === 'string' ? message : JSON.stringify(message),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -76,7 +76,7 @@ class Logger extends EventEmitter {
       this.emit('log', {
         type: 'error',
         message: typeof message === 'string' ? message : JSON.stringify(message),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -95,7 +95,7 @@ class Logger extends EventEmitter {
       this.emit('log', {
         type: 'debug',
         message: typeof message === 'string' ? message : JSON.stringify(message),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -112,7 +112,7 @@ class Logger extends EventEmitter {
       this.emit('progress', {
         type: 'start',
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -122,7 +122,7 @@ class Logger extends EventEmitter {
     this.stopSpinner(); // Stop any existing spinner
     this.spinner = ora({
       text: message,
-      color: 'blue'
+      color: 'blue',
     }).start();
   }
 
@@ -134,7 +134,7 @@ class Logger extends EventEmitter {
       this.emit('progress', {
         type: 'update',
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -152,7 +152,7 @@ class Logger extends EventEmitter {
       this.emit('progress', {
         type: 'success',
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -171,7 +171,7 @@ class Logger extends EventEmitter {
       this.emit('progress', {
         type: 'error',
         message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -189,7 +189,7 @@ class Logger extends EventEmitter {
     if (this.options.useInkEvents) {
       this.emit('progress', {
         type: 'stop',
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
       return;
     }
@@ -232,7 +232,7 @@ class Logger extends EventEmitter {
       italic: chalk.italic,
       underline: chalk.underline,
       inverse: chalk.inverse,
-      strikethrough: chalk.strikethrough
+      strikethrough: chalk.strikethrough,
     };
     
     const styleFunc = styles[style] || chalk.white;
@@ -255,7 +255,7 @@ class Logger extends EventEmitter {
   child(prefix) {
     return new Logger({
       ...this.options,
-      prefix: `${this.options.prefix}:${prefix}`
+      prefix: `${this.options.prefix}:${prefix}`,
     });
   }
 
@@ -339,5 +339,5 @@ module.exports = {
   success: defaultLogger.success.bind(defaultLogger),
   warn: defaultLogger.warn.bind(defaultLogger),
   error: defaultLogger.error.bind(defaultLogger),
-  debug: defaultLogger.debug.bind(defaultLogger)
+  debug: defaultLogger.debug.bind(defaultLogger),
 };

@@ -14,7 +14,7 @@ class GitUtils {
       baseDir: basePath,
       binary: 'git',
       maxConcurrentProcesses: 6,
-      trimmed: true
+      trimmed: true,
     });
     
     this.logger = options.logger || logger.child('GitUtils');
@@ -66,12 +66,12 @@ class GitUtils {
         ...status.modified,
         ...status.staged,
         ...status.not_added,
-        ...status.created
+        ...status.created,
       ];
 
       // Remove duplicates and normalize paths
-      const uniqueFiles = [...new Set(modifiedFiles)].map(file => 
-        path.normalize(file)
+      const uniqueFiles = [...new Set(modifiedFiles)].map((file) => 
+        path.normalize(file),
       );
 
       this.cache.set(cacheKey, uniqueFiles);
@@ -82,7 +82,7 @@ class GitUtils {
       throw new GitError(
         `Failed to get modified files: ${error.message}`,
         'getModifiedFiles',
-        { originalError: error }
+        { originalError: error },
       );
     }
   }
@@ -114,12 +114,12 @@ class GitUtils {
       }
 
       const changedFiles = diffSummary.files
-        .filter(file => file.file && !file.binary)
-        .map(file => path.normalize(file.file));
+        .filter((file) => file.file && !file.binary)
+        .map((file) => path.normalize(file.file));
 
       this.cache.set(cacheKey, changedFiles);
       this.logger.debug(
-        `Found ${changedFiles.length} changed files between ${fromRef} and ${toRef || 'working directory'}`
+        `Found ${changedFiles.length} changed files between ${fromRef} and ${toRef || 'working directory'}`,
       );
       
       return changedFiles;
@@ -127,7 +127,7 @@ class GitUtils {
       throw new GitError(
         `Failed to get changed files: ${error.message}`,
         'getChangedFiles',
-        { fromRef, toRef, originalError: error }
+        { fromRef, toRef, originalError: error },
       );
     }
   }
@@ -158,10 +158,10 @@ class GitUtils {
         created: status.created,
         deleted: status.deleted,
         renamed: status.renamed,
-        conflicted: status.conflicted
+        conflicted: status.conflicted,
       };
 
-      files.forEach(file => {
+      files.forEach((file) => {
         const normalizedPath = path.normalize(file);
         
         for (const [statusType, fileList] of Object.entries(allStatuses)) {
@@ -230,7 +230,7 @@ class GitUtils {
           hash: commit.hash,
           message: commit.message,
           author: commit.author_name,
-          date: commit.date
+          date: commit.date,
         };
         
         this.cache.set(cacheKey, commitInfo);

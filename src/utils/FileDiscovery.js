@@ -22,7 +22,7 @@ class FileDiscovery {
       maxFileSize: options.maxFileSize ?? this.config.get('copytree.maxFileSize'),
       maxTotalSize: options.maxTotalSize ?? this.config.get('copytree.maxTotalSize'),
       maxFileCount: options.maxFileCount ?? this.config.get('copytree.maxFileCount'),
-      ...options
+      ...options,
     };
   }
 
@@ -40,7 +40,7 @@ class FileDiscovery {
         throw new FileSystemError(
           `Base path does not exist: ${this.basePath}`,
           this.basePath,
-          'discover'
+          'discover',
         );
       }
 
@@ -58,7 +58,7 @@ class FileDiscovery {
       const duration = Date.now() - startTime;
       this.logger.info(
         `Discovered ${filteredFiles.length} files in ${duration}ms ` +
-        `(${files.length} total, ${files.length - filteredFiles.length} excluded)`
+        `(${files.length} total, ${files.length - filteredFiles.length} excluded)`,
       );
 
       return filteredFiles;
@@ -67,7 +67,7 @@ class FileDiscovery {
         `File discovery failed: ${error.message}`,
         this.basePath,
         'discover',
-        { originalError: error }
+        { originalError: error },
       );
     }
   }
@@ -125,7 +125,7 @@ class FileDiscovery {
       this.gitignorePatterns.push({
         pattern,
         isNegated,
-        original: trimmed
+        original: trimmed,
       });
     }
   }
@@ -146,10 +146,10 @@ class FileDiscovery {
       onlyFiles: true,
       stats: true,
       ignore: [
-        ...excludedDirs.map(dir => `**/${dir}/**`),
-        ...baseExcludedDirs.map(dir => `${dir}/**`),
-        ...excludedFiles
-      ]
+        ...excludedDirs.map((dir) => `**/${dir}/**`),
+        ...baseExcludedDirs.map((dir) => `${dir}/**`),
+        ...excludedFiles,
+      ],
     };
 
     this.logger.debug(`Glob patterns: ${JSON.stringify(this.patterns)}`);
@@ -157,14 +157,14 @@ class FileDiscovery {
 
     const entries = await fastGlob(this.patterns, globOptions);
 
-    return entries.map(entry => ({
+    return entries.map((entry) => ({
       path: entry.path,
       absolutePath: path.join(this.basePath, entry.path),
       relativePath: entry.path,
       size: entry.stats ? entry.stats.size : 0,
       modified: entry.stats ? entry.stats.mtime : null,
       isSymbolicLink: entry.stats ? entry.stats.isSymbolicLink() : false,
-      stats: entry.stats
+      stats: entry.stats,
     }));
   }
 
@@ -188,7 +188,7 @@ class FileDiscovery {
       if (this.options.maxFileSize && file.size > this.options.maxFileSize) {
         skippedBySize++;
         this.logger.debug(
-          `Skipping ${file.path} (${this.logger.formatBytes(file.size)} exceeds limit)`
+          `Skipping ${file.path} (${this.logger.formatBytes(file.size)} exceeds limit)`,
         );
         continue;
       }
@@ -196,7 +196,7 @@ class FileDiscovery {
       // Check total size
       if (this.options.maxTotalSize && totalSize + file.size > this.options.maxTotalSize) {
         this.logger.warn(
-          `Reached total size limit (${this.logger.formatBytes(this.options.maxTotalSize)})`
+          `Reached total size limit (${this.logger.formatBytes(this.options.maxTotalSize)})`,
         );
         break;
       }
@@ -241,7 +241,7 @@ class FileDiscovery {
       const options = {
         dot: true,
         matchBase: true,
-        nocase: process.platform === 'win32'
+        nocase: process.platform === 'win32',
       };
       
       if (minimatch(filePath, pattern, options)) {
@@ -260,7 +260,7 @@ class FileDiscovery {
       totalCount: files.length,
       totalSize: 0,
       largestFile: null,
-      fileTypes: {}
+      fileTypes: {},
     };
 
     for (const file of files) {
@@ -284,7 +284,7 @@ class FileDiscovery {
     return new FileDiscovery({
       ...this.options,
       ...options,
-      basePath: path.join(this.basePath, subPath)
+      basePath: path.join(this.basePath, subPath),
     });
   }
 }

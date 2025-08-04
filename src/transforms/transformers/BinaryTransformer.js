@@ -21,7 +21,7 @@ class BinaryTransformer extends BaseTransformer {
       // Media
       '.mp3', '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm',
       // Other
-      '.db', '.sqlite', '.bin', '.dat'
+      '.db', '.sqlite', '.bin', '.dat',
     ];
   }
 
@@ -29,15 +29,15 @@ class BinaryTransformer extends BaseTransformer {
     const action = this.config.get('copytree.binaryFileAction', 'placeholder');
     
     switch (action) {
-      case 'skip':
-        return null;
+    case 'skip':
+      return null;
         
-      case 'base64':
-        return await this.transformToBase64(file);
+    case 'base64':
+      return await this.transformToBase64(file);
         
-      case 'placeholder':
-      default:
-        return this.transformToPlaceholder(file);
+    case 'placeholder':
+    default:
+      return this.transformToPlaceholder(file);
     }
   }
 
@@ -49,13 +49,13 @@ class BinaryTransformer extends BaseTransformer {
   transformToPlaceholder(file) {
     const placeholderText = this.config.get(
       'copytree.binaryPlaceholderText', 
-      '[Binary file not included]'
+      '[Binary file not included]',
     );
 
     const fileInfo = [
       placeholderText,
       `Type: ${this.getFileType(file.path)}`,
-      `Size: ${this.formatBytes(file.size || 0)}`
+      `Size: ${this.formatBytes(file.size || 0)}`,
     ].join('\n');
 
     return {
@@ -64,7 +64,7 @@ class BinaryTransformer extends BaseTransformer {
       transformed: true,
       transformedBy: this.constructor.name,
       isBinary: true,
-      binaryAction: 'placeholder'
+      binaryAction: 'placeholder',
     };
   }
 
@@ -90,12 +90,12 @@ class BinaryTransformer extends BaseTransformer {
       
       // Add metadata comment
       const content = [
-        `[Binary file encoded as base64]`,
+        '[Binary file encoded as base64]',
         `Type: ${this.getFileType(file.path)}`,
         `Size: ${this.formatBytes(file.size || 0)}`,
-        `Encoding: base64`,
+        'Encoding: base64',
         '',
-        base64
+        base64,
       ].join('\n');
 
       return {
@@ -105,7 +105,7 @@ class BinaryTransformer extends BaseTransformer {
         transformedBy: this.constructor.name,
         isBinary: true,
         binaryAction: 'base64',
-        encoding: 'base64'
+        encoding: 'base64',
       };
     } catch (error) {
       this.logger.error(`Failed to encode ${file.path} to base64: ${error.message}`);
@@ -158,7 +158,7 @@ class BinaryTransformer extends BaseTransformer {
       '.exe': 'Windows Executable',
       '.dll': 'Dynamic Link Library',
       '.so': 'Shared Library',
-      '.db': 'Database File'
+      '.db': 'Database File',
     };
 
     return typeMap[ext] || `Binary File (${ext})`;

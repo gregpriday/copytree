@@ -55,7 +55,7 @@ class InstructionsStage extends Stage {
       const result = {
         ...input,
         instructions: instructionsContent,
-        instructionsName: instructionsName
+        instructionsName: instructionsName,
       };
 
       this.log(`Successfully loaded instructions '${instructionsName}' in ${this.getElapsedTime(startTime)}`, 'info');

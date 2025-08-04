@@ -10,7 +10,7 @@ class AISummaryTransformer extends BaseTransformer {
     this.description = 'Generates AI-powered summaries of file contents';
     this.supportedExtensions = options.extensions || [
       '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.go', '.rs', '.cpp', '.c',
-      '.php', '.rb', '.swift', '.kt', '.scala', '.r', '.m', '.h', '.cs'
+      '.php', '.rb', '.swift', '.kt', '.scala', '.r', '.m', '.h', '.cs',
     ];
     this.maxFileSize = options.maxFileSize || 100 * 1024; // 100KB default
     this.includeOriginal = options.includeOriginal ?? false;
@@ -28,7 +28,7 @@ class AISummaryTransformer extends BaseTransformer {
           ...file,
           content: `[File too large for AI summary: ${this.formatBytes(file.size)}]`,
           transformed: false,
-          transformedBy: this.constructor.name
+          transformedBy: this.constructor.name,
         };
       }
 
@@ -37,7 +37,7 @@ class AISummaryTransformer extends BaseTransformer {
         return {
           ...file,
           transformed: false,
-          transformedBy: this.constructor.name
+          transformedBy: this.constructor.name,
         };
       }
 
@@ -46,7 +46,7 @@ class AISummaryTransformer extends BaseTransformer {
       // Generate summary
       const summary = await this.ai.summarizeCode(file.content, {
         filePath: file.path,
-        language: this.detectLanguage(file.path)
+        language: this.detectLanguage(file.path),
       });
 
       // Build output
@@ -62,7 +62,7 @@ class AISummaryTransformer extends BaseTransformer {
         originalContent: file.content,
         transformed: true,
         transformedBy: this.constructor.name,
-        aiSummary: summary
+        aiSummary: summary,
       };
     } catch (error) {
       this.logger.error(`Failed to generate AI summary for ${file.path}: ${error.message}`);
@@ -72,7 +72,7 @@ class AISummaryTransformer extends BaseTransformer {
         content: `[Error generating AI summary: ${error.message}]\n\n${file.content}`,
         transformed: false,
         transformedBy: this.constructor.name,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -103,7 +103,7 @@ class AISummaryTransformer extends BaseTransformer {
       '.r': 'R',
       '.m': 'Objective-C',
       '.h': 'C/C++ Header',
-      '.cs': 'C#'
+      '.cs': 'C#',
     };
     
     return languageMap[ext] || 'Unknown';

@@ -28,7 +28,7 @@ class Clipboard {
     if (process.platform === 'win32') {
       try {
         // Use PowerShell to copy the file reference on Windows
-        const command = `powershell -Command "Set-Clipboard -Path '${filePath.replace(/'/g, "''")}'"`;  
+        const command = `powershell -Command "Set-Clipboard -Path '${filePath.replace(/'/g, '\'\'')}'"`;  
         execSync(command, { stdio: 'pipe' });
       } catch (error) {
         logger.debug('Failed to copy file reference using PowerShell, falling back to text:', error.message);
@@ -46,7 +46,7 @@ class Clipboard {
     } else if (process.platform === 'darwin') {
       try {
         // Use AppleScript to copy file reference
-        const escapedFilePath = filePath.replace(/"/g, '\"');
+        const escapedFilePath = filePath.replace(/"/g, '"');
         const script = `
           set aFile to POSIX file "${escapedFilePath}"
           tell app "Finder" to set the clipboard to aFile
@@ -54,7 +54,7 @@ class Clipboard {
 
         execSync(`osascript -e '${script}'`, { 
           encoding: 'utf8',
-          stdio: 'pipe' 
+          stdio: 'pipe', 
         });
       } catch (error) {
         logger.debug('Failed to copy file reference, falling back to text:', error.message);
@@ -89,7 +89,7 @@ class Clipboard {
       }
     } else if (process.platform === 'darwin') {
       try {
-        const escapedFilePath = filePath.replace(/"/g, '\"');
+        const escapedFilePath = filePath.replace(/"/g, '"');
         const script = `
           tell application "Finder" to reveal POSIX file "${escapedFilePath}"
           tell application "Finder" to activate
@@ -97,7 +97,7 @@ class Clipboard {
 
         execSync(`osascript -e '${script}'`, { 
           encoding: 'utf8',
-          stdio: 'pipe' 
+          stdio: 'pipe', 
         });
       } catch (error) {
         logger.debug('Failed to reveal file in Finder:', error.message);

@@ -24,7 +24,7 @@ class ConfigManager {
   }
 
   loadDefaults() {
-    const configFiles = fs.readdirSync(this.configPath).filter(file => file.endsWith('.js'));
+    const configFiles = fs.readdirSync(this.configPath).filter((file) => file.endsWith('.js'));
     
     for (const file of configFiles) {
       const configName = path.basename(file, '.js');
@@ -43,7 +43,7 @@ class ConfigManager {
     }
 
     const userConfigFiles = fs.readdirSync(this.userConfigPath)
-      .filter(file => file.endsWith('.js') || file.endsWith('.json'));
+      .filter((file) => file.endsWith('.js') || file.endsWith('.json'));
     
     for (const file of userConfigFiles) {
       const configName = path.basename(file).replace(/\.(js|json)$/, '');
@@ -178,5 +178,5 @@ module.exports = {
       instance = new ConfigManager();
     }
     return instance.env(key, defaultValue);
-  }
+  },
 };

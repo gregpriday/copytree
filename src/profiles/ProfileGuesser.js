@@ -36,7 +36,7 @@ class ProfileGuesser {
       hasCI: await this.hasAnyFile(['.github/workflows', '.gitlab-ci.yml', '.circleci', 'Jenkinsfile']),
       hasTests: await this.hasAnyDirectory(['test', 'tests', '__tests__', 'spec']),
       hasDocs: await this.hasAnyDirectory(['docs', 'documentation']),
-      packageManagers: []
+      packageManagers: [],
     };
 
     // Detect languages (for informational purposes only)
@@ -69,7 +69,7 @@ class ProfileGuesser {
         // Handle glob patterns
         const files = await fs.readdir(this.projectPath);
         const pattern = new RegExp(fileName.replace('*', '.*'));
-        if (files.some(f => pattern.test(f))) {
+        if (files.some((f) => pattern.test(f))) {
           return true;
         }
       } else {

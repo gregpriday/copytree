@@ -27,7 +27,7 @@ class FileLoader {
         ignore: exclude,
         dot: this.includeHidden,
         followSymbolicLinks: this.followSymlinks,
-        onlyFiles: true
+        onlyFiles: true,
       });
       
       // Load file contents
@@ -43,7 +43,7 @@ class FileLoader {
     } catch (error) {
       logger.error('Failed to load files', {
         basePath: this.basePath,
-        error: error.message
+        error: error.message,
       });
       throw error;
     }
@@ -63,7 +63,7 @@ class FileLoader {
         logger.warn('Skipping large file', {
           path: relativePath,
           size: stats.size,
-          maxSize: this.maxFileSize
+          maxSize: this.maxFileSize,
         });
         return null;
       }
@@ -80,9 +80,9 @@ class FileLoader {
           size: stats.size,
           mtime: stats.mtime,
           ctime: stats.ctime,
-          mode: stats.mode
+          mode: stats.mode,
         },
-        type: this.detectFileType(relativePath, content)
+        type: this.detectFileType(relativePath, content),
       };
     } catch (error) {
       // Try reading as binary if UTF-8 fails
@@ -102,22 +102,22 @@ class FileLoader {
               size: stats.size,
               mtime: stats.mtime,
               ctime: stats.ctime,
-              mode: stats.mode
+              mode: stats.mode,
             },
             type: 'binary',
-            isBinary: true
+            isBinary: true,
           };
         } catch (binaryError) {
           logger.error('Failed to load file as binary', {
             path: relativePath,
-            error: binaryError.message
+            error: binaryError.message,
           });
           return null;
         }
       } else {
         logger.error('Failed to load file', {
           path: relativePath,
-          error: error.message
+          error: error.message,
         });
         return null;
       }
@@ -146,7 +146,7 @@ class FileLoader {
       '.go': 'go',
       '.rs': 'rust',
       '.swift': 'swift',
-      '.kt': 'kotlin'
+      '.kt': 'kotlin',
     };
     
     if (codeExtensions[ext]) {
@@ -161,7 +161,7 @@ class FileLoader {
       '.yml': 'yaml',
       '.toml': 'toml',
       '.ini': 'ini',
-      '.csv': 'csv'
+      '.csv': 'csv',
     };
     
     if (dataExtensions[ext]) {
@@ -174,7 +174,7 @@ class FileLoader {
       '.mdx': 'markdown',
       '.txt': 'text',
       '.rst': 'restructuredtext',
-      '.tex': 'latex'
+      '.tex': 'latex',
     };
     
     if (docExtensions[ext]) {
@@ -188,7 +188,7 @@ class FileLoader {
       '.css': 'css',
       '.scss': 'scss',
       '.sass': 'sass',
-      '.less': 'less'
+      '.less': 'less',
     };
     
     if (webExtensions[ext]) {

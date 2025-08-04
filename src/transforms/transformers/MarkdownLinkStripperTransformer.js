@@ -88,20 +88,20 @@ class MarkdownLinkStripperTransformer extends BaseTransformer {
           reduction: `${reduction}%`,
           stripImages: this.stripImages,
           stripFootnotes: this.stripFootnotes,
-          stripReferences: this.stripReferences
-        }
+          stripReferences: this.stripReferences,
+        },
       };
     } catch (error) {
       this.logger.error('Failed to strip markdown links', {
         file: file.path,
-        error: error.message
+        error: error.message,
       });
 
       // Return original content on error
       return {
         ...file,
         transformed: false,
-        error: error.message
+        error: error.message,
       };
     }
   }

@@ -24,8 +24,8 @@ class LimitStage extends Stage {
       stats: {
         ...input.stats,
         truncated: true,
-        truncatedCount
-      }
+        truncatedCount,
+      },
     };
   }
 }

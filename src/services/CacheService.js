@@ -130,7 +130,7 @@ class CacheService {
       key: fullKey,
       value,
       expires,
-      created: Date.now()
+      created: Date.now(),
     };
     
     try {
@@ -256,7 +256,7 @@ class CacheService {
    * @param {Object} options - GC options
    * @returns {Promise<number>} Number of expired items removed
    */
-  async runGarbageCollection(options = {}) {
+  async runGarbageCollection(_options = {}) {
     if (!this.enabled || this.driver !== 'file') {
       return 0;
     }
@@ -302,12 +302,14 @@ class CacheService {
             removed++;
             totalSize += stats.size;
           }
-        } catch (error) {
+        } catch (_error) {
           // Remove corrupted cache files
           try {
             const stats = await fs.stat(filePath);
             totalSize += stats.size;
-          } catch {}
+          } catch (_statsError) {
+            // Ignore stat errors
+          }
           await fs.remove(filePath);
           removed++;
         }
@@ -346,7 +348,7 @@ class CacheService {
   static create(namespace, options = {}) {
     return new CacheService({
       prefix: `copytree_${namespace}_`,
-      ...options
+      ...options,
     });
   }
 }
@@ -362,5 +364,5 @@ module.exports = {
       defaultCache = new CacheService();
     }
     return defaultCache;
-  }
+  },
 };

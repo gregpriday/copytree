@@ -31,7 +31,7 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
           isBinary: false,
           transformed: true,
           transformedBy: this.constructor.name,
-          streamingSkipped: true
+          streamingSkipped: true,
         };
       }
 
@@ -52,7 +52,7 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
             isBinary: true,
             encoding: 'base64',
             transformed: true,
-            transformedBy: this.constructor.name
+            transformedBy: this.constructor.name,
           };
         } else {
           // Placeholder
@@ -61,7 +61,7 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
             content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
             isBinary: true,
             transformed: true,
-            transformedBy: this.constructor.name
+            transformedBy: this.constructor.name,
           };
         }
       }
@@ -74,7 +74,7 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
         content,
         isBinary: false,
         transformed: true,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     } catch (error) {
       this.logger.error(`Failed to load file ${file.path}: ${error.message}`);
@@ -84,7 +84,7 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
         content: `[Error reading file: ${error.message}]`,
         error: error.message,
         transformed: false,
-        transformedBy: this.constructor.name
+        transformedBy: this.constructor.name,
       };
     }
   }
@@ -97,10 +97,10 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
       const chunks = [];
       const stream = fs.createReadStream(filePath, {
         encoding: this.encoding,
-        highWaterMark: this.bufferSize
+        highWaterMark: this.bufferSize,
       });
 
-      stream.on('data', chunk => chunks.push(chunk));
+      stream.on('data', (chunk) => chunks.push(chunk));
       stream.on('end', () => resolve(chunks.join('')));
       stream.on('error', reject);
     });
@@ -113,10 +113,10 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
     return new Promise((resolve, reject) => {
       const chunks = [];
       const stream = fs.createReadStream(filePath, {
-        highWaterMark: this.bufferSize
+        highWaterMark: this.bufferSize,
       });
 
-      stream.on('data', chunk => chunks.push(chunk));
+      stream.on('data', (chunk) => chunks.push(chunk));
       stream.on('end', () => {
         const buffer = Buffer.concat(chunks);
         resolve(buffer.toString('base64'));
@@ -141,7 +141,7 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
       '.wav', '.flac', '.aac', '.ogg', '.wma', '.ttf', '.otf',
       '.woff', '.woff2', '.eot', '.pyc', '.pyo', '.class',
       '.o', '.obj', '.a', '.lib', '.pdb', '.idb', '.jar',
-      '.war', '.ear', '.db', '.sqlite', '.sqlite3'
+      '.war', '.ear', '.db', '.sqlite', '.sqlite3',
     ];
     
     const ext = (filePath.match(/\.[^.]+$/) || [''])[0].toLowerCase();

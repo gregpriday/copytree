@@ -77,20 +77,20 @@ class HTMLStripperTransformer extends BaseTransformer {
         metadata: {
           originalSize: htmlContent.length,
           strippedSize: textContent.length,
-          reduction: Math.round((1 - textContent.length / htmlContent.length) * 100) + '%'
-        }
+          reduction: Math.round((1 - textContent.length / htmlContent.length) * 100) + '%',
+        },
       };
     } catch (error) {
       this.logger.error('Failed to strip HTML', {
         file: file.path,
-        error: error.message
+        error: error.message,
       });
 
       // Return original content on error
       return {
         ...file,
         transformed: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -104,8 +104,8 @@ class HTMLStripperTransformer extends BaseTransformer {
       '&lt;': '<',
       '&gt;': '>',
       '&quot;': '"',
-      '&#39;': "'",
-      '&apos;': "'",
+      '&#39;': '\'',
+      '&apos;': '\'',
       '&nbsp;': ' ',
       '&copy;': '©',
       '&reg;': '®',
@@ -130,7 +130,7 @@ class HTMLStripperTransformer extends BaseTransformer {
       '&mu;': 'μ',
       '&pi;': 'π',
       '&sigma;': 'σ',
-      '&omega;': 'ω'
+      '&omega;': 'ω',
     };
 
     let decoded = text;
