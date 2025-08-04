@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.10.0] - 2025-08-04
+
+### Major Changes
+- **Complete ESM Migration** - Migrated entire codebase from CommonJS to ECMAScript Modules
+- **Node.js 18+ Support** - Updated minimum requirement to Node.js >=18.0.0 with compatibility for versions 18-24
+- **Enhanced Cross-Platform Support** - Improved Windows and Linux clipboard and file operations
+
+### Breaking Changes
+- Converted all modules from CommonJS `require/module.exports` to ESM `import/export` syntax
+- Added `.js` extensions to all relative imports for ESM compliance
+- Updated package.json to use `"type": "module"`
+
+### Added
+- Dynamic ESM import compatibility for UI components
+- PowerShell integration for Windows file operations
+- ESM-compatible test configurations
+
+### Fixed
+- **Critical**: Resolved copy command hanging issues on Node.js 18-22
+- **Critical**: Fixed React/Ink component loading timing problems
+- ESLint v9 compatibility with 2950+ auto-fixed formatting issues
+- Clipboardy ESM compatibility with dynamic imports
+
+### Removed
+- Deprecated ESM loader that caused `globalPreload` warnings
+- Legacy CommonJS compatibility shims
+
 ## [0.9.1] - 2025-08-01
 
 ### Added

@@ -22,7 +22,7 @@ const useInk = () => {
           Box: ink.Box,
           Text: ink.Text,
           Newline: ink.Newline,
-          Spinner: ink.Spinner
+          Spinner: ink.Spinner,
         };
         isLoading = false;
         return inkComponents;
