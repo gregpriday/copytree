@@ -2,6 +2,18 @@
 class ConfigManager {
   constructor() {
     this.config = {
+      cache: {
+        enabled: true,
+        driver: 'file',
+        prefix: 'copytree_',
+        defaultTtl: 3600,
+        file: {
+          path: null,
+          extension: '.cache',
+          gcProbability: 0.01,
+          maxAge: 7 * 24 * 60 * 60 * 1000
+        }
+      },
       copytree: {
         globalExcludedDirectories: [],
         basePathExcludedDirectories: [],
@@ -11,7 +23,16 @@ class ConfigManager {
         defaultExclusions: ['node_modules', '.git'],
         cache: {
           enabled: false,
-          ttl: 86400000
+          driver: 'file',
+          prefix: 'copytree_',
+          defaultTtl: 3600,
+          ttl: 86400000,
+          file: {
+            path: null,
+            extension: '.cache',
+            gcProbability: 0.01,
+            maxAge: 7 * 24 * 60 * 60 * 1000
+          }
         }
       },
       app: {

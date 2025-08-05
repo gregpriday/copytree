@@ -1,6 +1,6 @@
-const React = require('react');
-const { render } = require('ink-testing-library');
-const SummaryTable = require('../../../../src/ui/components/SummaryTable.js');
+import React from 'react';
+import { render } from 'ink-testing-library';
+import SummaryTable from '../../../../src/ui/components/SummaryTable.js';
 
 describe('SummaryTable Component', () => {
 	test('renders null when no stats provided', () => {

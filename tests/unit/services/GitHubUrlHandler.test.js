@@ -1,11 +1,7 @@
-const fs = require('fs-extra');
-const path = require('path');
-const { execSync } = require('child_process');
-
-// Mock dependencies
+// Mock dependencies before imports
 jest.mock('fs-extra');
 jest.mock('child_process');
-jest.mock('../../../src/utils/logger', () => ({
+jest.mock('../../../src/utils/logger.js', () => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
@@ -14,8 +10,10 @@ jest.mock('../../../src/utils/logger', () => ({
   }
 }));
 
-// Now require GitHubUrlHandler after mocks are set up
-const GitHubUrlHandler = require('../../../src/services/GitHubUrlHandler');
+import fs from 'fs-extra';
+import path from 'path';
+import { execSync } from 'child_process';
+import GitHubUrlHandler from '../../../src/services/GitHubUrlHandler.js';
 
 describe('GitHubUrlHandler', () => {
   beforeEach(() => {

@@ -1,13 +1,12 @@
-const InstructionsStage = require('../../../../src/pipeline/stages/InstructionsStage');
-const InstructionsLoader = require('../../../../src/services/InstructionsLoader');
-
 // Mock dependencies
-jest.mock('../../../../src/services/InstructionsLoader');
-jest.mock('../../../../src/config/ConfigManager', () => ({
+jest.mock('../../../../src/services/InstructionsLoader.js');
+jest.mock('../../../../src/config/ConfigManager.js', () => ({
   config: jest.fn()
 }));
 
-const { config } = require('../../../../src/config/ConfigManager');
+import InstructionsStage from '../../../../src/pipeline/stages/InstructionsStage.js';
+import InstructionsLoader from '../../../../src/services/InstructionsLoader.js';
+import { config } from '../../../../src/config/ConfigManager.js';
 
 describe('InstructionsStage', () => {
   let stage;

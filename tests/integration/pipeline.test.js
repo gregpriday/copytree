@@ -5,6 +5,8 @@ jest.unmock('fs-extra');
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { promisify } from 'util';
+import { utimes } from 'fs';
 
 // Use dynamic imports for modules under test
 let Pipeline, FileDiscoveryStage, ProfileFilterStage, FileLoadingStage, OutputFormattingStage, LimitStage, CharLimitStage, InstructionsStage;
@@ -308,13 +310,12 @@ describe('Pipeline Integration Tests', () => {
       // Ensure different modification times
       const now = Date.now();
       // Use fs.utimes with promisify
-      const { promisify } = require('util');
-      const utimes = promisify(require('fs').utimes);
+      const utimesAsync = promisify(utimes);
       
       try {
-        await utimes(path.join(tempDir, 'small.txt'), new Date(now - 3000), new Date(now - 3000));
-        await utimes(path.join(tempDir, 'medium.txt'), new Date(now - 2000), new Date(now - 2000));
-        await utimes(path.join(tempDir, 'large.txt'), new Date(now - 1000), new Date(now - 1000));
+        await utimesAsync(path.join(tempDir, 'small.txt'), new Date(now - 3000), new Date(now - 3000));
+        await utimesAsync(path.join(tempDir, 'medium.txt'), new Date(now - 2000), new Date(now - 2000));
+        await utimesAsync(path.join(tempDir, 'large.txt'), new Date(now - 1000), new Date(now - 1000));
       } catch (err) {
         console.error('Error setting file times:', err);
       }

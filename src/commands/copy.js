@@ -232,7 +232,7 @@ async function setupPipelineStages(basePath, profile, options) {
     
     let outputStream = process.stdout;
     if (options.output) {
-      outputStream = fsSync.createWriteStream(options.output);
+      outputStream = fsSync.createWriteStream(path.resolve(options.output));
     }
     
     stages.push(new StreamingOutputStage({

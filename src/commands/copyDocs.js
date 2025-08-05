@@ -1,8 +1,12 @@
 import fs from 'fs-extra';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import clipboardy from 'clipboardy';
 import { logger } from '../utils/logger.js';
 import { CommandError } from '../utils/errors.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Copy docs command - Copy framework/library documentation

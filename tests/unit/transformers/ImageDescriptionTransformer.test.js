@@ -1,5 +1,5 @@
 // Mock the BaseTransformer to avoid its dependencies
-jest.mock('../../../src/transforms/BaseTransformer', () => {
+jest.mock('../../../src/transforms/BaseTransformer.js', () => {
   return class BaseTransformer {
     constructor(options = {}) {
       this.options = options;
@@ -34,9 +34,9 @@ jest.mock('../../../src/transforms/BaseTransformer', () => {
 jest.mock('@google/generative-ai');
 jest.mock('fs-extra');
 
-const ImageDescriptionTransformer = require('../../../src/transforms/transformers/ImageDescriptionTransformer');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const fs = require('fs-extra');
+import ImageDescriptionTransformer from '../../../src/transforms/transformers/ImageDescriptionTransformer.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import fs from 'fs-extra';
 
 describe('ImageDescriptionTransformer', () => {
   let transformer;

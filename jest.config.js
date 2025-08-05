@@ -36,7 +36,11 @@ export default {
     '^@/(.*)$': '<rootDir>/src/$1.js',
     '^.*/config/ConfigManager\\.js$': '<rootDir>/tests/mocks/ConfigManager.js',
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
-    '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js'
+    '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
+    '^.*/services/InstructionsLoader\\.js$': '<rootDir>/tests/mocks/InstructionsLoader.js',
+    '^.*/profiles/ProfileLoader\\.js$': '<rootDir>/tests/mocks/ProfileLoader.js',
+    '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
+    '^ink$': '<rootDir>/tests/mocks/ink.js'
   },
   
   // Module directories
@@ -53,7 +57,7 @@ export default {
   
   // Transform ignore patterns to handle ES modules
   transformIgnorePatterns: [
-    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy|ink-testing-library|ink|ink-spinner)/)'
+    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy)/)'
   ],
   
   // Ignore patterns

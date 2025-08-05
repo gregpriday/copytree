@@ -1,11 +1,14 @@
 // Unmock fs-extra for integration tests
 jest.unmock('fs-extra');
 
-const { exec } = require('child_process');
-const path = require('path');
-const fs = require('fs-extra');
-const os = require('os');
-const { promises: fsPromises } = require('fs');
+import { exec } from 'child_process';
+import path from 'path';
+import fs from 'fs-extra';
+import { readFileSync, existsSync, readdirSync } from 'fs';
+import os from 'os';
+import { promises as fsPromises } from 'fs';
+// Jest/Babel compatibility: construct the test directory path
+const __dirname = path.join(process.cwd(), 'tests/integration');
 
 // Helper to run CLI commands
 function runCommand(command, options = {}) {
@@ -164,12 +167,11 @@ output:
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Use native fs for file existence check
-      const nodeFs = require('fs');
-      const fileExists = nodeFs.existsSync(fullOutputPath);
+      const fileExists = existsSync(fullOutputPath);
       console.log('File exists check:', { fullOutputPath, fileExists });
       if (!fileExists) {
         console.error('Output file not created at:', fullOutputPath);
-        const dirContents = nodeFs.readdirSync(testProjectDir);
+        const dirContents = readdirSync(testProjectDir);
         console.error('Test project dir contents:', dirContents);
         console.error('Stdout was:', stdout);
         console.error('Stderr was:', stderr);
@@ -181,7 +183,7 @@ output:
       }
       expect(fileExists).toBe(true);
       
-      const content = nodeFs.readFileSync(fullOutputPath, 'utf8');
+      const content = readFileSync(fullOutputPath, 'utf8');
       expect(content).toContain('<?xml');
       expect(content).toMatch(/<ct:files[\s\/>]/); // Match <ct:files> or <ct:files/>
     });
@@ -307,14 +309,13 @@ output:
       expect(exitCode).toBe(0);
       
       const fullOutputPath = path.join(testProjectDir, outputFile);
-      const nodeFs = require('fs');
-      const fileExists = nodeFs.existsSync(fullOutputPath);
+      const fileExists = existsSync(fullOutputPath);
       if (!fileExists) {
         console.error('JSON output file not created at:', fullOutputPath);
       }
       expect(fileExists).toBe(true);
       
-      const content = nodeFs.readFileSync(fullOutputPath, 'utf8');
+      const content = readFileSync(fullOutputPath, 'utf8');
       expect(() => JSON.parse(content)).not.toThrow();
     });
 
@@ -341,14 +342,13 @@ output:
   describe('File Filtering', () => {
     test('should respect filter patterns', async () => {
       // First verify files exist
-      const nodeFs = require('fs');
       const srcPath = path.join(testProjectDir, 'src');
       const indexPath = path.join(srcPath, 'index.js');
       console.log('Checking files before test:');
-      console.log('src exists:', nodeFs.existsSync(srcPath));
-      console.log('index.js exists:', nodeFs.existsSync(indexPath));
-      if (nodeFs.existsSync(srcPath)) {
-        console.log('src contents:', nodeFs.readdirSync(srcPath));
+      console.log('src exists:', existsSync(srcPath));
+      console.log('index.js exists:', existsSync(indexPath));
+      if (existsSync(srcPath)) {
+        console.log('src contents:', readdirSync(srcPath));
       }
       
       const { stdout, stderr, exitCode } = await runCommand(

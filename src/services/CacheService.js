@@ -33,7 +33,13 @@ class CacheService {
     // Memory cache for current process
     this.memoryCache = new Map();
     
-    this.logger = logger.child('CacheService');
+    this.logger = logger?.child?.('CacheService') || {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      success: () => {}
+    };
     
     // Ensure cache directory exists
     if (this.enabled && this.driver === 'file') {

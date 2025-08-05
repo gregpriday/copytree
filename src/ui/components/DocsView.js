@@ -19,7 +19,11 @@ let Box, Text;
 import { useAppContext } from '../contexts/AppContext.js';
 import fs from 'fs-extra';
 import path from 'path';
+import { fileURLToPath } from 'url';
 // Use dynamic import for ESM-only clipboardy inside async contexts
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const TopicsList = ({ topics }) => {
   if (!topics || topics.length === 0) {

@@ -1,8 +1,8 @@
 // Mock dependencies
-jest.mock('../../../../src/utils/GitUtils');
+jest.mock('../../../../src/utils/GitUtils.js');
 
-const GitFilterStage = require('../../../../src/pipeline/stages/GitFilterStage');
-const GitUtils = require('../../../../src/utils/GitUtils');
+import GitFilterStage from '../../../../src/pipeline/stages/GitFilterStage.js';
+import GitUtils from '../../../../src/utils/GitUtils.js';
 
 describe('GitFilterStage', () => {
   let stage;

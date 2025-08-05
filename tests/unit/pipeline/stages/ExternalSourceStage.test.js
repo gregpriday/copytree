@@ -1,16 +1,16 @@
 // Mock dependencies before any imports
-jest.mock('../../../../src/services/GitHubUrlHandler');
-jest.mock('../../../../src/utils/fileLoader');
+jest.mock('../../../../src/services/GitHubUrlHandler.js');
+jest.mock('../../../../src/utils/fileLoader.js');
 jest.mock('fs-extra');
 jest.mock('globby', () => ({
   globby: jest.fn()
 }));
 
-const ExternalSourceStage = require('../../../../src/pipeline/stages/ExternalSourceStage');
-const GitHubUrlHandler = require('../../../../src/services/GitHubUrlHandler');
-const FileLoader = require('../../../../src/utils/fileLoader');
-const fs = require('fs-extra');
-const path = require('path');
+import ExternalSourceStage from '../../../../src/pipeline/stages/ExternalSourceStage.js';
+import GitHubUrlHandler from '../../../../src/services/GitHubUrlHandler.js';
+import FileLoader from '../../../../src/utils/fileLoader.js';
+import fs from 'fs-extra';
+import path from 'path';
 
 describe('ExternalSourceStage', () => {
   let stage;

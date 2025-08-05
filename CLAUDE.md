@@ -83,7 +83,7 @@ copytree --transform             # Enable all transformers
 copytree --no-transform          # Disable transformers
 
 # Output options
-copytree --save output.xml       # Save to file
+copytree --output output.xml     # Save to file
 copytree --display               # Show in terminal
 copytree --clipboard             # Copy to clipboard
 

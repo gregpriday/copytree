@@ -1,8 +1,23 @@
-const path = require('path');
-const dotenv = require('dotenv');
+// Unmock fs-extra for integration tests
+jest.unmock('fs-extra');
+
+import path from 'path';
+import dotenv from 'dotenv';
+import fs from 'fs-extra';
+
+// Jest/Babel compatibility: construct the test directory path
+const __dirname = path.join(process.cwd(), 'tests/integration');
 
 // Load environment variables from root .env file
 dotenv.config({ path: path.join(__dirname, '../../.env') });
+
+// Use dynamic imports for modules under test
+let ImageDescriptionTransformer;
+
+beforeAll(async () => {
+  const imageDescriptionModule = await import('../../src/transforms/transformers/ImageDescriptionTransformer.js');
+  ImageDescriptionTransformer = imageDescriptionModule.default;
+});
 
 describe('ImageDescriptionTransformer Integration Test', () => {
   it('should generate description for image using real Gemini API', async () => {
@@ -11,14 +26,6 @@ describe('ImageDescriptionTransformer Integration Test', () => {
       console.log('GEMINI_API_KEY is not set. Skipping ImageDescription integration test.');
       return;
     }
-
-    // Reset modules and unmock fs-extra for this specific test
-    jest.resetModules();
-    jest.unmock('fs-extra');
-    
-    // Require modules after unmocking
-    const fs = require('fs-extra');
-    const ImageDescriptionTransformer = require('../../src/transforms/transformers/ImageDescriptionTransformer');
 
     // Get the path to the test image
     const imagePath = path.join(__dirname, '../fixtures/images/painting.jpg');
