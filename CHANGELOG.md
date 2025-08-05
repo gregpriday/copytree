@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.11.0] - 2025-08-05
+
+### Major Changes
+- **Comprehensive Architecture Improvements** - Enhanced pipeline system with improved validation and error handling
+- **JSON Schema Validation System** - Added robust configuration validation with detailed error reporting
+- **Performance Monitoring & Budgets** - Implemented performance tracking, budgets, and telemetry system
+- **Enhanced Error Handling** - New custom error classes with detailed context and recovery mechanisms
+
+### Added
+- **JSON Schema Configuration** - Complete schema validation for all configuration options
+- **Performance Budget System** - Automatic performance monitoring with grade calculations (A-F)
+- **Performance Telemetry** - Session recording and insights for optimization recommendations
+- **Enhanced Pipeline Architecture** - 16+ specialized processing stages with lifecycle hooks
+- **Advanced Transformer Registry** - Trait-based system with conflict detection and optimization
+- **Config Inspector UI** - New UI component for configuration debugging and validation
+- **Memory Usage Monitoring** - Real-time memory tracking and optimization suggestions
+- **Stage-Level Performance Tracking** - Detailed timing and resource usage per pipeline stage
+
+### Enhanced
+- **AIService Architecture** - Improved singleton pattern with better error handling and caching
+- **Pipeline Stage System** - Enhanced event emission and error recovery capabilities
+- **Configuration Management** - Hierarchical configuration with environment variable support
+- **Test Suite Coverage** - Complete ES module conversion with 496+ passing tests
+- **Documentation System** - New technical architecture documentation and transformer guides
+
+### Fixed
+- **Pipeline Error Recovery** - Improved graceful degradation and error boundary handling
+- **Memory Leak Prevention** - Better resource cleanup and garbage collection
+- **Configuration Validation** - Comprehensive validation with clear error messages
+- **Transform Stage Optimization** - Enhanced file processing efficiency and memory usage
+
+### Technical Improvements
+- **Transformer Traits System** - Advanced transformer compatibility and ordering
+- **Event-Driven Pipeline** - Enhanced event emission throughout processing lifecycle
+- **Performance Optimization** - Throughput calculations and bottleneck identification
+- **Error Context Enrichment** - Detailed error information with recovery suggestions
+
 ## [0.10.0] - 2025-08-04
 
 ### Major Changes
