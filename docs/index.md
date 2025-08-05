@@ -29,6 +29,10 @@ Learn about CopyTree's powerful profile system for project-specific file selecti
 ### [AI Integration](./installation/claude-integration.md)
 Set up CopyTree with Claude Code and other AI assistants for enhanced productivity.
 
+### [Technical Documentation](./technical/)
+In-depth technical documentation for developers and contributors:
+- [Architecture Guide](./technical/architecture.md) - Pipeline system, stages, and core contracts
+
 
 ## ✨ Key Features
 

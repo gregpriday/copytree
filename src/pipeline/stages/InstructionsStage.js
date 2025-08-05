@@ -85,18 +85,22 @@ class InstructionsStage extends Stage {
    */
   async validate(input) {
     // Skip validation if instructions are disabled
-    if (input.options?.noInstructions) {
+    if (input.options?.noInstructions || input.options?.instructions === false) {
       return true;
     }
 
-    const instructionsName = input.options?.instructions || 
-                            config().get('app.defaultInstructions', 'default');
+    let instructionsName = input.options?.instructions;
+    
+    // If instructions is true but not a string, use default
+    if (instructionsName === true || !instructionsName) {
+      instructionsName = config().get('app.defaultInstructions', 'default');
+    }
     
     // Check if instructions exist
     const exists = await this.instructionsLoader.exists(instructionsName);
     
-    if (!exists && input.options?.instructions) {
-      // Only throw error if a specific instructions set was requested
+    // Only throw error if a specific instructions set was requested (not true or default)
+    if (!exists && input.options?.instructions && input.options.instructions !== true) {
       throw new Error(`Instructions '${instructionsName}' not found`);
     }
     

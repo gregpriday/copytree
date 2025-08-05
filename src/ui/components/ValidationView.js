@@ -19,11 +19,7 @@ let Box, Text;
 import { useAppContext } from '../contexts/AppContext.js';
 import fs from 'fs-extra';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import os from 'os';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const ValidationStep = ({ step, isActive, isCompleted }) => {
   const getIcon = () => {
@@ -311,7 +307,7 @@ const ValidationView = ({ successMessage, type }) => {
 
     // Step 1: Check directories
     setCurrentStep(0);
-    const defaultConfigPath = path.join(__dirname, '../../../config');
+    const defaultConfigPath = path.join(process.cwd(), 'config');
     const userConfigPath = path.join(os.homedir(), '.copytree');
 		
     let directoriesStatus = 'success';

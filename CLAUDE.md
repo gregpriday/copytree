@@ -20,6 +20,8 @@ CopyTree is a sophisticated CLI tool for intelligently copying and transforming 
 - Event-driven processing pipeline with 16 specialized stages
 - Memory-efficient streaming for large files
 - Error recovery and graceful degradation
+- Comprehensive lifecycle hooks and event emission
+- See [Architecture Guide](./docs/technical/architecture.md) for detailed contracts and patterns
 
 **Commands** (`src/commands/`)
 - `copy.js` - Main copy command with extensive options
@@ -62,6 +64,7 @@ Comprehensive documentation available in `docs/`:
 - **[docs/index.md](./docs/index.md)** - Getting started guide
 - **[docs/cli/copytree-reference.md](./docs/cli/copytree-reference.md)** - Complete CLI reference
 - **[docs/profiles/transformer-reference.md](./docs/profiles/transformer-reference.md)** - All transformers documented
+- **[docs/technical/architecture.md](./docs/technical/architecture.md)** - Pipeline architecture and stage contracts
 - **[docs/usage/troubleshooting.md](./docs/usage/troubleshooting.md)** - Common issues
 
 ## Quick Reference

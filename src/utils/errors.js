@@ -177,6 +177,80 @@ function handleError(error, options = {}) {
 // Alias for consistency with BaseProvider
 const ProviderError = AIProviderError;
 
+/**
+ * Error codes that should be retried (transient errors)
+ */
+export const RETRYABLE_ERROR_CODES = [
+  'RATE_LIMIT',
+  'TIMEOUT',
+  'SERVICE_UNAVAILABLE', 
+  'NETWORK_ERROR',
+  'TEMPORARY_FAILURE',
+  'ENOTFOUND',
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNABORTED',
+  'SOCKET_TIMEOUT',
+];
+
+/**
+ * Error codes that should NOT be retried (permanent errors)
+ */
+export const NON_RETRYABLE_ERROR_CODES = [
+  'INVALID_API_KEY',
+  'SAFETY_FILTER',
+  'INVALID_REQUEST',
+  'CONTENT_BLOCKED',
+  'QUOTA_EXCEEDED',
+  'PERMISSION_DENIED',
+  'AUTHENTICATION_FAILED',
+  'VALIDATION_ERROR',
+  'CONFIG_ERROR',
+];
+
+/**
+ * Check if an error is retryable
+ * @param {Error} error - The error to check
+ * @returns {boolean} True if the error should be retried
+ */
+export function isRetryableError(error) {
+  if (error instanceof ProviderError) {
+    // For ProviderError, the specific error code is in details.code
+    const specificCode = error.details?.code;
+    return specificCode && RETRYABLE_ERROR_CODES.includes(specificCode);
+  }
+  
+  // Check for common network error codes on the error object
+  const errorCode = error.code || error.name || '';
+  return RETRYABLE_ERROR_CODES.includes(errorCode);
+}
+
+/**
+ * Categorize an error as retryable or non-retryable
+ * @param {Error} error - The error to categorize
+ * @returns {string} 'retryable', 'non-retryable', or 'unknown'
+ */
+export function categorizeError(error) {
+  if (isRetryableError(error)) {
+    return 'retryable';
+  }
+  
+  if (error instanceof ProviderError) {
+    // For ProviderError, the specific error code is in details.code
+    const specificCode = error.details?.code;
+    if (specificCode && NON_RETRYABLE_ERROR_CODES.includes(specificCode)) {
+      return 'non-retryable';
+    }
+  }
+  
+  const errorCode = error.code || error.name || '';
+  if (NON_RETRYABLE_ERROR_CODES.includes(errorCode)) {
+    return 'non-retryable';
+  }
+  
+  return 'unknown';
+}
+
 export {
   CopyTreeError,
   CommandError,

@@ -75,6 +75,7 @@ program
   .option('--no-cache', 'Disable caching for AI operations')
   .option('--no-instructions', 'Disable including instructions in output')
   .option('--instructions <name>', 'Use custom instructions set (default: default)')
+  .option('--no-validate', 'Disable configuration validation')
   .action(async (path, options) => {
     if (!render || !App) {
       const ink = await import('ink');
@@ -152,7 +153,8 @@ program
 program
   .command('config:validate')
   .description('Validate application configuration')
-  .action(async () => {
+  .option('--no-validate', 'Skip schema validation (for testing)')
+  .action(async (options) => {
     if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
@@ -162,11 +164,33 @@ program
     render(React.createElement(App, {
       command: 'config:validate',
       path: null,
-      options: {},
+      options,
     }));
   });
 
-// 10. Cache clear command
+// 10. Config inspect command
+program
+  .command('config:inspect')
+  .description('Inspect effective configuration with provenance')
+  .option('--section <name>', 'Show only specific config section (ai, app, cache, copytree, state)')
+  .option('--redact', 'Redact sensitive values (default: true)')
+  .option('--no-redact', 'Show all values including sensitive ones')
+  .option('--format <type>', 'Output format: table, json (default: table)', 'table')
+  .action(async (options) => {
+    if (!render || !App) {
+      const ink = await import('ink');
+      render = ink.render;
+      const appModule = await import('../src/ui/App.js');
+      App = appModule.default;
+    }
+    render(React.createElement(App, {
+      command: 'config:inspect',
+      path: null,
+      options,
+    }));
+  });
+
+// 11. Cache clear command
 program
   .command('cache:clear')
   .description('Clear all caches')
@@ -191,7 +215,7 @@ program
     }));
   });
 
-// 11. Install copytree command
+// 12. Install copytree command
 program
   .command('install:copytree')
   .description('Set up CopyTree environment and configuration')

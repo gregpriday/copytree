@@ -26,7 +26,8 @@ class Stage {
   }
 
   /**
-   * Validate input before processing
+   * Validate input before processing (optional but recommended)
+   * This method is automatically called by the Pipeline before process() if it exists
    * @param {*} input - Input to validate
    * @returns {boolean} - True if valid
    * @throws {Error} - If validation fails
@@ -36,13 +37,79 @@ class Stage {
   }
 
   /**
-   * Handle errors during processing
-   * @param {Error} error - Error that occurred
-   * @param {*} input - Input that caused the error
-   * @returns {*} - Recovery value or rethrows
+   * Handle errors during processing with recovery mechanism
+   * 
+   * This method allows stages to implement custom error recovery logic.
+   * If a stage can recover from an error, it should return a valid result
+   * that the pipeline can use to continue processing. If recovery is not
+   * possible, the method should rethrow the error or throw a new one.
+   * 
+   * @param {Error} error - Error that occurred during stage processing
+   * @param {*} input - Input data that was being processed when error occurred
+   * @returns {Promise<*>} - Recovered result to continue pipeline, or rethrows
+   * @throws {Error} - Rethrows original error or throws new error if recovery fails
    */
   async handleError(error, _input) {
+    // Default implementation: no recovery, rethrow error
     throw error;
+  }
+
+  /**
+   * Initialize stage with pipeline context
+   * Called once when pipeline is created, before any processing
+   * This hook allows stages to set up resources, warm caches, or prepare for processing
+   * 
+   * @param {Object} context - Pipeline context with shared resources
+   * @param {Object} context.logger - Logger instance
+   * @param {Object} context.options - Pipeline options
+   * @param {Object} context.stats - Pipeline statistics
+   * @param {Object} context.config - Configuration manager
+   * @returns {Promise<void>}
+   */
+  async onInit(_context) {
+    // Default implementation - no operation
+  }
+
+  /**
+   * Called before each stage execution
+   * This hook allows stages to perform pre-processing setup, validation, or preparation
+   * 
+   * Execution Order:
+   * 1. onInit() - once during pipeline creation
+   * 2. beforeRun() - before each process() call
+   * 3. process() - main stage logic
+   * 4. afterRun() - after successful process() call
+   * 5. onError() - if process() throws an error (before handleError())
+   * 
+   * @param {*} input - Input data about to be processed
+   * @returns {Promise<void>}
+   */
+  async beforeRun(_input) {
+    // Default implementation - no operation  
+  }
+
+  /**
+   * Called after successful stage execution
+   * This hook allows stages to perform post-processing cleanup, logging, or finalization
+   * 
+   * @param {*} output - Output data from stage processing
+   * @returns {Promise<void>}
+   */
+  async afterRun(_output) {
+    // Default implementation - no operation
+  }
+
+  /**
+   * Called when stage encounters an error
+   * This hook is called before handleError() and allows stages to log errors,
+   * clean up resources, or perform error-specific actions
+   * 
+   * @param {Error} error - Error that occurred
+   * @param {*} input - Input data being processed when error occurred
+   * @returns {Promise<void>}
+   */
+  async onError(_error, _input) {
+    // Default implementation - no operation
   }
 
   /**

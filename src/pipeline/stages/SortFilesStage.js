@@ -6,9 +6,18 @@ import path from 'path';
  */
 class SortFilesStage extends Stage {
   constructor(sortBy = 'path', order = 'asc') {
-    super();
-    this.sortBy = sortBy; // 'path', 'size', 'modified', 'name', 'extension'
-    this.order = order; // 'asc' or 'desc'
+    // Handle options object from Pipeline (new architecture)
+    if (typeof sortBy === 'object' && sortBy !== null) {
+      const options = sortBy;
+      super(options);
+      this.sortBy = options.sortBy || 'path';
+      this.order = options.order || 'asc';
+    } else {
+      // Handle individual parameters (legacy)
+      super();
+      this.sortBy = sortBy; // 'path', 'size', 'modified', 'name', 'extension'
+      this.order = order; // 'asc' or 'desc'
+    }
   }
 
   /**

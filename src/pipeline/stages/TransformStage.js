@@ -1,6 +1,7 @@
 import Stage from '../Stage.js';
 import { CacheService } from '../../services/CacheService.js';
 import { generateTransformCacheKey } from '../../utils/fileHash.js';
+import { AIProviderError, TransformError } from '../../utils/errors.js';
 import path from 'path';
 import appConfig from '../../../config/app.js';
 import { logger } from '../../utils/logger.js';
@@ -216,6 +217,62 @@ class TransformStage extends Stage {
         transformErrors: errorCount,
       },
     };
+  }
+
+  /**
+   * Handle errors during transformation with recovery mechanism
+   * 
+   * This implementation provides graceful recovery for transformation failures,
+   * particularly useful for AI-powered transformers that may fail intermittently.
+   * 
+   * @param {Error} error - Error that occurred during transformation
+   * @param {Object} input - Input data containing files to transform
+   * @returns {Promise<Object>} - Recovered result with error logging
+   */
+  async handleError(error, input) {
+    this.log(`Transform stage encountered error: ${error.message}`, 'warn');
+    
+    // Check if this is a recoverable error type
+    const isRecoverable = this._isRecoverableError(error);
+    
+    if (isRecoverable && input && input.files) {
+      this.log('Attempting recovery by skipping transformation for affected files', 'info');
+      
+      // Return input with transformation skipped but files preserved
+      return {
+        ...input,
+        stats: {
+          ...input.stats,
+          transformedCount: 0,
+          transformErrors: input.files.length,
+          recoveredFromError: true,
+        },
+      };
+    }
+    
+    // If not recoverable, rethrow the error
+    throw error;
+  }
+
+  /**
+   * Check if an error is recoverable for transformation stage
+   * @private
+   */
+  _isRecoverableError(error) {
+    // Recoverable errors include AI failures, network issues, etc.
+    const recoverableTypes = [
+      'AIProviderError',
+      'TransformError',
+      'ENOTFOUND', // Network errors
+      'ETIMEDOUT', // Timeout errors
+      'ECONNRESET', // Connection reset
+    ];
+    
+    return recoverableTypes.some(type => 
+      error.name === type || 
+      error.code === type || 
+      error.message.includes(type)
+    );
   }
 
   getTransformerForFile(file) {

@@ -590,6 +590,45 @@ transformers:
       maxRows: 5  # Fewer rows
 ```
 
+## Transformer Validation and Optimization
+
+CopyTree includes an advanced transformer traits system that provides validation and optimization for transformer sequences:
+
+### Plan Validation
+
+The system can validate transformer combinations to detect:
+
+- **Conflicts** between incompatible transformers
+- **Resource requirements** (API keys, network access)
+- **Type incompatibilities** (binary output → text-only input)
+- **Performance issues** (too many heavy operations)
+
+### Automatic Optimization
+
+The system can optimize transformer execution order by:
+
+- Moving order-sensitive transformers to appropriate positions
+- Placing heavy operations at the end of the pipeline
+- Organizing transformers for better resource utilization
+
+### Example Integration
+
+```javascript
+// Validation happens automatically in the pipeline
+const registry = await TransformerRegistry.createDefault();
+const validation = registry.validatePlan(['ai-summary', 'pdf', 'image']);
+
+if (!validation.valid) {
+  console.log('Issues found:', validation.issues);
+}
+
+// Optimization suggestions
+const optimization = registry.optimizePlan(['heavy-ai', 'light-text', 'order-sensitive']);
+console.log('Optimized order:', optimization.optimized);
+```
+
+For detailed information about the traits system, see the [Transformer Traits Development Guide](../development/transformer-traits.md).
+
 ## Custom Transformers
 
 While not covered here, CopyTree's architecture supports custom transformers. See the development documentation for creating your own transformers.
@@ -599,3 +638,4 @@ While not covered here, CopyTree's architecture supports custom transformers. Se
 - [Profile Creation Guide](./profile-creation-guide.md) - Configure transformers in profiles
 - [Profile Examples](./profile-examples.md) - See transformers in action
 - [Advanced Features](./profile-advanced.md) - Complex transformer patterns
+- [Transformer Traits System](../development/transformer-traits.md) - Advanced validation and optimization

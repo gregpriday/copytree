@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import BaseProvider from './BaseProvider.js';
 import { ProviderError } from '../utils/errors.js';
@@ -23,9 +24,12 @@ class GeminiProvider extends BaseProvider {
   /**
    * Send a completion request
    * @param {Object} options - Request options
-   * @returns {Promise<Object>} Response object
+   * @returns {Promise<AIResponseEnvelope>} Standardized response envelope
    */
   async complete(options) {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+
     try {
       const prompt = options.systemPrompt 
         ? `${options.systemPrompt}\n\n${options.prompt}`
@@ -38,7 +42,7 @@ class GeminiProvider extends BaseProvider {
         topK: options.topK ?? this.config.get('ai.defaults.topK', 40),
       };
 
-      this.logger.debug(`Sending completion request to Gemini: ${this.model}`);
+      this.logger.debug(`Sending completion request to Gemini: ${this.model}`, { requestId });
 
       if (options.stream) {
         const result = await this.modelInstance.generateContentStream({
@@ -46,7 +50,13 @@ class GeminiProvider extends BaseProvider {
           generationConfig,
         });
         
-        return { stream: result.stream, model: this.model };
+        // For streaming, return a different envelope structure
+        return { 
+          stream: result.stream, 
+          model: this.model, 
+          requestId,
+          meta: { provider: 'gemini' }
+        };
       }
 
       const result = await this.modelInstance.generateContent({
@@ -56,23 +66,49 @@ class GeminiProvider extends BaseProvider {
 
       const response = await result.response;
       const text = response.text();
+      const latencyMs = Date.now() - startTime;
 
-      return {
+      // Create standardized envelope
+      return this.createEnvelope({
         content: text,
         model: this.model,
-        finishReason: response.candidates?.[0]?.finishReason,
-      };
+        finishReason: response.candidates?.[0]?.finishReason || 'stop',
+        tokensUsed: {
+          prompt: response.usageMetadata?.promptTokenCount || 0,
+          completion: response.usageMetadata?.candidatesTokenCount || 0,
+          total: response.usageMetadata?.totalTokenCount || 0,
+        },
+        latencyMs,
+        requestId,
+        rateLimit: this._parseRateLimit(response),
+        meta: {
+          safetyRatings: response.candidates?.[0]?.safetyRatings,
+          citationMetadata: response.candidates?.[0]?.citationMetadata,
+          blockReason: response.candidates?.[0]?.blockReason,
+          usageMetadata: response.usageMetadata,
+        },
+      });
     } catch (error) {
-      this.handleError(error, 'completion');
+      const errorEnvelope = this.createErrorEnvelope(
+        error,
+        requestId,
+        Date.now() - startTime,
+        { operation: 'completion' }
+      );
+      
+      this.handleError(error, 'completion', errorEnvelope);
     }
   }
 
   /**
    * Send a chat completion request
    * @param {Object} options - Request options
-   * @returns {Promise<Object>} Response object
+   * @returns {Promise<AIResponseEnvelope>} Standardized response envelope
    */
   async chat(options) {
+    const requestId = crypto.randomUUID();
+    const startTime = Date.now();
+
     try {
       // Convert messages to Gemini format
       const contents = this.convertMessagesToGeminiFormat(options.messages);
@@ -84,7 +120,7 @@ class GeminiProvider extends BaseProvider {
         topK: options.topK ?? this.config.get('ai.defaults.topK', 40),
       };
 
-      this.logger.debug(`Sending chat request to Gemini: ${this.model}`);
+      this.logger.debug(`Sending chat request to Gemini: ${this.model}`, { requestId });
 
       if (options.stream) {
         const chat = this.modelInstance.startChat({
@@ -94,7 +130,13 @@ class GeminiProvider extends BaseProvider {
         
         const result = await chat.sendMessageStream(contents[contents.length - 1].parts[0].text);
         
-        return { stream: result.stream, model: this.model };
+        // For streaming, return a different envelope structure
+        return { 
+          stream: result.stream, 
+          model: this.model, 
+          requestId,
+          meta: { provider: 'gemini' }
+        };
       }
 
       const chat = this.modelInstance.startChat({
@@ -105,14 +147,38 @@ class GeminiProvider extends BaseProvider {
       const result = await chat.sendMessage(contents[contents.length - 1].parts[0].text);
       const response = await result.response;
       const text = response.text();
+      const latencyMs = Date.now() - startTime;
 
-      return {
+      // Create standardized envelope
+      return this.createEnvelope({
         content: text,
         model: this.model,
-        finishReason: response.candidates?.[0]?.finishReason,
-      };
+        finishReason: response.candidates?.[0]?.finishReason || 'stop',
+        tokensUsed: {
+          prompt: response.usageMetadata?.promptTokenCount || 0,
+          completion: response.usageMetadata?.candidatesTokenCount || 0,
+          total: response.usageMetadata?.totalTokenCount || 0,
+        },
+        latencyMs,
+        requestId,
+        rateLimit: this._parseRateLimit(response),
+        meta: {
+          safetyRatings: response.candidates?.[0]?.safetyRatings,
+          citationMetadata: response.candidates?.[0]?.citationMetadata,
+          blockReason: response.candidates?.[0]?.blockReason,
+          usageMetadata: response.usageMetadata,
+          messageCount: contents.length,
+        },
+      });
     } catch (error) {
-      this.handleError(error, 'chat');
+      const errorEnvelope = this.createErrorEnvelope(
+        error,
+        requestId,
+        Date.now() - startTime,
+        { operation: 'chat', messageCount: contents?.length || 0 }
+      );
+      
+      this.handleError(error, 'chat', errorEnvelope);
     }
   }
 
@@ -175,39 +241,55 @@ class GeminiProvider extends BaseProvider {
   }
 
   /**
+   * Parse rate limit information from response
+   * @param {Object} response - Gemini API response
+   * @returns {Object} Rate limit information
+   */
+  _parseRateLimit(response) {
+    // Gemini doesn't currently expose rate limit headers in the response
+    // This method is prepared for future API updates
+    return {
+      requests: { limit: null, remaining: null },
+      tokens: { limit: null, remaining: null },
+      resetTime: null,
+    };
+  }
+
+  /**
    * Handle Gemini-specific errors
    * @param {Error} error - Original error
    * @param {string} operation - Operation that failed
+   * @param {Object} envelope - Error envelope metadata
    */
-  handleError(error, operation) {
+  handleError(error, operation, envelope = {}) {
     if (error.status === 403 || error.message?.includes('API key not valid')) {
       throw new ProviderError(
         'Invalid Gemini API key',
         this.name,
-        { code: 'INVALID_API_KEY', operation },
+        { code: 'INVALID_API_KEY', operation, envelope },
       );
     } else if (error.status === 429 || error.message?.includes('quota')) {
       throw new ProviderError(
         'Gemini rate limit or quota exceeded',
         this.name,
-        { code: 'RATE_LIMIT', operation },
+        { code: 'RATE_LIMIT', operation, envelope },
       );
     } else if (error.status === 503) {
       throw new ProviderError(
         'Gemini service unavailable',
         this.name,
-        { code: 'SERVICE_UNAVAILABLE', operation },
+        { code: 'SERVICE_UNAVAILABLE', operation, envelope },
       );
     } else if (error.message?.includes('safety')) {
       throw new ProviderError(
         'Content blocked by Gemini safety filters',
         this.name,
-        { code: 'SAFETY_FILTER', operation },
+        { code: 'SAFETY_FILTER', operation, envelope },
       );
     }
     
     // Default error handling
-    super.handleError(error, operation);
+    super.handleError(error, operation, envelope);
   }
 }
 
