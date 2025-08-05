@@ -18,6 +18,7 @@ let Text;
 import CopyView from './components/CopyView.js';
 import ProfileListView from './components/ProfileListView.js';
 import ValidationView from './components/ValidationView.js';
+import ConfigInspectView from './components/ConfigInspectView.js';
 import DocsView from './components/DocsView.js';
 import InstallView from './components/InstallView.js';
 
@@ -41,6 +42,8 @@ const AppContent = () => {
     case 'profile:validate':
     case 'config:validate':
       return React.createElement(ValidationView);
+    case 'config:inspect':
+      return React.createElement(ConfigInspectView);
     case 'cache:clear':
       return React.createElement(ValidationView, { 
         successMessage: 'Cache cleared successfully',

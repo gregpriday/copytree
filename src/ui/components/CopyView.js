@@ -34,6 +34,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import Clipboard from '../../utils/clipboard.js';
 import os from 'os';
+import { globalTelemetry } from '../../utils/performanceBudgets.js';
 
 const CopyView = () => {
   const { 
@@ -140,6 +141,18 @@ const CopyView = () => {
       const outputResult = await prepareOutput(result, options);
       setOutput(outputResult.content);
 			
+      // Record performance telemetry if info mode is enabled
+      if (options.info && result.stats) {
+        const duration = Date.now() - startTime;
+        const fileCount = result.stats.filesProcessed || result.stats.totalFiles || 0;
+        globalTelemetry.recordSession(result.stats, duration, fileCount, {
+          profile: profileName,
+          hasTransformers: !options.noTransform,
+          format: options.format || 'xml',
+          outputDestination: options.output ? 'file' : options.display ? 'terminal' : 'clipboard'
+        });
+      }
+
       // Handle output actions and create completion message
       const completionMessage = await handleOutputAndCreateMessage(outputResult, options, result);
 			
@@ -398,6 +411,8 @@ const CopyView = () => {
       React.createElement(SummaryTable, {
         stats,
         duration: stats.duration,
+        showDetailedTiming: options.info,
+        showPerformanceBudgets: options.info, // Enable performance budgets with --info flag
       }),
     ),
   );

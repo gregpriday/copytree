@@ -1,10 +1,30 @@
 import { env } from '../src/config/ConfigManager.js';
 
 export default {
-  // Gemini is the only supported provider
+  // Primary provider (for backward compatibility)
   provider: 'gemini',
   
-  // Gemini configuration
+  // Multi-provider configuration (supports fallback)
+  providers: [
+    {
+      name: 'gemini',
+      model: env('GEMINI_MODEL', 'gemini-2.5-flash'),
+      priority: 1,
+      apiKey: env('GEMINI_API_KEY', ''),
+      baseUrl: env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1'),
+      timeout: env('GEMINI_TIMEOUT', 60000),
+    }
+    // Future providers can be added here with higher priority numbers
+    // {
+    //   name: 'openai',
+    //   model: 'gpt-4o-mini',
+    //   priority: 2,
+    //   apiKey: env('OPENAI_API_KEY', ''),
+    //   ...
+    // }
+  ],
+  
+  // Legacy Gemini configuration (maintained for backward compatibility)
   gemini: {
     apiKey: env('GEMINI_API_KEY', ''),
     baseUrl: env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1'),
@@ -55,12 +75,25 @@ export default {
     ttl: env('AI_CACHE_TTL', 86400), // 24 hours in seconds
   },
   
-  // Retry configuration
+  // Enhanced retry configuration
   retry: {
     maxAttempts: env('AI_RETRY_MAX_ATTEMPTS', 3),
     initialDelay: env('AI_RETRY_INITIAL_DELAY', 1000),
     maxDelay: env('AI_RETRY_MAX_DELAY', 10000),
     backoffMultiplier: env('AI_RETRY_BACKOFF', 2),
+    // Error codes that should be retried (transient errors)
+    retryableErrors: [
+      'RATE_LIMIT',
+      'TIMEOUT', 
+      'SERVICE_UNAVAILABLE',
+      'NETWORK_ERROR',
+      'TEMPORARY_FAILURE',
+      'ENOTFOUND',
+      'ETIMEDOUT',
+      'ECONNRESET',
+      'ECONNABORTED',
+      'SOCKET_TIMEOUT',
+    ],
   },
   
   // Prompt templates path

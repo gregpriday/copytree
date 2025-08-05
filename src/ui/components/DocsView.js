@@ -97,7 +97,7 @@ const DocsView = () => {
   useEffect(() => {
     const runDocsCommand = async () => {
       try {
-        const docsDir = path.join(__dirname, '../../../docs');
+        const docsDir = path.join(process.cwd(), 'docs');
         const topic = options.topic;
 
         if (!topic) {

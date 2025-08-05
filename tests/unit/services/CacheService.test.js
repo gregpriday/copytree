@@ -1,51 +1,28 @@
-// Moved inside describe block
+// Use automatic mocking for logger
+jest.mock('../../../src/utils/logger.js');
+
+// Mock fs-extra methods that CacheService uses
+jest.mock('fs-extra', () => ({
+  ensureDirSync: jest.fn(),
+  pathExists: jest.fn().mockResolvedValue(false),
+  readJson: jest.fn().mockRejectedValue(new Error('File not found')),
+  remove: jest.fn().mockResolvedValue(undefined),
+  ensureDir: jest.fn().mockResolvedValue(undefined),
+  writeJson: jest.fn().mockResolvedValue(undefined),
+  readdir: jest.fn().mockResolvedValue([]),
+  stat: jest.fn().mockResolvedValue({ size: 1024, mtimeMs: Date.now() })
+}));
+
+import { CacheService } from '../../../src/services/CacheService.js';
+import fs from 'fs-extra';
+import path from 'path';
+import os from 'os';
 
 describe('CacheService', () => {
-  let CacheService;
   let cacheService;
   let tempDir;
-  let fs;
-  const path = require('path');
-  const os = require('os');
 
   beforeEach(async () => {
-    // Reset modules to ensure clean state
-    jest.resetModules();
-    
-    // Require fs-extra first before any mocking
-    fs = require('fs-extra');
-    
-    // Mock dependencies before requiring CacheService
-    jest.doMock('../../../src/utils/logger', () => ({
-      logger: {
-        info: jest.fn(),
-        warn: jest.fn(),
-        error: jest.fn(),
-        debug: jest.fn(),
-        verbose: jest.fn(),
-        silly: jest.fn(),
-        child: jest.fn(() => ({
-          info: jest.fn(),
-          warn: jest.fn(),
-          error: jest.fn(),
-          debug: jest.fn(),
-          verbose: jest.fn(),
-          silly: jest.fn()
-        }))
-      }
-    }));
-
-    // Mock ConfigManager to avoid loading actual config files
-    jest.doMock('../../../src/config/ConfigManager', () => ({
-      config: () => ({
-        get: jest.fn((key, defaultValue) => defaultValue)
-      })
-    }));
-
-    // Now require CacheService with mocked dependencies
-    const CacheServiceModule = require('../../../src/services/CacheService');
-    CacheService = CacheServiceModule.CacheService;
-
     // Create temp directory for tests
     tempDir = path.join(os.tmpdir(), 'copytree-cache-test-' + Date.now());
     await fs.ensureDir(tempDir);
@@ -64,8 +41,6 @@ describe('CacheService', () => {
     if (tempDir && await fs.pathExists(tempDir)) {
       await fs.remove(tempDir);
     }
-    jest.dontMock('../../../src/utils/logger');
-    jest.dontMock('../../../src/config/ConfigManager');
   });
 
   describe('basic functionality', () => {
@@ -73,6 +48,8 @@ describe('CacheService', () => {
       expect(cacheService).toBeDefined();
       expect(cacheService.enabled).toBe(true);
       expect(cacheService.driver).toBe('file');
+      expect(cacheService.logger).toBeDefined();
+      expect(typeof cacheService.logger.error).toBe('function');
     });
 
     test('should set and get values', async () => {

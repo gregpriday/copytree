@@ -4,6 +4,36 @@ import { logger } from '../utils/logger.js';
 import { ProviderError } from '../utils/errors.js';
 
 /**
+ * @typedef {Object} TokenUsage
+ * @property {number} prompt - Tokens used in prompt
+ * @property {number} completion - Tokens used in completion
+ * @property {number} total - Total tokens used
+ */
+
+/**
+ * @typedef {Object} RateLimit
+ * @property {Object} requests - Request rate limit info
+ * @property {number|null} requests.limit - Request limit per period
+ * @property {number|null} requests.remaining - Remaining requests
+ * @property {Object} tokens - Token rate limit info
+ * @property {number|null} tokens.limit - Token limit per period
+ * @property {number|null} tokens.remaining - Remaining tokens
+ * @property {Date|null} resetTime - When limits reset
+ */
+
+/**
+ * @typedef {Object} AIResponseEnvelope
+ * @property {string} content - Main response content
+ * @property {string} model - Model used for response
+ * @property {string} finishReason - Completion reason
+ * @property {TokenUsage} tokensUsed - Token usage information
+ * @property {number} latencyMs - Response latency in milliseconds
+ * @property {string} requestId - Unique request identifier
+ * @property {RateLimit} rateLimit - Rate limiting information
+ * @property {Object} meta - Provider-specific metadata
+ */
+
+/**
  * Base class for AI provider (Gemini only)
  */
 class BaseProvider {
@@ -69,7 +99,7 @@ class BaseProvider {
    * @param {number} options.maxTokens - Maximum tokens to generate
    * @param {number} options.temperature - Temperature for generation
    * @param {boolean} options.stream - Whether to stream the response
-   * @returns {Promise<Object>} Response object
+   * @returns {Promise<AIResponseEnvelope>} Standardized response envelope
    * @abstract
    */
   async complete(_options) {
@@ -83,11 +113,76 @@ class BaseProvider {
    * @param {number} options.maxTokens - Maximum tokens to generate
    * @param {number} options.temperature - Temperature for generation
    * @param {boolean} options.stream - Whether to stream the response
-   * @returns {Promise<Object>} Response object
+   * @returns {Promise<AIResponseEnvelope>} Standardized response envelope
    * @abstract
    */
   async chat(_options) {
     throw new Error('chat() must be implemented by subclass');
+  }
+
+  /**
+   * Create a standardized AI response envelope
+   * @param {Object} options - Envelope options
+   * @param {string} options.content - Main response content
+   * @param {string} options.model - Model used for response
+   * @param {string} options.finishReason - Completion reason
+   * @param {Object} options.tokensUsed - Token usage information
+   * @param {number} options.latencyMs - Response latency in milliseconds
+   * @param {string} options.requestId - Unique request identifier
+   * @param {Object} options.rateLimit - Rate limiting information
+   * @param {Object} options.meta - Provider-specific metadata
+   * @returns {AIResponseEnvelope} Standardized response envelope
+   */
+  createEnvelope(options) {
+    return {
+      content: options.content || '',
+      model: options.model || this.model,
+      finishReason: options.finishReason || 'stop',
+      tokensUsed: {
+        prompt: options.tokensUsed?.prompt || 0,
+        completion: options.tokensUsed?.completion || 0,
+        total: options.tokensUsed?.total || 0,
+      },
+      latencyMs: options.latencyMs || 0,
+      requestId: options.requestId || crypto.randomUUID(),
+      rateLimit: {
+        requests: { 
+          limit: options.rateLimit?.requests?.limit || null, 
+          remaining: options.rateLimit?.requests?.remaining || null 
+        },
+        tokens: { 
+          limit: options.rateLimit?.tokens?.limit || null, 
+          remaining: options.rateLimit?.tokens?.remaining || null 
+        },
+        resetTime: options.rateLimit?.resetTime || null,
+      },
+      meta: {
+        provider: this.name,
+        ...options.meta,
+      },
+    };
+  }
+
+  /**
+   * Create an error envelope for failed requests
+   * @param {Error} error - The error that occurred
+   * @param {string} requestId - Request identifier
+   * @param {number} latencyMs - Time spent before error
+   * @param {Object} meta - Additional metadata
+   * @returns {Object} Error envelope
+   */
+  createErrorEnvelope(error, requestId, latencyMs, meta = {}) {
+    return {
+      error: error.message,
+      requestId,
+      latencyMs,
+      model: this.model,
+      meta: {
+        provider: this.name,
+        errorType: error.constructor.name,
+        ...meta,
+      },
+    };
   }
 
   /**
@@ -168,10 +263,11 @@ class BaseProvider {
    * Handle API errors
    * @param {Error} error - Original error
    * @param {string} operation - Operation that failed
+   * @param {Object} envelope - Error envelope metadata
    * @throws {ProviderError} Wrapped error
    */
-  handleError(error, operation) {
-    let message = `Gemini ${operation} failed: ${error.message}`;
+  handleError(error, operation, envelope = {}) {
+    let message = `${this.name} ${operation} failed: ${error.message}`;
     let code = 'PROVIDER_ERROR';
     
     // Handle common API errors
@@ -179,13 +275,13 @@ class BaseProvider {
       const status = error.response.status;
       
       if (status === 401 || status === 403) {
-        message = 'Invalid Gemini API key';
+        message = `Invalid ${this.name} API key`;
         code = 'INVALID_API_KEY';
       } else if (status === 429) {
-        message = 'Gemini rate limit exceeded';
+        message = `${this.name} rate limit exceeded`;
         code = 'RATE_LIMIT';
       } else if (status === 503) {
-        message = 'Gemini service unavailable';
+        message = `${this.name} service unavailable`;
         code = 'SERVICE_UNAVAILABLE';
       }
     }
@@ -194,6 +290,7 @@ class BaseProvider {
       code,
       originalError: error,
       operation,
+      envelope,
     });
   }
 

@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 /**
  * Registry for file transformers
  * Manages transformer registration and selection based on file type
+ * Includes traits-based validation and optimization
  */
 class TransformerRegistry {
   constructor() {
@@ -12,6 +13,10 @@ class TransformerRegistry {
     this.mimeTypeMap = new Map();
     this.defaultTransformer = null;
     this.logger = logger.child('TransformerRegistry');
+    
+    // Traits system
+    this.traits = new Map(); // transformer name -> traits
+    this.validationEnabled = true;
   }
 
   /**
@@ -19,8 +24,9 @@ class TransformerRegistry {
    * @param {string} name - Transformer name
    * @param {Object} transformer - Transformer instance or class
    * @param {Object} options - Registration options
+   * @param {Object} traits - Transformer traits for validation and optimization
    */
-  register(name, transformer, options = {}) {
+  register(name, transformer, options = {}, traits = null) {
     if (this.transformers.has(name)) {
       this.logger.warn(`Overwriting existing transformer: ${name}`);
     }
@@ -30,6 +36,12 @@ class TransformerRegistry {
       options,
       priority: options.priority || 0,
     });
+
+    // Register traits if provided
+    if (traits) {
+      this.traits.set(name, this._normalizeTraits(traits));
+      this.logger.debug(`Registered traits for transformer: ${name}`, traits);
+    }
 
     // Register extensions
     if (options.extensions) {
@@ -138,6 +150,7 @@ class TransformerRegistry {
         .filter(([_, names]) => names.includes(name))
         .map(([mime]) => mime),
       isDefault: this.defaultTransformer === name,
+      traits: this.traits.get(name) || null,
     }));
   }
 
@@ -156,7 +169,348 @@ class TransformerRegistry {
     this.transformers.clear();
     this.extensionMap.clear();
     this.mimeTypeMap.clear();
+    this.traits.clear();
     this.defaultTransformer = null;
+  }
+
+  /**
+   * Validate a transformer execution plan
+   * @param {Array<string>} stages - Array of transformer names in execution order
+   * @returns {Object} Validation result with issues and warnings
+   */
+  validatePlan(stages) {
+    if (!this.validationEnabled || !stages || stages.length === 0) {
+      return { valid: true, issues: [], warnings: [] };
+    }
+
+    const issues = [];
+    const warnings = [];
+
+    // Check for conflicts between transformers
+    for (let i = 0; i < stages.length; i++) {
+      for (let j = i + 1; j < stages.length; j++) {
+        const conflicts = this._checkConflicts(stages[i], stages[j]);
+        issues.push(...conflicts);
+      }
+    }
+
+    // Check ordering issues
+    const orderingIssues = this._validateOrdering(stages);
+    issues.push(...orderingIssues);
+
+    // Check resource requirements
+    const resourceIssues = this._validateResources(stages);
+    issues.push(...resourceIssues);
+
+    // Generate optimization warnings
+    const optimizationWarnings = this._generateWarnings(stages);
+    warnings.push(...optimizationWarnings);
+
+    return {
+      valid: issues.length === 0,
+      issues,
+      warnings
+    };
+  }
+
+  /**
+   * Optimize a transformer execution plan
+   * @param {Array<string>} stages - Array of transformer names
+   * @returns {Object} Optimization result with suggested order and reasoning
+   */
+  optimizePlan(stages) {
+    if (!stages || stages.length <= 1) {
+      return { 
+        optimized: stages || [], 
+        changes: [], 
+        reasoning: [] 
+      };
+    }
+
+    const optimized = [...stages];
+    const changes = [];
+    const reasoning = [];
+
+    // Sort by dependency requirements (order-sensitive transformers first)
+    const withTraits = optimized.map(name => ({
+      name,
+      traits: this.traits.get(name) || {}
+    }));
+
+    // Move order-sensitive transformers to appropriate positions
+    const orderSensitive = withTraits.filter(t => t.traits.orderSensitive);
+    const orderInsensitive = withTraits.filter(t => !t.traits.orderSensitive);
+    const heavy = withTraits.filter(t => t.traits.heavy);
+
+    // Rebuild order: order-sensitive first, then light operations, then heavy operations
+    const reordered = [
+      ...orderSensitive.filter(t => !t.traits.heavy),
+      ...orderInsensitive.filter(t => !t.traits.heavy),
+      ...heavy
+    ];
+
+    const optimizedNames = reordered.map(t => t.name);
+
+    // Track changes
+    for (let i = 0; i < stages.length; i++) {
+      if (stages[i] !== optimizedNames[i]) {
+        changes.push({
+          from: stages.indexOf(optimizedNames[i]),
+          to: i,
+          transformer: optimizedNames[i]
+        });
+      }
+    }
+
+    // Generate reasoning
+    if (changes.length > 0) {
+      reasoning.push('Reordered transformers for optimal execution:');
+      reasoning.push('- Order-sensitive transformers moved to appropriate positions');
+      reasoning.push('- Heavy operations moved to end to minimize impact');
+    }
+
+    return {
+      optimized: optimizedNames,
+      changes,
+      reasoning
+    };
+  }
+
+  /**
+   * Get traits for a specific transformer
+   * @param {string} name - Transformer name
+   * @returns {Object|null} Transformer traits or null if not found
+   */
+  getTraits(name) {
+    return this.traits.get(name) || null;
+  }
+
+  /**
+   * Enable or disable validation
+   * @param {boolean} enabled - Whether validation should be enabled
+   */
+  setValidationEnabled(enabled) {
+    this.validationEnabled = Boolean(enabled);
+  }
+
+  /**
+   * Normalize and validate transformer traits
+   * @private
+   */
+  _normalizeTraits(traits) {
+    const normalized = {
+      inputTypes: traits.inputTypes || ['text'],
+      outputTypes: traits.outputTypes || ['text'],
+      idempotent: traits.idempotent ?? true,
+      orderSensitive: traits.orderSensitive ?? false,
+      dependencies: traits.dependencies || [],
+      heavy: traits.heavy ?? false,
+      stateful: traits.stateful ?? false,
+      conflictsWith: traits.conflictsWith || [],
+      requirements: traits.requirements || {},
+      tags: traits.tags || []
+    };
+
+    // Validate trait values
+    if (!Array.isArray(normalized.inputTypes)) {
+      normalized.inputTypes = [normalized.inputTypes];
+    }
+    if (!Array.isArray(normalized.outputTypes)) {
+      normalized.outputTypes = [normalized.outputTypes];
+    }
+    if (!Array.isArray(normalized.dependencies)) {
+      normalized.dependencies = [normalized.dependencies];
+    }
+    if (!Array.isArray(normalized.conflictsWith)) {
+      normalized.conflictsWith = [normalized.conflictsWith];
+    }
+    if (!Array.isArray(normalized.tags)) {
+      normalized.tags = [normalized.tags];
+    }
+
+    return normalized;
+  }
+
+  /**
+   * Check for conflicts between two transformers
+   * @private
+   */
+  _checkConflicts(transformer1, transformer2) {
+    const issues = [];
+    const traits1 = this.traits.get(transformer1);
+    const traits2 = this.traits.get(transformer2);
+
+    if (!traits1 || !traits2) {
+      return issues; // Skip validation if traits not available
+    }
+
+    // Check explicit conflicts
+    if (traits1.conflictsWith.includes(transformer2)) {
+      issues.push({
+        type: 'conflict',
+        severity: 'error',
+        message: `Transformer '${transformer1}' conflicts with '${transformer2}'`,
+        transformers: [transformer1, transformer2]
+      });
+    }
+
+    if (traits2.conflictsWith.includes(transformer1)) {
+      issues.push({
+        type: 'conflict', 
+        severity: 'error',
+        message: `Transformer '${transformer2}' conflicts with '${transformer1}'`,
+        transformers: [transformer1, transformer2]
+      });
+    }
+
+    // Check input/output type compatibility
+    const hasCompatibleTypes = traits1.outputTypes.some(output => 
+      traits2.inputTypes.includes(output)
+    );
+    
+    if (!hasCompatibleTypes && traits1.outputTypes[0] !== 'any' && traits2.inputTypes[0] !== 'any') {
+      issues.push({
+        type: 'incompatible_types',
+        severity: 'warning',
+        message: `Output types of '${transformer1}' (${traits1.outputTypes.join(', ')}) may not be compatible with input types of '${transformer2}' (${traits2.inputTypes.join(', ')})`,
+        transformers: [transformer1, transformer2]
+      });
+    }
+
+    return issues;
+  }
+
+  /**
+   * Validate transformer ordering
+   * @private
+   */
+  _validateOrdering(stages) {
+    const issues = [];
+
+    for (let i = 0; i < stages.length; i++) {
+      const traits = this.traits.get(stages[i]);
+      if (!traits) continue;
+
+      // Check if order-sensitive transformer is placed appropriately
+      if (traits.orderSensitive) {
+        // Look for non-idempotent transformers before this one
+        for (let j = 0; j < i; j++) {
+          const prevTraits = this.traits.get(stages[j]);
+          if (prevTraits && !prevTraits.idempotent) {
+            issues.push({
+              type: 'ordering',
+              severity: 'warning',
+              message: `Order-sensitive transformer '${stages[i]}' follows non-idempotent transformer '${stages[j]}', which may cause unpredictable results`,
+              transformers: [stages[j], stages[i]]
+            });
+          }
+        }
+      }
+
+      // Check if heavy transformer is placed optimally
+      if (traits.heavy && i < stages.length - 2) {
+        const remainingHeavy = stages.slice(i + 1).filter(name => {
+          const t = this.traits.get(name);
+          return t && t.heavy;
+        });
+        
+        if (remainingHeavy.length === 0) {
+          issues.push({
+            type: 'performance',
+            severity: 'info',
+            message: `Heavy transformer '${stages[i]}' could be moved later in the pipeline for better performance`,
+            transformers: [stages[i]]
+          });
+        }
+      }
+    }
+
+    return issues;
+  }
+
+  /**
+   * Validate resource requirements
+   * @private
+   */
+  _validateResources(stages) {
+    const issues = [];
+    const requiredResources = new Set();
+
+    for (const stage of stages) {
+      const traits = this.traits.get(stage);
+      if (!traits) continue;
+
+      // Check for required dependencies
+      for (const dep of traits.dependencies) {
+        requiredResources.add(dep);
+      }
+
+      // Check specific requirements
+      if (traits.requirements.apiKey && !process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+        issues.push({
+          type: 'missing_resource',
+          severity: 'error',
+          message: `Transformer '${stage}' requires an API key but none is configured`,
+          transformers: [stage]
+        });
+      }
+
+      if (traits.requirements.network) {
+        // Could add network connectivity checks here
+      }
+    }
+
+    return issues;
+  }
+
+  /**
+   * Generate optimization warnings
+   * @private
+   */
+  _generateWarnings(stages) {
+    const warnings = [];
+
+    // Check for too many heavy operations
+    const heavyCount = stages.filter(name => {
+      const traits = this.traits.get(name);
+      return traits && traits.heavy;
+    }).length;
+
+    if (heavyCount > 3) {
+      warnings.push({
+        type: 'performance',
+        severity: 'warning',
+        message: `Pipeline contains ${heavyCount} heavy transformers, which may impact performance`,
+        suggestion: 'Consider reducing the number of AI or computationally intensive transformers'
+      });
+    }
+
+    // Check for redundant transformers
+    const duplicateTags = new Map();
+    stages.forEach(name => {
+      const traits = this.traits.get(name);
+      if (traits && traits.tags) {
+        traits.tags.forEach(tag => {
+          if (!duplicateTags.has(tag)) {
+            duplicateTags.set(tag, []);
+          }
+          duplicateTags.get(tag).push(name);
+        });
+      }
+    });
+
+    for (const [tag, transformers] of duplicateTags) {
+      if (transformers.length > 1 && ['summary', 'text-extraction'].includes(tag)) {
+        warnings.push({
+          type: 'redundancy',
+          severity: 'info',
+          message: `Multiple transformers with similar functionality detected: ${transformers.join(', ')} (tag: ${tag})`,
+          suggestion: 'Consider using only one transformer per functional category'
+        });
+      }
+    }
+
+    return warnings;
   }
 
   /**
@@ -169,7 +523,7 @@ class TransformerRegistry {
   }
 
   /**
-   * Create default registry with standard transformers
+   * Create default registry with standard transformers and their traits
    * @static
    */
   static async createDefault() {
@@ -184,34 +538,99 @@ class TransformerRegistry {
     const { default: ImageTransformer } = await import('./transformers/ImageTransformer.js');
     const { default: AISummaryTransformer } = await import('./transformers/AISummaryTransformer.js');
     
+    // File Loader - default transformer
     registry.register('file-loader', new FileLoaderTransformer(), {
       isDefault: true,
       priority: 0,
+    }, {
+      inputTypes: ['any'],
+      outputTypes: ['text', 'binary'],
+      idempotent: true,
+      orderSensitive: false,
+      heavy: false,
+      stateful: false,
+      dependencies: [],
+      conflictsWith: [],
+      requirements: {},
+      tags: ['loader', 'default']
     });
 
+    // Markdown transformer
     registry.register('markdown', new MarkdownTransformer(), {
       extensions: [], // Must be explicitly enabled - not applied automatically
       priority: 10,
+    }, {
+      inputTypes: ['text'],
+      outputTypes: ['text'],
+      idempotent: true,
+      orderSensitive: false,
+      heavy: false,
+      stateful: false,
+      dependencies: [],
+      conflictsWith: [],
+      requirements: {},
+      tags: ['text-processing', 'markdown']
     });
 
+    // CSV transformer
     registry.register('csv', new CSVTransformer(), {
       extensions: [], // Must be explicitly enabled - not applied automatically
       mimeTypes: [], // Must be explicitly enabled - not applied automatically
       priority: 10,
+    }, {
+      inputTypes: ['text'],
+      outputTypes: ['text'],
+      idempotent: true,
+      orderSensitive: false,
+      heavy: false,
+      stateful: false,
+      dependencies: [],
+      conflictsWith: [],
+      requirements: {},
+      tags: ['data-processing', 'csv', 'formatting']
     });
 
+    // PDF transformer
     registry.register('pdf', new PDFTransformer(), {
       extensions: ['.pdf'],
       mimeTypes: ['application/pdf'],
       priority: 15,
+    }, {
+      inputTypes: ['binary'],
+      outputTypes: ['text'],
+      idempotent: true,
+      orderSensitive: false,
+      heavy: true,
+      stateful: false,
+      dependencies: [],
+      conflictsWith: [],
+      requirements: {
+        memory: '50MB'
+      },
+      tags: ['text-extraction', 'document', 'pdf']
     });
 
+    // Image transformer (OCR)
     registry.register('image', new ImageTransformer(), {
       extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp'],
       mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff', 'image/webp'],
       priority: 15,
+    }, {
+      inputTypes: ['binary'],
+      outputTypes: ['text'],
+      idempotent: true,
+      orderSensitive: false,
+      heavy: true,
+      stateful: false,
+      dependencies: ['tesseract'],
+      conflictsWith: ['image-description'],
+      requirements: {
+        memory: '100MB'
+      },
+      tags: ['text-extraction', 'image', 'ocr']
     });
 
+    // Binary transformer
     registry.register('binary', new BinaryTransformer(), {
       extensions: [
         '.doc', '.docx', '.xls', '.xlsx',
@@ -219,12 +638,38 @@ class TransformerRegistry {
         '.exe', '.dll', '.so', '.dylib',
       ],
       priority: 5,
+    }, {
+      inputTypes: ['binary'],
+      outputTypes: ['text'],
+      idempotent: true,
+      orderSensitive: false,
+      heavy: false,
+      stateful: false,
+      dependencies: [],
+      conflictsWith: [],
+      requirements: {},
+      tags: ['binary-handler', 'placeholder']
     });
     
     // AI Summary transformer (optional, not enabled by default)
     registry.register('ai-summary', new AISummaryTransformer(), {
       extensions: [], // Must be explicitly enabled
       priority: 20,
+    }, {
+      inputTypes: ['text'],
+      outputTypes: ['text'],
+      idempotent: true,
+      orderSensitive: false,
+      heavy: true,
+      stateful: false,
+      dependencies: ['network'],
+      conflictsWith: ['file-summary'],
+      requirements: {
+        apiKey: true,
+        network: true,
+        memory: '200MB'
+      },
+      tags: ['ai', 'summary', 'expensive', 'text-processing']
     });
 
     return registry;

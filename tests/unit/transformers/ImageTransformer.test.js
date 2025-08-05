@@ -1,12 +1,12 @@
-// Mock dependencies before requiring
+// Mock dependencies before importing
 jest.mock('tesseract.js');
 jest.mock('fs-extra');
 jest.mock('os');
 
-const ImageTransformer = require('../../../src/transforms/transformers/ImageTransformer');
-const Tesseract = require('tesseract.js');
-const fs = require('fs-extra');
-const os = require('os');
+import ImageTransformer from '../../../src/transforms/transformers/ImageTransformer.js';
+import Tesseract from 'tesseract.js';
+import fs from 'fs-extra';
+import os from 'os';
 
 describe('ImageTransformer', () => {
   let transformer;

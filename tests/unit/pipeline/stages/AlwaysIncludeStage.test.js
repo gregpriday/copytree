@@ -1,8 +1,10 @@
 // Mock minimatch before requiring the stage
-jest.mock('minimatch', () => jest.fn());
+jest.mock('minimatch', () => ({
+  minimatch: jest.fn()
+}));
 
 // Static import for mocked modules
-import minimatch from 'minimatch';
+import { minimatch } from 'minimatch';
 
 // Use dynamic import for module under test
 let AlwaysIncludeStage;

@@ -6,7 +6,7 @@ jest.mock('fs-extra', () => ({
   remove: jest.fn()
 }));
 jest.mock('os');
-jest.mock('../../../src/utils/logger', () => ({
+jest.mock('../../../src/utils/logger.js', () => ({
   logger: {
     child: () => ({
       error: jest.fn(),
@@ -16,21 +16,21 @@ jest.mock('../../../src/utils/logger', () => ({
     })
   }
 }));
-jest.mock('../../../src/config/ConfigManager', () => ({
+jest.mock('../../../src/config/ConfigManager.js', () => ({
   config: () => ({
     get: jest.fn((key, defaultValue) => defaultValue)
   })
 }));
-jest.mock('../../../src/services/CacheService', () => ({
+jest.mock('../../../src/services/CacheService.js', () => ({
   CacheService: {
     create: jest.fn(() => null)
   }
 }));
 
-const DocumentToTextTransformer = require('../../../src/transforms/transformers/DocumentToTextTransformer');
-const { execSync } = require('child_process');
-const fs = require('fs-extra');
-const os = require('os');
+import DocumentToTextTransformer from '../../../src/transforms/transformers/DocumentToTextTransformer.js';
+import { execSync } from 'child_process';
+import fs from 'fs-extra';
+import os from 'os';
 
 describe('DocumentToTextTransformer', () => {
   let transformer;

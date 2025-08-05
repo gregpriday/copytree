@@ -1,6 +1,6 @@
-const React = require('react');
-const { render } = require('ink-testing-library');
-const PipelineStatus = require('../../../../src/ui/components/PipelineStatus.js');
+import React from 'react';
+import { render } from 'ink-testing-library';
+import PipelineStatus from '../../../../src/ui/components/PipelineStatus.js';
 
 describe('PipelineStatus Component', () => {
 	test('renders null when not loading and no current stage', () => {

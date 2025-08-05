@@ -1,8 +1,8 @@
-// Mock dependencies
+// Mock dependencies before importing
 jest.mock('fs-extra');
 
-const CSVTransformer = require('../../../src/transforms/transformers/CSVTransformer');
-const fs = require('fs-extra');
+import CSVTransformer from '../../../src/transforms/transformers/CSVTransformer.js';
+import fs from 'fs-extra';
 
 describe('CSVTransformer', () => {
   let transformer;

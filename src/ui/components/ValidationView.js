@@ -307,7 +307,7 @@ const ValidationView = ({ successMessage, type }) => {
 
     // Step 1: Check directories
     setCurrentStep(0);
-    const defaultConfigPath = path.join(__dirname, '../../../config');
+    const defaultConfigPath = path.join(process.cwd(), 'config');
     const userConfigPath = path.join(os.homedir(), '.copytree');
 		
     let directoriesStatus = 'success';
