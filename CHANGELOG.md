@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Added support for `.copytreeignore` files in subdirectories.
+
 ## [0.11.0] - 2025-08-05
 
 ### Major Changes

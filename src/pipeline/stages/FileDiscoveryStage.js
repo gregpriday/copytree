@@ -63,16 +63,23 @@ class FileDiscoveryStage extends Stage {
   }
 
   async loadCopytreeIgnore() {
-    const copytreeignorePath = path.join(this.basePath, '.copytreeignore');
-    
-    if (await fs.pathExists(copytreeignorePath)) {
-      const copytreeignoreContent = await fs.readFile(copytreeignorePath, 'utf8');
-      this.parseGitignoreContent(copytreeignoreContent);
-      this.log('Loaded .copytreeignore rules', 'debug');
+    // Find all .copytreeignore files within the base path
+    const ignoreFiles = await fastGlob('**/.copytreeignore', {
+      cwd: this.basePath,
+      dot: true,
+    });
+
+    for (const file of ignoreFiles) {
+      const fullPath = path.join(this.basePath, file);
+      const content = await fs.readFile(fullPath, 'utf8');
+      // Determine directory containing this .copytreeignore relative to basePath
+      const dir = path.posix.dirname(file) === '.' ? '' : path.posix.dirname(file);
+      this.parseGitignoreContent(content, dir);
+      this.log(`Loaded ${file} rules`, 'debug');
     }
   }
 
-  parseGitignoreContent(content) {
+  parseGitignoreContent(content, dir = '') {
     const lines = content.split('\n');
     
     for (const line of lines) {
@@ -96,12 +103,17 @@ class FileDiscoveryStage extends Stage {
         // Remove leading slash for relative matching
         pattern = pattern.substring(1);
       }
-      
+
       // If pattern ends with /, it only matches directories
       if (pattern.endsWith('/')) {
         pattern = pattern + '**';
       }
-      
+
+      // Prefix with directory if provided so rules in subdirectories are scoped correctly
+      if (dir) {
+        pattern = path.posix.join(dir, pattern);
+      }
+
       this.gitignorePatterns.push({
         pattern,
         isNegated,

@@ -138,8 +138,8 @@ class FileFilter {
   
   createChildFilter(subPath) {
     const childFilter = new FileFilter(path.join(this.basePath, subPath));
-    // Copy current patterns
-    childFilter.patterns = [...this.patterns];
+    // Combine parent patterns with child patterns so subdirectory rules take precedence
+    childFilter.patterns = [...this.patterns, ...childFilter.patterns];
     return childFilter;
   }
 }
