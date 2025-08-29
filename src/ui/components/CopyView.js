@@ -74,12 +74,7 @@ const CopyView = () => {
     const startTime = Date.now();
 		
     try {
-      // Check if this looks like an invalid command rather than a path
-      if (targetPath && !targetPath.startsWith('/') && !targetPath.startsWith('./') && !targetPath.startsWith('../') && 
-				!targetPath.includes('/') && !targetPath.includes('\\') && !targetPath.includes('.') && 
-				(targetPath.includes(':') || targetPath.includes('-'))) {
-        throw new CommandError(`Path does not exist: ${targetPath}`, 'copy');
-      }
+
 			
       // Handle dry-run mode early
       if (options.dryRun) {
