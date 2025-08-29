@@ -23,32 +23,32 @@ class OutputFormattingStage extends Stage {
 
     let output;
     switch (this.format) {
-      case 'xml': {
-        const formatter = new XMLFormatter({
-          stage: this,
-          addLineNumbers: this.addLineNumbers,
-          onlyTree: this.onlyTree,
-        });
-        output = await formatter.format(input);
-        break;
-      }
-      case 'json':
-        output = this.formatAsJSON(input);
-        break;
-      case 'tree':
-        output = this.formatAsTree(input);
-        break;
-      case 'markdown': {
-        const formatter = new MarkdownFormatter({
-          stage: this,
-          addLineNumbers: this.addLineNumbers,
-          onlyTree: this.onlyTree,
-        });
-        output = await formatter.format(input);
-        break;
-      }
-      default:
-        throw new Error(`Unknown output format: ${this.format}`);
+    case 'xml': {
+      const formatter = new XMLFormatter({
+        stage: this,
+        addLineNumbers: this.addLineNumbers,
+        onlyTree: this.onlyTree,
+      });
+      output = await formatter.format(input);
+      break;
+    }
+    case 'json':
+      output = this.formatAsJSON(input);
+      break;
+    case 'tree':
+      output = this.formatAsTree(input);
+      break;
+    case 'markdown': {
+      const formatter = new MarkdownFormatter({
+        stage: this,
+        addLineNumbers: this.addLineNumbers,
+        onlyTree: this.onlyTree,
+      });
+      output = await formatter.format(input);
+      break;
+    }
+    default:
+      throw new Error(`Unknown output format: ${this.format}`);
     }
 
     this.log(`Formatted output in ${this.getElapsedTime(startTime)}`, 'info');

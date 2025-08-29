@@ -133,19 +133,19 @@ class Stage {
       const prefix = `[${this.name}]`;
 
       switch (level) {
-        case 'error':
-          console.error(prefix, message);
-          break;
-        case 'warn':
-          console.warn(prefix, message);
-          break;
-        case 'debug':
-          if (this.config.get('app.debug')) {
-            console.log(prefix, '[DEBUG]', message);
-          }
-          break;
-        default:
-          console.log(prefix, message);
+      case 'error':
+        console.error(prefix, message);
+        break;
+      case 'warn':
+        console.warn(prefix, message);
+        break;
+      case 'debug':
+        if (this.config.get('app.debug')) {
+          console.log(prefix, '[DEBUG]', message);
+        }
+        break;
+      default:
+        console.log(prefix, message);
       }
     }
   }

@@ -28,7 +28,7 @@ class Clipboard {
     if (process.platform === 'win32') {
       try {
         // Use PowerShell to copy the file reference on Windows
-        const command = `powershell -Command "Set-Clipboard -Path '${filePath.replace(/'/g, "''")}'"`;
+        const command = `powershell -Command "Set-Clipboard -Path '${filePath.replace(/'/g, '\'\'')}'"`;
         execSync(command, { stdio: 'pipe' });
       } catch (error) {
         logger.debug(

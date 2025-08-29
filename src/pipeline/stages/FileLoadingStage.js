@@ -104,19 +104,19 @@ class FileLoadingStage extends Stage {
 
   handleBinaryFile(file) {
     switch (this.binaryAction) {
-      case 'skip':
-        return null;
+    case 'skip':
+      return null;
 
-      case 'base64':
-        return this.loadBinaryAsBase64(file);
+    case 'base64':
+      return this.loadBinaryAsBase64(file);
 
-      case 'placeholder':
-      default:
-        return {
-          ...file,
-          content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
-          isBinary: true,
-        };
+    case 'placeholder':
+    default:
+      return {
+        ...file,
+        content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
+        isBinary: true,
+      };
     }
   }
 
