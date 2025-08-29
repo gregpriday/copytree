@@ -43,7 +43,7 @@ class OutputFormattingStage extends Stage {
   async formatAsXML(input) {
     // Manual XML construction to avoid any escaping
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += `<ct:directory path="${input.basePath}">\n`;
+    xml += `<ct:directory xmlns:ct="urn:copytree" path="${input.basePath}">\n`;
     
     // Add metadata
     xml += '  <ct:metadata>\n';
@@ -62,7 +62,8 @@ class OutputFormattingStage extends Stage {
         xml += `      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`;
       }
       if (input.gitMetadata.lastCommit) {
-        xml += `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}">${input.gitMetadata.lastCommit.message}</ct:lastCommit>\n`;
+        const msg = (input.gitMetadata.lastCommit.message || '').toString().split(']]>').join(']]]]><![CDATA[>');
+        xml += `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}"><![CDATA[${msg}]]></ct:lastCommit>\n`;
       }
       if (input.gitMetadata.filterType) {
         xml += `      <ct:filterType>${input.gitMetadata.filterType}</ct:filterType>\n`;
@@ -80,7 +81,8 @@ class OutputFormattingStage extends Stage {
     // Add instructions if present (loaded by InstructionsStage)
     if (input.instructions) {
       const nameAttr = input.instructionsName ? ` name="${input.instructionsName}"` : '';
-      xml += `    <ct:instructions${nameAttr}>${input.instructions}</ct:instructions>\n`;
+      const instr = input.instructions.toString().split(']]>').join(']]]]><![CDATA[>');
+      xml += `    <ct:instructions${nameAttr}><![CDATA[${instr}]]></ct:instructions>\n`;
     }
     
     xml += '  </ct:metadata>\n';
@@ -120,8 +122,9 @@ class OutputFormattingStage extends Stage {
           content = this.addLineNumbersToContent(content);
         }
         
-        // Output raw content without any escaping
-        xml += content;
+        // Wrap content in CDATA to ensure well-formed XML
+        const c = content.toString().split(']]>').join(']]]]><![CDATA[>');
+        xml += `<![CDATA[${c}]]>`;
       }
       
       xml += '</ct:file>\n';
