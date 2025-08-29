@@ -18,7 +18,7 @@ class PDFTransformer extends BaseTransformer {
   async doTransform(file) {
     // Load PDF buffer if not already loaded
     let buffer;
-    
+
     if (file.content) {
       // If content is base64, decode it
       if (file.encoding === 'base64') {
@@ -62,20 +62,19 @@ class PDFTransformer extends BaseTransformer {
         max: this.maxPages,
         // Disable some features for better performance
         pagerender: (pageData) => {
-          return pageData.getTextContent()
-            .then((textContent) => {
-              let text = '';
-              for (const item of textContent.items) {
-                text += item.str + ' ';
-              }
-              return text;
-            });
+          return pageData.getTextContent().then((textContent) => {
+            let text = '';
+            for (const item of textContent.items) {
+              text += item.str + ' ';
+            }
+            return text;
+          });
         },
       });
 
       // Build output
       let output = '';
-      
+
       if (this.includeMetadata && data.info) {
         output += '=== PDF Metadata ===\n';
         if (data.info.Title) output += `Title: ${data.info.Title}\n`;
@@ -92,10 +91,10 @@ class PDFTransformer extends BaseTransformer {
         output += `Pages: ${data.numpages}\n`;
         output += '\n=== Content ===\n';
       }
-      
+
       // Add text content
       output += data.text;
-      
+
       // Add page limit notice if applicable
       if (data.numpages > this.maxPages) {
         output += `\n\n[... PDF contains ${data.numpages} pages, showing first ${this.maxPages} ...]`;
@@ -115,7 +114,7 @@ class PDFTransformer extends BaseTransformer {
       };
     } catch (error) {
       this.logger.error(`Failed to parse PDF ${file.path}: ${error.message}`);
-      
+
       return {
         ...file,
         content: `[Error parsing PDF: ${error.message}]`,
@@ -133,7 +132,7 @@ class PDFTransformer extends BaseTransformer {
    */
   formatPDFDate(dateStr) {
     if (!dateStr || typeof dateStr !== 'string') return dateStr;
-    
+
     // PDF dates are in format: D:YYYYMMDDHHmmSSOHH'mm'
     const match = dateStr.match(/D:(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
     if (match) {
@@ -141,7 +140,7 @@ class PDFTransformer extends BaseTransformer {
       const date = new Date(year, month - 1, day, hour, minute, second);
       return date.toLocaleString();
     }
-    
+
     return dateStr;
   }
 

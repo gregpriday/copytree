@@ -13,7 +13,7 @@ class ProfileLoader {
       include: ['**/*'],
       exclude: ['node_modules/**'],
       transforms: [],
-      options: overrides
+      options: overrides,
     };
   }
 

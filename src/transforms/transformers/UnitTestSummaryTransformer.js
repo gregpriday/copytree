@@ -23,16 +23,16 @@ class UnitTestSummaryTransformer extends BaseTransformer {
     ];
     this.maxFileSize = options.maxFileSize || 100 * 1024; // 100KB default
     this.apiKey = options.apiKey || process.env.GEMINI_API_KEY;
-    
+
     if (!this.apiKey) {
       this.logger.warn('No Gemini API key provided, test summaries will be disabled');
     } else {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
-      this.model = this.genAI.getGenerativeModel({ 
+      this.model = this.genAI.getGenerativeModel({
         model: options.model || this.config.get('ai.gemini.model'),
       });
     }
-    
+
     this.isHeavy = true; // AI test analysis is a heavy operation
   }
 
@@ -41,11 +41,11 @@ class UnitTestSummaryTransformer extends BaseTransformer {
    */
   canTransform(file) {
     if (!this.apiKey) return false;
-    
+
     // Check if it's a test file
     const isTestFile = this.isTestFile(file.path);
     if (!isTestFile) return false;
-    
+
     // Check file size
     const size = file.stats?.size || Buffer.byteLength(file.content);
     return size <= this.maxFileSize;
@@ -65,7 +65,7 @@ class UnitTestSummaryTransformer extends BaseTransformer {
       /Spec\.(rb|scala)$/,
       /test\.go$/,
     ];
-    
+
     return patterns.some((pattern) => pattern.test(filename));
   }
 
@@ -75,18 +75,19 @@ class UnitTestSummaryTransformer extends BaseTransformer {
   async doTransform(file) {
     try {
       // Get content as string
-      const content = Buffer.isBuffer(file.content) 
-        ? file.content.toString('utf8') 
+      const content = Buffer.isBuffer(file.content)
+        ? file.content.toString('utf8')
         : String(file.content);
 
       // Extract test information
       const testInfo = this.extractTestInfo(content, file.path);
-      
+
       // Truncate content if too long
       const maxLength = 8000; // Roughly 2000 tokens
-      const truncatedContent = content.length > maxLength
-        ? content.substring(0, maxLength) + '\n... (truncated)'
-        : content;
+      const truncatedContent =
+        content.length > maxLength
+          ? content.substring(0, maxLength) + '\n... (truncated)'
+          : content;
 
       // Generate summary using Gemini
       const prompt = `Analyze this unit test file and provide a concise summary.
@@ -172,13 +173,7 @@ Keep the summary concise (3-5 sentences plus bullet points for scenarios).`;
     }
 
     // Count test cases (rough estimate)
-    const testPatterns = [
-      /\bit\(/g,
-      /\btest\(/g,
-      /\bdef test_/g,
-      /@Test/g,
-      /\bscenario\(/g,
-    ];
+    const testPatterns = [/\bit\(/g, /\btest\(/g, /\bdef test_/g, /@Test/g, /\bscenario\(/g];
 
     for (const pattern of testPatterns) {
       const matches = content.match(pattern);
@@ -206,20 +201,20 @@ Keep the summary concise (3-5 sentences plus bullet points for scenarios).`;
   formatBasicSummary(file, testInfo) {
     const filename = path.basename(file.path);
     let summary = `[Test File: ${filename}]\n\n`;
-    
+
     summary += `Framework: ${testInfo.framework || 'Unknown'}\n`;
     summary += `Test cases: ${testInfo.testCount || 0}\n`;
-    
+
     if (testInfo.describeBlocks > 0) {
       summary += `Test suites: ${testInfo.describeBlocks}\n`;
     }
-    
+
     if (testInfo.hasSetup || testInfo.hasTeardown) {
       summary += `Setup/Teardown: ${testInfo.hasSetup ? '✓' : '✗'} / ${testInfo.hasTeardown ? '✓' : '✗'}\n`;
     }
-    
+
     summary += '\n[AI summary generation failed]';
-    
+
     return summary;
   }
 
@@ -229,13 +224,13 @@ Keep the summary concise (3-5 sentences plus bullet points for scenarios).`;
   formatOutput(file, summary, testInfo) {
     const filename = path.basename(file.path);
     let header = `[Test Summary: ${filename}]\n`;
-    
+
     if (testInfo.framework) {
       header += `Framework: ${testInfo.framework} | `;
     }
-    
+
     header += `Tests: ${testInfo.testCount || '?'}\n\n`;
-    
+
     return header + summary.trim() + `\n\n[AI-generated test summary by ${this.constructor.name}]`;
   }
 }

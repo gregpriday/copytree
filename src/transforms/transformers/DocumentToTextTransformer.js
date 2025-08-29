@@ -47,7 +47,7 @@ class DocumentToTextTransformer extends BaseTransformer {
    */
   async doTransform(file) {
     const size = file.stats?.size || Buffer.byteLength(file.content);
-    
+
     // Check file size
     if (size > this.maxDocSize) {
       return {
@@ -65,7 +65,7 @@ class DocumentToTextTransformer extends BaseTransformer {
     // Create temp file
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'copytree-doc-'));
     const tempInput = path.join(tempDir, path.basename(file.path));
-    
+
     try {
       // Write content to temp file
       if (Buffer.isBuffer(file.content)) {
@@ -76,12 +76,14 @@ class DocumentToTextTransformer extends BaseTransformer {
 
       // Determine input format
       const inputFormat = this.getInputFormat(file.path);
-      
+
       // Run pandoc conversion
       const command = [
         this.pandocPath,
-        '-f', inputFormat,
-        '-t', 'plain',
+        '-f',
+        inputFormat,
+        '-t',
+        'plain',
         '--wrap=none',
         '--strip-comments',
         `"${tempInput}"`,
@@ -154,7 +156,7 @@ class DocumentToTextTransformer extends BaseTransformer {
     const filename = path.basename(file.path);
     const header = `[Document: ${filename} - Original size: ${this.formatBytes(originalSize)}]\n`;
     const footer = `\n\n[Converted to plain text by ${this.constructor.name}]`;
-    
+
     return header + '\n' + textContent.trim() + footer;
   }
 }

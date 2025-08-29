@@ -9,18 +9,22 @@ export const Box = ({ children, ...props }) => {
 
 // Mock Text component - renders text content
 export const Text = ({ children, color, bold, ...props }) => {
-  return React.createElement('span', { 
-    ...props,
-    style: { 
-      color: color || 'inherit',
-      fontWeight: bold ? 'bold' : 'normal',
-      ...props.style 
-    }
-  }, children);
+  return React.createElement(
+    'span',
+    {
+      ...props,
+      style: {
+        color: color || 'inherit',
+        fontWeight: bold ? 'bold' : 'normal',
+        ...props.style,
+      },
+    },
+    children,
+  );
 };
 
 // Default export with named exports
 export default {
   Box,
-  Text
+  Text,
 };

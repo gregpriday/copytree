@@ -74,7 +74,10 @@ async function ensureDir(dirPath) {
  */
 async function getTempDir(prefix = 'copytree') {
   const tempBase = os.tmpdir();
-  const tempDir = path.join(tempBase, `${prefix}-${Date.now()}-${shortHash(Math.random().toString())}`);
+  const tempDir = path.join(
+    tempBase,
+    `${prefix}-${Date.now()}-${shortHash(Math.random().toString())}`,
+  );
   await ensureDir(tempDir);
   return tempDir;
 }
@@ -118,13 +121,47 @@ function getExtension(filePath) {
  */
 function isBinaryExtension(filePath) {
   const binaryExtensions = new Set([
-    'exe', 'dll', 'so', 'dylib', 'bin',
-    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'webp', 'svg',
-    'mp3', 'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm',
-    'zip', 'tar', 'gz', 'rar', '7z', 'bz2',
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
-    'ttf', 'otf', 'woff', 'woff2', 'eot',
-    'db', 'sqlite', 'sqlite3',
+    'exe',
+    'dll',
+    'so',
+    'dylib',
+    'bin',
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'bmp',
+    'ico',
+    'webp',
+    'svg',
+    'mp3',
+    'mp4',
+    'avi',
+    'mov',
+    'wmv',
+    'flv',
+    'webm',
+    'zip',
+    'tar',
+    'gz',
+    'rar',
+    '7z',
+    'bz2',
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'ttf',
+    'otf',
+    'woff',
+    'woff2',
+    'eot',
+    'db',
+    'sqlite',
+    'sqlite3',
   ]);
 
   const ext = getExtension(filePath).toLowerCase();
@@ -159,7 +196,7 @@ function formatBytes(bytes, decimals = 2) {
  */
 function formatDuration(ms) {
   if (ms < 1000) return `${ms}ms`;
-  
+
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
@@ -212,10 +249,10 @@ function chunk(array, size) {
  */
 function debounce(fn, delay) {
   let timeoutId;
-  
+
   return function debounced(...args) {
     clearTimeout(timeoutId);
-    
+
     return new Promise((resolve) => {
       timeoutId = setTimeout(() => {
         resolve(fn.apply(this, args));
@@ -273,7 +310,7 @@ function escapeXml(str) {
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
-    '\'': '&apos;',
+    "'": '&apos;',
   };
 
   return str.replace(/[&<>"']/g, (char) => xmlEscapes[char]);

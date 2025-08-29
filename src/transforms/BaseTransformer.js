@@ -13,19 +13,23 @@ class BaseTransformer {
     this.options = options;
     this.config = config();
     this.logger = options.logger || logger.child(this.constructor.name);
-    
+
     // Only enable caching for AI-based transformers by default
-    const isAITransformer = this.constructor.name.toLowerCase().includes('ai') || 
-                           this.constructor.name.toLowerCase().includes('summary') ||
-                           this.constructor.name.toLowerCase().includes('description');
-    
-    this.cacheEnabled = options.noCache ? false : (options.cache ?? (isAITransformer && this.config.get('cache.transformations.enabled', true)));
+    const isAITransformer =
+      this.constructor.name.toLowerCase().includes('ai') ||
+      this.constructor.name.toLowerCase().includes('summary') ||
+      this.constructor.name.toLowerCase().includes('description');
+
+    this.cacheEnabled = options.noCache
+      ? false
+      : (options.cache ??
+        (isAITransformer && this.config.get('cache.transformations.enabled', true)));
     this.cacheTTL = options.cacheTTL ?? this.config.get('cache.transformations.ttl', 86400);
-    
+
     // Indicates whether this transformer performs heavy/slow operations
     // Heavy transformers will show progress during processing
     this.isHeavy = false;
-    
+
     // Cache will be initialized on first use if caching is enabled
     this.cache = null;
   }
@@ -37,7 +41,7 @@ class BaseTransformer {
     if (!this.cache && this.cacheEnabled) {
       const transformerName = this.constructor.name.toLowerCase().replace('transformer', '');
       const specificConfig = `cache.transformations.${transformerName}`;
-      
+
       this.cache = CacheService.create('transform', {
         enabled: this.config.get(`${specificConfig}.enabled`, this.cacheEnabled),
         defaultTtl: this.config.get(`${specificConfig}.ttl`, this.cacheTTL),
@@ -54,7 +58,7 @@ class BaseTransformer {
     try {
       // Validate input first
       this.validateInput(file);
-      
+
       this.logger.debug(`Transforming ${file.path}`);
       const startTime = Date.now();
 
@@ -146,11 +150,8 @@ class BaseTransformer {
       file.modified ? file.modified.getTime() : 0,
       JSON.stringify(this.options),
     ];
-    
-    return crypto
-      .createHash('sha256')
-      .update(parts.join(':'))
-      .digest('hex');
+
+    return crypto.createHash('sha256').update(parts.join(':')).digest('hex');
   }
 
   /**
@@ -160,10 +161,10 @@ class BaseTransformer {
    */
   async getFromCache(file) {
     if (!this.cache) return null;
-    
+
     const cacheKey = this.getCacheKey(file);
     const cached = await this.cache.get(cacheKey);
-    
+
     if (cached) {
       // Merge cached content back into file object
       return {
@@ -172,7 +173,7 @@ class BaseTransformer {
         fromCache: true,
       };
     }
-    
+
     return null;
   }
 
@@ -184,9 +185,9 @@ class BaseTransformer {
    */
   async saveToCache(file, result) {
     if (!this.cache) return;
-    
+
     const cacheKey = this.getCacheKey(file);
-    
+
     // Only cache successful transformations
     if (result.transformed) {
       // Don't cache the entire file object, just the transformation results
@@ -197,7 +198,7 @@ class BaseTransformer {
         metadata: result.metadata,
         error: result.error,
       };
-      
+
       await this.cache.set(cacheKey, cacheData, this.cacheTTL);
     }
   }
@@ -231,7 +232,7 @@ class BaseTransformer {
    */
   isTextContent(content) {
     if (typeof content === 'string') return true;
-    
+
     if (Buffer.isBuffer(content)) {
       // Check first 512 bytes for null characters
       const sample = content.slice(0, Math.min(512, content.length));
@@ -240,7 +241,7 @@ class BaseTransformer {
       }
       return true;
     }
-    
+
     return false;
   }
 
@@ -252,17 +253,17 @@ class BaseTransformer {
   detectEncoding(buffer) {
     // Simple BOM detection
     if (buffer.length >= 3) {
-      if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+      if (buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
         return 'utf8';
       }
-      if (buffer[0] === 0xFF && buffer[1] === 0xFE) {
+      if (buffer[0] === 0xff && buffer[1] === 0xfe) {
         return 'utf16le';
       }
-      if (buffer[0] === 0xFE && buffer[1] === 0xFF) {
+      if (buffer[0] === 0xfe && buffer[1] === 0xff) {
         return 'utf16be';
       }
     }
-    
+
     return 'utf8'; // Default
   }
 

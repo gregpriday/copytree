@@ -9,17 +9,34 @@ class BatchAISummaryTransformer extends BaseTransformer {
     super(options);
     this.description = 'Generates AI-powered summaries of multiple files in batches';
     this.supportedExtensions = options.extensions || [
-      '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.go', '.rs', '.cpp', '.c',
-      '.php', '.rb', '.swift', '.kt', '.scala', '.r', '.m', '.h', '.cs',
+      '.js',
+      '.jsx',
+      '.ts',
+      '.tsx',
+      '.py',
+      '.java',
+      '.go',
+      '.rs',
+      '.cpp',
+      '.c',
+      '.php',
+      '.rb',
+      '.swift',
+      '.kt',
+      '.scala',
+      '.r',
+      '.m',
+      '.h',
+      '.cs',
     ];
     this.maxFileSize = options.maxFileSize || 50 * 1024; // 50KB per file
     this.batchSize = options.batchSize || 5; // Process 5 files at a time
     this.maxBatchSize = options.maxBatchSize || 200 * 1024; // 200KB total batch size
     this.includeOriginal = options.includeOriginal ?? false;
-    
+
     // Initialize AI service
     this.ai = AIService.forTask('codeDescription', options);
-    
+
     // Batch queue
     this.batchQueue = [];
     this.batchPromises = new Map();
@@ -48,13 +65,13 @@ class BatchAISummaryTransformer extends BaseTransformer {
 
     // Add to batch queue
     const batchPromise = this.addToBatch(file);
-    
+
     // Wait for batch result
     const summary = await batchPromise;
 
     // Build output
     let output = `=== AI Summary ===\n${summary}\n`;
-    
+
     if (this.includeOriginal) {
       output += `\n=== Original Content ===\n${file.content}`;
     }
@@ -75,7 +92,7 @@ class BatchAISummaryTransformer extends BaseTransformer {
   async addToBatch(file) {
     return new Promise((resolve, reject) => {
       this.batchQueue.push({ file, resolve, reject });
-      
+
       // Check if we should process the batch
       if (this.shouldProcessBatch()) {
         this.processBatch();
@@ -90,13 +107,13 @@ class BatchAISummaryTransformer extends BaseTransformer {
     if (this.batchQueue.length >= this.batchSize) {
       return true;
     }
-    
+
     // Check total size
     const totalSize = this.batchQueue.reduce((sum, item) => sum + (item.file.size || 0), 0);
     if (totalSize >= this.maxBatchSize) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -105,34 +122,33 @@ class BatchAISummaryTransformer extends BaseTransformer {
    */
   async processBatch() {
     if (this.batchQueue.length === 0) return;
-    
+
     // Take items from queue
     const batchItems = this.batchQueue.splice(0, this.batchSize);
-    
+
     try {
       this.logger.debug(`Processing batch of ${batchItems.length} files for AI summary`);
-      
+
       // Create batch prompt
       const batchPrompt = this.createBatchPrompt(batchItems.map((item) => item.file));
-      
+
       // Get batch summary
       const response = await this.ai.complete({
         prompt: batchPrompt,
         temperature: 0.3,
         maxTokens: 2000,
       });
-      
+
       // Parse response and resolve promises
       const summaries = this.parseBatchResponse(response.content, batchItems.length);
-      
+
       batchItems.forEach((item, index) => {
         const summary = summaries[index] || 'Summary not available';
         item.resolve(summary);
       });
-      
     } catch (error) {
       this.logger.error(`Batch AI summary failed: ${error.message}`);
-      
+
       // Reject all promises in batch
       batchItems.forEach((item) => {
         item.reject(error);
@@ -166,7 +182,7 @@ ${file.content.substring(0, 10000)} // Truncated if needed
     });
 
     prompt += `Please provide summaries for all ${files.length} files above:`;
-    
+
     return prompt;
   }
 
@@ -175,10 +191,10 @@ ${file.content.substring(0, 10000)} // Truncated if needed
    */
   parseBatchResponse(response, expectedCount) {
     const summaries = [];
-    
+
     // Split by file markers
     const parts = response.split(/=== FILE \d+ ===/);
-    
+
     // Skip first empty part
     for (let i = 1; i <= expectedCount; i++) {
       if (parts[i]) {
@@ -187,7 +203,7 @@ ${file.content.substring(0, 10000)} // Truncated if needed
         summaries.push('Summary not available');
       }
     }
-    
+
     return summaries;
   }
 
@@ -217,7 +233,7 @@ ${file.content.substring(0, 10000)} // Truncated if needed
       '.h': 'C/C++ Header',
       '.cs': 'C#',
     };
-    
+
     return languageMap[ext] || 'Unknown';
   }
 

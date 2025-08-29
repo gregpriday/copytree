@@ -27,7 +27,10 @@ class XMLFormatter {
         xml += `      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`;
       }
       if (input.gitMetadata.lastCommit) {
-        const msg = (input.gitMetadata.lastCommit.message || '').toString().split(']]>').join(']]]]><![CDATA[>');
+        const msg = (input.gitMetadata.lastCommit.message || '')
+          .toString()
+          .split(']]>')
+          .join(']]]]><![CDATA[>');
         xml += `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}"><![CDATA[${msg}]]></ct:lastCommit>\n`;
       }
       if (input.gitMetadata.filterType) {
@@ -60,9 +63,8 @@ class XMLFormatter {
       xml += `    <ct:file path="@${file.path}" size="${file.size}"`;
 
       if (file.modified) {
-        const modifiedDate = file.modified instanceof Date
-          ? file.modified
-          : new Date(file.modified);
+        const modifiedDate =
+          file.modified instanceof Date ? file.modified : new Date(file.modified);
         xml += ` modified="${modifiedDate.toISOString()}"`;
       }
 
@@ -103,4 +105,3 @@ class XMLFormatter {
 }
 
 export default XMLFormatter;
-

@@ -15,11 +15,11 @@ class InstructionsLoader {
   constructor(basePath = process.cwd()) {
     this.basePath = basePath;
     this.logger = logger?.child ? logger.child('InstructionsLoader') : logger;
-    
+
     // Instructions directories (in order of priority)
     this.userDir = path.join(os.homedir(), '.copytree/instructions');
     this.appDir = path.join(__dirname, '..', 'templates', 'instructions');
-    
+
     // Cache for loaded instructions
     this.instructionsCache = new Map();
   }
@@ -51,7 +51,7 @@ class InstructionsLoader {
         if (this.logger?.debug) {
           this.logger.debug(`Loading instructions from user directory: ${userPath}`);
         }
-      } 
+      }
       // Then check app directory (built-in)
       else if (await fs.pathExists(appPath)) {
         content = await fs.readFile(appPath, 'utf8');
@@ -59,29 +59,23 @@ class InstructionsLoader {
         if (this.logger?.debug) {
           this.logger.debug(`Loading instructions from app directory: ${appPath}`);
         }
-      } 
-      else {
+      } else {
         const { InstructionsError, CopyTreeError } = await import('../utils/errors.js');
         const ErrorClass = InstructionsError || CopyTreeError;
-        throw new ErrorClass(
-          `Instructions '${name}' not found`,
-          name,
-          { 
-            searchPaths: [userPath, appPath],
-            userDir: this.userDir,
-            appDir: this.appDir,
-          },
-        );
+        throw new ErrorClass(`Instructions '${name}' not found`, name, {
+          searchPaths: [userPath, appPath],
+          userDir: this.userDir,
+          appDir: this.appDir,
+        });
       }
 
       // Cache the result
       this.instructionsCache.set(cacheKey, content);
-      
+
       if (this.logger?.debug) {
         this.logger.debug(`Successfully loaded instructions '${name}' from ${foundPath}`);
       }
       return content;
-
     } catch (error) {
       if (this.logger?.error) {
         this.logger.error(`Failed to load instructions '${name}':`, error.message);
@@ -99,7 +93,7 @@ class InstructionsLoader {
 
     // Helper to add instructions from a directory
     const addInstructionsFromDir = async (dir) => {
-      if (!await fs.pathExists(dir)) return;
+      if (!(await fs.pathExists(dir))) return;
 
       try {
         const files = await fs.readdir(dir);
@@ -132,7 +126,7 @@ class InstructionsLoader {
   async exists(name = 'default') {
     const userPath = path.join(this.userDir, `${name}.md`);
     const appPath = path.join(this.appDir, `${name}.md`);
-    
+
     return (await fs.pathExists(userPath)) || (await fs.pathExists(appPath));
   }
 

@@ -2,7 +2,26 @@
 import fs from 'fs-extra';
 
 // Use dynamic import for module under test
-let hash, shortHash, sleep, retry, ensureDir, getTempDir, cleanupTempDir, isPathInside, normalizePath, getExtension, isBinaryExtension, truncate, formatBytes, formatDuration, parseSize, chunk, debounce, createCache, escapeXml, timestamp;
+let hash,
+  shortHash,
+  sleep,
+  retry,
+  ensureDir,
+  getTempDir,
+  cleanupTempDir,
+  isPathInside,
+  normalizePath,
+  getExtension,
+  isBinaryExtension,
+  truncate,
+  formatBytes,
+  formatDuration,
+  parseSize,
+  chunk,
+  debounce,
+  createCache,
+  escapeXml,
+  timestamp;
 
 beforeAll(async () => {
   const helpersModule = await import('../../../src/utils/helpers.js');
@@ -26,7 +45,7 @@ beforeAll(async () => {
     debounce,
     createCache,
     escapeXml,
-    timestamp
+    timestamp,
   } = helpersModule);
 });
 
@@ -165,17 +184,13 @@ describe('Helper Functions', () => {
       expect(chunk(array, 3)).toEqual([
         [1, 2, 3],
         [4, 5, 6],
-        [7, 8, 9]
+        [7, 8, 9],
       ]);
     });
 
     test('should handle arrays not evenly divisible', () => {
       const array = [1, 2, 3, 4, 5];
-      expect(chunk(array, 2)).toEqual([
-        [1, 2],
-        [3, 4],
-        [5]
-      ]);
+      expect(chunk(array, 2)).toEqual([[1, 2], [3, 4], [5]]);
     });
   });
 
@@ -224,8 +239,7 @@ describe('Helper Functions', () => {
     test('should fail after max attempts', async () => {
       const fn = jest.fn().mockRejectedValue(new Error('Always fails'));
 
-      await expect(retry(fn, { maxAttempts: 2, initialDelay: 10 }))
-        .rejects.toThrow('Always fails');
+      await expect(retry(fn, { maxAttempts: 2, initialDelay: 10 })).rejects.toThrow('Always fails');
       expect(fn).toHaveBeenCalledTimes(2);
     });
   });
@@ -233,7 +247,7 @@ describe('Helper Functions', () => {
   describe('createCache', () => {
     test('should create working cache', () => {
       const cache = createCache(1000);
-      
+
       cache.set('key1', 'value1');
       expect(cache.get('key1')).toBe('value1');
       expect(cache.size()).toBe(1);
@@ -241,25 +255,25 @@ describe('Helper Functions', () => {
 
     test('should expire entries', async () => {
       const cache = createCache(100); // 100ms TTL
-      
+
       cache.set('key1', 'value1');
       expect(cache.get('key1')).toBe('value1');
-      
+
       await sleep(150);
       expect(cache.get('key1')).toBeNull();
     });
 
     test('should support delete and clear', () => {
       const cache = createCache();
-      
+
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
       expect(cache.size()).toBe(2);
-      
+
       cache.delete('key1');
       expect(cache.get('key1')).toBeNull();
       expect(cache.size()).toBe(1);
-      
+
       cache.clear();
       expect(cache.size()).toBe(0);
     });
@@ -277,8 +291,9 @@ describe('Helper Functions', () => {
 
   describe('escapeXml', () => {
     test('should escape XML entities', () => {
-      expect(escapeXml('<tag>content & "value"</tag>'))
-        .toBe('&lt;tag&gt;content &amp; &quot;value&quot;&lt;/tag&gt;');
+      expect(escapeXml('<tag>content & "value"</tag>')).toBe(
+        '&lt;tag&gt;content &amp; &quot;value&quot;&lt;/tag&gt;',
+      );
     });
   });
 
@@ -293,13 +308,13 @@ describe('Helper Functions', () => {
   describe('ensureDir', () => {
     test('should ensure directory exists', async () => {
       const tempPath = `/tmp/test-${Date.now()}`;
-      
+
       // Mock pathExists to return true after ensureDir is called
       fs.pathExists.mockResolvedValue(true);
-      
+
       await ensureDir(tempPath);
       expect(await fs.pathExists(tempPath)).toBe(true);
-      
+
       // Cleanup
       await fs.remove(tempPath);
     });
@@ -309,12 +324,12 @@ describe('Helper Functions', () => {
     test('should create temporary directory', async () => {
       // Mock pathExists to return true for temp directories
       fs.pathExists.mockResolvedValue(true);
-      
+
       const tempDir = await getTempDir('test');
-      
+
       expect(tempDir).toMatch(/test-\d+-\w{8}$/);
       expect(await fs.pathExists(tempDir)).toBe(true);
-      
+
       // Cleanup
       await cleanupTempDir(tempDir);
     });

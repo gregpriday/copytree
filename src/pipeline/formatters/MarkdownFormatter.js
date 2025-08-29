@@ -22,10 +22,14 @@ class MarkdownFormatter {
     const fileCount = files.length;
     const totalSize = this.stage.calculateTotalSize(files);
     const profileName = input.profile?.name || 'default';
-    const includeGitStatus = !!(input.options?.withGitStatus);
+    const includeGitStatus = !!input.options?.withGitStatus;
     const includeLineNumbers = !!(this.addLineNumbers || input.options?.withLineNumbers);
     const onlyTree = !!(this.onlyTree || input.options?.onlyTree);
-    const charLimitApplied = !!(input.options?.charLimit || input.stats?.truncatedFiles > 0 || files.some((f) => f?.truncated));
+    const charLimitApplied = !!(
+      input.options?.charLimit ||
+      input.stats?.truncatedFiles > 0 ||
+      files.some((f) => f?.truncated)
+    );
 
     // YAML front matter
     lines.push('---');
@@ -67,13 +71,17 @@ class MarkdownFormatter {
     if (instrIncluded) {
       lines.push('## Instructions');
       lines.push('');
-      lines.push(`<!-- copytree:instructions-begin name=${escapeYamlScalar(instrName || 'default')} -->`);
+      lines.push(
+        `<!-- copytree:instructions-begin name=${escapeYamlScalar(instrName || 'default')} -->`,
+      );
       const instrFence = chooseFence(input.instructions || '');
       lines.push(`${instrFence}text`);
       lines.push(input.instructions.toString());
       lines.push(instrFence);
       lines.push('');
-      lines.push(`<!-- copytree:instructions-end name=${escapeYamlScalar(instrName || 'default')} -->`);
+      lines.push(
+        `<!-- copytree:instructions-end name=${escapeYamlScalar(instrName || 'default')} -->`,
+      );
       lines.push('');
     }
 
@@ -84,7 +92,11 @@ class MarkdownFormatter {
 
       for (const file of files) {
         const relPath = `@${file.path}`;
-        const modifiedISO = file.modified ? (file.modified instanceof Date ? file.modified.toISOString() : new Date(file.modified).toISOString()) : null;
+        const modifiedISO = file.modified
+          ? file.modified instanceof Date
+            ? file.modified.toISOString()
+            : new Date(file.modified).toISOString()
+          : null;
         // Prefer hashing absolute file if available; fall back to content hash
         let sha = null;
         try {
@@ -128,7 +140,9 @@ class MarkdownFormatter {
 
         // Code fence
         const lang = file.isBinary
-          ? (binaryAction === 'base64' || file.encoding === 'base64' ? 'text' : 'text')
+          ? binaryAction === 'base64' || file.encoding === 'base64'
+            ? 'text'
+            : 'text'
           : detectFenceLanguage(file.path);
         const content = file.content || '';
         const fence = chooseFence(typeof content === 'string' ? content : '');
@@ -139,7 +153,14 @@ class MarkdownFormatter {
             lines.push('Content-Transfer: base64');
             lines.push(typeof content === 'string' ? content : '');
           } else if (binaryAction === 'placeholder') {
-            lines.push(typeof content === 'string' ? content : (this.stage.config.get('copytree.binaryPlaceholderText', '[Binary file not included]') || ''));
+            lines.push(
+              typeof content === 'string'
+                ? content
+                : this.stage.config.get(
+                    'copytree.binaryPlaceholderText',
+                    '[Binary file not included]',
+                  ) || '',
+            );
           } else {
             // skip mode: emit empty block
           }
@@ -151,7 +172,10 @@ class MarkdownFormatter {
 
         // Truncation marker (per-file)
         if (file.truncated) {
-          const remaining = typeof file.originalLength === 'number' ? Math.max(0, file.originalLength - (file.content?.length || 0)) : undefined;
+          const remaining =
+            typeof file.originalLength === 'number'
+              ? Math.max(0, file.originalLength - (file.content?.length || 0))
+              : undefined;
           const remAttr = remaining !== undefined ? ` remaining="${remaining}"` : '';
           lines.push('');
           lines.push(`<!-- copytree:truncated reason="char-limit"${remAttr} -->`);
@@ -168,4 +192,3 @@ class MarkdownFormatter {
 }
 
 export default MarkdownFormatter;
-

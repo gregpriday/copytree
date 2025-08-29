@@ -7,7 +7,8 @@ class OutputFormattingStage extends Stage {
   constructor(options = {}) {
     super(options);
     this.format = options.format || 'xml';
-    this.addLineNumbers = options.addLineNumbers ?? this.config.get('copytree.addLineNumbers', false);
+    this.addLineNumbers =
+      options.addLineNumbers ?? this.config.get('copytree.addLineNumbers', false);
     this.lineNumberFormat = this.config.get('copytree.lineNumberFormat', '%4d: ');
     this.onlyTree = options.onlyTree || false;
   }
@@ -19,7 +20,11 @@ class OutputFormattingStage extends Stage {
     let output;
     switch (this.format) {
       case 'xml': {
-        const formatter = new XMLFormatter({ stage: this, addLineNumbers: this.addLineNumbers, onlyTree: this.onlyTree });
+        const formatter = new XMLFormatter({
+          stage: this,
+          addLineNumbers: this.addLineNumbers,
+          onlyTree: this.onlyTree,
+        });
         output = await formatter.format(input);
         break;
       }
@@ -30,7 +35,11 @@ class OutputFormattingStage extends Stage {
         output = this.formatAsTree(input);
         break;
       case 'markdown': {
-        const formatter = new MarkdownFormatter({ stage: this, addLineNumbers: this.addLineNumbers, onlyTree: this.onlyTree });
+        const formatter = new MarkdownFormatter({
+          stage: this,
+          addLineNumbers: this.addLineNumbers,
+          onlyTree: this.onlyTree,
+        });
         output = await formatter.format(input);
         break;
       }
@@ -61,24 +70,27 @@ class OutputFormattingStage extends Stage {
           instructions: input.instructions,
         }),
       },
-      files: input.files.filter((f) => f !== null).map((file) => {
-        const fileObj = {
-          path: file.path,
-          size: file.size,
-          modified: file.modified,
-          isBinary: file.isBinary,
-          encoding: file.encoding,
-        };
+      files: input.files
+        .filter((f) => f !== null)
+        .map((file) => {
+          const fileObj = {
+            path: file.path,
+            size: file.size,
+            modified: file.modified,
+            isBinary: file.isBinary,
+            encoding: file.encoding,
+          };
 
-        // Add content unless --only-tree is set
-        if (!this.onlyTree) {
-          fileObj.content = this.addLineNumbers && !file.isBinary
-            ? this.addLineNumbersToContent(file.content)
-            : file.content;
-        }
+          // Add content unless --only-tree is set
+          if (!this.onlyTree) {
+            fileObj.content =
+              this.addLineNumbers && !file.isBinary
+                ? this.addLineNumbersToContent(file.content)
+                : file.content;
+          }
 
-        return fileObj;
-      }),
+          return fileObj;
+        }),
     };
 
     const prettyPrint = this.config.get('app.prettyPrint', true);
@@ -102,7 +114,9 @@ class OutputFormattingStage extends Stage {
 
     // Add summary
     lines.push('');
-    lines.push(`${input.files.length} files, ${this.formatBytes(this.calculateTotalSize(input.files))}`);
+    lines.push(
+      `${input.files.length} files, ${this.formatBytes(this.calculateTotalSize(input.files))}`,
+    );
 
     return lines.join('\n');
   }
@@ -175,11 +189,15 @@ class OutputFormattingStage extends Stage {
     if (!content) return content;
 
     const lines = content.split('\n');
-    return lines.map((line, index) => {
-      const lineNumber = (index + 1).toString();
-      const formatted = this.lineNumberFormat.replace('%d', lineNumber).replace('%4d', lineNumber.padStart(4));
-      return formatted + line;
-    }).join('\n');
+    return lines
+      .map((line, index) => {
+        const lineNumber = (index + 1).toString();
+        const formatted = this.lineNumberFormat
+          .replace('%d', lineNumber)
+          .replace('%4d', lineNumber.padStart(4));
+        return formatted + line;
+      })
+      .join('\n');
   }
 
   calculateTotalSize(files) {
@@ -230,4 +248,3 @@ class OutputFormattingStage extends Stage {
 }
 
 export default OutputFormattingStage;
-

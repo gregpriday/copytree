@@ -12,21 +12,21 @@ class AIService {
   constructor(options = {}) {
     this.config = config();
     this.logger = logger.child('AIService');
-    
+
     // Initialize providers (supports multi-provider fallback)
     this.providers = this._initializeProviders(options);
     this.currentProviderIndex = 0;
-    
+
     // Primary provider (for backward compatibility)
     this.provider = this.providers[0];
-    
+
     // Initialize cache if enabled
     if (this.config.get('ai.cache.enabled', true)) {
       this.cache = CacheService.create('ai', {
         defaultTtl: this.config.get('ai.cache.ttl', 86400),
       });
     }
-    
+
     // Enhanced retry configuration with selective retrying
     this.retryOptions = {
       maxAttempts: this.config.get('ai.retry.maxAttempts', 3),
@@ -45,30 +45,36 @@ class AIService {
   _initializeProviders(options = {}) {
     const providersConfig = this.config.get('ai.providers', []);
     const providers = [];
-    
+
     // If no providers config, fall back to legacy single provider setup
     if (providersConfig.length === 0) {
       const modelName = this.config.get('ai.gemini.model');
-      providers.push(new GeminiProvider({
-        model: modelName,
-        ...options,
-      }));
+      providers.push(
+        new GeminiProvider({
+          model: modelName,
+          ...options,
+        }),
+      );
       return providers;
     }
-    
+
     // Sort providers by priority (lower number = higher priority)
-    const sortedProviders = [...providersConfig].sort((a, b) => (a.priority || 1) - (b.priority || 1));
-    
+    const sortedProviders = [...providersConfig].sort(
+      (a, b) => (a.priority || 1) - (b.priority || 1),
+    );
+
     for (const providerConfig of sortedProviders) {
       try {
         if (providerConfig.name === 'gemini') {
-          providers.push(new GeminiProvider({
-            model: providerConfig.model,
-            apiKey: providerConfig.apiKey,
-            baseUrl: providerConfig.baseUrl,
-            timeout: providerConfig.timeout,
-            ...options,
-          }));
+          providers.push(
+            new GeminiProvider({
+              model: providerConfig.model,
+              apiKey: providerConfig.apiKey,
+              baseUrl: providerConfig.baseUrl,
+              timeout: providerConfig.timeout,
+              ...options,
+            }),
+          );
         }
         // Future providers can be added here
         // else if (providerConfig.name === 'openai') {
@@ -78,15 +84,15 @@ class AIService {
         this.logger.warn(`Failed to initialize provider ${providerConfig.name}: ${error.message}`);
       }
     }
-    
+
     if (providers.length === 0) {
       throw new Error('No AI providers could be initialized');
     }
-    
+
     this.logger.debug(`Initialized ${providers.length} AI provider(s)`, {
-      providers: providers.map(p => ({ name: p.name, model: p.model }))
+      providers: providers.map((p) => ({ name: p.name, model: p.model })),
     });
-    
+
     return providers;
   }
 
@@ -100,23 +106,23 @@ class AIService {
     if (this.cache && !options.noCache) {
       const cacheKey = this.provider.getCacheKey(options);
       const cached = await this.cache.get(cacheKey);
-      
+
       if (cached) {
-        this.logger.debug('AI response retrieved from cache', { 
+        this.logger.debug('AI response retrieved from cache', {
           requestId: cached.requestId,
           tokensUsed: cached.tokensUsed?.total || 0,
-          model: cached.model 
+          model: cached.model,
         });
         return cached;
       }
     }
-    
+
     // Make request with retry and provider fallback
     const response = await this._retryWithFallback(
       (provider) => provider.complete(options),
-      options
+      options,
     );
-    
+
     // Log response metrics
     this.logger.debug('AI completion response received', {
       requestId: response.requestId,
@@ -126,13 +132,13 @@ class AIService {
       finishReason: response.finishReason,
       provider: response.meta?.provider,
     });
-    
+
     // Cache successful responses (cache the full envelope)
     if (this.cache && !options.noCache && response.content) {
       const cacheKey = this.provider.getCacheKey(options);
       await this.cache.set(cacheKey, response);
     }
-    
+
     return response;
   }
 
@@ -146,23 +152,20 @@ class AIService {
     if (this.cache && !options.noCache) {
       const cacheKey = this.provider.getCacheKey(options);
       const cached = await this.cache.get(cacheKey);
-      
+
       if (cached) {
-        this.logger.debug('AI chat response retrieved from cache', { 
+        this.logger.debug('AI chat response retrieved from cache', {
           requestId: cached.requestId,
           tokensUsed: cached.tokensUsed?.total || 0,
-          model: cached.model 
+          model: cached.model,
         });
         return cached;
       }
     }
-    
+
     // Make request with retry and provider fallback
-    const response = await this._retryWithFallback(
-      (provider) => provider.chat(options),
-      options
-    );
-    
+    const response = await this._retryWithFallback((provider) => provider.chat(options), options);
+
     // Log response metrics
     this.logger.debug('AI chat response received', {
       requestId: response.requestId,
@@ -173,13 +176,13 @@ class AIService {
       messageCount: response.meta?.messageCount,
       provider: response.meta?.provider,
     });
-    
+
     // Cache successful responses (cache the full envelope)
     if (this.cache && !options.noCache && response.content) {
       const cacheKey = this.provider.getCacheKey(options);
       await this.cache.set(cacheKey, response);
     }
-    
+
     return response;
   }
 
@@ -213,11 +216,11 @@ class AIService {
    */
   async performTask(task, options) {
     const taskConfig = this.config.get(`ai.tasks.${task}`);
-    
+
     if (!taskConfig) {
       throw new Error(`Unknown AI task: ${task}`);
     }
-    
+
     // Prepare options with task-specific configuration
     const requestOptions = {
       ...options,
@@ -225,7 +228,7 @@ class AIService {
       maxTokens: options.maxTokens ?? taskConfig.maxTokens,
       stream: options.stream ?? taskConfig.stream,
     };
-    
+
     // Use the appropriate method with multi-provider support
     if (options.messages) {
       return this.chat(requestOptions);
@@ -254,11 +257,9 @@ Summary:`;
       prompt,
       ...options,
     });
-    
+
     return response.content;
   }
-
-
 
   /**
    * Retry operation with multi-provider fallback
@@ -269,42 +270,46 @@ Summary:`;
   async _retryWithFallback(operation, options) {
     let lastError;
     let currentProviderIndex = 0;
-    
+
     // Try each provider with retries for retryable errors only
     while (currentProviderIndex < this.providers.length) {
       const provider = this.providers[currentProviderIndex];
-      
+
       try {
         return await this._retryOperation(() => operation(provider), provider);
       } catch (error) {
         lastError = error;
-        
+
         this.logger.debug(`Provider ${provider.name} failed`, {
           providerIndex: currentProviderIndex,
           error: error.message,
           errorCode: error.details?.code || error.code,
           retryable: isRetryableError(error),
         });
-        
+
         // If error is not retryable, try next provider immediately
         if (!isRetryableError(error)) {
-          this.logger.warn(`Non-retryable error with ${provider.name}, trying next provider: ${error.message}`);
+          this.logger.warn(
+            `Non-retryable error with ${provider.name}, trying next provider: ${error.message}`,
+          );
           currentProviderIndex++;
           continue;
         }
-        
+
         // If retryable error exhausted retries, try next provider
-        this.logger.warn(`Retryable error exhausted retries with ${provider.name}, trying next provider: ${error.message}`);
+        this.logger.warn(
+          `Retryable error exhausted retries with ${provider.name}, trying next provider: ${error.message}`,
+        );
         currentProviderIndex++;
       }
     }
-    
+
     // All providers failed
     this.logger.error('All AI providers failed', {
       providersAttempted: this.providers.length,
       lastError: lastError.message,
     });
-    
+
     throw lastError;
   }
 
@@ -319,7 +324,7 @@ Summary:`;
       model: provider.model,
       maxRetries: this.retryOptions.maxAttempts,
     });
-    
+
     return retry(operation, this.retryOptions);
   }
 
@@ -336,7 +341,7 @@ Summary:`;
    * @returns {Array} Array of provider info objects
    */
   getAllProviderInfo() {
-    return this.providers.map(provider => provider.getInfo());
+    return this.providers.map((provider) => provider.getInfo());
   }
 
   /**
@@ -347,11 +352,11 @@ Summary:`;
    */
   static forTask(task, options = {}) {
     const taskConfig = config().get(`ai.tasks.${task}`);
-    
+
     if (!taskConfig) {
       throw new Error(`Unknown AI task: ${task}`);
     }
-    
+
     return new AIService({
       temperature: taskConfig.temperature,
       maxTokens: taskConfig.maxTokens,

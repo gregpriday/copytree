@@ -29,8 +29,8 @@ class HTMLStripperTransformer extends BaseTransformer {
   async doTransform(file) {
     try {
       // Get content as string
-      const htmlContent = Buffer.isBuffer(file.content) 
-        ? file.content.toString('utf8') 
+      const htmlContent = Buffer.isBuffer(file.content)
+        ? file.content.toString('utf8')
         : String(file.content);
 
       // Strip HTML and convert to text
@@ -42,14 +42,20 @@ class HTMLStripperTransformer extends BaseTransformer {
 
       // Replace links with text representation if requested
       if (this.preserveLinks) {
-        textContent = textContent.replace(/<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '$2 [$1]');
+        textContent = textContent.replace(
+          /<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>/gi,
+          '$2 [$1]',
+        );
       }
 
       // Replace common block elements with newlines
       if (this.preserveNewlines) {
         // Block elements
-        textContent = textContent.replace(/<\/?(p|div|h[1-6]|ul|ol|li|blockquote|pre|hr|br|tr)\b[^>]*>/gi, '\n');
-        
+        textContent = textContent.replace(
+          /<\/?(p|div|h[1-6]|ul|ol|li|blockquote|pre|hr|br|tr)\b[^>]*>/gi,
+          '\n',
+        );
+
         // Add extra newline for headers
         textContent = textContent.replace(/<h[1-6]\b[^>]*>/gi, '\n\n');
       }
@@ -104,8 +110,8 @@ class HTMLStripperTransformer extends BaseTransformer {
       '&lt;': '<',
       '&gt;': '>',
       '&quot;': '"',
-      '&#39;': '\'',
-      '&apos;': '\'',
+      '&#39;': "'",
+      '&apos;': "'",
       '&nbsp;': ' ',
       '&copy;': '©',
       '&reg;': '®',
@@ -140,7 +146,9 @@ class HTMLStripperTransformer extends BaseTransformer {
 
     // Decode numeric entities
     decoded = decoded.replace(/&#(\d+);/g, (match, num) => String.fromCharCode(parseInt(num)));
-    decoded = decoded.replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+    decoded = decoded.replace(/&#x([0-9a-f]+);/gi, (match, hex) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    );
 
     return decoded;
   }
@@ -151,7 +159,7 @@ class HTMLStripperTransformer extends BaseTransformer {
   formatOutput(file, content, originalSize) {
     const filename = path.basename(file.path);
     const header = `[HTML stripped: ${filename} - Reduced from ${this.formatBytes(originalSize)}]\n\n`;
-    
+
     return header + content;
   }
 }

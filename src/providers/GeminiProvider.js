@@ -9,14 +9,14 @@ import { ProviderError } from '../utils/errors.js';
 class GeminiProvider extends BaseProvider {
   constructor(options = {}) {
     super(options);
-    
+
     // Set up Gemini client
     this.baseUrl = options.baseUrl || this.config.get('ai.gemini.baseUrl');
     this.timeout = options.timeout || this.config.get('ai.gemini.timeout', 60000);
-    
+
     // Initialize Google AI SDK
     this.client = new GoogleGenerativeAI(this.apiKey);
-    
+
     // Get the model
     this.modelInstance = this.client.getGenerativeModel({ model: this.model });
   }
@@ -31,7 +31,7 @@ class GeminiProvider extends BaseProvider {
     const startTime = Date.now();
 
     try {
-      const prompt = options.systemPrompt 
+      const prompt = options.systemPrompt
         ? `${options.systemPrompt}\n\n${options.prompt}`
         : options.prompt;
 
@@ -49,13 +49,13 @@ class GeminiProvider extends BaseProvider {
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig,
         });
-        
+
         // For streaming, return a different envelope structure
-        return { 
-          stream: result.stream, 
-          model: this.model, 
+        return {
+          stream: result.stream,
+          model: this.model,
           requestId,
-          meta: { provider: 'gemini' }
+          meta: { provider: 'gemini' },
         };
       }
 
@@ -89,13 +89,10 @@ class GeminiProvider extends BaseProvider {
         },
       });
     } catch (error) {
-      const errorEnvelope = this.createErrorEnvelope(
-        error,
-        requestId,
-        Date.now() - startTime,
-        { operation: 'completion' }
-      );
-      
+      const errorEnvelope = this.createErrorEnvelope(error, requestId, Date.now() - startTime, {
+        operation: 'completion',
+      });
+
       this.handleError(error, 'completion', errorEnvelope);
     }
   }
@@ -112,7 +109,7 @@ class GeminiProvider extends BaseProvider {
     try {
       // Convert messages to Gemini format
       const contents = this.convertMessagesToGeminiFormat(options.messages);
-      
+
       const generationConfig = {
         temperature: options.temperature ?? this.temperature,
         maxOutputTokens: options.maxTokens || this.maxTokens,
@@ -127,15 +124,15 @@ class GeminiProvider extends BaseProvider {
           history: contents.slice(0, -1),
           generationConfig,
         });
-        
+
         const result = await chat.sendMessageStream(contents[contents.length - 1].parts[0].text);
-        
+
         // For streaming, return a different envelope structure
-        return { 
-          stream: result.stream, 
-          model: this.model, 
+        return {
+          stream: result.stream,
+          model: this.model,
           requestId,
-          meta: { provider: 'gemini' }
+          meta: { provider: 'gemini' },
         };
       }
 
@@ -171,13 +168,11 @@ class GeminiProvider extends BaseProvider {
         },
       });
     } catch (error) {
-      const errorEnvelope = this.createErrorEnvelope(
-        error,
-        requestId,
-        Date.now() - startTime,
-        { operation: 'chat', messageCount: contents?.length || 0 }
-      );
-      
+      const errorEnvelope = this.createErrorEnvelope(error, requestId, Date.now() - startTime, {
+        operation: 'chat',
+        messageCount: contents?.length || 0,
+      });
+
       this.handleError(error, 'chat', errorEnvelope);
     }
   }
@@ -190,27 +185,27 @@ class GeminiProvider extends BaseProvider {
   convertMessagesToGeminiFormat(messages) {
     const contents = [];
     let systemPrompt = '';
-    
+
     for (const message of messages) {
       if (message.role === 'system') {
         systemPrompt = message.content;
       } else {
         const role = message.role === 'assistant' ? 'model' : 'user';
         let text = message.content;
-        
+
         // Prepend system prompt to first user message
         if (systemPrompt && message.role === 'user' && contents.length === 0) {
           text = `${systemPrompt}\n\n${text}`;
           systemPrompt = '';
         }
-        
+
         contents.push({
           role,
           parts: [{ text }],
         });
       }
     }
-    
+
     return contents;
   }
 
@@ -231,13 +226,7 @@ class GeminiProvider extends BaseProvider {
    * @returns {Array<string>} Supported features
    */
   getSupportedFeatures() {
-    return [
-      'complete',
-      'chat',
-      'streaming',
-      'systemPrompt',
-      'multiModal',
-    ];
+    return ['complete', 'chat', 'streaming', 'systemPrompt', 'multiModal'];
   }
 
   /**
@@ -263,31 +252,31 @@ class GeminiProvider extends BaseProvider {
    */
   handleError(error, operation, envelope = {}) {
     if (error.status === 403 || error.message?.includes('API key not valid')) {
-      throw new ProviderError(
-        'Invalid Gemini API key',
-        this.name,
-        { code: 'INVALID_API_KEY', operation, envelope },
-      );
+      throw new ProviderError('Invalid Gemini API key', this.name, {
+        code: 'INVALID_API_KEY',
+        operation,
+        envelope,
+      });
     } else if (error.status === 429 || error.message?.includes('quota')) {
-      throw new ProviderError(
-        'Gemini rate limit or quota exceeded',
-        this.name,
-        { code: 'RATE_LIMIT', operation, envelope },
-      );
+      throw new ProviderError('Gemini rate limit or quota exceeded', this.name, {
+        code: 'RATE_LIMIT',
+        operation,
+        envelope,
+      });
     } else if (error.status === 503) {
-      throw new ProviderError(
-        'Gemini service unavailable',
-        this.name,
-        { code: 'SERVICE_UNAVAILABLE', operation, envelope },
-      );
+      throw new ProviderError('Gemini service unavailable', this.name, {
+        code: 'SERVICE_UNAVAILABLE',
+        operation,
+        envelope,
+      });
     } else if (error.message?.includes('safety')) {
-      throw new ProviderError(
-        'Content blocked by Gemini safety filters',
-        this.name,
-        { code: 'SAFETY_FILTER', operation, envelope },
-      );
+      throw new ProviderError('Content blocked by Gemini safety filters', this.name, {
+        code: 'SAFETY_FILTER',
+        operation,
+        envelope,
+      });
     }
-    
+
     // Default error handling
     super.handleError(error, operation, envelope);
   }

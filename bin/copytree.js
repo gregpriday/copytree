@@ -47,7 +47,9 @@ program
 // 1. Main copy command (default)
 program
   .command('copy [path]', { isDefault: true })
-  .description('Copy directory structure to markdown (default) or XML/JSON/tree with customizable profiles and filters')
+  .description(
+    'Copy directory structure to markdown (default) or XML/JSON/tree with customizable profiles and filters',
+  )
   .option('-p, --profile <name>', 'Use a predefined profile (default: default)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
   .option('-m, --modified', 'Only include git modified files')
@@ -83,11 +85,13 @@ program
       const appModule = await import('../src/ui/App.js');
       App = appModule.default;
     }
-    render(React.createElement(App, {
-      command: 'copy',
-      path: path || '.',
-      options,
-    }));
+    render(
+      React.createElement(App, {
+        command: 'copy',
+        path: path || '.',
+        options,
+      }),
+    );
   });
 
 // 2. Profile list command
@@ -102,11 +106,13 @@ program
       const appModule = await import('../src/ui/App.js');
       App = appModule.default;
     }
-    render(React.createElement(App, {
-      command: 'profile:list',
-      path: null,
-      options,
-    }));
+    render(
+      React.createElement(App, {
+        command: 'profile:list',
+        path: null,
+        options,
+      }),
+    );
   });
 
 // 7. Profile validate command
@@ -121,11 +127,13 @@ program
       const appModule = await import('../src/ui/App.js');
       App = appModule.default;
     }
-    render(React.createElement(App, {
-      command: 'profile:validate',
-      path: null,
-      options: { ...options, profile },
-    }));
+    render(
+      React.createElement(App, {
+        command: 'profile:validate',
+        path: null,
+        options: { ...options, profile },
+      }),
+    );
   });
 
 // 8. Copy docs command
@@ -142,11 +150,13 @@ program
       const appModule = await import('../src/ui/App.js');
       App = appModule.default;
     }
-    render(React.createElement(App, {
-      command: 'copy:docs',
-      path: null,
-      options,
-    }));
+    render(
+      React.createElement(App, {
+        command: 'copy:docs',
+        path: null,
+        options,
+      }),
+    );
   });
 
 // 9. Config validate command
@@ -161,11 +171,13 @@ program
       const appModule = await import('../src/ui/App.js');
       App = appModule.default;
     }
-    render(React.createElement(App, {
-      command: 'config:validate',
-      path: null,
-      options,
-    }));
+    render(
+      React.createElement(App, {
+        command: 'config:validate',
+        path: null,
+        options,
+      }),
+    );
   });
 
 // 10. Config inspect command
@@ -183,11 +195,13 @@ program
       const appModule = await import('../src/ui/App.js');
       App = appModule.default;
     }
-    render(React.createElement(App, {
-      command: 'config:inspect',
-      path: null,
-      options,
-    }));
+    render(
+      React.createElement(App, {
+        command: 'config:inspect',
+        path: null,
+        options,
+      }),
+    );
   });
 
 // 11. Cache clear command
@@ -208,11 +222,13 @@ program
       const appModule = await import('../src/ui/App.js');
       App = appModule.default;
     }
-    render(React.createElement(App, {
-      command: 'cache:clear',
-      path: null,
-      options,
-    }));
+    render(
+      React.createElement(App, {
+        command: 'cache:clear',
+        path: null,
+        options,
+      }),
+    );
   });
 
 // 12. Install copytree command
@@ -226,11 +242,13 @@ program
       const appModule = await import('../src/ui/App.js');
       App = appModule.default;
     }
-    render(React.createElement(App, {
-      command: 'install:copytree',
-      path: null,
-      options: {},
-    }));
+    render(
+      React.createElement(App, {
+        command: 'install:copytree',
+        path: null,
+        options: {},
+      }),
+    );
   });
 
 program.parse(process.argv);

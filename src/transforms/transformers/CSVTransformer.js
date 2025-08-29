@@ -17,7 +17,7 @@ class CSVTransformer extends BaseTransformer {
   async doTransform(file) {
     // Load content if not already loaded
     let content = file.content;
-    
+
     if (content === undefined && file.absolutePath) {
       content = await fs.readFile(file.absolutePath, 'utf8');
     }
@@ -33,7 +33,7 @@ class CSVTransformer extends BaseTransformer {
 
     try {
       const transformed = this.transformCSV(content, file.path);
-      
+
       return {
         ...file,
         content: transformed.content,
@@ -49,7 +49,7 @@ class CSVTransformer extends BaseTransformer {
       };
     } catch (error) {
       this.logger.warn(`Failed to parse CSV ${file.path}: ${error.message}`);
-      
+
       // Return first N lines as fallback
       const allLines = content.split('\n');
       const lines = allLines.slice(0, this.maxRows);
@@ -72,7 +72,7 @@ class CSVTransformer extends BaseTransformer {
    */
   transformCSV(content, filePath = '') {
     const lines = content.split('\n').filter((line) => line.trim());
-    
+
     if (lines.length === 0) {
       return {
         content: '[Empty CSV file]',
@@ -85,15 +85,15 @@ class CSVTransformer extends BaseTransformer {
 
     // Detect delimiter
     const delimiter = this.detectDelimiter(lines[0], filePath);
-    
+
     // Parse rows
     const rows = lines.map((line) => this.parseCSVLine(line, delimiter));
     const totalRows = rows.length;
     const displayRows = rows.slice(0, this.maxRows + 1); // +1 for header
-    
+
     // Format as table
     const columnWidths = this.calculateColumnWidths(displayRows);
-    const formattedRows = displayRows.map((row, index) => 
+    const formattedRows = displayRows.map((row, index) =>
       this.formatRow(row, columnWidths, index === 0),
     );
 
@@ -126,7 +126,7 @@ class CSVTransformer extends BaseTransformer {
    */
   detectDelimiter(firstLine, filePath) {
     if (this.delimiter) return this.delimiter;
-    
+
     // Check file extension
     if (filePath.toLowerCase().endsWith('.tsv')) {
       return '\t';
@@ -136,7 +136,8 @@ class CSVTransformer extends BaseTransformer {
     const delimiters = [',', '\t', ';', '|'];
     const counts = delimiters.map((delim) => ({
       delimiter: delim,
-      count: (firstLine.match(new RegExp(delim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length,
+      count: (firstLine.match(new RegExp(delim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || [])
+        .length,
     }));
 
     // Return delimiter with highest count
@@ -154,11 +155,11 @@ class CSVTransformer extends BaseTransformer {
     const values = [];
     let current = '';
     let inQuotes = false;
-    
+
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       const nextChar = line[i + 1];
-      
+
       if (char === '"') {
         if (inQuotes && nextChar === '"') {
           current += '"';
@@ -173,7 +174,7 @@ class CSVTransformer extends BaseTransformer {
         current += char;
       }
     }
-    
+
     values.push(current.trim());
     return values;
   }
@@ -185,16 +186,16 @@ class CSVTransformer extends BaseTransformer {
    */
   calculateColumnWidths(rows) {
     if (rows.length === 0) return [];
-    
+
     const columnCount = Math.max(...rows.map((row) => row.length));
     const widths = new Array(columnCount).fill(0);
-    
+
     rows.forEach((row) => {
       row.forEach((cell, index) => {
         widths[index] = Math.max(widths[index], cell.length);
       });
     });
-    
+
     // Cap maximum width
     return widths.map((width) => Math.min(width, 30));
   }
@@ -212,7 +213,7 @@ class CSVTransformer extends BaseTransformer {
       const truncated = cell.length > width ? cell.substring(0, width - 3) + '...' : cell;
       return truncated.padEnd(width);
     });
-    
+
     return cells.join(' | ');
   }
 

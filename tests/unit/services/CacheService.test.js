@@ -10,7 +10,7 @@ jest.mock('fs-extra', () => ({
   ensureDir: jest.fn().mockResolvedValue(undefined),
   writeJson: jest.fn().mockResolvedValue(undefined),
   readdir: jest.fn().mockResolvedValue([]),
-  stat: jest.fn().mockResolvedValue({ size: 1024, mtimeMs: Date.now() })
+  stat: jest.fn().mockResolvedValue({ size: 1024, mtimeMs: Date.now() }),
 }));
 
 import { CacheService } from '../../../src/services/CacheService.js';
@@ -26,19 +26,19 @@ describe('CacheService', () => {
     // Create temp directory for tests
     tempDir = path.join(os.tmpdir(), 'copytree-cache-test-' + Date.now());
     await fs.ensureDir(tempDir);
-    
+
     // Create cache service instance
     cacheService = new CacheService({
       cachePath: tempDir,
       defaultTtl: 3600,
       enabled: true,
-      driver: 'file'
+      driver: 'file',
     });
   });
 
   afterEach(async () => {
     // Clean up
-    if (tempDir && await fs.pathExists(tempDir)) {
+    if (tempDir && (await fs.pathExists(tempDir))) {
       await fs.remove(tempDir);
     }
   });
@@ -56,9 +56,9 @@ describe('CacheService', () => {
       // Create a memory-based cache to avoid file system issues
       const memCache = new CacheService({
         driver: 'memory',
-        enabled: true
+        enabled: true,
       });
-      
+
       const result = await memCache.set('test-key', 'test-value');
       expect(result).toBe(true);
 
@@ -73,7 +73,7 @@ describe('CacheService', () => {
 
     test('should check if key exists', async () => {
       await cacheService.set('exists', 'value');
-      
+
       expect(await cacheService.has('exists')).toBe(true);
       expect(await cacheService.has('not-exists')).toBe(false);
     });
@@ -108,13 +108,13 @@ describe('CacheService', () => {
     test('should expire entries after TTL', async () => {
       // Set with 1 second TTL
       await cacheService.set('expire-test', 'value', 1);
-      
+
       // Should exist immediately
       expect(await cacheService.get('expire-test')).toBe('value');
-      
+
       // Wait for expiration
-      await new Promise(resolve => setTimeout(resolve, 1100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+
       // Should be expired
       expect(await cacheService.get('expire-test')).toBeNull();
     });
@@ -124,7 +124,7 @@ describe('CacheService', () => {
     test('should not store when disabled', async () => {
       const disabledCache = new CacheService({
         cachePath: tempDir,
-        enabled: false
+        enabled: false,
       });
 
       await disabledCache.set('test', 'value');
@@ -136,7 +136,7 @@ describe('CacheService', () => {
     test('should use memory cache', async () => {
       const memCache = new CacheService({
         driver: 'memory',
-        enabled: true
+        enabled: true,
       });
 
       await memCache.set('key', 'value');

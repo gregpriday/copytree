@@ -19,24 +19,24 @@ class DeduplicateFilesStage extends Stage {
     if (!files || files.length === 0) {
       return files;
     }
-    
+
     const startTime = Date.now();
     const contentHashes = new Map();
     const duplicates = [];
     const uniqueFiles = [];
-    
+
     this.log(`Checking ${files.length} files for duplicates`, 'info');
-    
+
     for (const file of files) {
       // Skip files without content
       if (!file.content && file.content !== '') {
         uniqueFiles.push(file);
         continue;
       }
-      
+
       // Calculate content hash
       const hash = this.calculateHash(file.content);
-      
+
       if (contentHashes.has(hash)) {
         // Found a duplicate
         const original = contentHashes.get(hash);
@@ -45,7 +45,7 @@ class DeduplicateFilesStage extends Stage {
           duplicateOf: original.path || original.relativePath,
           size: file.size || file.stats?.size || 0,
         });
-        
+
         // Emit deduplication event
         if (context && context.emit) {
           context.emit('file:deduplicated', {
@@ -53,7 +53,7 @@ class DeduplicateFilesStage extends Stage {
             duplicate: file.path || file.relativePath,
           });
         }
-        
+
         logger.debug('Found duplicate file', {
           file: file.path || file.relativePath,
           original: original.path || original.relativePath,
@@ -65,17 +65,17 @@ class DeduplicateFilesStage extends Stage {
         uniqueFiles.push(file);
       }
     }
-    
+
     const elapsed = this.getElapsedTime(startTime);
-    
+
     if (duplicates.length > 0) {
       const totalDuplicateSize = duplicates.reduce((sum, dup) => sum + dup.size, 0);
-      
+
       this.log(
         `Removed ${duplicates.length} duplicate file(s) (${this.formatBytes(totalDuplicateSize)}) in ${elapsed}`,
         'info',
       );
-      
+
       // Log details if debug is enabled
       if (this.config.get('app.debug')) {
         duplicates.forEach((dup) => {
@@ -85,7 +85,7 @@ class DeduplicateFilesStage extends Stage {
     } else {
       this.log(`No duplicates found in ${elapsed}`, 'info');
     }
-    
+
     return uniqueFiles;
   }
 
@@ -94,7 +94,7 @@ class DeduplicateFilesStage extends Stage {
    */
   calculateHash(content) {
     const hash = crypto.createHash(this.hashAlgorithm);
-    
+
     if (Buffer.isBuffer(content)) {
       hash.update(content);
     } else if (typeof content === 'string') {
@@ -103,7 +103,7 @@ class DeduplicateFilesStage extends Stage {
       // For other types, convert to string
       hash.update(String(content), 'utf8');
     }
-    
+
     return hash.digest('hex');
   }
 
@@ -113,7 +113,7 @@ class DeduplicateFilesStage extends Stage {
   shouldApply(context) {
     return context.options && context.options.dedupe === true;
   }
-  
+
   /**
    * Validate input
    */
@@ -121,11 +121,11 @@ class DeduplicateFilesStage extends Stage {
     if (!input || typeof input !== 'object') {
       throw new Error('Input must be an object');
     }
-    
+
     if (!Array.isArray(input.files)) {
       throw new Error('Input must have a files array');
     }
-    
+
     return true;
   }
 }

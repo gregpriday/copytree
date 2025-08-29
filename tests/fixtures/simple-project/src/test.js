@@ -1,1 +1,3 @@
-export function test() { return 42; }
+export function test() {
+  return 42;
+}

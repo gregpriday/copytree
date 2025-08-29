@@ -28,13 +28,13 @@ class FileLoadingStage extends Stage {
   async loadFileContent(file) {
     try {
       const isBinary = await this.isBinaryFile(file.absolutePath);
-      
+
       if (isBinary) {
         return this.handleBinaryFile(file);
       }
 
       const content = await fs.readFile(file.absolutePath, this.encoding);
-      
+
       return {
         ...file,
         content,
@@ -43,7 +43,7 @@ class FileLoadingStage extends Stage {
       };
     } catch (error) {
       this.log(`Error loading ${file.path}: ${error.message}`, 'warn');
-      
+
       return {
         ...file,
         content: `[Error loading file: ${error.message}]`,
@@ -58,12 +58,29 @@ class FileLoadingStage extends Stage {
       // First check by extension
       const ext = path.extname(filePath).toLowerCase();
       const binaryExtensions = [
-        '.exe', '.dll', '.so', '.dylib', '.bin',
-        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico',
-        '.mp3', '.mp4', '.avi', '.mov', '.pdf',
-        '.zip', '.tar', '.gz', '.rar', '.7z',
+        '.exe',
+        '.dll',
+        '.so',
+        '.dylib',
+        '.bin',
+        '.jpg',
+        '.jpeg',
+        '.png',
+        '.gif',
+        '.bmp',
+        '.ico',
+        '.mp3',
+        '.mp4',
+        '.avi',
+        '.mov',
+        '.pdf',
+        '.zip',
+        '.tar',
+        '.gz',
+        '.rar',
+        '.7z',
       ];
-      
+
       if (binaryExtensions.includes(ext)) {
         return true;
       }
@@ -71,14 +88,14 @@ class FileLoadingStage extends Stage {
       // Then check content for null bytes
       const buffer = await fs.readFile(filePath);
       const sampleSize = Math.min(512, buffer.length);
-      
+
       // Check for null bytes (common in binary files)
       for (let i = 0; i < sampleSize; i++) {
         if (buffer[i] === 0) {
           return true;
         }
       }
-      
+
       return false;
     } catch (_error) {
       return false;
@@ -87,19 +104,19 @@ class FileLoadingStage extends Stage {
 
   handleBinaryFile(file) {
     switch (this.binaryAction) {
-    case 'skip':
-      return null;
-        
-    case 'base64':
-      return this.loadBinaryAsBase64(file);
-        
-    case 'placeholder':
-    default:
-      return {
-        ...file,
-        content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
-        isBinary: true,
-      };
+      case 'skip':
+        return null;
+
+      case 'base64':
+        return this.loadBinaryAsBase64(file);
+
+      case 'placeholder':
+      default:
+        return {
+          ...file,
+          content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
+          isBinary: true,
+        };
     }
   }
 
@@ -107,7 +124,7 @@ class FileLoadingStage extends Stage {
     try {
       const buffer = await fs.readFile(file.absolutePath);
       const base64 = buffer.toString('base64');
-      
+
       return {
         ...file,
         content: base64,

@@ -1,7 +1,7 @@
 // Mock dependencies
 jest.mock('../../../../src/services/InstructionsLoader.js');
 jest.mock('../../../../src/config/ConfigManager.js', () => ({
-  config: jest.fn()
+  config: jest.fn(),
 }));
 
 import InstructionsStage from '../../../../src/pipeline/stages/InstructionsStage.js';
@@ -15,20 +15,20 @@ describe('InstructionsStage', () => {
   beforeEach(() => {
     // Reset mocks
     jest.clearAllMocks();
-    
+
     // Mock InstructionsLoader
     mockInstructionsLoader = {
       load: jest.fn(),
-      exists: jest.fn()
+      exists: jest.fn(),
     };
     InstructionsLoader.mockImplementation(() => mockInstructionsLoader);
-    
+
     // Mock config
     config.mockReturnValue({
       get: jest.fn((key, defaultValue) => {
         if (key === 'app.defaultInstructions') return 'default';
         return defaultValue;
-      })
+      }),
     });
 
     stage = new InstructionsStage();
@@ -39,7 +39,7 @@ describe('InstructionsStage', () => {
       const input = {
         options: { noInstructions: true },
         basePath: '/test',
-        files: []
+        files: [],
       };
 
       const result = await stage.process(input);
@@ -55,7 +55,7 @@ describe('InstructionsStage', () => {
       const input = {
         options: {},
         basePath: '/test',
-        files: []
+        files: [],
       };
 
       const result = await stage.process(input);
@@ -72,7 +72,7 @@ describe('InstructionsStage', () => {
       const input = {
         options: { instructions: 'custom' },
         basePath: '/test',
-        files: []
+        files: [],
       };
 
       const result = await stage.process(input);
@@ -88,12 +88,12 @@ describe('InstructionsStage', () => {
       const input = {
         options: {},
         basePath: '/test',
-        files: []
+        files: [],
       };
 
       // Should not throw
       const result = await stage.process(input);
-      
+
       expect(result).toBe(input);
       expect(result.instructions).toBeUndefined();
     });
@@ -104,7 +104,7 @@ describe('InstructionsStage', () => {
       const input = {
         options: { instructions: 'custom' },
         basePath: '/test',
-        files: []
+        files: [],
       };
 
       const result = await stage.process(input);
@@ -117,7 +117,7 @@ describe('InstructionsStage', () => {
       const input = {
         options: {},
         basePath: '/test',
-        files: []
+        files: [],
       };
 
       const result = await stage.process(input);
@@ -135,7 +135,7 @@ describe('InstructionsStage', () => {
         basePath: '/test',
         files: [{ path: 'test.js' }],
         profile: { name: 'test' },
-        metadata: { test: true }
+        metadata: { test: true },
       };
 
       const result = await stage.process(input);
@@ -151,7 +151,7 @@ describe('InstructionsStage', () => {
   describe('validate()', () => {
     it('should return true when instructions are disabled', async () => {
       const input = {
-        options: { noInstructions: true }
+        options: { noInstructions: true },
       };
 
       const result = await stage.validate(input);
@@ -162,11 +162,11 @@ describe('InstructionsStage', () => {
       mockInstructionsLoader.exists.mockResolvedValue(true);
 
       const input = {
-        options: {}
+        options: {},
       };
 
       const result = await stage.validate(input);
-      
+
       expect(result).toBe(true);
       expect(mockInstructionsLoader.exists).toHaveBeenCalledWith('default');
     });
@@ -175,11 +175,11 @@ describe('InstructionsStage', () => {
       mockInstructionsLoader.exists.mockResolvedValue(true);
 
       const input = {
-        options: { instructions: 'custom' }
+        options: { instructions: 'custom' },
       };
 
       const result = await stage.validate(input);
-      
+
       expect(result).toBe(true);
       expect(mockInstructionsLoader.exists).toHaveBeenCalledWith('custom');
     });
@@ -188,7 +188,7 @@ describe('InstructionsStage', () => {
       mockInstructionsLoader.exists.mockResolvedValue(false);
 
       const input = {
-        options: { instructions: 'custom' }
+        options: { instructions: 'custom' },
       };
 
       await expect(stage.validate(input)).rejects.toThrow("Instructions 'custom' not found");
@@ -198,7 +198,7 @@ describe('InstructionsStage', () => {
       mockInstructionsLoader.exists.mockResolvedValue(false);
 
       const input = {
-        options: {}
+        options: {},
       };
 
       const result = await stage.validate(input);

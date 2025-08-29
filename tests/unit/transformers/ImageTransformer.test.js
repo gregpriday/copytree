@@ -14,7 +14,7 @@ describe('ImageTransformer', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Mock Tesseract worker
     mockWorker = {
       loadLanguage: jest.fn().mockResolvedValue(undefined),
@@ -27,12 +27,12 @@ describe('ImageTransformer', () => {
             {
               text: 'Sample text',
               confidence: 88.2,
-              bbox: { x0: 10, y0: 20, x1: 100, y1: 50 }
-            }
-          ]
-        }
+              bbox: { x0: 10, y0: 20, x1: 100, y1: 50 },
+            },
+          ],
+        },
       }),
-      terminate: jest.fn().mockResolvedValue(undefined)
+      terminate: jest.fn().mockResolvedValue(undefined),
     };
 
     Tesseract.createWorker.mockImplementation((lang) => {
@@ -44,13 +44,13 @@ describe('ImageTransformer', () => {
       return Promise.resolve(mockWorker);
     });
     os.tmpdir.mockReturnValue('/tmp');
-    
+
     transformer = new ImageTransformer();
     transformer.logger = {
       error: jest.fn(),
       warn: jest.fn(),
       info: jest.fn(),
-      debug: jest.fn()
+      debug: jest.fn(),
     };
   });
 
@@ -75,9 +75,9 @@ describe('ImageTransformer', () => {
       const transformer = new ImageTransformer({
         enableOCR: false,
         language: 'fra',
-        includeMetadata: false
+        includeMetadata: false,
       });
-      
+
       expect(transformer.enableOCR).toBe(false);
       expect(transformer.language).toBe('fra');
       expect(transformer.includeMetadata).toBe(false);
@@ -94,10 +94,10 @@ describe('ImageTransformer', () => {
         { path: 'bitmap.bmp' },
         { path: 'photo.tiff' },
         { path: 'image.tif' },
-        { path: 'modern.webp' }
+        { path: 'modern.webp' },
       ];
 
-      supportedFiles.forEach(file => {
+      supportedFiles.forEach((file) => {
         expect(transformer.canTransform(file)).toBe(true);
       });
     });
@@ -108,10 +108,10 @@ describe('ImageTransformer', () => {
         { path: 'script.js' },
         { path: 'video.mp4' },
         { path: 'audio.mp3' },
-        { path: 'text.txt' }
+        { path: 'text.txt' },
       ];
 
-      unsupportedFiles.forEach(file => {
+      unsupportedFiles.forEach((file) => {
         expect(transformer.canTransform(file)).toBe(false);
       });
     });
@@ -132,7 +132,7 @@ describe('ImageTransformer', () => {
       const file = {
         path: 'test.jpg',
         absolutePath: '/project/test.jpg',
-        size: 50000
+        size: 50000,
       };
 
       const result = await transformer.doTransform(file);
@@ -157,7 +157,7 @@ describe('ImageTransformer', () => {
       const file = {
         path: 'test.png',
         absolutePath: '/project/test.png',
-        size: 25000
+        size: 25000,
       };
 
       const result = await transformer.doTransform(file);
@@ -173,7 +173,7 @@ describe('ImageTransformer', () => {
 
       const file = {
         path: 'test.png',
-        absolutePath: '/project/test.png'
+        absolutePath: '/project/test.png',
       };
 
       const result = await transformer.doTransform(file);
@@ -186,12 +186,12 @@ describe('ImageTransformer', () => {
     it('should handle base64 encoded images', async () => {
       const mockBuffer = Buffer.from('fake image data');
       const base64Content = mockBuffer.toString('base64');
-      
+
       const file = {
         path: 'encoded.jpg',
         content: base64Content,
         encoding: 'base64',
-        size: 1000
+        size: 1000,
       };
 
       // Ensure fs.writeFile succeeds for this test
@@ -202,7 +202,7 @@ describe('ImageTransformer', () => {
 
       expect(fs.writeFile).toHaveBeenCalledWith(
         expect.stringContaining('/tmp/copytree-img-'),
-        mockBuffer
+        mockBuffer,
       );
       expect(fs.remove).toHaveBeenCalled();
       expect(result.transformed).toBe(true);
@@ -212,7 +212,7 @@ describe('ImageTransformer', () => {
     it('should handle missing file path', async () => {
       const file = {
         path: 'nopath.jpg',
-        size: 1000
+        size: 1000,
       };
 
       const result = await transformer.doTransform(file);
@@ -226,14 +226,14 @@ describe('ImageTransformer', () => {
         data: {
           text: '',
           confidence: 0,
-          blocks: []
-        }
+          blocks: [],
+        },
       });
 
       const file = {
         path: 'blank.jpg',
         absolutePath: '/project/blank.jpg',
-        size: 1000
+        size: 1000,
       };
 
       const result = await transformer.doTransform(file);
@@ -248,7 +248,7 @@ describe('ImageTransformer', () => {
       const file = {
         path: 'corrupt.jpg',
         absolutePath: '/project/corrupt.jpg',
-        size: 1000
+        size: 1000,
       };
 
       const result = await transformer.doTransform(file);
@@ -265,7 +265,7 @@ describe('ImageTransformer', () => {
         path: 'error.jpg',
         content: 'base64content',
         encoding: 'base64',
-        size: 1000
+        size: 1000,
       };
 
       const result = await transformer.doTransform(file);
@@ -280,13 +280,13 @@ describe('ImageTransformer', () => {
       const file1 = {
         path: 'test1.jpg',
         absolutePath: '/project/test1.jpg',
-        size: 1000
+        size: 1000,
       };
 
       const file2 = {
         path: 'test2.jpg',
         absolutePath: '/project/test2.jpg',
-        size: 1000
+        size: 1000,
       };
 
       await transformer.doTransform(file1);
@@ -304,7 +304,7 @@ describe('ImageTransformer', () => {
         path: 'encoded.jpg',
         content: 'base64content',
         encoding: 'base64',
-        size: 1000
+        size: 1000,
       };
 
       const result = await transformer.doTransform(file);
@@ -326,10 +326,10 @@ describe('ImageTransformer', () => {
         { path: 'document.tiff', expected: 'TIFF Image' },
         { path: 'scan.tif', expected: 'TIFF Image' },
         { path: 'modern.webp', expected: 'WebP Image' },
-        { path: 'unknown.xyz', expected: 'Image' }
+        { path: 'unknown.xyz', expected: 'Image' },
       ];
 
-      testCases.forEach(testCase => {
+      testCases.forEach((testCase) => {
         expect(transformer.getImageType(testCase.path)).toBe(testCase.expected);
       });
     });
@@ -379,15 +379,15 @@ describe('ImageTransformer', () => {
             {
               text: 'Block 1',
               confidence: 85,
-              bbox: { x0: 0, y0: 0, x1: 50, y1: 20 }
+              bbox: { x0: 0, y0: 0, x1: 50, y1: 20 },
             },
             {
               text: 'Block 2',
               confidence: 95,
-              bbox: { x0: 0, y0: 25, x1: 50, y1: 45 }
-            }
-          ]
-        }
+              bbox: { x0: 0, y0: 25, x1: 50, y1: 45 },
+            },
+          ],
+        },
       });
 
       const result = await transformer.performOCR('/path/to/multiblock.jpg');
@@ -396,7 +396,7 @@ describe('ImageTransformer', () => {
       expect(result.blocks[0]).toEqual({
         text: 'Block 1',
         confidence: 85,
-        bbox: { x0: 0, y0: 0, x1: 50, y1: 20 }
+        bbox: { x0: 0, y0: 0, x1: 50, y1: 20 },
       });
     });
   });
@@ -415,9 +415,9 @@ describe('ImageTransformer', () => {
 
     it('should handle cleanup when no worker exists', async () => {
       expect(transformer.worker).toBeNull();
-      
+
       await transformer.cleanup();
-      
+
       // Should not throw error
       expect(mockWorker.terminate).not.toHaveBeenCalled();
     });
@@ -442,7 +442,7 @@ describe('ImageTransformer', () => {
       const file = {
         path: 'huge.jpg',
         absolutePath: '/project/huge.jpg',
-        size: 50 * 1024 * 1024 // 50MB
+        size: 50 * 1024 * 1024, // 50MB
       };
 
       const result = await transformer.doTransform(file);
@@ -454,7 +454,7 @@ describe('ImageTransformer', () => {
     it('should handle empty file size', async () => {
       const file = {
         path: 'empty.jpg',
-        absolutePath: '/project/empty.jpg'
+        absolutePath: '/project/empty.jpg',
         // No size property
       };
 
@@ -468,14 +468,14 @@ describe('ImageTransformer', () => {
         data: {
           text: 'Special chars: €£¥ñáéíóú "quotes" & symbols!',
           confidence: 80,
-          blocks: []
-        }
+          blocks: [],
+        },
       });
 
       const file = {
         path: 'special.jpg',
         absolutePath: '/project/special.jpg',
-        size: 1000
+        size: 1000,
       };
 
       const result = await transformer.doTransform(file);
@@ -488,14 +488,14 @@ describe('ImageTransformer', () => {
         data: {
           text: 'Barely readable text',
           confidence: 0.1,
-          blocks: []
-        }
+          blocks: [],
+        },
       });
 
       const file = {
         path: 'blurry.jpg',
         absolutePath: '/project/blurry.jpg',
-        size: 1000
+        size: 1000,
       };
 
       const result = await transformer.doTransform(file);

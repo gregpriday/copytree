@@ -28,10 +28,13 @@ class Clipboard {
     if (process.platform === 'win32') {
       try {
         // Use PowerShell to copy the file reference on Windows
-        const command = `powershell -Command "Set-Clipboard -Path '${filePath.replace(/'/g, '\'\'')}'"`;  
+        const command = `powershell -Command "Set-Clipboard -Path '${filePath.replace(/'/g, "''")}'"`;
         execSync(command, { stdio: 'pipe' });
       } catch (error) {
-        logger.debug('Failed to copy file reference using PowerShell, falling back to text:', error.message);
+        logger.debug(
+          'Failed to copy file reference using PowerShell, falling back to text:',
+          error.message,
+        );
         return this.copyText(filePath);
       }
     } else if (process.platform === 'linux') {
@@ -52,9 +55,9 @@ class Clipboard {
           tell app "Finder" to set the clipboard to aFile
         `.trim();
 
-        execSync(`osascript -e '${script}'`, { 
+        execSync(`osascript -e '${script}'`, {
           encoding: 'utf8',
-          stdio: 'pipe', 
+          stdio: 'pipe',
         });
       } catch (error) {
         logger.debug('Failed to copy file reference, falling back to text:', error.message);
@@ -95,9 +98,9 @@ class Clipboard {
           tell application "Finder" to activate
         `.trim();
 
-        execSync(`osascript -e '${script}'`, { 
+        execSync(`osascript -e '${script}'`, {
           encoding: 'utf8',
-          stdio: 'pipe', 
+          stdio: 'pipe',
         });
       } catch (error) {
         logger.debug('Failed to reveal file in Finder:', error.message);

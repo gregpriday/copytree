@@ -15,16 +15,16 @@ import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
  */
 async function copyCommand(targetPath = '.', options = {}) {
   const startTime = Date.now();
-  
+
   try {
     // Start with initializing message
     logger.startSpinner('Initializing');
-    
+
     // 1. Load profile
     const profileLoader = new ProfileLoader();
     const profileName = options.profile || 'default';
     const profile = await loadProfile(profileLoader, profileName, options);
-    
+
     // 2. Validate and resolve path
     let basePath;
     if (GitHubUrlHandler.isGitHubUrl(targetPath)) {
@@ -35,24 +35,24 @@ async function copyCommand(targetPath = '.', options = {}) {
       logger.info(`Using GitHub repository: ${targetPath}`);
     } else {
       basePath = path.resolve(targetPath);
-      if (!await fs.pathExists(basePath)) {
+      if (!(await fs.pathExists(basePath))) {
         throw new CommandError(`Path does not exist: ${basePath}`, 'copy');
       }
     }
-    
+
     // 3. Update to processing
     logger.updateSpinner('Processing files');
-    
+
     // 4. Initialize pipeline with stages
     const pipeline = new Pipeline({
       continueOnError: true,
       emitProgress: true,
     });
-    
+
     // Setup pipeline stages
     const stages = await setupPipelineStages(basePath, profile, options);
     pipeline.through(stages);
-    
+
     // 5. Execute pipeline
     const result = await pipeline.process({
       basePath,
@@ -60,16 +60,16 @@ async function copyCommand(targetPath = '.', options = {}) {
       options,
       startTime,
     });
-    
+
     // 6. Prepare output
     let outputResult;
     if (!options.dryRun) {
       outputResult = await prepareOutput(result, options);
     }
-    
+
     // 7. Stop spinner before showing final result
     logger.stopSpinner();
-    
+
     // 8. Display final output
     if (!options.dryRun && outputResult) {
       await displayOutput(outputResult, options);
@@ -79,12 +79,11 @@ async function copyCommand(targetPath = '.', options = {}) {
       const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
       logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}] would be processed`);
     }
-    
+
     // 9. Show summary if requested
     if (options.info) {
       showSummary(result, startTime);
     }
-    
   } catch (error) {
     logger.stopSpinner();
     handleError(error, {
@@ -100,18 +99,18 @@ async function copyCommand(targetPath = '.', options = {}) {
 async function loadProfile(profileLoader, profileName, options) {
   // Build overrides from command options
   const overrides = {};
-  
+
   if (options.filter) {
     overrides.filter = Array.isArray(options.filter) ? options.filter : [options.filter];
     // Also update include patterns for file discovery
     overrides.include = Array.isArray(options.filter) ? options.filter : [options.filter];
   }
-  
+
   if (options.includeHidden !== undefined) {
     overrides.options = overrides.options || {};
     overrides.options.includeHidden = options.includeHidden;
   }
-  
+
   if (options.includeBinary !== undefined) {
     overrides.transformers = overrides.transformers || {};
     overrides.transformers.binary = {
@@ -119,7 +118,7 @@ async function loadProfile(profileLoader, profileName, options) {
       options: { action: 'include' },
     };
   }
-  
+
   // Load profile with overrides
   let profile;
   try {
@@ -129,7 +128,7 @@ async function loadProfile(profileLoader, profileName, options) {
     logger.warn(`Failed to load profile '${profileName}', using default`);
     profile = ProfileLoader.createDefault();
   }
-  
+
   return profile;
 }
 
@@ -138,127 +137,156 @@ async function loadProfile(profileLoader, profileName, options) {
  */
 async function setupPipelineStages(basePath, profile, options) {
   const stages = [];
-  
+
   // 1. File Discovery Stage
   const { default: FileDiscoveryStage } = await import('../pipeline/stages/FileDiscoveryStage.js');
-  stages.push(new FileDiscoveryStage({
-    basePath,
-    patterns: profile.include || ['**/*'],
-    respectGitignore: profile.options?.respectGitignore ?? true,
-    includeHidden: profile.options?.includeHidden ?? false,
-    followSymlinks: profile.options?.followSymlinks ?? false,
-    maxFileSize: profile.options?.maxFileSize,
-    maxTotalSize: profile.options?.maxTotalSize,
-    maxFileCount: profile.options?.maxFileCount,
-  }));
-  
+  stages.push(
+    new FileDiscoveryStage({
+      basePath,
+      patterns: profile.include || ['**/*'],
+      respectGitignore: profile.options?.respectGitignore ?? true,
+      includeHidden: profile.options?.includeHidden ?? false,
+      followSymlinks: profile.options?.followSymlinks ?? false,
+      maxFileSize: profile.options?.maxFileSize,
+      maxTotalSize: profile.options?.maxTotalSize,
+      maxFileCount: profile.options?.maxFileCount,
+    }),
+  );
+
   // 2. Git Filter Stage (if --modified or --changed is used)
   if (options.modified || options.changed) {
     const { default: GitFilterStage } = await import('../pipeline/stages/GitFilterStage.js');
-    stages.push(new GitFilterStage({
-      basePath,
-      modified: options.modified,
-      changed: options.changed,
-      withGitStatus: options.withGitStatus,
-    }));
+    stages.push(
+      new GitFilterStage({
+        basePath,
+        modified: options.modified,
+        changed: options.changed,
+        withGitStatus: options.withGitStatus,
+      }),
+    );
   }
-  
+
   // 3. Profile Filter Stage (applies exclude patterns)
   const { default: ProfileFilterStage } = await import('../pipeline/stages/ProfileFilterStage.js');
-  stages.push(new ProfileFilterStage({
-    exclude: profile.exclude || [],
-    filter: profile.filter || [],
-  }));
-  
+  stages.push(
+    new ProfileFilterStage({
+      exclude: profile.exclude || [],
+      filter: profile.filter || [],
+    }),
+  );
+
   // 4. Always Include Stage (if --always option is used)
   if (options.always) {
-    const { default: AlwaysIncludeStage } = await import('../pipeline/stages/AlwaysIncludeStage.js');
-    stages.push(new AlwaysIncludeStage({
-      patterns: Array.isArray(options.always) ? options.always : [options.always],
-    }));
+    const { default: AlwaysIncludeStage } = await import(
+      '../pipeline/stages/AlwaysIncludeStage.js'
+    );
+    stages.push(
+      new AlwaysIncludeStage({
+        patterns: Array.isArray(options.always) ? options.always : [options.always],
+      }),
+    );
   }
-  
+
   // 5. External Source Stage (if external sources are configured)
   if (profile.external && profile.external.length > 0) {
-    const { default: ExternalSourceStage } = await import('../pipeline/stages/ExternalSourceStage.js');
+    const { default: ExternalSourceStage } = await import(
+      '../pipeline/stages/ExternalSourceStage.js'
+    );
     stages.push(new ExternalSourceStage(profile.external));
   }
-  
+
   // 6. Limit Stage (if --head option is used)
   if (options.head) {
     const { default: LimitStage } = await import('../pipeline/stages/LimitStage.js');
-    stages.push(new LimitStage({
-      limit: parseInt(options.head),
-    }));
+    stages.push(
+      new LimitStage({
+        limit: parseInt(options.head),
+      }),
+    );
   }
-  
+
   // 7. File Loading Stage (skip if --only-tree)
   if (!options.onlyTree) {
     const { default: FileLoadingStage } = await import('../pipeline/stages/FileLoadingStage.js');
-    stages.push(new FileLoadingStage({
-      encoding: 'utf8',
-    }));
-    
+    stages.push(
+      new FileLoadingStage({
+        encoding: 'utf8',
+      }),
+    );
+
     // 8. Transformer Stage
     const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
     const registry = await TransformerRegistry.createDefault();
-    stages.push(new TransformStage({
-      registry,
-      transformers: profile.transformers || {},
-      noCache: options.noCache,
-    }));
+    stages.push(
+      new TransformStage({
+        registry,
+        transformers: profile.transformers || {},
+        noCache: options.noCache,
+      }),
+    );
   }
-  
+
   // 9. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
-    stages.push(new CharLimitStage({
-      limit: parseInt(options.charLimit),
-    }));
+    stages.push(
+      new CharLimitStage({
+        limit: parseInt(options.charLimit),
+      }),
+    );
   }
-  
+
   // 10. Instructions Stage (load instructions unless disabled)
   const { default: InstructionsStage } = await import('../pipeline/stages/InstructionsStage.js');
   stages.push(new InstructionsStage());
-  
+
   // 11. Output Formatting Stage
   // Determine output format (default to tree if --only-tree is used)
-  const rawFormat = (options.format || (options.onlyTree ? 'tree' : (profile.output?.format || 'markdown')));
-  const outputFormat = (rawFormat || 'markdown').toString().toLowerCase() === 'md'
-    ? 'markdown'
-    : (rawFormat || 'markdown').toString().toLowerCase();
-  
+  const rawFormat =
+    options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'markdown');
+  const outputFormat =
+    (rawFormat || 'markdown').toString().toLowerCase() === 'md'
+      ? 'markdown'
+      : (rawFormat || 'markdown').toString().toLowerCase();
+
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
-    const { default: StreamingOutputStage } = await import('../pipeline/stages/StreamingOutputStage.js');
+    const { default: StreamingOutputStage } = await import(
+      '../pipeline/stages/StreamingOutputStage.js'
+    );
     const fsSync = await import('fs');
-    
+
     let outputStream = process.stdout;
     if (options.output) {
       outputStream = fsSync.createWriteStream(path.resolve(options.output));
     }
-    
-    stages.push(new StreamingOutputStage({
-      format: outputFormat,
-      addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
-      prettyPrint: profile.output?.prettyPrint ?? true,
-      outputStream,
-    }));
+
+    stages.push(
+      new StreamingOutputStage({
+        format: outputFormat,
+        addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
+        prettyPrint: profile.output?.prettyPrint ?? true,
+        outputStream,
+      }),
+    );
   } else {
-    const { default: OutputFormattingStage } = await import('../pipeline/stages/OutputFormattingStage.js');
-    stages.push(new OutputFormattingStage({
-      format: outputFormat,
-      addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
-      prettyPrint: profile.output?.prettyPrint ?? true,
-      includeMetadata: profile.output?.includeMetadata ?? true,
-      showSize: options.showSize,
-      onlyTree: options.onlyTree,
-    }));
+    const { default: OutputFormattingStage } = await import(
+      '../pipeline/stages/OutputFormattingStage.js'
+    );
+    stages.push(
+      new OutputFormattingStage({
+        format: outputFormat,
+        addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
+        prettyPrint: profile.output?.prettyPrint ?? true,
+        includeMetadata: profile.output?.includeMetadata ?? true,
+        showSize: options.showSize,
+        onlyTree: options.onlyTree,
+      }),
+    );
   }
-  
+
   return stages;
 }
-
 
 /**
  * Prepare output but don't display yet
@@ -268,7 +296,7 @@ async function prepareOutput(result, options) {
   if (result.streamed) {
     const fileCount = result.files.length;
     const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
-    
+
     return {
       type: 'streamed',
       fileCount,
@@ -276,17 +304,17 @@ async function prepareOutput(result, options) {
       outputPath: options.output,
     };
   }
-  
+
   const output = result.output;
-  
+
   if (!output) {
     throw new CommandError('No output generated', 'copy');
   }
-  
+
   // Calculate output size
   const outputSize = Buffer.byteLength(output, 'utf8');
   const fileCount = result.files.length;
-  
+
   return {
     type: 'normal',
     output,
@@ -300,10 +328,12 @@ async function prepareOutput(result, options) {
  */
 async function displayOutput(outputResult, options) {
   const { type, output, outputSize, fileCount, totalSize, outputPath } = outputResult;
-  
+
   if (type === 'streamed') {
     if (outputPath) {
-      logger.success(`Streamed ${fileCount} files [${logger.formatBytes(totalSize)}] to ${path.resolve(outputPath)}`);
+      logger.success(
+        `Streamed ${fileCount} files [${logger.formatBytes(totalSize)}] to ${path.resolve(outputPath)}`,
+      );
     } else {
       logger.success(`Streamed ${fileCount} files [${logger.formatBytes(totalSize)}]`);
     }
@@ -313,14 +343,17 @@ async function displayOutput(outputResult, options) {
   // Handle --as-reference option
   if (options.asReference) {
     const format = (options.format || 'markdown').toString().toLowerCase();
-    const extension = format === 'json' ? 'json' : (format === 'markdown' || format === 'md' ? 'md' : 'xml');
+    const extension =
+      format === 'json' ? 'json' : format === 'markdown' || format === 'md' ? 'md' : 'xml';
     const os = await import('os');
     const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
     await fs.writeFile(tempFile, output, 'utf8');
-    
+
     try {
       await Clipboard.copyFileReference(tempFile);
-      logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${path.basename(tempFile)}`);
+      logger.success(
+        `Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${path.basename(tempFile)}`,
+      );
     } catch (_error) {
       logger.warn('Failed to copy reference to clipboard');
       logger.info(`Output saved to: ${tempFile}`);
@@ -328,27 +361,26 @@ async function displayOutput(outputResult, options) {
     }
     return;
   }
-  
+
   // Determine output destination
   if (options.output) {
     // Write to file
     const outputPath = path.resolve(options.output);
     await fs.ensureDir(path.dirname(outputPath));
     await fs.writeFile(outputPath, output, 'utf8');
-    logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${outputPath}`);
-    
+    logger.success(
+      `Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${outputPath}`,
+    );
+
     // Reveal in Finder on macOS
     await Clipboard.revealInFinder(outputPath);
-    
   } else if (options.display) {
     // Display to console
     console.log(output);
     logger.success(`Displayed ${fileCount} files [${logger.formatBytes(outputSize)}]`);
-    
   } else if (options.stream) {
     // Stream to stdout (shouldn't reach here if streaming was properly used)
     process.stdout.write(output);
-    
   } else {
     // Default: copy to clipboard
     try {
@@ -357,19 +389,19 @@ async function displayOutput(outputResult, options) {
     } catch (_error) {
       // If clipboard fails, save to temporary file
       const format = (options.format || 'markdown').toString().toLowerCase();
-      const extension = format === 'json' ? 'json' : (format === 'markdown' || format === 'md' ? 'md' : 'xml');
+      const extension =
+        format === 'json' ? 'json' : format === 'markdown' || format === 'md' ? 'md' : 'xml';
       const os = await import('os');
       const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, output, 'utf8');
       logger.warn(`Failed to copy to clipboard. Output saved to: ${tempFile}`);
       logger.info(`${fileCount} files [${logger.formatBytes(outputSize)}]`);
-      
+
       // Reveal in Finder on macOS
       await Clipboard.revealInFinder(tempFile);
     }
   }
 }
-
 
 /**
  * Show summary information
@@ -377,20 +409,20 @@ async function displayOutput(outputResult, options) {
 function showSummary(result, startTime) {
   const duration = Date.now() - startTime;
   const stats = result.stats || {};
-  
+
   console.log('\n📊 Summary:');
   console.log(`  Files processed: ${result.files.length}`);
-  
+
   // Calculate total size from files
   const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
   console.log(`  Total size: ${logger.formatBytes(totalSize)}`);
   console.log(`  Output size: ${logger.formatBytes(result.outputSize || 0)}`);
   console.log(`  Duration: ${logger.formatDuration(duration)}`);
-  
+
   if (stats.excludedFiles > 0) {
     console.log(`  Excluded files: ${stats.excludedFiles}`);
   }
-  
+
   if (result.errors && result.errors.length > 0) {
     console.log(`  Errors: ${result.errors.length}`);
   }

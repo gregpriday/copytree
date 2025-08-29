@@ -13,7 +13,9 @@ import fs from 'fs-extra';
 let PDFTransformer;
 
 beforeAll(async () => {
-  const pdfTransformerModule = await import('../../../src/transforms/transformers/PDFTransformer.js');
+  const pdfTransformerModule = await import(
+    '../../../src/transforms/transformers/PDFTransformer.js'
+  );
   PDFTransformer = pdfTransformerModule.default;
 });
 
@@ -28,7 +30,7 @@ describe('PDFTransformer', () => {
       error: jest.fn(),
       warn: jest.fn(),
       info: jest.fn(),
-      debug: jest.fn()
+      debug: jest.fn(),
     };
   });
 
@@ -59,14 +61,14 @@ describe('PDFTransformer', () => {
         Title: 'Test Document',
         Author: 'Test Author',
         Subject: 'Test Subject',
-        Creator: 'Test Creator'
+        Creator: 'Test Creator',
       },
       metadata: {
         _metadata: {
           'dc:title': 'Test Document',
-          'dc:creator': 'Test Author'
-        }
-      }
+          'dc:creator': 'Test Author',
+        },
+      },
     };
 
     beforeEach(() => {
@@ -77,7 +79,7 @@ describe('PDFTransformer', () => {
     it('should extract text from PDF', async () => {
       const file = {
         path: 'document.pdf',
-        absolutePath: '/project/document.pdf'
+        absolutePath: '/project/document.pdf',
       };
 
       const result = await transformer.doTransform(file);
@@ -95,7 +97,7 @@ describe('PDFTransformer', () => {
     it('should include metadata when available', async () => {
       const file = {
         path: 'report.pdf',
-        absolutePath: '/project/report.pdf'
+        absolutePath: '/project/report.pdf',
       };
 
       const result = await transformer.doTransform(file);
@@ -109,12 +111,12 @@ describe('PDFTransformer', () => {
       pdfParse.mockResolvedValue({
         text: 'Simple PDF content',
         numpages: 1,
-        info: {}
+        info: {},
       });
 
       const file = {
         path: 'simple.pdf',
-        absolutePath: '/project/simple.pdf'
+        absolutePath: '/project/simple.pdf',
       };
 
       const result = await transformer.doTransform(file);
@@ -128,12 +130,12 @@ describe('PDFTransformer', () => {
     it('should handle empty PDFs', async () => {
       pdfParse.mockResolvedValue({
         text: '',
-        numpages: 0
+        numpages: 0,
       });
 
       const file = {
         path: 'empty.pdf',
-        absolutePath: '/project/empty.pdf'
+        absolutePath: '/project/empty.pdf',
       };
 
       const result = await transformer.doTransform(file);
@@ -146,7 +148,7 @@ describe('PDFTransformer', () => {
 
       const file = {
         path: 'corrupt.pdf',
-        absolutePath: '/project/corrupt.pdf'
+        absolutePath: '/project/corrupt.pdf',
       };
 
       const result = await transformer.doTransform(file);
@@ -159,7 +161,7 @@ describe('PDFTransformer', () => {
 
       const file = {
         path: 'missing.pdf',
-        absolutePath: '/project/missing.pdf'
+        absolutePath: '/project/missing.pdf',
       };
 
       const result = await transformer.doTransform(file);
@@ -170,12 +172,12 @@ describe('PDFTransformer', () => {
     it('should clean extracted text', async () => {
       pdfParse.mockResolvedValue({
         text: '  Text with   extra    spaces  \n\n\n\nAnd multiple newlines  ',
-        numpages: 1
+        numpages: 1,
       });
 
       const file = {
         path: 'messy.pdf',
-        absolutePath: '/project/messy.pdf'
+        absolutePath: '/project/messy.pdf',
       };
 
       const result = await transformer.doTransform(file);
@@ -190,12 +192,12 @@ describe('PDFTransformer', () => {
       const largeText = 'Lorem ipsum '.repeat(10000);
       pdfParse.mockResolvedValue({
         text: largeText,
-        numpages: 100
+        numpages: 100,
       });
 
       const file = {
         path: 'large.pdf',
-        absolutePath: '/project/large.pdf'
+        absolutePath: '/project/large.pdf',
       };
 
       const result = await transformer.doTransform(file);
@@ -210,12 +212,12 @@ describe('PDFTransformer', () => {
     it('should handle special characters in text', async () => {
       pdfParse.mockResolvedValue({
         text: 'Text with special chars: €£¥ • ™ © ® "quotes"',
-        numpages: 1
+        numpages: 1,
       });
 
       const file = {
         path: 'special.pdf',
-        absolutePath: '/project/special.pdf'
+        absolutePath: '/project/special.pdf',
       };
 
       const result = await transformer.doTransform(file);

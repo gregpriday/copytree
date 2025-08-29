@@ -26,7 +26,7 @@ describe('ConfigManager', () => {
     jest.clearAllMocks();
     originalEnv = { ...process.env };
     tempDir = path.join(os.tmpdir(), `copytree-test-${Date.now()}`);
-    
+
     // Mock file system operations
     fs.mkdtempSync.mockReturnValue(tempDir);
     fs.existsSync.mockReturnValue(false);
@@ -51,7 +51,7 @@ describe('ConfigManager', () => {
       // Mock the loaded config
       configInstance.config = {
         log: { level: 'error' },
-        copytree: { maxFileSize: 10 * 1024 * 1024 }
+        copytree: { maxFileSize: 10 * 1024 * 1024 },
       };
       const value = configInstance.get('log.level', 'info');
       expect(value).toBe('error');
@@ -70,7 +70,7 @@ describe('ConfigManager', () => {
       // Set up mock config
       configInstance.config = {
         copytree: { maxFileSize: 10 * 1024 * 1024 },
-        log: { level: 'error' }
+        log: { level: 'error' },
       };
       const allConfig = configInstance.all();
       expect(allConfig).toHaveProperty('copytree');
@@ -83,7 +83,7 @@ describe('ConfigManager', () => {
       const configInstance = config();
       configInstance.config = {
         copytree: { maxFileSize: 10 * 1024 * 1024 },
-        log: { level: 'error' }
+        log: { level: 'error' },
       };
       expect(configInstance.get('copytree.maxFileSize')).toBe(10 * 1024 * 1024);
       expect(configInstance.get('log.level')).toBe('error');

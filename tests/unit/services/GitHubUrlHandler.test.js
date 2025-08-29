@@ -6,8 +6,8 @@ jest.mock('../../../src/utils/logger.js', () => ({
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
-    debug: jest.fn()
-  }
+    debug: jest.fn(),
+  },
 }));
 
 import fs from 'fs-extra';
@@ -80,7 +80,7 @@ describe('GitHubUrlHandler', () => {
         .mockReturnValueOnce(false) // repoDir check in else block (line 72)
         .mockReturnValueOnce(false) // repoDir check before removal in cloneRepository (line 111)
         .mockReturnValueOnce(true); // targetPath exists after clone (line 85)
-      
+
       // Mock detectDefaultBranch to return 'main'
       execSync.mockImplementation((cmd) => {
         if (cmd.includes('ls-remote')) {
@@ -88,12 +88,12 @@ describe('GitHubUrlHandler', () => {
         }
         return '';
       });
-      
+
       const targetPath = await handler.getFiles();
-      
+
       expect(execSync).toHaveBeenCalledWith(
         expect.stringContaining('git clone'),
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(targetPath).toBe(handler.repoDir);
     });
@@ -106,11 +106,11 @@ describe('GitHubUrlHandler', () => {
       });
 
       await handler.getFiles();
-      
+
       expect(execSync).toHaveBeenCalledWith('git fetch', expect.any(Object));
       expect(execSync).toHaveBeenCalledWith(
         expect.stringContaining('git pull'),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -132,7 +132,7 @@ describe('GitHubUrlHandler', () => {
 
     it('should detect default branch from remote', async () => {
       execSync.mockReturnValue('ref: refs/heads/main\tHEAD\n');
-      
+
       const branch = await handler.detectDefaultBranch();
       expect(branch).toBe('main');
     });
@@ -141,7 +141,7 @@ describe('GitHubUrlHandler', () => {
       execSync.mockImplementation(() => {
         throw new Error('Network error');
       });
-      
+
       const branch = await handler.detectDefaultBranch();
       expect(branch).toBe('main');
     });
@@ -157,23 +157,23 @@ describe('GitHubUrlHandler', () => {
     it('should generate consistent cache keys', () => {
       const handler1 = new GitHubUrlHandler('https://github.com/user/repo');
       const handler2 = new GitHubUrlHandler('https://github.com/user/repo');
-      
+
       expect(handler1.cacheKey).toBe(handler2.cacheKey);
     });
 
     it('should generate different cache keys for different branches', () => {
       const handler1 = new GitHubUrlHandler('https://github.com/user/repo/tree/main');
       const handler2 = new GitHubUrlHandler('https://github.com/user/repo/tree/develop');
-      
+
       expect(handler1.cacheKey).not.toBe(handler2.cacheKey);
     });
 
     it('should clear cache when requested', async () => {
       fs.existsSync.mockReturnValue(true);
       fs.removeSync.mockImplementation(() => {});
-      
+
       await handler.clearCache();
-      
+
       expect(fs.removeSync).toHaveBeenCalledWith(handler.repoDir);
     });
   });

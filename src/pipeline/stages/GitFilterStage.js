@@ -12,7 +12,7 @@ class GitFilterStage extends Stage {
     this.modified = options.modified || false;
     this.changed = options.changed || null;
     this.includeGitStatus = options.withGitStatus || false;
-    
+
     this.gitUtils = new GitUtils(this.basePath);
   }
 
@@ -22,7 +22,7 @@ class GitFilterStage extends Stage {
       this.basePath = input.basePath;
       this.gitUtils = new GitUtils(this.basePath);
     }
-    
+
     // Skip if no git filtering is requested
     if (!this.modified && !this.changed && !this.includeGitStatus) {
       return input;
@@ -33,7 +33,7 @@ class GitFilterStage extends Stage {
 
     try {
       // Check if we're in a git repository
-      if (!await this.gitUtils.isGitRepository()) {
+      if (!(await this.gitUtils.isGitRepository())) {
         this.log('Not a git repository, skipping git filters', 'warn');
         return input;
       }
@@ -53,7 +53,7 @@ class GitFilterStage extends Stage {
       // Filter files if git filtering is active
       if (this.modified || this.changed) {
         const gitFileSet = new Set(gitFiles.map((f) => path.normalize(f)));
-        
+
         filteredFiles = input.files.filter((file) => {
           const normalizedPath = path.normalize(file.path);
           return gitFileSet.has(normalizedPath) || gitFileSet.has(file.path);
@@ -69,7 +69,7 @@ class GitFilterStage extends Stage {
       if (this.includeGitStatus) {
         const filePaths = filteredFiles.map((f) => f.path);
         const statuses = await this.gitUtils.getFileStatuses(filePaths);
-        
+
         filteredFiles = filteredFiles.map((file) => ({
           ...file,
           gitStatus: statuses[file.path] || 'unknown',
@@ -97,7 +97,7 @@ class GitFilterStage extends Stage {
       };
     } catch (error) {
       this.log(`Git filtering error: ${error.message}`, 'error');
-      
+
       // Continue without git filtering on error
       return input;
     }

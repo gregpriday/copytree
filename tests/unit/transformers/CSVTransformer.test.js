@@ -39,7 +39,7 @@ describe('CSVTransformer', () => {
     it('should format simple CSV data', async () => {
       const file = {
         path: 'data.csv',
-        content: 'Name,Age,City\nJohn,30,New York\nJane,25,Los Angeles\nBob,35,Chicago'
+        content: 'Name,Age,City\nJohn,30,New York\nJane,25,Los Angeles\nBob,35,Chicago',
       };
 
       const result = await transformer.doTransform(file);
@@ -56,14 +56,15 @@ describe('CSVTransformer', () => {
         totalRows: 3,
         displayedRows: 3,
         columns: 3,
-        delimiter: ','
+        delimiter: ',',
       });
     });
 
     it('should handle CSV with quotes', async () => {
       const file = {
         path: 'quoted.csv',
-        content: 'Product,Description,Price\n"Widget A","A great widget, really!",19.99\n"Widget B","Another ""awesome"" widget",29.99'
+        content:
+          'Product,Description,Price\n"Widget A","A great widget, really!",19.99\n"Widget B","Another ""awesome"" widget",29.99',
       };
 
       const result = await transformer.doTransform(file);
@@ -77,7 +78,7 @@ describe('CSVTransformer', () => {
     it('should handle empty cells', async () => {
       const file = {
         path: 'sparse.csv',
-        content: 'A,B,C\n1,,3\n,2,\n,,3'
+        content: 'A,B,C\n1,,3\n,2,\n,,3',
       };
 
       const result = await transformer.doTransform(file);
@@ -95,10 +96,10 @@ describe('CSVTransformer', () => {
       for (let i = 1; i <= 100; i++) {
         rows.push(`Row${i}A,Row${i}B,Row${i}C`);
       }
-      
+
       const file = {
         path: 'large.csv',
-        content: headers + '\n' + rows.join('\n')
+        content: headers + '\n' + rows.join('\n'),
       };
 
       const result = await transformer.doTransform(file);
@@ -120,10 +121,10 @@ describe('CSVTransformer', () => {
 
     it('should handle different delimiters', async () => {
       transformer = new CSVTransformer({ delimiter: ';' });
-      
+
       const file = {
         path: 'semicolon.csv',
-        content: 'Name;Age;Country\nAlice;28;USA\nBob;32;Canada'
+        content: 'Name;Age;Country\nAlice;28;USA\nBob;32;Canada',
       };
 
       const result = await transformer.doTransform(file);
@@ -137,7 +138,7 @@ describe('CSVTransformer', () => {
     it('should auto-detect TSV files', async () => {
       const file = {
         path: 'data.tsv',
-        content: 'Name\tAge\tCity\nJohn\t30\tBoston\nJane\t25\tSeattle'
+        content: 'Name\tAge\tCity\nJohn\t30\tBoston\nJane\t25\tSeattle',
       };
 
       const result = await transformer.doTransform(file);
@@ -151,7 +152,7 @@ describe('CSVTransformer', () => {
     it('should handle empty CSV', async () => {
       const file = {
         path: 'empty.csv',
-        content: ''
+        content: '',
       };
 
       const result = await transformer.doTransform(file);
@@ -163,7 +164,7 @@ describe('CSVTransformer', () => {
     it('should handle CSV with only headers', async () => {
       const file = {
         path: 'headers-only.csv',
-        content: 'Column1,Column2,Column3'
+        content: 'Column1,Column2,Column3',
       };
 
       const result = await transformer.doTransform(file);
@@ -176,10 +177,10 @@ describe('CSVTransformer', () => {
     it('should load content from file if not provided', async () => {
       const fileContent = 'A,B\n1,2\n3,4';
       fs.readFile.mockResolvedValue(fileContent);
-      
+
       const file = {
         path: 'from-disk.csv',
-        absolutePath: '/project/from-disk.csv'
+        absolutePath: '/project/from-disk.csv',
         // No content property
       };
 
@@ -193,15 +194,15 @@ describe('CSVTransformer', () => {
     it('should handle parsing errors gracefully', async () => {
       // Mock the logger to avoid undefined error
       transformer.logger = { warn: jest.fn() };
-      
+
       // Simulate a file that causes parsing error
       transformer.transformCSV = jest.fn().mockImplementation(() => {
         throw new Error('Invalid CSV format');
       });
-      
+
       const file = {
         path: 'malformed.csv',
-        content: 'A,B,C\n1,2\n3,4,5,6,7\n8,9,10'
+        content: 'A,B,C\n1,2\n3,4,5,6,7\n8,9,10',
       };
 
       const result = await transformer.doTransform(file);
@@ -219,7 +220,7 @@ describe('CSVTransformer', () => {
     it('should handle special characters', async () => {
       const file = {
         path: 'special.csv',
-        content: 'Symbol,Name,Price\n€,Euro,1.10\n£,Pound,1.25\n¥,Yen,0.0091'
+        content: 'Symbol,Name,Price\n€,Euro,1.10\n£,Pound,1.25\n¥,Yen,0.0091',
       };
 
       const result = await transformer.doTransform(file);
@@ -232,13 +233,16 @@ describe('CSVTransformer', () => {
     it('should truncate long cell values', async () => {
       const file = {
         path: 'long.csv',
-        content: 'Short,VeryLongDescriptionThatExceedsTheMaximumWidth\nA,ThisIsAVeryLongValueThatShouldBeTruncatedToFitTheColumn'
+        content:
+          'Short,VeryLongDescriptionThatExceedsTheMaximumWidth\nA,ThisIsAVeryLongValueThatShouldBeTruncatedToFitTheColumn',
       };
 
       const result = await transformer.doTransform(file);
 
       expect(result.content).toContain('...');
-      expect(result.content).not.toContain('ThisIsAVeryLongValueThatShouldBeTruncatedToFitTheColumn');
+      expect(result.content).not.toContain(
+        'ThisIsAVeryLongValueThatShouldBeTruncatedToFitTheColumn',
+      );
     });
   });
 
@@ -295,15 +299,15 @@ describe('CSVTransformer', () => {
   describe('options', () => {
     it('should respect maxRows option', async () => {
       transformer = new CSVTransformer({ maxRows: 5 });
-      
+
       const rows = [];
       for (let i = 1; i <= 20; i++) {
         rows.push(`Row${i}`);
       }
-      
+
       const file = {
         path: 'limited.csv',
-        content: 'Data\n' + rows.join('\n')
+        content: 'Data\n' + rows.join('\n'),
       };
 
       const result = await transformer.doTransform(file);

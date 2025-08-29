@@ -15,12 +15,12 @@ class ProfileLoader {
     this.options = options;
     this.logger = options.logger || logger.child('ProfileLoader');
     this.config = config();
-    
+
     // Profile directories
     this.builtInProfilesDir = path.join(import.meta.dirname, '../../profiles');
     this.userProfilesDir = null; // Will be set on first access
     this.projectProfilesDir = path.join(process.cwd(), '.copytree');
-    
+
     // Cache for loaded profiles
     this.profileCache = new Map();
   }
@@ -31,11 +31,7 @@ class ProfileLoader {
   async getUserProfilesDir() {
     if (!this.userProfilesDir) {
       const os = await import('os');
-      this.userProfilesDir = path.join(
-        os.homedir(),
-        '.copytree',
-        'profiles',
-      );
+      this.userProfilesDir = path.join(os.homedir(), '.copytree', 'profiles');
     }
     return this.userProfilesDir;
   }
@@ -56,7 +52,7 @@ class ProfileLoader {
 
       // Load base profile
       let profile = await this.loadProfileFile(profileNameOrPath);
-      
+
       // Handle profile inheritance
       if (profile.extends) {
         const parentProfile = await this.load(profile.extends);
@@ -77,11 +73,9 @@ class ProfileLoader {
       if (error instanceof ProfileError) {
         throw error;
       }
-      throw new ProfileError(
-        `Failed to load profile: ${error.message}`,
-        profileNameOrPath,
-        { originalError: error },
-      );
+      throw new ProfileError(`Failed to load profile: ${error.message}`, profileNameOrPath, {
+        originalError: error,
+      });
     }
   }
 
@@ -92,12 +86,16 @@ class ProfileLoader {
    */
   async loadProfileFile(profileNameOrPath) {
     // If it's a path (absolute or relative), load directly
-    if (profileNameOrPath.includes('/') || profileNameOrPath.includes('\\') || path.isAbsolute(profileNameOrPath)) {
+    if (
+      profileNameOrPath.includes('/') ||
+      profileNameOrPath.includes('\\') ||
+      path.isAbsolute(profileNameOrPath)
+    ) {
       // Check if file exists as-is
       if (await fs.pathExists(profileNameOrPath)) {
         return await this.loadFromPath(profileNameOrPath);
       }
-      
+
       // If no extension, try common extensions
       if (!path.extname(profileNameOrPath)) {
         const extensions = ['.yml', '.yaml', '.json'];
@@ -108,11 +106,8 @@ class ProfileLoader {
           }
         }
       }
-      
-      throw new ProfileError(
-        `Profile file not found: ${profileNameOrPath}`,
-        profileNameOrPath,
-      );
+
+      throw new ProfileError(`Profile file not found: ${profileNameOrPath}`, profileNameOrPath);
     }
 
     // Search for profile by name
@@ -122,12 +117,12 @@ class ProfileLoader {
       path.join(process.cwd(), '.copytree', `${profileNameOrPath}.yml`),
       path.join(process.cwd(), '.copytree', `${profileNameOrPath}.yaml`),
       path.join(process.cwd(), '.copytree', `${profileNameOrPath}.json`),
-      
+
       // User profiles in home directory
       path.join(userProfilesDir, `${profileNameOrPath}.yml`),
       path.join(userProfilesDir, `${profileNameOrPath}.yaml`),
       path.join(userProfilesDir, `${profileNameOrPath}.json`),
-      
+
       // Built-in profiles (default only)
       path.join(this.builtInProfilesDir, `${profileNameOrPath}.yml`),
       path.join(this.builtInProfilesDir, `${profileNameOrPath}.yaml`),
@@ -141,11 +136,9 @@ class ProfileLoader {
       }
     }
 
-    throw new ProfileError(
-      `Profile not found: ${profileNameOrPath}`,
-      profileNameOrPath,
-      { searchPaths },
-    );
+    throw new ProfileError(`Profile not found: ${profileNameOrPath}`, profileNameOrPath, {
+      searchPaths,
+    });
   }
 
   /**
@@ -159,28 +152,28 @@ class ProfileLoader {
 
     let data;
     switch (ext) {
-    case '.yml':
-    case '.yaml':
-      data = yaml.load(content);
-      break;
-    case '.json':
-      data = JSON.parse(content);
-      break;
-    default:
-      // For files without recognized extensions, try YAML first, then JSON
-      try {
+      case '.yml':
+      case '.yaml':
         data = yaml.load(content);
-      } catch (yamlError) {
+        break;
+      case '.json':
+        data = JSON.parse(content);
+        break;
+      default:
+        // For files without recognized extensions, try YAML first, then JSON
         try {
-          data = JSON.parse(content);
-        } catch (jsonError) {
-          throw new ProfileError(
-            `Unable to parse profile file as YAML or JSON: ${filePath}`,
-            filePath,
-            { yamlError: yamlError.message, jsonError: jsonError.message },
-          );
+          data = yaml.load(content);
+        } catch (yamlError) {
+          try {
+            data = JSON.parse(content);
+          } catch (jsonError) {
+            throw new ProfileError(
+              `Unable to parse profile file as YAML or JSON: ${filePath}`,
+              filePath,
+              { yamlError: yamlError.message, jsonError: jsonError.message },
+            );
+          }
         }
-      }
     }
 
     // Add metadata
@@ -202,13 +195,13 @@ class ProfileLoader {
       description: joi.string(),
       version: joi.string(),
       extends: joi.string(),
-      
+
       // File selection
       include: joi.array().items(joi.string()),
       exclude: joi.array().items(joi.string()),
       filter: joi.array().items(joi.string()),
       always: joi.array().items(joi.string()),
-      
+
       // External sources
       external: joi.array().items(
         joi.object({
@@ -218,7 +211,7 @@ class ProfileLoader {
           optional: joi.boolean(),
         }),
       ),
-      
+
       // Options
       options: joi.object({
         includeHidden: joi.boolean(),
@@ -229,7 +222,7 @@ class ProfileLoader {
         maxFileCount: joi.number().positive().integer(),
         maxDepth: joi.number().positive().integer(),
       }),
-      
+
       // Transformations
       transformers: joi.object().pattern(
         joi.string(),
@@ -241,7 +234,7 @@ class ProfileLoader {
           }),
         ),
       ),
-      
+
       // Output
       output: joi.object({
         format: joi.string().valid('xml', 'json', 'tree', 'markdown'),
@@ -250,14 +243,14 @@ class ProfileLoader {
         prettyPrint: joi.boolean(),
         characterLimit: joi.number().positive(),
       }),
-      
+
       // Pipeline configuration
       pipeline: joi.object({
         stages: joi.array().items(joi.string()),
         parallel: joi.boolean(),
         stopOnError: joi.boolean(),
       }),
-      
+
       // Metadata
       _source: joi.string(),
       _loadedAt: joi.string(),
@@ -301,10 +294,7 @@ class ProfileLoader {
     // Arrays - concatenate and deduplicate
     ['include', 'exclude', 'filter'].forEach((prop) => {
       if (overlay[prop]) {
-        merged[prop] = [...new Set([
-          ...(base[prop] || []),
-          ...(overlay[prop] || []),
-        ])];
+        merged[prop] = [...new Set([...(base[prop] || []), ...(overlay[prop] || [])])];
       }
     });
 
@@ -331,21 +321,21 @@ class ProfileLoader {
 
     // Helper to add profiles from a directory
     const addProfilesFromDir = async (dir, source) => {
-      if (!await fs.pathExists(dir)) return;
+      if (!(await fs.pathExists(dir))) return;
 
       const files = await fs.readdir(dir);
       for (const file of files) {
         const ext = path.extname(file).toLowerCase();
         if (['.yml', '.yaml', '.json'].includes(ext)) {
           const name = path.basename(file, ext);
-          
+
           if (!seen.has(name)) {
             seen.add(name);
-            
+
             try {
               const filePath = path.join(dir, file);
               const profile = await this.loadFromPath(filePath);
-              
+
               profiles.push({
                 name,
                 description: profile.description || 'No description',
@@ -380,11 +370,11 @@ class ProfileLoader {
       name: 'default',
       description: 'Default profile with standard settings',
       version: '1.0.0',
-      
+
       include: ['**/*'],
       exclude: [],
       filter: [],
-      
+
       options: {
         includeHidden: false,
         followSymlinks: false,
@@ -393,14 +383,14 @@ class ProfileLoader {
         maxTotalSize: 100 * 1024 * 1024, // 100MB
         maxFileCount: 10000,
       },
-      
+
       transformers: {
         'file-loader': { enabled: true },
-        'markdown': { enabled: true, options: { mode: 'strip' } },
-        'csv': { enabled: true, options: { maxRows: 10 } },
-        'binary': { enabled: true },
+        markdown: { enabled: true, options: { mode: 'strip' } },
+        csv: { enabled: true, options: { maxRows: 10 } },
+        binary: { enabled: true },
       },
-      
+
       output: {
         format: 'xml',
         includeMetadata: true,

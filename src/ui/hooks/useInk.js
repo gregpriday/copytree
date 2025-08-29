@@ -17,21 +17,23 @@ const useInk = () => {
 
     if (!loadPromise) {
       isLoading = true;
-      loadPromise = import('ink').then((ink) => {
-        inkComponents = {
-          Box: ink.Box,
-          Text: ink.Text,
-          Newline: ink.Newline,
-          Spinner: ink.Spinner,
-        };
-        isLoading = false;
-        return inkComponents;
-      }).catch((error) => {
-        console.error('Failed to load Ink components:', error);
-        inkComponents = {};
-        isLoading = false;
-        return inkComponents;
-      });
+      loadPromise = import('ink')
+        .then((ink) => {
+          inkComponents = {
+            Box: ink.Box,
+            Text: ink.Text,
+            Newline: ink.Newline,
+            Spinner: ink.Spinner,
+          };
+          isLoading = false;
+          return inkComponents;
+        })
+        .catch((error) => {
+          console.error('Failed to load Ink components:', error);
+          inkComponents = {};
+          isLoading = false;
+          return inkComponents;
+        });
     }
 
     loadPromise.then((components) => {

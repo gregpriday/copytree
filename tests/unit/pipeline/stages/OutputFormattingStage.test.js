@@ -90,7 +90,7 @@ describe('OutputFormattingStage - Markdown', () => {
     config().set('copytree.binaryPlaceholderText', '[Binary file not included]');
 
     const filePath = path.join(tempDir, 'image.png');
-    await fs.writeFile(filePath, Buffer.from([1,2,3,4]));
+    await fs.writeFile(filePath, Buffer.from([1, 2, 3, 4]));
 
     const stage = new OutputFormattingStage({ format: 'markdown' });
     const result = await stage.process({
@@ -104,7 +104,7 @@ describe('OutputFormattingStage - Markdown', () => {
           size: 4,
           modified: new Date(),
           isBinary: true,
-          content: '[Binary file not included]'
+          content: '[Binary file not included]',
         },
       ],
     });
@@ -181,7 +181,14 @@ describe('OutputFormattingStage - Markdown', () => {
       instructions: 'Read carefully',
       instructionsName: 'default',
       files: [
-        { path: 'x.txt', absolutePath: filePath, size: 1, modified: new Date(), isBinary: false, content: 'x' },
+        {
+          path: 'x.txt',
+          absolutePath: filePath,
+          size: 1,
+          modified: new Date(),
+          isBinary: false,
+          content: 'x',
+        },
       ],
     });
     const out = result.output;
@@ -215,4 +222,3 @@ describe('OutputFormattingStage - Markdown', () => {
     expect(out).toContain('copytree:truncated');
   });
 });
-

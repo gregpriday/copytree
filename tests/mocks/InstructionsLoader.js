@@ -9,13 +9,13 @@ class InstructionsLoader {
       debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
-      error: jest.fn()
+      error: jest.fn(),
     };
-    
+
     // Instructions directories (mocked paths)
     this.userDir = path.join(os.homedir(), '.copytree/instructions');
     this.appDir = path.join(process.cwd(), 'src', 'templates', 'instructions');
-    
+
     // Cache for loaded instructions
     this.instructionsCache = new Map();
   }
@@ -23,7 +23,7 @@ class InstructionsLoader {
   async loadInstructions(name = 'default') {
     return 'Mock instructions content';
   }
-  
+
   async load(name = 'default') {
     // Check cache first
     const cacheKey = name;
@@ -45,7 +45,7 @@ class InstructionsLoader {
     this.instructionsCache.set(cacheKey, content);
     return content;
   }
-  
+
   async exists(name = 'default') {
     // Always return true for the default instructions and common test cases
     return name === 'default' || name === 'custom';

@@ -24,9 +24,13 @@ import os from 'os';
 const ValidationStep = ({ step, isActive, isCompleted }) => {
   const getIcon = () => {
     if (isCompleted) {
-      return step.status === 'success' ? '✓' : 
-				   step.status === 'warning' ? '⚠' : 
-				   step.status === 'error' ? '✗' : '○';
+      return step.status === 'success'
+        ? '✓'
+        : step.status === 'warning'
+          ? '⚠'
+          : step.status === 'error'
+            ? '✗'
+            : '○';
     }
     if (isActive) {
       return '⏳';
@@ -36,9 +40,13 @@ const ValidationStep = ({ step, isActive, isCompleted }) => {
 
   const getColor = () => {
     if (isCompleted) {
-      return step.status === 'success' ? 'green' :
-				   step.status === 'warning' ? 'yellow' :
-				   step.status === 'error' ? 'red' : 'gray';
+      return step.status === 'success'
+        ? 'green'
+        : step.status === 'warning'
+          ? 'yellow'
+          : step.status === 'error'
+            ? 'red'
+            : 'gray';
     }
     if (isActive) {
       return 'blue';
@@ -65,17 +73,9 @@ const WarningsList = ({ warnings }) => {
   return React.createElement(
     Box,
     { flexDirection: 'column', marginTop: 1 },
-    React.createElement(
-      Text,
-      { color: 'yellow', bold: true },
-      '⚠ Warnings:',
-    ),
+    React.createElement(Text, { color: 'yellow', bold: true }, '⚠ Warnings:'),
     ...warnings.map((warning, index) =>
-      React.createElement(
-        Text,
-        { key: index, color: 'yellow', marginLeft: 2 },
-        `- ${warning}`,
-      ),
+      React.createElement(Text, { key: index, color: 'yellow', marginLeft: 2 }, `- ${warning}`),
     ),
   );
 };
@@ -105,11 +105,7 @@ const ValidationDetails = ({ details, command }) => {
           displayValue = JSON.stringify(value, null, 2);
         }
 
-        return React.createElement(
-          Text,
-          { key },
-          `${key}: ${displayValue}`,
-        );
+        return React.createElement(Text, { key }, `${key}: ${displayValue}`);
       }),
     ),
   );
@@ -202,12 +198,12 @@ const ValidationView = ({ successMessage, type }) => {
   const runProfileValidation = async () => {
     const { default: ProfileLoader } = await import('../../profiles/ProfileLoader.js');
     const { ProfileError } = await import('../../utils/errors.js');
-		
+
     const profileName = options.profile || options.args?.[0] || 'default';
     const profileLoader = new ProfileLoader();
     let loadedProfile;
     const validationWarnings = [];
-		
+
     const validationSteps = [
       { name: 'Load profile', details: '' },
       { name: 'Check profile structure', details: '' },
@@ -247,7 +243,7 @@ const ValidationView = ({ successMessage, type }) => {
 
     // Step 3: Validate configuration
     setCurrentStep(2);
-		
+
     // Check for warnings
     if (!loadedProfile.description) {
       validationWarnings.push('No description provided');
@@ -268,24 +264,31 @@ const ValidationView = ({ successMessage, type }) => {
     validationSteps[2] = {
       name: 'Validate configuration',
       status: validationWarnings.length > 0 ? 'warning' : 'success',
-      details: validationWarnings.length > 0 ? `${validationWarnings.length} warnings found` : 'No issues found',
+      details:
+        validationWarnings.length > 0
+          ? `${validationWarnings.length} warnings found`
+          : 'No issues found',
     };
     setSteps([...validationSteps]);
 
     setWarnings(validationWarnings);
     setValidationResult({
       success: true,
-      message: validationWarnings.length === 0 ? 
-        'Profile is valid with no issues' : 
-        `Profile is valid with ${validationWarnings.length} warning(s)`,
-      details: options.verbose || options.show ? {
-        name: loadedProfile.name,
-        description: loadedProfile.description || 'N/A',
-        version: loadedProfile.version || 'N/A',
-        source: loadedProfile._source,
-        includePatterns: loadedProfile.include?.join(', ') || 'None',
-        excludePatterns: loadedProfile.exclude?.join(', ') || 'None',
-      } : null,
+      message:
+        validationWarnings.length === 0
+          ? 'Profile is valid with no issues'
+          : `Profile is valid with ${validationWarnings.length} warning(s)`,
+      details:
+        options.verbose || options.show
+          ? {
+              name: loadedProfile.name,
+              description: loadedProfile.description || 'N/A',
+              version: loadedProfile.version || 'N/A',
+              source: loadedProfile._source,
+              includePatterns: loadedProfile.include?.join(', ') || 'None',
+              excludePatterns: loadedProfile.exclude?.join(', ') || 'None',
+            }
+          : null,
     });
     setIsCompleted(true);
     setCurrentStep(-1);
@@ -309,17 +312,19 @@ const ValidationView = ({ successMessage, type }) => {
     setCurrentStep(0);
     const defaultConfigPath = path.join(process.cwd(), 'config');
     const userConfigPath = path.join(os.homedir(), '.copytree');
-		
+
     let directoriesStatus = 'success';
     let directoriesDetails = 'All directories found';
-		
-    if (!await fs.pathExists(defaultConfigPath)) {
+
+    if (!(await fs.pathExists(defaultConfigPath))) {
       directoriesStatus = 'error';
       directoriesDetails = 'Default config directory missing';
-    } else if (!await fs.pathExists(userConfigPath)) {
+    } else if (!(await fs.pathExists(userConfigPath))) {
       directoriesStatus = 'warning';
       directoriesDetails = 'User config directory not found (this is normal)';
-      validationWarnings.push('User config directory does not exist (this is normal if no custom configs)');
+      validationWarnings.push(
+        'User config directory does not exist (this is normal if no custom configs)',
+      );
     }
 
     validationSteps[0] = {
@@ -333,13 +338,13 @@ const ValidationView = ({ successMessage, type }) => {
     setCurrentStep(1);
     const configModules = ['ai', 'app', 'cache', 'copytree', 'state'];
     let modulesOk = 0;
-		
+
     for (const moduleName of configModules) {
       try {
         const moduleConfig = configManager.get(moduleName);
         if (moduleConfig) {
           modulesOk++;
-					
+
           // Module-specific validation
           if (moduleName === 'ai') {
             validateAIConfig(moduleConfig, validationWarnings);
@@ -364,10 +369,10 @@ const ValidationView = ({ successMessage, type }) => {
     // Step 3: Check environment variables
     setCurrentStep(2);
     const envVars = {
-      'GEMINI_API_KEY': { required: false, type: 'ai' },
-      'COPYTREE_MAX_FILE_SIZE': { required: false, type: 'size' },
-      'COPYTREE_MAX_TOTAL_SIZE': { required: false, type: 'size' },
-      'COPYTREE_CACHE_TTL': { required: false, type: 'number' },
+      GEMINI_API_KEY: { required: false, type: 'ai' },
+      COPYTREE_MAX_FILE_SIZE: { required: false, type: 'size' },
+      COPYTREE_MAX_TOTAL_SIZE: { required: false, type: 'size' },
+      COPYTREE_CACHE_TTL: { required: false, type: 'number' },
     };
 
     let envVarsSet = 0;
@@ -380,7 +385,7 @@ const ValidationView = ({ successMessage, type }) => {
         }
       } else if (config.type === 'ai' && envVar.includes('API_KEY')) {
         validationWarnings.push(`${envVar} not set - AI features will not work`);
-      }  
+      }
     }
 
     validationSteps[2] = {
@@ -392,12 +397,7 @@ const ValidationView = ({ successMessage, type }) => {
 
     // Step 4: Test configuration access
     setCurrentStep(3);
-    const testPaths = [
-      'copytree.defaultExclusions',
-      'ai.provider',
-      'cache.enabled',
-      'app.name',
-    ];
+    const testPaths = ['copytree.defaultExclusions', 'ai.provider', 'cache.enabled', 'app.name'];
 
     let accessiblePaths = 0;
     for (const testPath of testPaths) {
@@ -421,9 +421,10 @@ const ValidationView = ({ successMessage, type }) => {
     setWarnings(validationWarnings);
     setValidationResult({
       success: true,
-      message: validationWarnings.length === 0 ? 
-        'Configuration is valid with no issues' : 
-        `Configuration is valid with ${validationWarnings.length} warning(s)`,
+      message:
+        validationWarnings.length === 0
+          ? 'Configuration is valid with no issues'
+          : `Configuration is valid with ${validationWarnings.length} warning(s)`,
       details: options.verbose || options.show ? configManager.all() : null,
     });
     setIsCompleted(true);
@@ -452,7 +453,7 @@ const ValidationView = ({ successMessage, type }) => {
     }
     if (!config.defaultExclusions || config.defaultExclusions.length === 0) {
       warnings.push('No default exclusions configured');
-    }  
+    }
   };
 
   const validateCacheConfig = (config, warnings) => {
@@ -468,28 +469,22 @@ const ValidationView = ({ successMessage, type }) => {
     return React.createElement(
       Box,
       { flexDirection: 'column' },
-      React.createElement(
-        Text,
-        { color: 'red', bold: true },
-        '✗ Validation Failed',
-      ),
+      React.createElement(Text, { color: 'red', bold: true }, '✗ Validation Failed'),
       React.createElement(
         Text,
         { color: 'red' },
         command === 'profile:validate' ? 'Failed to load profile' : error,
       ),
-      React.createElement(
-        Text,
-        { color: 'red' },
-        error,
-      ),
+      React.createElement(Text, { color: 'red' }, error),
     );
   }
 
-  const finalStatus = validationResult?.success ? 
-    (warnings.length === 0 ? '✓' : '⚠') : '?';
-  const finalColor = validationResult?.success ? 
-    (warnings.length === 0 ? 'green' : 'yellow') : 'gray';
+  const finalStatus = validationResult?.success ? (warnings.length === 0 ? '✓' : '⚠') : '?';
+  const finalColor = validationResult?.success
+    ? warnings.length === 0
+      ? 'green'
+      : 'yellow'
+    : 'gray';
 
   return React.createElement(
     Box,
@@ -497,9 +492,11 @@ const ValidationView = ({ successMessage, type }) => {
     React.createElement(
       Text,
       { bold: true, color: 'yellow' },
-      type === 'cache' ? 'Cache Clearing Progress:' :
-        command === 'profile:validate' ? `Validating profile: ${options.profile || options.args?.[0] || 'default'}` :
-          'Validating CopyTree Configuration',
+      type === 'cache'
+        ? 'Cache Clearing Progress:'
+        : command === 'profile:validate'
+          ? `Validating profile: ${options.profile || options.args?.[0] || 'default'}`
+          : 'Validating CopyTree Configuration',
     ),
     React.createElement(Box, { marginTop: 1 }, null),
     ...steps.map((step, index) =>
@@ -511,18 +508,19 @@ const ValidationView = ({ successMessage, type }) => {
       }),
     ),
     React.createElement(WarningsList, { warnings }),
-    isCompleted && React.createElement(
-      Box,
-      { marginTop: 1 },
+    isCompleted &&
       React.createElement(
-        Text,
-        { color: finalColor, bold: true },
-        `${finalStatus} ${validationResult?.message || 'Validation completed'}`,
+        Box,
+        { marginTop: 1 },
+        React.createElement(
+          Text,
+          { color: finalColor, bold: true },
+          `${finalStatus} ${validationResult?.message || 'Validation completed'}`,
+        ),
       ),
-    ),
-    React.createElement(ValidationDetails, { 
-      details: validationResult?.details, 
-      command, 
+    React.createElement(ValidationDetails, {
+      details: validationResult?.details,
+      command,
     }),
   );
 };

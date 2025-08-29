@@ -13,19 +13,19 @@ jest.mock('../src/config/ConfigManager.js', () => {
         ttl: 86400000,
         driver: 'file',
         prefix: 'copytree_',
-        defaultTtl: 3600
-      }
+        defaultTtl: 3600,
+      },
     },
     log: {
       level: 'error',
-      format: 'simple'
+      format: 'simple',
     },
     pipeline: {
       continueOnError: false,
-      emitProgress: true
+      emitProgress: true,
     },
     app: {
-      maxConcurrency: 5
+      maxConcurrency: 5,
     },
     cache: {
       enabled: false,
@@ -34,17 +34,17 @@ jest.mock('../src/config/ConfigManager.js', () => {
       defaultTtl: 3600,
       transformations: {
         enabled: true,
-        ttl: 86400
-      }
-    }
+        ttl: 86400,
+      },
+    },
   };
 
-  const mockConfig = function() {
+  const mockConfig = function () {
     return {
       get: (key, defaultValue = null) => {
         const keys = key.split('.');
         let value = mockConfigData;
-        
+
         for (const k of keys) {
           if (value && typeof value === 'object' && k in value) {
             value = value[k];
@@ -52,27 +52,27 @@ jest.mock('../src/config/ConfigManager.js', () => {
             return defaultValue;
           }
         }
-        
+
         return value;
       },
       set: (key, value) => {
         const keys = key.split('.');
         let target = mockConfigData;
-        
+
         for (let i = 0; i < keys.length - 1; i++) {
           if (!(keys[i] in target)) {
             target[keys[i]] = {};
           }
           target = target[keys[i]];
         }
-        
+
         target[keys[keys.length - 1]] = value;
       },
       all: () => ({ ...mockConfigData }),
       has: (key) => {
         const keys = key.split('.');
         let value = mockConfigData;
-        
+
         for (const k of keys) {
           if (value && typeof value === 'object' && k in value) {
             value = value[k];
@@ -80,9 +80,9 @@ jest.mock('../src/config/ConfigManager.js', () => {
             return false;
           }
         }
-        
+
         return true;
-      }
+      },
     };
   };
 
@@ -106,23 +106,23 @@ jest.mock('../src/config/ConfigManager.js', () => {
     set: (key, value) => mockConfig().set(key, value),
     all: () => mockConfig().all(),
     has: (key) => mockConfig().has(key),
-    env: mockConfig.env
+    env: mockConfig.env,
   };
 
   // Create singleton instance
   let singletonInstance = null;
-  
+
   const configFactory = () => {
     if (!singletonInstance) {
       singletonInstance = mockConfig();
     }
     return singletonInstance;
   };
-  
+
   return {
     ConfigManager: MockConfigManager,
     config: configFactory,
-    env: mockConfig.env
+    env: mockConfig.env,
   };
 });
 
@@ -147,7 +147,7 @@ const createMockLogger = () => {
     tree: jest.fn(),
     formatBytes: jest.fn((bytes) => `${bytes} B`),
     formatDuration: jest.fn((ms) => `${ms}ms`),
-    progress: jest.fn()
+    progress: jest.fn(),
   };
   logger.child = jest.fn(() => createMockLogger());
   return logger;
@@ -156,7 +156,7 @@ const createMockLogger = () => {
 const mockLogger = createMockLogger();
 
 jest.mock('../src/utils/logger.js', () => ({
-  logger: mockLogger
+  logger: mockLogger,
 }));
 
 // Mock AIService to prevent API key validation at load time
@@ -176,34 +176,34 @@ jest.mock('../src/services/AIService.js', () => {
           'ai.retry.backoffMultiplier': 2,
           'ai.tasks.codeDescription': {
             temperature: 0.3,
-            maxTokens: 2048
-          }
+            maxTokens: 2048,
+          },
         };
         return mockConfig[key] || defaultValue;
-      })
+      }),
     },
     logger: {
       child: jest.fn(() => ({
         debug: jest.fn(),
         info: jest.fn(),
         warn: jest.fn(),
-        error: jest.fn()
+        error: jest.fn(),
       })),
       debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
-      error: jest.fn()
+      error: jest.fn(),
     },
     provider: {
       complete: jest.fn().mockResolvedValue({
         content: 'Mocked completion response',
         model: 'gemini-1.5-flash',
-        finishReason: 'STOP'
+        finishReason: 'STOP',
       }),
       chat: jest.fn().mockResolvedValue({
         content: 'Mocked chat response',
         model: 'gemini-1.5-flash',
-        finishReason: 'STOP'
+        finishReason: 'STOP',
       }),
       processStream: jest.fn().mockResolvedValue('Mocked streaming response'),
       getCacheKey: jest.fn().mockReturnValue('mock-cache-key'),
@@ -211,42 +211,42 @@ jest.mock('../src/services/AIService.js', () => {
         name: 'gemini',
         model: 'gemini-1.5-flash',
         maxTokens: 2048,
-        temperature: 0.7
-      })
+        temperature: 0.7,
+      }),
     },
     cache: {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue(true),
       has: jest.fn().mockResolvedValue(false),
-      forget: jest.fn().mockResolvedValue(true)
+      forget: jest.fn().mockResolvedValue(true),
     },
     retryOptions: {
       maxAttempts: 3,
       initialDelay: 1000,
       maxDelay: 10000,
-      backoffMultiplier: 2
+      backoffMultiplier: 2,
     },
     // AIService methods - use regular functions for consistency
     complete: async () => ({
       content: 'Mocked completion response',
-      model: 'gemini-1.5-flash'
+      model: 'gemini-1.5-flash',
     }),
     chat: async () => ({
       content: 'Mocked chat response',
-      model: 'gemini-1.5-flash'
+      model: 'gemini-1.5-flash',
     }),
     streamComplete: async () => 'Mocked streaming response',
     streamChat: async () => 'Mocked streaming response',
     performTask: async () => ({
-      content: 'Mocked task response'
+      content: 'Mocked task response',
     }),
     summarizeCode: async () => 'Mocked code summary',
     getProviderInfo: () => ({
       name: 'gemini',
       model: 'gemini-1.5-flash',
       maxTokens: 2048,
-      temperature: 0.7
-    })
+      temperature: 0.7,
+    }),
   }));
 
   // Add static methods to the mock class
@@ -259,7 +259,7 @@ jest.mock('../src/services/AIService.js', () => {
     return new MockAIService(options);
   };
 
-  // Legacy static methods for transformer compatibility  
+  // Legacy static methods for transformer compatibility
   // Use regular functions that always return the expected values
   MockAIService.summarizeFile = async () => 'Mocked file summary';
   MockAIService.describeImage = async () => 'Mocked image description';
@@ -290,7 +290,7 @@ jest.mock('../src/services/AIService.js', () => {
     describeSVG: MockAIService.describeSVG,
     isAvailable: MockAIService.isAvailable,
     getProvider: MockAIService.getProvider,
-    getModel: MockAIService.getModel
+    getModel: MockAIService.getModel,
   };
 });
 
@@ -299,7 +299,7 @@ jest.mock('clipboardy', () => ({
   write: jest.fn().mockResolvedValue(undefined),
   read: jest.fn().mockResolvedValue(''),
   writeSync: jest.fn(),
-  readSync: jest.fn().mockReturnValue('')
+  readSync: jest.fn().mockReturnValue(''),
 }));
 
 // Mock fs-extra
@@ -309,7 +309,7 @@ jest.mock('fs-extra', () => ({
   writeFile: jest.fn().mockResolvedValue(undefined),
   createWriteStream: jest.fn(() => ({
     write: jest.fn(),
-    end: jest.fn((cb) => cb && cb())
+    end: jest.fn((cb) => cb && cb()),
   })),
   ensureDir: jest.fn().mockResolvedValue(undefined),
   ensureDirSync: jest.fn(),
@@ -322,6 +322,5 @@ jest.mock('fs-extra', () => ({
   removeSync: jest.fn(),
   mkdtempSync: jest.fn().mockReturnValue('/tmp/test-temp-dir'),
   readdirSync: jest.fn().mockReturnValue([]),
-  rmSync: jest.fn()
+  rmSync: jest.fn(),
 }));
-

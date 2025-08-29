@@ -14,16 +14,16 @@ class ImageDescriptionTransformer extends BaseTransformer {
     this.supportedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
     this.maxImageSize = options.maxImageSize || 10 * 1024 * 1024; // 10MB default
     this.apiKey = options.apiKey || process.env.GEMINI_API_KEY;
-    
+
     if (!this.apiKey) {
       this.logger.warn('No Gemini API key provided, image descriptions will be disabled');
     } else {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
-      this.model = this.genAI.getGenerativeModel({ 
+      this.model = this.genAI.getGenerativeModel({
         model: options.model || this.config.get('ai.gemini.model'),
       });
     }
-    
+
     this.isHeavy = true; // AI image analysis is a heavy operation
   }
 
@@ -59,7 +59,7 @@ class ImageDescriptionTransformer extends BaseTransformer {
       let imageBuffer;
       if (Buffer.isBuffer(file.content)) {
         imageBuffer = file.content;
-      } else if (file.path && await fs.pathExists(file.path)) {
+      } else if (file.path && (await fs.pathExists(file.path))) {
         imageBuffer = await fs.readFile(file.path);
       } else {
         throw new Error('No image content available');
@@ -70,7 +70,9 @@ class ImageDescriptionTransformer extends BaseTransformer {
       const mimeType = this.getMimeType(file.path);
 
       // Generate description using Gemini
-      const prompt = this.options.prompt || `Describe this image in detail for a developer. Include:
+      const prompt =
+        this.options.prompt ||
+        `Describe this image in detail for a developer. Include:
 - What the image shows
 - Key visual elements and their arrangement
 - Any text or code visible in the image
@@ -142,9 +144,10 @@ Keep the description concise but informative (2-3 paragraphs).`;
    */
   formatDescription(file, description, size) {
     const filename = path.basename(file.path);
-    const dimensions = file.metadata?.dimensions ? 
-      ` (${file.metadata.dimensions.width}x${file.metadata.dimensions.height})` : '';
-    
+    const dimensions = file.metadata?.dimensions
+      ? ` (${file.metadata.dimensions.width}x${file.metadata.dimensions.height})`
+      : '';
+
     return `[Image: ${filename}${dimensions} - ${this.formatBytes(size)}]
 
 ${description}

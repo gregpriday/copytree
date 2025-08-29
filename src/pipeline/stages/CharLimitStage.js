@@ -22,7 +22,7 @@ class CharLimitStage extends Stage {
       }
 
       const contentLength = file.content.length;
-      
+
       if (totalChars + contentLength <= this.limit) {
         // File fits entirely
         limitedFiles.push(file);
@@ -31,14 +31,14 @@ class CharLimitStage extends Stage {
         // File partially fits
         const remainingChars = this.limit - totalChars;
         const truncatedContent = file.content.substring(0, remainingChars);
-        
+
         limitedFiles.push({
           ...file,
           content: truncatedContent + '\n\n... truncated due to character limit ...',
           originalLength: contentLength,
           truncated: true,
         });
-        
+
         totalChars += truncatedContent.length;
         truncatedFiles++;
         break; // Hit the limit

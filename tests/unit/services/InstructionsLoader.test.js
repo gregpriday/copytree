@@ -12,13 +12,13 @@ jest.mock('../../../src/utils/logger.js', () => ({
       debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
-      error: jest.fn()
+      error: jest.fn(),
     })),
     debug: jest.fn(),
     info: jest.fn(),
     warn: jest.fn(),
-    error: jest.fn()
-  }
+    error: jest.fn(),
+  },
 }));
 
 // Mock the errors module
@@ -36,7 +36,7 @@ jest.mock('../../../src/utils/errors.js', () => ({
       super(message);
       this.name = 'CopyTreeError';
     }
-  }
+  },
 }));
 
 // Import modules after mocking
@@ -55,13 +55,13 @@ describe('InstructionsLoader', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Mock os.homedir()
     jest.spyOn(os, 'homedir').mockReturnValue('/home/user');
-    
+
     // Create loader instance
     loader = new InstructionsLoader();
-    
+
     // Override the directories for testing
     loader.userDir = mockUserDir;
     loader.appDir = mockAppDir;
@@ -91,7 +91,7 @@ describe('InstructionsLoader', () => {
 
       // Both results should be identical (from cache)
       expect(result1).toBe(result2);
-      
+
       // Check that cache contains the instruction
       const stats = loader.getCacheStats();
       expect(stats.size).toBe(1);
@@ -99,7 +99,9 @@ describe('InstructionsLoader', () => {
     });
 
     it('should throw error when instructions not found', async () => {
-      await expect(loader.load('nonexistent')).rejects.toThrow("Instructions 'nonexistent' not found");
+      await expect(loader.load('nonexistent')).rejects.toThrow(
+        "Instructions 'nonexistent' not found",
+      );
     });
 
     it('should use default name when no name provided', async () => {
@@ -111,7 +113,7 @@ describe('InstructionsLoader', () => {
     it('should handle multiple different instruction names', async () => {
       const result1 = await loader.load('test1');
       const result2 = await loader.load('test2');
-      
+
       expect(result1).toContain('test1');
       expect(result2).toContain('test2');
       expect(result1).not.toBe(result2);
@@ -160,14 +162,14 @@ describe('InstructionsLoader', () => {
       // Load some instructions to populate cache
       await loader.load('test1');
       await loader.load('test2');
-      
+
       // Verify cache has items
       let stats = loader.getCacheStats();
       expect(stats.size).toBe(2);
-      
+
       // Clear cache
       loader.clearCache();
-      
+
       // Verify cache is empty
       stats = loader.getCacheStats();
       expect(stats.size).toBe(0);

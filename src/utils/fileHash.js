@@ -10,7 +10,7 @@ import fs from 'fs-extra';
 async function hashFile(filePath, algorithm = 'sha256') {
   const hash = crypto.createHash(algorithm);
   const stream = fs.createReadStream(filePath);
-  
+
   return new Promise((resolve, reject) => {
     stream.on('data', (data) => hash.update(data));
     stream.on('end', () => resolve(hash.digest('hex')));
@@ -43,12 +43,8 @@ function generateTransformCacheKey(file, transformerName, options = {}) {
     transformer: transformerName,
     options: JSON.stringify(options, Object.keys(options).sort()),
   };
-  
+
   return hashContent(JSON.stringify(components));
 }
 
-export {
-  hashFile,
-  hashContent,
-  generateTransformCacheKey,
-};
+export { hashFile, hashContent, generateTransformCacheKey };

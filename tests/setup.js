@@ -12,7 +12,7 @@ global.console = {
   error: jest.fn(),
   warn: jest.fn(),
   info: jest.fn(),
-  debug: jest.fn()
+  debug: jest.fn(),
 };
 
 // Add custom matchers if needed
@@ -21,20 +21,21 @@ expect.extend({
     const pass = typeof received === 'string' && received.length > 0;
     return {
       pass,
-      message: () => `expected ${received} to be a valid file path`
+      message: () => `expected ${received} to be a valid file path`,
     };
   },
-  
+
   toContainFile(received, filepath) {
     const files = Array.isArray(received) ? received : [];
-    const pass = files.some(f => f.path === filepath);
+    const pass = files.some((f) => f.path === filepath);
     return {
       pass,
-      message: () => pass
-        ? `expected files not to contain ${filepath}`
-        : `expected files to contain ${filepath}`
+      message: () =>
+        pass
+          ? `expected files not to contain ${filepath}`
+          : `expected files to contain ${filepath}`,
     };
-  }
+  },
 });
 
 // Global test utilities
@@ -45,24 +46,24 @@ global.testUtils = {
     absolutePath: `/test/project/${path}`,
     size: content.length,
     mtime: new Date(),
-    ...metadata
+    ...metadata,
   }),
-  
+
   createMockProfile: (overrides = {}) => ({
     name: 'test-profile',
     patterns: ['**/*'],
     exclude: ['node_modules/**'],
     transformers: [],
-    ...overrides
+    ...overrides,
   }),
-  
+
   createMockContext: (overrides = {}) => ({
     basePath: '/test/project',
     options: {},
     profile: global.testUtils.createMockProfile(),
     emit: jest.fn(),
-    ...overrides
-  })
+    ...overrides,
+  }),
 };
 
 // Cleanup after tests

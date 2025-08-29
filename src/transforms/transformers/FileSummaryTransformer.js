@@ -14,16 +14,16 @@ class FileSummaryTransformer extends BaseTransformer {
     this.maxInputTokens = options.maxInputTokens || 4000;
     this.summaryLength = options.summaryLength || '2-3 sentences';
     this.apiKey = options.apiKey || process.env.GEMINI_API_KEY;
-    
+
     if (!this.apiKey) {
       this.logger.warn('No Gemini API key provided, file summaries will be disabled');
     } else {
       this.genAI = new GoogleGenerativeAI(this.apiKey);
-      this.model = this.genAI.getGenerativeModel({ 
+      this.model = this.genAI.getGenerativeModel({
         model: options.model || this.config.get('ai.gemini.model'),
       });
     }
-    
+
     this.isHeavy = true; // AI file analysis is a heavy operation
   }
 
@@ -32,10 +32,10 @@ class FileSummaryTransformer extends BaseTransformer {
    */
   canTransform(file) {
     if (!this.apiKey) return false;
-    
+
     // Only summarize text files
     if (file.type === 'binary' || file.isBinary) return false;
-    
+
     // Check file size
     const size = file.stats?.size || Buffer.byteLength(file.content);
     return size <= this.maxFileSize;
@@ -47,18 +47,19 @@ class FileSummaryTransformer extends BaseTransformer {
   async doTransform(file) {
     try {
       // Get content as string
-      const content = Buffer.isBuffer(file.content) 
-        ? file.content.toString('utf8') 
+      const content = Buffer.isBuffer(file.content)
+        ? file.content.toString('utf8')
         : String(file.content);
 
       // Truncate content if too long
-      const truncatedContent = content.length > this.maxInputTokens * 4
-        ? content.substring(0, this.maxInputTokens * 4) + '\n... (truncated)'
-        : content;
+      const truncatedContent =
+        content.length > this.maxInputTokens * 4
+          ? content.substring(0, this.maxInputTokens * 4) + '\n... (truncated)'
+          : content;
 
       // Detect file type for better prompts
       const fileType = this.detectFileType(file);
-      
+
       // Generate prompt based on file type
       const prompt = this.generatePrompt(fileType, file.path, truncatedContent);
 
@@ -85,10 +86,10 @@ class FileSummaryTransformer extends BaseTransformer {
       });
 
       // Return truncated content on error
-      const content = Buffer.isBuffer(file.content) 
-        ? file.content.toString('utf8') 
+      const content = Buffer.isBuffer(file.content)
+        ? file.content.toString('utf8')
         : String(file.content);
-      
+
       return {
         ...file,
         content: content.substring(0, 500) + '\n\n... (summary generation failed)',
@@ -106,7 +107,7 @@ class FileSummaryTransformer extends BaseTransformer {
    */
   detectFileType(file) {
     const ext = path.extname(file.path).toLowerCase();
-    
+
     // Map extensions to file types
     const typeMap = {
       '.js': 'javascript',
@@ -147,23 +148,23 @@ class FileSummaryTransformer extends BaseTransformer {
   generatePrompt(fileType, filePath, content) {
     const filename = path.basename(filePath);
     const basePrompt = `Summarize this ${fileType} file in ${this.summaryLength}. Focus on what the file does, its main purpose, and key functionality.`;
-    
+
     // Type-specific prompts
     const typePrompts = {
-      'javascript': 'Mention key functions, classes, or exports.',
-      'react': 'Describe the component(s), props, and main UI elements.',
-      'typescript': 'Include type definitions and interfaces if significant.',
-      'python': 'Mention classes, functions, and main logic flow.',
-      'css': 'Describe the styling targets and main visual effects.',
-      'json': 'Describe the data structure and main fields.',
-      'markdown': 'Summarize the document content and main topics.',
-      'yaml': 'Describe the configuration structure and key settings.',
-      'dockerfile': 'Describe the base image and main build steps.',
-      'sql': 'Describe the database operations or schema.',
+      javascript: 'Mention key functions, classes, or exports.',
+      react: 'Describe the component(s), props, and main UI elements.',
+      typescript: 'Include type definitions and interfaces if significant.',
+      python: 'Mention classes, functions, and main logic flow.',
+      css: 'Describe the styling targets and main visual effects.',
+      json: 'Describe the data structure and main fields.',
+      markdown: 'Summarize the document content and main topics.',
+      yaml: 'Describe the configuration structure and key settings.',
+      dockerfile: 'Describe the base image and main build steps.',
+      sql: 'Describe the database operations or schema.',
     };
 
     const typeSpecific = typePrompts[fileType] || '';
-    
+
     return `${basePrompt} ${typeSpecific}
 
 File: ${filename}
@@ -178,7 +179,7 @@ ${content}`;
     const filename = path.basename(file.path);
     const header = `[Summary of ${filename} - ${this.formatBytes(originalSize)}]\n\n`;
     const footer = `\n\n[AI-generated summary by ${this.constructor.name}]`;
-    
+
     return header + summary.trim() + footer;
   }
 }

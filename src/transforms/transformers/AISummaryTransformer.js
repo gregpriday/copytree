@@ -9,12 +9,29 @@ class AISummaryTransformer extends BaseTransformer {
     super(options);
     this.description = 'Generates AI-powered summaries of file contents';
     this.supportedExtensions = options.extensions || [
-      '.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.go', '.rs', '.cpp', '.c',
-      '.php', '.rb', '.swift', '.kt', '.scala', '.r', '.m', '.h', '.cs',
+      '.js',
+      '.jsx',
+      '.ts',
+      '.tsx',
+      '.py',
+      '.java',
+      '.go',
+      '.rs',
+      '.cpp',
+      '.c',
+      '.php',
+      '.rb',
+      '.swift',
+      '.kt',
+      '.scala',
+      '.r',
+      '.m',
+      '.h',
+      '.cs',
     ];
     this.maxFileSize = options.maxFileSize || 100 * 1024; // 100KB default
     this.includeOriginal = options.includeOriginal ?? false;
-    
+
     // Initialize AI service
     this.ai = AIService.forTask('codeDescription', options);
     this.isHeavy = true; // AI analysis is a heavy operation
@@ -51,7 +68,7 @@ class AISummaryTransformer extends BaseTransformer {
 
       // Build output
       let output = `=== AI Summary ===\n${summary}\n`;
-      
+
       if (this.includeOriginal) {
         output += `\n=== Original Content ===\n${file.content}`;
       }
@@ -66,7 +83,7 @@ class AISummaryTransformer extends BaseTransformer {
       };
     } catch (error) {
       this.logger.error(`Failed to generate AI summary for ${file.path}: ${error.message}`);
-      
+
       return {
         ...file,
         content: `[Error generating AI summary: ${error.message}]\n\n${file.content}`,
@@ -105,7 +122,7 @@ class AISummaryTransformer extends BaseTransformer {
       '.h': 'C/C++ Header',
       '.cs': 'C#',
     };
-    
+
     return languageMap[ext] || 'Unknown';
   }
 

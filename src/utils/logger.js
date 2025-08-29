@@ -13,7 +13,7 @@ class Logger extends EventEmitter {
       useInkEvents: options.useInkEvents || false, // New option for Ink integration
       ...options,
     };
-    
+
     this.spinner = null;
   }
 
@@ -29,7 +29,7 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     if (this.options.silent) return;
     console.log(chalk.blue(`[${this.options.prefix}]`), message, ...args);
   }
@@ -46,7 +46,7 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     if (this.options.silent) return;
     console.log(chalk.green(`✓ ${message}`), ...args);
   }
@@ -63,7 +63,7 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     if (this.options.silent) return;
     console.warn(chalk.yellow(`⚠ ${message}`), ...args);
   }
@@ -80,7 +80,7 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     // Errors are never silenced
     console.error(chalk.red(`✗ ${message}`), ...args);
   }
@@ -90,7 +90,7 @@ class Logger extends EventEmitter {
    */
   debug(message, ...args) {
     if (!this.options.debug) return;
-    
+
     if (this.options.useInkEvents) {
       this.emit('log', {
         type: 'debug',
@@ -99,7 +99,7 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     if (this.options.silent) return;
     console.log(chalk.gray(`[DEBUG] ${message}`), ...args);
   }
@@ -116,9 +116,9 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     if (this.options.silent || !process.stdout.isTTY) return;
-    
+
     this.stopSpinner(); // Stop any existing spinner
     this.spinner = ora({
       text: message,
@@ -138,7 +138,7 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     if (this.spinner && process.stdout.isTTY) {
       this.spinner.text = message;
     }
@@ -156,7 +156,7 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     if (this.spinner) {
       this.spinner.succeed(message || this.spinner.text);
       this.spinner = null;
@@ -175,7 +175,7 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     if (this.spinner) {
       this.spinner.fail(message || this.spinner.text);
       this.spinner = null;
@@ -193,7 +193,7 @@ class Logger extends EventEmitter {
       });
       return;
     }
-    
+
     if (this.spinner) {
       this.spinner.stop();
       // Clear the line after stopping
@@ -225,7 +225,7 @@ class Logger extends EventEmitter {
    */
   styled(style, message, ...args) {
     if (this.options.silent) return;
-    
+
     const styles = {
       bold: chalk.bold,
       dim: chalk.dim,
@@ -234,7 +234,7 @@ class Logger extends EventEmitter {
       inverse: chalk.inverse,
       strikethrough: chalk.strikethrough,
     };
-    
+
     const styleFunc = styles[style] || chalk.white;
     console.log(styleFunc(message), ...args);
   }
@@ -244,7 +244,7 @@ class Logger extends EventEmitter {
    */
   tree(path, isLast = false, indent = '') {
     if (this.options.silent) return;
-    
+
     const connector = isLast ? '└── ' : '├── ';
     console.log(chalk.gray(indent + connector) + path);
   }
@@ -278,11 +278,11 @@ class Logger extends EventEmitter {
    */
   formatBytes(bytes) {
     if (bytes === 0) return '0 B';
-    
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
@@ -300,14 +300,14 @@ class Logger extends EventEmitter {
    */
   progress(current, total, message = '') {
     if (this.options.silent) return;
-    
+
     const percentage = Math.round((current / total) * 100);
     const bar = this.createProgressBar(percentage);
-    
+
     process.stdout.clearLine(0);
     process.stdout.cursorTo(0);
     process.stdout.write(`${bar} ${percentage}% ${message}`);
-    
+
     if (current >= total) {
       process.stdout.write('\n');
     }
@@ -319,11 +319,8 @@ class Logger extends EventEmitter {
   createProgressBar(percentage, width = 30) {
     const filled = Math.round((percentage / 100) * width);
     const empty = width - filled;
-    
-    return '[' + 
-      chalk.green('█'.repeat(filled)) + 
-      chalk.gray('░'.repeat(empty)) + 
-      ']';
+
+    return '[' + chalk.green('█'.repeat(filled)) + chalk.gray('░'.repeat(empty)) + ']';
   }
 }
 
@@ -331,10 +328,7 @@ class Logger extends EventEmitter {
 const defaultLogger = new Logger();
 
 // Export both the class and a default instance
-export {
-  Logger,
-  defaultLogger as logger,
-};
+export { Logger, defaultLogger as logger };
 
 // Convenience method exports
 export const info = defaultLogger.info.bind(defaultLogger);

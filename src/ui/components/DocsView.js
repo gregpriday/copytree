@@ -29,35 +29,19 @@ const TopicsList = ({ topics }) => {
   return React.createElement(
     Box,
     { flexDirection: 'column' },
-    React.createElement(
-      Text,
-      { bold: true, color: 'yellow' },
-      'Available Documentation Topics:',
-    ),
+    React.createElement(Text, { bold: true, color: 'yellow' }, 'Available Documentation Topics:'),
     React.createElement(Box, { marginTop: 1 }, null),
-    ...topics.map((section) => 
+    ...topics.map((section) =>
       React.createElement(
         Box,
         { key: section.title, flexDirection: 'column', marginBottom: 1 },
-        React.createElement(
-          Text,
-          { color: section.color, bold: true },
-          section.title + ':',
-        ),
+        React.createElement(Text, { color: section.color, bold: true }, section.title + ':'),
         ...section.items.map((item) =>
           React.createElement(
             Box,
             { key: item.name, marginLeft: 2 },
-            React.createElement(
-              Text,
-              { bold: true },
-              item.name.padEnd(20),
-            ),
-            React.createElement(
-              Text,
-              { dimColor: true },
-              item.description,
-            ),
+            React.createElement(Text, { bold: true }, item.name.padEnd(20)),
+            React.createElement(Text, { dimColor: true }, item.description),
           ),
         ),
       ),
@@ -74,16 +58,13 @@ const DocContent = ({ content, stats, action }) => {
   return React.createElement(
     Box,
     { flexDirection: 'column' },
-    React.createElement(
-      Text,
-      { color: 'green', bold: true },
-      `✓ ${action}`,
-    ),
-    stats && React.createElement(
-      Text,
-      { dimColor: true },
-      `${stats.lines} lines, ${stats.characters} characters`,
-    ),
+    React.createElement(Text, { color: 'green', bold: true }, `✓ ${action}`),
+    stats &&
+      React.createElement(
+        Text,
+        { dimColor: true },
+        `${stats.lines} lines, ${stats.characters} characters`,
+      ),
   );
 };
 
@@ -107,7 +88,7 @@ const DocsView = () => {
         } else {
           // Load and handle documentation
           const docContent = await loadDocumentation(docsDir, topic);
-					
+
           if (!docContent) {
             throw new Error(`Documentation not found for topic: ${topic}`);
           }
@@ -145,19 +126,11 @@ const DocsView = () => {
   }, [options, updateState]);
 
   if (loading) {
-    return React.createElement(
-      Text,
-      { color: 'blue' },
-      'Loading documentation...',
-    );
+    return React.createElement(Text, { color: 'blue' }, 'Loading documentation...');
   }
 
   if (error) {
-    return React.createElement(
-      Text,
-      { color: 'red' },
-      `Error: ${error}`,
-    );
+    return React.createElement(Text, { color: 'red' }, `Error: ${error}`);
   }
 
   if (topics.length > 0) {
@@ -172,11 +145,7 @@ const DocsView = () => {
     });
   }
 
-  return React.createElement(
-    Text,
-    { color: 'yellow' },
-    'No documentation found',
-  );
+  return React.createElement(Text, { color: 'yellow' }, 'No documentation found');
 };
 
 /**
@@ -190,7 +159,7 @@ async function getAvailableTopics(docsDir) {
   if (await fs.pathExists(frameworksDir)) {
     const frameworks = await fs.readdir(frameworksDir);
     const frameworkItems = [];
-		
+
     for (const file of frameworks) {
       if (file.endsWith('.md')) {
         const name = path.basename(file, '.md');
@@ -200,7 +169,7 @@ async function getAvailableTopics(docsDir) {
         });
       }
     }
-		
+
     if (frameworkItems.length > 0) {
       topics.push({
         title: 'Frameworks',
@@ -215,7 +184,7 @@ async function getAvailableTopics(docsDir) {
   if (await fs.pathExists(topicsDir)) {
     const topicFiles = await fs.readdir(topicsDir);
     const topicItems = [];
-		
+
     for (const file of topicFiles) {
       if (file.endsWith('.md')) {
         const name = path.basename(file, '.md');
@@ -223,7 +192,7 @@ async function getAvailableTopics(docsDir) {
         topicItems.push({ name, description });
       }
     }
-		
+
     if (topicItems.length > 0) {
       topics.push({
         title: 'Topics',

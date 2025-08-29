@@ -4,22 +4,44 @@ import path from 'path';
 // Map common extensions to GitHub code fence languages
 const EXT_LANG_MAP = new Map([
   // JS/TS
-  ['.js', 'js'], ['.cjs', 'js'], ['.mjs', 'js'],
-  ['.jsx', 'jsx'], ['.ts', 'ts'], ['.tsx', 'tsx'],
+  ['.js', 'js'],
+  ['.cjs', 'js'],
+  ['.mjs', 'js'],
+  ['.jsx', 'jsx'],
+  ['.ts', 'ts'],
+  ['.tsx', 'tsx'],
   // Data / config
-  ['.json', 'json'], ['.yml', 'yaml'], ['.yaml', 'yaml'],
+  ['.json', 'json'],
+  ['.yml', 'yaml'],
+  ['.yaml', 'yaml'],
   // Markup & styles
-  ['.md', 'markdown'], ['.htm', 'html'], ['.html', 'html'],
-  ['.css', 'css'], ['.scss', 'scss'], ['.sass', 'scss'],
+  ['.md', 'markdown'],
+  ['.htm', 'html'],
+  ['.html', 'html'],
+  ['.css', 'css'],
+  ['.scss', 'scss'],
+  ['.sass', 'scss'],
   // Languages
-  ['.py', 'python'], ['.rb', 'ruby'], ['.java', 'java'], ['.go', 'go'],
-  ['.rs', 'rust'], ['.c', 'c'], ['.h', 'c'],
-  ['.cpp', 'cpp'], ['.cc', 'cpp'], ['.hpp', 'cpp'], ['.hh', 'cpp'],
-  ['.sh', 'bash'], ['.csv', 'csv'], ['.txt', 'text'],
+  ['.py', 'python'],
+  ['.rb', 'ruby'],
+  ['.java', 'java'],
+  ['.go', 'go'],
+  ['.rs', 'rust'],
+  ['.c', 'c'],
+  ['.h', 'c'],
+  ['.cpp', 'cpp'],
+  ['.cc', 'cpp'],
+  ['.hpp', 'cpp'],
+  ['.hh', 'cpp'],
+  ['.sh', 'bash'],
+  ['.csv', 'csv'],
+  ['.txt', 'text'],
 ]);
 
 function detectFenceLanguage(filePathOrExt = '') {
-  const ext = filePathOrExt.startsWith('.') ? filePathOrExt.toLowerCase() : path.extname(filePathOrExt).toLowerCase();
+  const ext = filePathOrExt.startsWith('.')
+    ? filePathOrExt.toLowerCase()
+    : path.extname(filePathOrExt).toLowerCase();
   return EXT_LANG_MAP.get(ext) || '';
 }
 
@@ -42,7 +64,8 @@ function formatSmallMeta({ size, modified, git, binaryLabel, truncatedAt }) {
   if (modified) parts.push(`Modified: ${modified}`);
   if (git) parts.push(`Git: ${git}`);
   if (binaryLabel) parts.push(`Binary: ${binaryLabel}`);
-  if (typeof truncatedAt === 'number') parts.push(`Truncated at ${truncatedAt.toLocaleString()} chars`);
+  if (typeof truncatedAt === 'number')
+    parts.push(`Truncated at ${truncatedAt.toLocaleString()} chars`);
   return `<small>${parts.join(' • ')}</small>`;
 }
 
@@ -84,4 +107,3 @@ export {
   formatEndMarker,
   escapeYamlScalar,
 };
-

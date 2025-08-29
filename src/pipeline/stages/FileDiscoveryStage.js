@@ -18,7 +18,7 @@ class FileDiscoveryStage extends Stage {
     if (input.basePath) {
       this.basePath = input.basePath;
     }
-    
+
     this.log(`Discovering files in ${this.basePath}`, 'debug');
     const startTime = Date.now();
 
@@ -38,7 +38,10 @@ class FileDiscoveryStage extends Stage {
     // Filter out excluded files
     const filteredFiles = this.filterFiles(files);
 
-    this.log(`Discovered ${filteredFiles.length} files in ${this.getElapsedTime(startTime)}`, 'info');
+    this.log(
+      `Discovered ${filteredFiles.length} files in ${this.getElapsedTime(startTime)}`,
+      'info',
+    );
 
     return {
       ...input,
@@ -54,7 +57,7 @@ class FileDiscoveryStage extends Stage {
 
   async loadGitignore() {
     const gitignorePath = path.join(this.basePath, '.gitignore');
-    
+
     if (await fs.pathExists(gitignorePath)) {
       const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
       this.parseGitignoreContent(gitignoreContent);
@@ -64,7 +67,7 @@ class FileDiscoveryStage extends Stage {
 
   async loadCopytreeIgnore() {
     const copytreeignorePath = path.join(this.basePath, '.copytreeignore');
-    
+
     if (await fs.pathExists(copytreeignorePath)) {
       const copytreeignoreContent = await fs.readFile(copytreeignorePath, 'utf8');
       this.parseGitignoreContent(copytreeignoreContent);
@@ -74,21 +77,21 @@ class FileDiscoveryStage extends Stage {
 
   parseGitignoreContent(content) {
     const lines = content.split('\n');
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
-      
+
       // Skip empty lines and comments
       if (!trimmed || trimmed.startsWith('#')) continue;
-      
+
       // Convert gitignore pattern to minimatch pattern
       let pattern = trimmed;
       const isNegated = pattern.startsWith('!');
-      
+
       if (isNegated) {
         pattern = pattern.substring(1);
       }
-      
+
       // If pattern doesn't start with /, it matches anywhere
       if (!pattern.startsWith('/')) {
         pattern = '**/' + pattern;
@@ -96,12 +99,12 @@ class FileDiscoveryStage extends Stage {
         // Remove leading slash for relative matching
         pattern = pattern.substring(1);
       }
-      
+
       // If pattern ends with /, it only matches directories
       if (pattern.endsWith('/')) {
         pattern = pattern + '**';
       }
-      
+
       this.gitignorePatterns.push({
         pattern,
         isNegated,
@@ -113,22 +116,22 @@ class FileDiscoveryStage extends Stage {
   async discoverFiles() {
     // Get copytree config for exclusions from ConfigManager
     const ignorePatterns = [];
-    
+
     // Add default ignores from config
     if (this.respectGitignore) {
       // Add global excluded directories
       const globalExcludedDirs = this.config.get('copytree.globalExcludedDirectories', []);
       ignorePatterns.push(...globalExcludedDirs.map((dir) => `**/${dir}/**`));
-      
+
       // Add base path excluded directories (only at root)
       const basePathExcludedDirs = this.config.get('copytree.basePathExcludedDirectories', []);
       ignorePatterns.push(...basePathExcludedDirs.map((dir) => `${dir}/**`));
-      
+
       // Add global excluded files
       const globalExcludedFiles = this.config.get('copytree.globalExcludedFiles', []);
       ignorePatterns.push(...globalExcludedFiles);
     }
-    
+
     // Add gitignore patterns (converted to glob format)
     if (this.respectGitignore) {
       for (const { pattern, isNegated } of this.gitignorePatterns) {
@@ -137,12 +140,12 @@ class FileDiscoveryStage extends Stage {
         }
       }
     }
-    
+
     // Add profile exclusions if provided
     if (this.options.profileExclusions) {
       ignorePatterns.push(...this.options.profileExclusions);
     }
-    
+
     const globOptions = {
       cwd: this.basePath,
       absolute: false,
@@ -176,19 +179,19 @@ class FileDiscoveryStage extends Stage {
   shouldIgnore(filePath) {
     // Process patterns in order - last match wins for gitignore compatibility
     let ignored = false;
-    
+
     for (const { pattern, isNegated } of this.gitignorePatterns) {
       const options = {
         dot: true,
         matchBase: true,
         nocase: process.platform === 'win32',
       };
-      
+
       if (minimatch(filePath, pattern, options)) {
         ignored = !isNegated;
       }
     }
-    
+
     return ignored;
   }
 }

@@ -18,11 +18,11 @@ class FileLoader {
    */
   async loadFiles(patterns = {}) {
     const { include = ['**/*'], exclude = [] } = patterns;
-    
+
     try {
       // Dynamic import for ESM-only globby
       const { globby } = await import('globby');
-      
+
       // Get file paths using globby
       const filePaths = await globby(include, {
         cwd: this.basePath,
@@ -31,7 +31,7 @@ class FileLoader {
         followSymbolicLinks: this.followSymlinks,
         onlyFiles: true,
       });
-      
+
       // Load file contents
       const files = [];
       for (const filePath of filePaths) {
@@ -40,7 +40,7 @@ class FileLoader {
           files.push(file);
         }
       }
-      
+
       return files;
     } catch (error) {
       logger.error('Failed to load files', {
@@ -56,10 +56,10 @@ class FileLoader {
    */
   async loadFile(relativePath) {
     const fullPath = path.join(this.basePath, relativePath);
-    
+
     try {
       const stats = await fs.stat(fullPath);
-      
+
       // Skip files that are too large
       if (stats.size > this.maxFileSize) {
         logger.warn('Skipping large file', {
@@ -69,10 +69,10 @@ class FileLoader {
         });
         return null;
       }
-      
+
       // Read file content
       const content = await fs.readFile(fullPath, 'utf8');
-      
+
       return {
         name: path.basename(relativePath),
         relativePath: relativePath,
@@ -94,7 +94,7 @@ class FileLoader {
         try {
           const content = await fs.readFile(fullPath);
           const stats = await fs.stat(fullPath);
-          
+
           return {
             name: path.basename(relativePath),
             relativePath: relativePath,
@@ -131,7 +131,7 @@ class FileLoader {
    */
   detectFileType(filePath, content) {
     const ext = path.extname(filePath).toLowerCase();
-    
+
     // Code files
     const codeExtensions = {
       '.js': 'javascript',
@@ -150,11 +150,11 @@ class FileLoader {
       '.swift': 'swift',
       '.kt': 'kotlin',
     };
-    
+
     if (codeExtensions[ext]) {
       return codeExtensions[ext];
     }
-    
+
     // Data files
     const dataExtensions = {
       '.json': 'json',
@@ -165,11 +165,11 @@ class FileLoader {
       '.ini': 'ini',
       '.csv': 'csv',
     };
-    
+
     if (dataExtensions[ext]) {
       return dataExtensions[ext];
     }
-    
+
     // Document files
     const docExtensions = {
       '.md': 'markdown',
@@ -178,11 +178,11 @@ class FileLoader {
       '.rst': 'restructuredtext',
       '.tex': 'latex',
     };
-    
+
     if (docExtensions[ext]) {
       return docExtensions[ext];
     }
-    
+
     // Web files
     const webExtensions = {
       '.html': 'html',
@@ -192,16 +192,16 @@ class FileLoader {
       '.sass': 'sass',
       '.less': 'less',
     };
-    
+
     if (webExtensions[ext]) {
       return webExtensions[ext];
     }
-    
+
     // Default to text if content looks like text
     if (typeof content === 'string' && this.isTextContent(content)) {
       return 'text';
     }
-    
+
     return 'unknown';
   }
 
@@ -210,15 +210,18 @@ class FileLoader {
    */
   isTextContent(content) {
     if (typeof content !== 'string') return false;
-    
+
     // Check for null bytes or other binary indicators
     for (let i = 0; i < Math.min(content.length, 1000); i++) {
       const charCode = content.charCodeAt(i);
-      if (charCode === 0 || (charCode < 32 && charCode !== 9 && charCode !== 10 && charCode !== 13)) {
+      if (
+        charCode === 0 ||
+        (charCode < 32 && charCode !== 9 && charCode !== 10 && charCode !== 13)
+      ) {
         return false;
       }
     }
-    
+
     return true;
   }
 }

@@ -25,7 +25,7 @@ async function showCacheStatus() {
     const cache = new CacheService();
     const fs = await import('fs-extra');
     const path = await import('path');
-    
+
     const status = {
       enabled: config().get('cache.enabled', true),
       driver: config().get('cache.driver', 'file'),
@@ -40,17 +40,17 @@ async function showCacheStatus() {
         other: 0,
       },
     };
-    
-    if (config().get('cache.driver') === 'file' && await fs.pathExists(cache.cachePath)) {
+
+    if (config().get('cache.driver') === 'file' && (await fs.pathExists(cache.cachePath))) {
       const files = await fs.readdir(cache.cachePath);
       const cacheFiles = files.filter((f) => f.endsWith(cache.extension));
-      
+
       status.entries = cacheFiles.length;
-      
+
       for (const file of cacheFiles) {
         const stats = await fs.stat(path.join(cache.cachePath, file));
         status.totalSize += stats.size;
-        
+
         if (file.includes('_transform_')) status.byType.transform++;
         else if (file.includes('_ai_')) status.byType.ai++;
         else if (file.includes('_git_')) status.byType.git++;
@@ -58,9 +58,8 @@ async function showCacheStatus() {
         else status.byType.other++;
       }
     }
-    
+
     return status;
-    
   } catch (error) {
     logger.error('Failed to get cache status:', error.message);
     return null;

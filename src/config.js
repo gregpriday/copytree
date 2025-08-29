@@ -26,7 +26,7 @@ export default {
     '.DS_Store',
     'Thumbs.db',
   ],
-  
+
   supportedTransformers: {
     '.pdf': 'pdf',
     '.png': 'image',
@@ -37,23 +37,23 @@ export default {
     '.md': 'markdown',
     '.mdx': 'markdown',
   },
-  
+
   maxFileSize: process.env.MAX_FILE_SIZE ? parseInt(process.env.MAX_FILE_SIZE) : 10 * 1024 * 1024, // 10MB default
-  
+
   configDir: path.join(os.homedir(), '.copytree'),
-  
+
   getProfilesDir() {
     return path.join(__dirname, '..', 'profiles');
   },
-  
+
   getUserProfilesDir() {
     return path.join(this.configDir, 'profiles');
   },
-  
+
   getStateDir() {
     return path.join(this.configDir, 'state');
   },
-  
+
   getCacheDir() {
     return path.join(this.configDir, 'cache');
   },
