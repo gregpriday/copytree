@@ -166,9 +166,7 @@ describe('TransformerRegistry', () => {
   });
 
   describe('createDefault', () => {
-    test.skip('should create registry with default transformers', async () => {
-      // Skipped due to ES module dynamic import mocking complexity in Jest
-      // The core functionality is tested in other tests above
+    test('should create registry with default transformers', async () => {
       const defaultRegistry = await TransformerRegistry.createDefault();
 
       // Should have loaded some default transformers
