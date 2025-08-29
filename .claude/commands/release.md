@@ -53,6 +53,6 @@ Execute the GitFlow release process:
 
 The command should handle both cases:
 - With version argument: Use provided version directly
-- Without version argument: Analyze git log and changes to recommend version based on semantic versioning rules
+- Without version argument: Analyze git log and changes to recommend version based on semantic versioning rules and ALWAYS confirm with the user before making key decisions like the version number
 
 Ensure all steps follow GitFlow conventions and include proper error handling for each step.
