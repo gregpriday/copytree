@@ -32,8 +32,8 @@ class MarkdownFormatter {
 
     // YAML front matter
     lines.push('---');
-    lines.push(`format: copytree-md@1`);
-    lines.push(`tool: copytree`);
+    lines.push('format: copytree-md@1');
+    lines.push('tool: copytree');
     lines.push(`generated: ${escapeYamlScalar(new Date().toISOString())}`);
     lines.push(`base_path: ${escapeYamlScalar(input.basePath)}`);
     lines.push(`profile: ${escapeYamlScalar(profileName)}`);
@@ -104,7 +104,9 @@ class MarkdownFormatter {
           } else if (typeof file.content === 'string') {
             sha = hashContent(file.content, 'sha256');
           }
-        } catch (_e) {}
+        } catch (_e) {
+          // Silently ignore hash errors
+        }
         const binaryAction = this.stage.config.get('copytree.binaryFileAction', 'placeholder');
         let binaryMode = undefined;
         if (file.isBinary) {

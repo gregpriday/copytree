@@ -163,7 +163,7 @@ output:
       console.log('CLI path:', cliPath);
 
       const { exitCode, stderr, stdout } = await runCommand(
-        `node "${cliPath}" copy . --output "${outputFile}" --always "**/*.txt" "**/*.md" "**/*.json"`,
+        `node "${cliPath}" copy . --output "${outputFile}" --format xml --always "**/*.txt" "**/*.md" "**/*.json"`,
         { cwd: testProjectDir, timeout: 45000 },
       );
 

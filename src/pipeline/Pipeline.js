@@ -305,7 +305,9 @@ class Pipeline extends EventEmitter {
             }
           } catch (handlerError) {
             // Handler failed, continue with original error handling
-            error = handlerError;
+            handlerError.originalError = error;
+            // Use the handler error for the rest of error processing
+            // Don't reassign the catch parameter, just continue with original error
           }
         }
 

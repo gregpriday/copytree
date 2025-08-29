@@ -105,10 +105,11 @@ class GeminiProvider extends BaseProvider {
   async chat(options) {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
+    let contents;
 
     try {
       // Convert messages to Gemini format
-      const contents = this.convertMessagesToGeminiFormat(options.messages);
+      contents = this.convertMessagesToGeminiFormat(options.messages);
 
       const generationConfig = {
         temperature: options.temperature ?? this.temperature,
