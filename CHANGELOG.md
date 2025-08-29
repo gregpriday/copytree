@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.12.0] - 2025-08-29
+
+### Major Changes
+- **Markdown Output Format** - Set markdown as the new default output format with comprehensive formatting support
+- **Enhanced Output Formatting** - Improved markdown and XML output formatting with proper namespace and CDATA wrapping
+- **Comprehensive Testing** - Added extensive unit tests for GitUtils and UnitTestSummaryTransformer
+
+### Added
+- **Markdown Formatter** - New MarkdownFormatter with comprehensive file structure and content formatting
+- **Enhanced File Extension Handling** - Improved detection and handling of various file types in markdown output
+- **GitUtils Unit Tests** - Complete test coverage for Git utility functions
+- **UnitTestSummaryTransformer Tests** - Comprehensive testing for unit test summary generation
+- **Claude Code Release Command** - Added automated release process command for GitFlow workflows
+
+### Enhanced
+- **XML Output Formatting** - Improved XML output with proper namespace declarations and CDATA section handling
+- **Markdown Output Structure** - Better organization and readability of markdown formatted output
+- **File Extension Detection** - More accurate file type identification for appropriate formatting
+- **Release Process** - Streamlined GitFlow release workflow with automated version management
+
+### Fixed
+- **Path Validation** - Removed overly restrictive path validation that blocked directories with hyphens
+- **XML Formatting Issues** - Resolved XML output formatting problems with proper escaping and structure
+- **Code Formatting** - Applied consistent code formatting across the entire codebase
+
+### Technical Improvements
+- **Output Pipeline Refactoring** - Significant improvements to output formatting pipeline architecture
+- **Formatter Abstraction** - Better separation of concerns between XML and Markdown formatters  
+- **Test Coverage Expansion** - Increased test coverage for critical utility functions and transformers
+- **GitFlow Integration** - Enhanced release management with proper GitFlow branching strategies
+
 ## [0.11.0] - 2025-08-05
 
 ### Major Changes
