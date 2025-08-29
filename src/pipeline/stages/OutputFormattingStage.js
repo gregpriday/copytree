@@ -6,9 +6,13 @@ import MarkdownFormatter from '../formatters/MarkdownFormatter.js';
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
     super(options);
-    this.format = options.format || 'xml';
+    // Normalize and default format (markdown is default)
+    const raw = (options.format || 'markdown').toString().toLowerCase();
+    this.format = raw === 'md' ? 'markdown' : raw;
     this.addLineNumbers =
-      options.addLineNumbers ?? this.config.get('copytree.addLineNumbers', false);
+      options.addLineNumbers ??
+      options.withLineNumbers ??
+      this.config.get('copytree.addLineNumbers', false);
     this.lineNumberFormat = this.config.get('copytree.lineNumberFormat', '%4d: ');
     this.onlyTree = options.onlyTree || false;
   }

@@ -342,9 +342,10 @@ async function displayOutput(outputResult, options) {
 
   // Handle --as-reference option
   if (options.asReference) {
-    const format = (options.format || 'markdown').toString().toLowerCase();
+    const f = (options.format || 'markdown').toString().toLowerCase();
+    const format = f === 'md' ? 'markdown' : f;
     const extension =
-      format === 'json' ? 'json' : format === 'markdown' || format === 'md' ? 'md' : 'xml';
+      format === 'json' ? 'json' : format === 'markdown' ? 'md' : format === 'tree' ? 'txt' : 'xml';
     const os = await import('os');
     const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
     await fs.writeFile(tempFile, output, 'utf8');
@@ -388,9 +389,16 @@ async function displayOutput(outputResult, options) {
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
     } catch (_error) {
       // If clipboard fails, save to temporary file
-      const format = (options.format || 'markdown').toString().toLowerCase();
+      const f = (options.format || 'markdown').toString().toLowerCase();
+      const format = f === 'md' ? 'markdown' : f;
       const extension =
-        format === 'json' ? 'json' : format === 'markdown' || format === 'md' ? 'md' : 'xml';
+        format === 'json'
+          ? 'json'
+          : format === 'markdown'
+            ? 'md'
+            : format === 'tree'
+              ? 'txt'
+              : 'xml';
       const os = await import('os');
       const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, output, 'utf8');

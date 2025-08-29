@@ -18,9 +18,13 @@ import { hashFile, hashContent } from '../../utils/fileHash.js';
 class StreamingOutputStage extends Stage {
   constructor(options = {}) {
     super(options);
-    this.format = options.format || 'xml';
+    const raw = (options.format || 'markdown').toString().toLowerCase();
+    this.format = raw === 'md' ? 'markdown' : raw;
     this.outputStream = options.outputStream || process.stdout;
-    this.addLineNumbers = this.config.get('copytree.addLineNumbers', false);
+    this.addLineNumbers =
+      options.addLineNumbers ??
+      options.withLineNumbers ??
+      this.config.get('copytree.addLineNumbers', false);
     this.lineNumberFormat = this.config.get('copytree.lineNumberFormat', '%4d: ');
     this.prettyPrint = options.prettyPrint ?? true;
   }
@@ -148,6 +152,8 @@ class StreamingOutputStage extends Stage {
         if (file.absolutePath) sha = await hashFile(file.absolutePath, 'sha256');
         else if (typeof file.content === 'string') sha = hashContent(file.content, 'sha256');
       } catch (_e) {}
+      const binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
+      // Prepare attributes for the file-begin marker (include meta here instead of inline <small>)
       const attrs = {
         path: relPath,
         size: file.size ?? 0,
@@ -155,27 +161,23 @@ class StreamingOutputStage extends Stage {
         hash: sha ? `sha256:${sha}` : undefined,
         git: includeGitStatus && file.gitStatus ? file.gitStatus : undefined,
         binary: file.isBinary ? true : false,
+        encoding: file.encoding || undefined,
+        binaryMode: file.isBinary
+          ? binaryAction === 'base64' || file.encoding === 'base64'
+            ? 'base64'
+            : binaryAction === 'placeholder'
+              ? 'placeholder'
+              : binaryAction === 'skip'
+                ? 'skip'
+                : undefined
+          : undefined,
         truncated: file.truncated ? true : false,
+        truncatedAt: file.truncated ? (file.content?.length ?? 0) : undefined,
       };
       let chunk = '';
       chunk += formatBeginMarker(attrs) + '\n\n';
       chunk += `### ${relPath}\n\n`;
-      const binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
-      let binaryLabel = null;
-      if (file.isBinary) {
-        if (binaryAction === 'base64' || file.encoding === 'base64') binaryLabel = 'base64';
-        else if (binaryAction === 'placeholder') binaryLabel = 'placeholder';
-        else if (binaryAction === 'skip') binaryLabel = 'skipped';
-      }
-      const parts = [];
-      if (typeof (file.size ?? 0) === 'number')
-        parts.push(`Size: ${(file.size ?? 0).toLocaleString()} bytes`);
-      if (modifiedISO) parts.push(`Modified: ${modifiedISO}`);
-      if (includeGitStatus && file.gitStatus) parts.push(`Git: ${file.gitStatus}`);
-      if (binaryLabel) parts.push(`Binary: ${binaryLabel}`);
-      if (file.truncated)
-        parts.push(`Truncated at ${(file.content?.length || 0).toLocaleString()} chars`);
-      chunk += `<small>${parts.join(' • ')}</small>\n\n`;
+      // binaryAction already defined above
 
       const lang = file.isBinary
         ? binaryAction === 'base64' || file.encoding === 'base64'

@@ -42,21 +42,28 @@ describe('UnitTestSummaryTransformer', () => {
 
   test('canTransform returns false without API key', () => {
     delete process.env.GEMINI_API_KEY;
-    const t = new UnitTestSummaryTransformer({ logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } });
+    const t = new UnitTestSummaryTransformer({
+      logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+    });
     expect(t.canTransform(makeFile('sample.test.js', 'it("a",()=>{})'))).toBe(false);
   });
 
   test('canTransform returns true for test files with API key and within size', () => {
     process.env.GEMINI_API_KEY = 'test-key';
-    const t = new UnitTestSummaryTransformer({ maxFileSize: 1024, logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } });
+    const t = new UnitTestSummaryTransformer({
+      maxFileSize: 1024,
+      logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+    });
     expect(t.canTransform(makeFile('feature.spec.js', 'describe("x",()=>{})'))).toBe(true);
   });
 
   test('doTransform produces AI summary output and metadata', async () => {
     process.env.GEMINI_API_KEY = 'test-key';
-    const t = new UnitTestSummaryTransformer({ logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } });
+    const t = new UnitTestSummaryTransformer({
+      logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+    });
     const out = await t.doTransform(
-      makeFile('calc.test.js', 'describe("calc",()=>{ it("adds",()=>expect(1+1).toBe(2)) })')
+      makeFile('calc.test.js', 'describe("calc",()=>{ it("adds",()=>expect(1+1).toBe(2)) })'),
     );
     expect(out.transformed).toBe(true);
     expect(String(out.content)).toMatch(/AI-generated test summary/i);
@@ -75,9 +82,11 @@ describe('UnitTestSummaryTransformer', () => {
       }),
     }));
 
-    const t = new UnitTestSummaryTransformer({ logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() } });
+    const t = new UnitTestSummaryTransformer({
+      logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+    });
     const out = await t.doTransform(
-      makeFile('calc.test.js', 'describe("calc",()=>{ it("adds",()=>{}) })')
+      makeFile('calc.test.js', 'describe("calc",()=>{ it("adds",()=>{}) })'),
     );
     expect(out.transformed).toBe(true);
     expect(String(out.content)).toMatch(/AI summary generation failed/i);

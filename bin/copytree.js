@@ -41,7 +41,9 @@ const program = new Command();
 
 program
   .name('copytree')
-  .description('Copy directory structures and file contents into structured XML format')
+  .description(
+    'Copy directory structures and file contents into Markdown (default), XML, JSON, or tree formats',
+  )
   .version(pkg.version);
 
 // 1. Main copy command (default)

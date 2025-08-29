@@ -137,11 +137,21 @@ describe('GitUtils', () => {
 
     // Repo: last commit
     mockGitInstance.revparse.mockResolvedValue('.git');
-    mockGitInstance.log.mockResolvedValue({ latest: {
-      hash: 'abc123', message: 'feat: test', author_name: 'Dev', date: '2024-01-01',
-    }});
+    mockGitInstance.log.mockResolvedValue({
+      latest: {
+        hash: 'abc123',
+        message: 'feat: test',
+        author_name: 'Dev',
+        date: '2024-01-01',
+      },
+    });
     const commit = await utils.getLastCommit();
-    expect(commit).toEqual({ hash: 'abc123', message: 'feat: test', author: 'Dev', date: '2024-01-01' });
+    expect(commit).toEqual({
+      hash: 'abc123',
+      message: 'feat: test',
+      author: 'Dev',
+      date: '2024-01-01',
+    });
 
     // Non-repo: returns null without throwing (use fresh instance)
     const utils3 = new GitUtils('/not-repo');

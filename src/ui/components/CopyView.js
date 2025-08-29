@@ -141,7 +141,12 @@ const CopyView = () => {
         globalTelemetry.recordSession(result.stats, duration, fileCount, {
           profile: profileName,
           hasTransformers: !options.noTransform,
-          format: options.format || 'xml',
+          format:
+            (options.format ? String(options.format).toLowerCase() : 'markdown') === 'md'
+              ? 'markdown'
+              : options.format
+                ? String(options.format).toLowerCase()
+                : 'markdown',
           outputDestination: options.output ? 'file' : options.display ? 'terminal' : 'clipboard',
         });
       }
@@ -283,7 +288,12 @@ const CopyView = () => {
 
     return {
       content: String(content),
-      format: options.format || 'xml',
+      format:
+        (options.format ? String(options.format).toLowerCase() : 'markdown') === 'md'
+          ? 'markdown'
+          : options.format
+            ? String(options.format).toLowerCase()
+            : 'markdown',
       stats: result.stats || {},
     };
   };
@@ -307,8 +317,16 @@ const CopyView = () => {
 
     // Handle --as-reference option
     if (options.asReference) {
-      const format = options.format || 'xml';
-      const extension = format === 'json' ? 'json' : 'xml';
+      const f = options.format ? String(options.format).toLowerCase() : 'markdown';
+      const format = f === 'md' ? 'markdown' : f;
+      const extension =
+        format === 'json'
+          ? 'json'
+          : format === 'markdown'
+            ? 'md'
+            : format === 'tree'
+              ? 'txt'
+              : 'xml';
       const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, outputResult.content, 'utf8');
 
@@ -341,8 +359,16 @@ const CopyView = () => {
         action = 'copied';
       } catch (error) {
         // If clipboard fails, save to temporary file
-        const format = options.format || 'xml';
-        const extension = format === 'json' ? 'json' : 'xml';
+        const f = options.format ? String(options.format).toLowerCase() : 'markdown';
+        const format = f === 'md' ? 'markdown' : f;
+        const extension =
+          format === 'json'
+            ? 'json'
+            : format === 'markdown'
+              ? 'md'
+              : format === 'tree'
+                ? 'txt'
+                : 'xml';
         const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
         await fs.writeFile(tempFile, outputResult.content, 'utf8');
         destination = tempFile;
@@ -404,7 +430,12 @@ const CopyView = () => {
         React.createElement(Results, {
           results,
           output,
-          format: options.format || 'xml',
+          format:
+            (options.format ? String(options.format).toLowerCase() : 'markdown') === 'md'
+              ? 'markdown'
+              : options.format
+                ? String(options.format).toLowerCase()
+                : 'markdown',
           showOutput: options.display,
         }),
         React.createElement(SummaryTable, {

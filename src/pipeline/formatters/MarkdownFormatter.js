@@ -2,7 +2,6 @@ import path from 'path';
 import {
   detectFenceLanguage,
   chooseFence,
-  formatSmallMeta,
   formatBeginMarker,
   formatEndMarker,
   escapeYamlScalar,
@@ -106,6 +105,13 @@ class MarkdownFormatter {
             sha = hashContent(file.content, 'sha256');
           }
         } catch (_e) {}
+        const binaryAction = this.stage.config.get('copytree.binaryFileAction', 'placeholder');
+        let binaryMode = undefined;
+        if (file.isBinary) {
+          if (binaryAction === 'base64' || file.encoding === 'base64') binaryMode = 'base64';
+          else if (binaryAction === 'placeholder') binaryMode = 'placeholder';
+          else if (binaryAction === 'skip') binaryMode = 'skip';
+        }
         const attrs = {
           path: relPath,
           size: file.size ?? 0,
@@ -113,29 +119,14 @@ class MarkdownFormatter {
           hash: sha ? `sha256:${sha}` : undefined,
           git: includeGitStatus && file.gitStatus ? file.gitStatus : undefined,
           binary: file.isBinary ? true : false,
+          encoding: file.encoding || undefined,
+          binaryMode,
           truncated: file.truncated ? true : false,
+          truncatedAt: file.truncated ? (file.content?.length ?? 0) : undefined,
         };
         lines.push(formatBeginMarker(attrs));
         lines.push('');
         lines.push(`### ${relPath}`);
-        lines.push('');
-
-        // Small meta line
-        const binaryAction = this.stage.config.get('copytree.binaryFileAction', 'placeholder');
-        let binaryLabel = null;
-        if (file.isBinary) {
-          if (binaryAction === 'base64' || file.encoding === 'base64') binaryLabel = 'base64';
-          else if (binaryAction === 'placeholder') binaryLabel = 'placeholder';
-          else if (binaryAction === 'skip') binaryLabel = 'skipped';
-        }
-        const small = formatSmallMeta({
-          size: file.size ?? 0,
-          modified: modifiedISO || undefined,
-          git: includeGitStatus && file.gitStatus ? file.gitStatus : undefined,
-          binaryLabel: binaryLabel || undefined,
-          truncatedAt: file.truncated ? (file.content?.length ?? 0) : undefined,
-        });
-        lines.push(small);
         lines.push('');
 
         // Code fence
