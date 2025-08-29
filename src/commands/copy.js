@@ -223,7 +223,10 @@ async function setupPipelineStages(basePath, profile, options) {
   
   // 11. Output Formatting Stage
   // Determine output format (default to tree if --only-tree is used)
-  const outputFormat = options.format || (options.onlyTree ? 'tree' : (profile.output?.format || 'xml'));
+  const rawFormat = (options.format || (options.onlyTree ? 'tree' : (profile.output?.format || 'markdown')));
+  const outputFormat = (rawFormat || 'markdown').toString().toLowerCase() === 'md'
+    ? 'markdown'
+    : (rawFormat || 'markdown').toString().toLowerCase();
   
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
@@ -309,8 +312,8 @@ async function displayOutput(outputResult, options) {
 
   // Handle --as-reference option
   if (options.asReference) {
-    const format = options.format || 'xml';
-    const extension = format === 'json' ? 'json' : 'xml';
+    const format = (options.format || 'markdown').toString().toLowerCase();
+    const extension = format === 'json' ? 'json' : (format === 'markdown' || format === 'md' ? 'md' : 'xml');
     const os = await import('os');
     const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
     await fs.writeFile(tempFile, output, 'utf8');
@@ -353,8 +356,8 @@ async function displayOutput(outputResult, options) {
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
     } catch (_error) {
       // If clipboard fails, save to temporary file
-      const format = options.format || 'xml';
-      const extension = format === 'json' ? 'json' : 'xml';
+      const format = (options.format || 'markdown').toString().toLowerCase();
+      const extension = format === 'json' ? 'json' : (format === 'markdown' || format === 'md' ? 'md' : 'xml');
       const os = await import('os');
       const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, output, 'utf8');

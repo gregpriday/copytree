@@ -47,7 +47,7 @@ npm link  # Makes 'copytree' available globally
 copytree
 
 # Use default profile (automatic)
-copytree -o project-structure.xml
+copytree -o project-structure.md
 
 # Copy from GitHub repository
 copytree https://github.com/user/repo
@@ -80,6 +80,7 @@ copytree -t
 
 # Different output formats
 copytree --format json -o structure.json
+copytree --format xml  -o structure.xml
 copytree --format tree  # Tree view in console
 ```
 

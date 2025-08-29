@@ -2,6 +2,14 @@ import Stage from '../Stage.js';
 import { Transform } from 'stream';
 // const { create } = require('xmlbuilder2'); // Currently unused
 import path from 'path';
+import {
+  detectFenceLanguage,
+  chooseFence,
+  formatBeginMarker,
+  formatEndMarker,
+  escapeYamlScalar,
+} from '../../utils/markdown.js';
+import { hashFile, hashContent } from '../../utils/fileHash.js';
 
 /**
  * Streaming output stage for handling large outputs
@@ -53,9 +61,143 @@ class StreamingOutputStage extends Stage {
       return this.createJSONStream(input);
     } else if (this.format === 'tree') {
       return this.createTreeStream(input);
+    } else if (this.format === 'markdown') {
+      return this.createMarkdownStream(input);
     }
     
     throw new Error(`Unknown streaming format: ${this.format}`);
+  }
+
+  createMarkdownStream(input) {
+    const stream = new Transform({
+      writableObjectMode: true,
+      transform: (chunk, _encoding, callback) => callback(null, chunk),
+    });
+    const files = input.files || [];
+    const nonNullFiles = files.filter((f) => f !== null);
+    const fileCount = nonNullFiles.length;
+    const totalSize = this.calculateTotalSize(nonNullFiles);
+    const includeGitStatus = !!(input.options?.withGitStatus);
+    const includeLineNumbers = !!(this.addLineNumbers || input.options?.withLineNumbers);
+    const onlyTree = !!(input.options?.onlyTree);
+    const charLimitApplied = !!(input.options?.charLimit || input.stats?.truncatedFiles > 0 || nonNullFiles.some((f) => f?.truncated));
+
+    // Header and front matter
+    stream.write('---\n');
+    stream.write(`format: copytree-md@1\n`);
+    stream.write(`tool: copytree\n`);
+    stream.write(`generated: ${escapeYamlScalar(new Date().toISOString())}\n`);
+    stream.write(`base_path: ${escapeYamlScalar(input.basePath)}\n`);
+    stream.write(`profile: ${escapeYamlScalar(input.profile?.name || 'default')}\n`);
+    stream.write(`file_count: ${fileCount}\n`);
+    stream.write(`total_size_bytes: ${totalSize}\n`);
+    stream.write(`char_limit_applied: ${charLimitApplied ? 'true' : 'false'}\n`);
+    stream.write(`only_tree: ${onlyTree ? 'true' : 'false'}\n`);
+    stream.write(`include_git_status: ${includeGitStatus ? 'true' : 'false'}\n`);
+    stream.write(`include_line_numbers: ${includeLineNumbers ? 'true' : 'false'}\n`);
+    const instrIncluded = !!(input.instructions && !input.options?.noInstructions);
+    const instrName = input.instructionsName || null;
+    stream.write('instructions:\n');
+    stream.write(`  name: ${instrName ? escapeYamlScalar(instrName) : 'null'}\n`);
+    stream.write(`  included: ${instrIncluded ? 'true' : 'false'}\n`);
+    stream.write('---\n\n');
+
+    // Title
+    stream.write(`# CopyTree Export — ${path.basename(input.basePath)}\n\n`);
+
+    // Directory Tree
+    stream.write('## Directory Tree\n');
+    const tree = this.buildTreeStructure(nonNullFiles);
+    const treeLines = [];
+    this.renderTree(tree, treeLines, '', true);
+    stream.write('```text\n');
+    stream.write(treeLines.join('\n'));
+    stream.write('\n```\n\n');
+
+    // Instructions
+    if (instrIncluded) {
+      stream.write('## Instructions\n\n');
+      stream.write(`<!-- copytree:instructions-begin name=${escapeYamlScalar(instrName || 'default')} -->\n`);
+      const instrFence = chooseFence(input.instructions || '');
+      stream.write(`${instrFence}text\n`);
+      stream.write(input.instructions.toString());
+      stream.write(`\n${instrFence}\n\n`);
+      stream.write(`<!-- copytree:instructions-end name=${escapeYamlScalar(instrName || 'default')} -->\n\n`);
+    }
+
+    // Transform per file
+    stream._transform = async (file, _encoding, callback) => {
+      if (!file || onlyTree) return callback();
+
+      const relPath = `@${file.path}`;
+      const modifiedISO = file.modified ? (file.modified instanceof Date ? file.modified.toISOString() : new Date(file.modified).toISOString()) : null;
+      let sha = null;
+      try {
+        if (file.absolutePath) sha = await hashFile(file.absolutePath, 'sha256');
+        else if (typeof file.content === 'string') sha = hashContent(file.content, 'sha256');
+      } catch (_e) {}
+      const attrs = {
+        path: relPath,
+        size: file.size ?? 0,
+        modified: modifiedISO || undefined,
+        hash: sha ? `sha256:${sha}` : undefined,
+        git: includeGitStatus && file.gitStatus ? file.gitStatus : undefined,
+        binary: file.isBinary ? true : false,
+        truncated: file.truncated ? true : false,
+      };
+      let chunk = '';
+      chunk += formatBeginMarker(attrs) + '\n\n';
+      chunk += `### ${relPath}\n\n`;
+      const binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
+      let binaryLabel = null;
+      if (file.isBinary) {
+        if (binaryAction === 'base64' || file.encoding === 'base64') binaryLabel = 'base64';
+        else if (binaryAction === 'placeholder') binaryLabel = 'placeholder';
+        else if (binaryAction === 'skip') binaryLabel = 'skipped';
+      }
+      const parts = [];
+      if (typeof (file.size ?? 0) === 'number') parts.push(`Size: ${(file.size ?? 0).toLocaleString()} bytes`);
+      if (modifiedISO) parts.push(`Modified: ${modifiedISO}`);
+      if (includeGitStatus && file.gitStatus) parts.push(`Git: ${file.gitStatus}`);
+      if (binaryLabel) parts.push(`Binary: ${binaryLabel}`);
+      if (file.truncated) parts.push(`Truncated at ${(file.content?.length || 0).toLocaleString()} chars`);
+      chunk += `<small>${parts.join(' • ')}</small>\n\n`;
+
+      const lang = file.isBinary
+        ? (binaryAction === 'base64' || file.encoding === 'base64' ? 'text' : 'text')
+        : detectFenceLanguage(file.path);
+      const content = file.content || '';
+      const fence = chooseFence(typeof content === 'string' ? content : '');
+      chunk += `${fence}${lang ? lang : ''}`.trim() + '\n';
+      if (file.isBinary) {
+        if (binaryAction === 'base64' || file.encoding === 'base64') {
+          chunk += 'Content-Transfer: base64\n';
+          chunk += (typeof content === 'string' ? content : '') + '\n';
+        } else if (binaryAction === 'placeholder') {
+          chunk += (typeof content === 'string' ? content : (this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]') || '')) + '\n';
+        }
+      } else {
+        const text = this.addLineNumbers ? this.addLineNumbersToContent(content) : content;
+        chunk += text + '\n';
+      }
+      chunk += `${fence}\n`;
+      if (file.truncated) {
+        const remaining = typeof file.originalLength === 'number' ? Math.max(0, file.originalLength - (file.content?.length || 0)) : undefined;
+        chunk += `\n<!-- copytree:truncated reason="char-limit"${remaining !== undefined ? ` remaining="${remaining}"` : ''} -->\n`;
+      }
+      chunk += `\n${formatEndMarker(relPath)}\n\n`;
+
+      callback(null, chunk);
+    };
+
+    // End handler
+    stream.on('pipe', (src) => {
+      src.on('end', () => {
+        stream.end();
+      });
+    });
+
+    return stream;
   }
 
   createXMLStream(input) {
