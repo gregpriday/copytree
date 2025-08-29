@@ -1,6 +1,6 @@
 // Mock minimatch before requiring the stage
 jest.mock('minimatch', () => ({
-  minimatch: jest.fn()
+  minimatch: jest.fn(),
 }));
 
 // Static import for mocked modules
@@ -10,7 +10,9 @@ import { minimatch } from 'minimatch';
 let AlwaysIncludeStage;
 
 beforeAll(async () => {
-  const alwaysIncludeStageModule = await import('../../../../src/pipeline/stages/AlwaysIncludeStage.js');
+  const alwaysIncludeStageModule = await import(
+    '../../../../src/pipeline/stages/AlwaysIncludeStage.js'
+  );
   AlwaysIncludeStage = alwaysIncludeStageModule.default;
 });
 
@@ -19,7 +21,7 @@ describe('AlwaysIncludeStage', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Default minimatch mock implementation
     minimatch.mockImplementation((path, pattern, options) => {
       // Simple glob matching for tests
@@ -59,8 +61,8 @@ describe('AlwaysIncludeStage', () => {
           { relativePath: 'README.md', content: 'readme' },
           { relativePath: 'app.config.js', content: 'config' },
           { relativePath: 'src/utils.js', content: 'utils' },
-          { relativePath: 'test.js', content: 'test' }
-        ]
+          { relativePath: 'test.js', content: 'test' },
+        ],
       };
 
       const result = await stage.process(input);
@@ -68,11 +70,11 @@ describe('AlwaysIncludeStage', () => {
       expect(result.files).toHaveLength(4);
       expect(result.files[0]).toMatchObject({
         relativePath: 'README.md',
-        alwaysInclude: true
+        alwaysInclude: true,
       });
       expect(result.files[1]).toMatchObject({
         relativePath: 'app.config.js',
-        alwaysInclude: true
+        alwaysInclude: true,
       });
       expect(result.files[2]).not.toHaveProperty('alwaysInclude');
       expect(result.files[3]).not.toHaveProperty('alwaysInclude');
@@ -85,18 +87,18 @@ describe('AlwaysIncludeStage', () => {
           { relativePath: 'src/index.js' },
           { relativePath: 'src/utils/helper.js' },
           { relativePath: 'README.md' },
-          { relativePath: 'test.txt' }
-        ]
+          { relativePath: 'test.txt' },
+        ],
       };
 
       const result = await stage.process(input);
 
-      const markedFiles = result.files.filter(f => f.alwaysInclude);
+      const markedFiles = result.files.filter((f) => f.alwaysInclude);
       expect(markedFiles).toHaveLength(3);
-      expect(markedFiles.map(f => f.relativePath)).toEqual([
+      expect(markedFiles.map((f) => f.relativePath)).toEqual([
         'src/index.js',
         'src/utils/helper.js',
-        'README.md'
+        'README.md',
       ]);
     });
 
@@ -106,8 +108,8 @@ describe('AlwaysIncludeStage', () => {
         files: [
           { relativePath: 'src/index.js' },
           { relativePath: 'index.js' },
-          { relativePath: 'src/index.ts' }
-        ]
+          { relativePath: 'src/index.ts' },
+        ],
       };
 
       const result = await stage.process(input);
@@ -123,8 +125,8 @@ describe('AlwaysIncludeStage', () => {
         files: [
           { relativePath: 'package.json' },
           { relativePath: 'src/package.json' },
-          { relativePath: 'package.lock' }
-        ]
+          { relativePath: 'package.lock' },
+        ],
       };
 
       const result = await stage.process(input);
@@ -137,9 +139,7 @@ describe('AlwaysIncludeStage', () => {
     it('should handle empty patterns', async () => {
       stage = new AlwaysIncludeStage([]);
       const input = {
-        files: [
-          { relativePath: 'test.js' }
-        ]
+        files: [{ relativePath: 'test.js' }],
       };
 
       const result = await stage.process(input);
@@ -161,9 +161,7 @@ describe('AlwaysIncludeStage', () => {
     it('should maintain file object integrity', async () => {
       stage = new AlwaysIncludeStage(['test.js']);
       const input = {
-        files: [
-          { relativePath: 'test.js', content: 'content', size: 100, custom: 'prop' }
-        ]
+        files: [{ relativePath: 'test.js', content: 'content', size: 100, custom: 'prop' }],
       };
 
       const result = await stage.process(input);
@@ -173,7 +171,7 @@ describe('AlwaysIncludeStage', () => {
         content: 'content',
         size: 100,
         custom: 'prop',
-        alwaysInclude: true
+        alwaysInclude: true,
       });
     });
 
@@ -183,10 +181,7 @@ describe('AlwaysIncludeStage', () => {
 
       stage = new AlwaysIncludeStage(['*.MD']);
       const input = {
-        files: [
-          { relativePath: 'README.md' },
-          { relativePath: 'README.MD' }
-        ]
+        files: [{ relativePath: 'README.md' }, { relativePath: 'README.MD' }],
       };
 
       const result = await stage.process(input);
@@ -201,7 +196,7 @@ describe('AlwaysIncludeStage', () => {
   describe('matchesAlwaysPatterns', () => {
     it('should detect glob patterns', () => {
       stage = new AlwaysIncludeStage(['*.js', 'src/**/*', 'test[0-9].js']);
-      
+
       expect(stage.matchesAlwaysPatterns({ relativePath: 'test.js' })).toBe(true);
       expect(stage.matchesAlwaysPatterns({ relativePath: 'src/deep/file.js' })).toBe(true);
       expect(stage.matchesAlwaysPatterns({ relativePath: 'test1.js' })).toBe(true);
@@ -209,7 +204,7 @@ describe('AlwaysIncludeStage', () => {
 
     it('should handle path contains matching', () => {
       stage = new AlwaysIncludeStage(['config']);
-      
+
       expect(stage.matchesAlwaysPatterns({ relativePath: 'src/config/app.js' })).toBe(true);
       expect(stage.matchesAlwaysPatterns({ relativePath: 'config.js' })).toBe(true);
     });

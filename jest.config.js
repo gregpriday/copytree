@@ -28,7 +28,9 @@ export default {
       functions: 80,
       lines: 80,
       statements: 80
-    }
+    },
+    "./src/utils/GitUtils.js": { branches: 90, lines: 90 },
+    "./src/transforms/transformers/UnitTestSummaryTransformer.js": { branches: 70, lines: 80 }
   },
   
   // Module paths - keep mocks for ESM
@@ -57,7 +59,7 @@ export default {
   
   // Transform ignore patterns to handle ES modules
   transformIgnorePatterns: [
-    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy)/)'
+    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy|marked)/)'
   ],
   
   // Ignore patterns

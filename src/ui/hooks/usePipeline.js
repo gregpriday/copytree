@@ -8,15 +8,18 @@ const usePipeline = () => {
   const progressUpdateTimer = useRef(null);
 
   // Debounced state update to prevent excessive re-renders
-  const debouncedUpdateState = useCallback((updates) => {
-    if (progressUpdateTimer.current) {
-      clearTimeout(progressUpdateTimer.current);
-    }
-    progressUpdateTimer.current = setTimeout(() => {
-      updateState(updates);
-      progressUpdateTimer.current = null;
-    }, 30); // Update max every 30ms
-  }, [updateState]);
+  const debouncedUpdateState = useCallback(
+    (updates) => {
+      if (progressUpdateTimer.current) {
+        clearTimeout(progressUpdateTimer.current);
+      }
+      progressUpdateTimer.current = setTimeout(() => {
+        updateState(updates);
+        progressUpdateTimer.current = null;
+      }, 30); // Update max every 30ms
+    },
+    [updateState],
+  );
 
   useEffect(() => {
     if (!pipelineRef.current) return;

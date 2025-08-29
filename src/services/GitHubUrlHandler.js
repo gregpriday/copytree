@@ -29,7 +29,7 @@ class GitHubUrlHandler {
   parseUrl() {
     const pattern = /^https:\/\/github\.com\/([^/]+\/[^/]+)(?:\/tree\/([^/]+))?(?:\/(.*?))?$/;
     const matches = this.url.match(pattern);
-    
+
     if (!matches) {
       throw new CommandError('Invalid GitHub URL format', 'github-url');
     }
@@ -45,7 +45,8 @@ class GitHubUrlHandler {
    */
   updateCacheKey() {
     const identifier = this.repoUrl.replace('https://github.com/', '').replace('.git', '');
-    this.cacheKey = crypto.createHash('md5')
+    this.cacheKey = crypto
+      .createHash('md5')
       .update(`${identifier}/${this.branch || 'default'}`)
       .digest('hex');
   }
@@ -70,17 +71,15 @@ class GitHubUrlHandler {
       } else {
         // Clean up any partial directory if it exists without .git
         if (fs.existsSync(this.repoDir)) {
-          logger.warn('Found incomplete repository cache, removing...', { 
-            cacheDir: this.repoDir, 
+          logger.warn('Found incomplete repository cache, removing...', {
+            cacheDir: this.repoDir,
           });
           fs.rmSync(this.repoDir, { recursive: true, force: true });
         }
         await this.cloneRepository();
       }
 
-      const targetPath = this.subPath 
-        ? path.join(this.repoDir, this.subPath)
-        : this.repoDir;
+      const targetPath = this.subPath ? path.join(this.repoDir, this.subPath) : this.repoDir;
 
       if (!fs.existsSync(targetPath)) {
         throw new CommandError(`Path '${this.subPath}' not found in repository`, 'github-path');
@@ -88,9 +87,9 @@ class GitHubUrlHandler {
 
       return targetPath;
     } catch (error) {
-      logger.error('Failed to get files from GitHub', { 
-        url: this.url, 
-        error: error.message, 
+      logger.error('Failed to get files from GitHub', {
+        url: this.url,
+        error: error.message,
       });
       throw error;
     }
@@ -109,25 +108,25 @@ class GitHubUrlHandler {
 
     // Clean up existing directory if it exists
     if (fs.existsSync(this.repoDir)) {
-      logger.warn('Repository cache already exists, removing...', { 
-        cacheDir: this.repoDir, 
+      logger.warn('Repository cache already exists, removing...', {
+        cacheDir: this.repoDir,
       });
       fs.rmSync(this.repoDir, { recursive: true, force: true });
     }
 
     const command = `git clone --branch ${this.branch} --single-branch ${this.repoUrl} ${this.repoDir}`;
-    
+
     try {
-      logger.info('Cloning repository', { 
-        repo: this.repoUrl, 
-        branch: this.branch, 
-      });
-      
-      execSync(command, { stdio: 'pipe' });
-      
-      logger.info('Repository cloned successfully', { 
+      logger.info('Cloning repository', {
         repo: this.repoUrl,
-        cacheDir: this.repoDir, 
+        branch: this.branch,
+      });
+
+      execSync(command, { stdio: 'pipe' });
+
+      logger.info('Repository cloned successfully', {
+        repo: this.repoUrl,
+        cacheDir: this.repoDir,
       });
     } catch (error) {
       // Handle specific errors
@@ -137,15 +136,9 @@ class GitHubUrlHandler {
           'github-auth',
         );
       } else if (error.message.includes('not found')) {
-        throw new CommandError(
-          `Repository not found: ${this.repoUrl}`,
-          'github-not-found',
-        );
+        throw new CommandError(`Repository not found: ${this.repoUrl}`, 'github-not-found');
       } else {
-        throw new CommandError(
-          `Failed to clone repository: ${error.message}`,
-          'github-clone',
-        );
+        throw new CommandError(`Failed to clone repository: ${error.message}`, 'github-clone');
       }
     }
   }
@@ -155,17 +148,17 @@ class GitHubUrlHandler {
    */
   async updateRepository() {
     try {
-      logger.info('Updating repository', { 
-        repo: this.repoUrl, 
-        cacheDir: this.repoDir, 
+      logger.info('Updating repository', {
+        repo: this.repoUrl,
+        cacheDir: this.repoDir,
       });
-      
+
       // Fetch latest changes
       execSync('git fetch', { cwd: this.repoDir, stdio: 'pipe' });
-      
+
       // Check if behind origin
       const behindCount = parseInt(
-        execSync(`git rev-list HEAD..origin/${this.branch} --count`, { 
+        execSync(`git rev-list HEAD..origin/${this.branch} --count`, {
           cwd: this.repoDir,
           encoding: 'utf8',
         }).trim(),
@@ -173,23 +166,23 @@ class GitHubUrlHandler {
 
       if (behindCount > 0) {
         logger.info(`Repository is ${behindCount} commits behind, updating...`);
-        
+
         // Reset and clean to avoid conflicts
         execSync('git reset --hard HEAD', { cwd: this.repoDir, stdio: 'pipe' });
         execSync('git clean -fd', { cwd: this.repoDir, stdio: 'pipe' });
-        
+
         // Pull latest changes
         execSync(`git pull origin ${this.branch}`, { cwd: this.repoDir, stdio: 'pipe' });
-        
+
         logger.info('Repository updated successfully');
       } else {
         logger.info('Repository is up to date');
       }
     } catch (error) {
-      logger.warn('Failed to update repository, re-cloning', { 
-        error: error.message, 
+      logger.warn('Failed to update repository, re-cloning', {
+        error: error.message,
       });
-      
+
       // Re-clone on failure
       fs.removeSync(this.repoDir);
       await this.cloneRepository();
@@ -205,15 +198,15 @@ class GitHubUrlHandler {
         encoding: 'utf8',
         stdio: 'pipe',
       });
-      
+
       const match = output.match(/ref: refs\/heads\/([^\s]+)\s+HEAD/);
       const branch = match ? match[1] : 'main';
-      
+
       logger.info('Detected default branch', { branch });
       return branch;
     } catch (error) {
-      logger.warn('Failed to detect default branch, using "main"', { 
-        error: error.message, 
+      logger.warn('Failed to detect default branch, using "main"', {
+        error: error.message,
       });
       return 'main';
     }
@@ -256,15 +249,17 @@ class GitHubUrlHandler {
         lastFetch: fs.statSync(path.join(this.repoDir, '.git', 'FETCH_HEAD')).mtime,
         size: await this.getDirectorySize(this.repoDir),
         commitCount: parseInt(
-          execSync('git rev-list --count HEAD', { 
-            cwd: this.repoDir, 
-            encoding: 'utf8', 
+          execSync('git rev-list --count HEAD', {
+            cwd: this.repoDir,
+            encoding: 'utf8',
           }).trim(),
         ),
-        currentCommit: execSync('git rev-parse HEAD', { 
-          cwd: this.repoDir, 
-          encoding: 'utf8', 
-        }).trim().substring(0, 7),
+        currentCommit: execSync('git rev-parse HEAD', {
+          cwd: this.repoDir,
+          encoding: 'utf8',
+        })
+          .trim()
+          .substring(0, 7),
       };
 
       return stats;

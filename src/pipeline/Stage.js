@@ -10,7 +10,7 @@ class Stage {
     this.config = config();
     this.name = this.constructor.name;
     this.pipeline = options.pipeline; // Reference to parent pipeline for event emission
-    
+
     // Performance optimization: throttle file events
     this.fileEventCount = 0;
     this.lastFileEventTime = 0;
@@ -38,12 +38,12 @@ class Stage {
 
   /**
    * Handle errors during processing with recovery mechanism
-   * 
+   *
    * This method allows stages to implement custom error recovery logic.
    * If a stage can recover from an error, it should return a valid result
    * that the pipeline can use to continue processing. If recovery is not
    * possible, the method should rethrow the error or throw a new one.
-   * 
+   *
    * @param {Error} error - Error that occurred during stage processing
    * @param {*} input - Input data that was being processed when error occurred
    * @returns {Promise<*>} - Recovered result to continue pipeline, or rethrows
@@ -58,7 +58,7 @@ class Stage {
    * Initialize stage with pipeline context
    * Called once when pipeline is created, before any processing
    * This hook allows stages to set up resources, warm caches, or prepare for processing
-   * 
+   *
    * @param {Object} context - Pipeline context with shared resources
    * @param {Object} context.logger - Logger instance
    * @param {Object} context.options - Pipeline options
@@ -73,25 +73,25 @@ class Stage {
   /**
    * Called before each stage execution
    * This hook allows stages to perform pre-processing setup, validation, or preparation
-   * 
+   *
    * Execution Order:
    * 1. onInit() - once during pipeline creation
    * 2. beforeRun() - before each process() call
    * 3. process() - main stage logic
    * 4. afterRun() - after successful process() call
    * 5. onError() - if process() throws an error (before handleError())
-   * 
+   *
    * @param {*} input - Input data about to be processed
    * @returns {Promise<void>}
    */
   async beforeRun(_input) {
-    // Default implementation - no operation  
+    // Default implementation - no operation
   }
 
   /**
    * Called after successful stage execution
    * This hook allows stages to perform post-processing cleanup, logging, or finalization
-   * 
+   *
    * @param {*} output - Output data from stage processing
    * @returns {Promise<void>}
    */
@@ -103,7 +103,7 @@ class Stage {
    * Called when stage encounters an error
    * This hook is called before handleError() and allows stages to log errors,
    * clean up resources, or perform error-specific actions
-   * 
+   *
    * @param {Error} error - Error that occurred
    * @param {*} input - Input data being processed when error occurred
    * @returns {Promise<void>}
@@ -131,21 +131,21 @@ class Stage {
     // Original logging behavior for debug mode or errors
     if (this.config.get('app.debug') || level === 'error') {
       const prefix = `[${this.name}]`;
-      
+
       switch (level) {
-      case 'error':
-        console.error(prefix, message);
-        break;
-      case 'warn':
-        console.warn(prefix, message);
-        break;
-      case 'debug':
-        if (this.config.get('app.debug')) {
-          console.log(prefix, '[DEBUG]', message);
-        }
-        break;
-      default:
-        console.log(prefix, message);
+        case 'error':
+          console.error(prefix, message);
+          break;
+        case 'warn':
+          console.warn(prefix, message);
+          break;
+        case 'debug':
+          if (this.config.get('app.debug')) {
+            console.log(prefix, '[DEBUG]', message);
+          }
+          break;
+        default:
+          console.log(prefix, message);
       }
     }
   }
@@ -173,10 +173,10 @@ class Stage {
    */
   emitFileEvent(filePath, action = 'processed') {
     if (!this.pipeline) return;
-    
+
     this.fileEventCount++;
     const now = Date.now();
-    
+
     // Only emit every 20th file or every 100ms
     if (this.fileEventCount % 20 === 0 || now - this.lastFileEventTime > 100) {
       this.pipeline.emit('file:batch', {
@@ -197,7 +197,7 @@ class Stage {
    */
   getElapsedTime(startTime) {
     const elapsed = Date.now() - startTime;
-    
+
     if (elapsed < 1000) {
       return `${elapsed}ms`;
     } else if (elapsed < 60000) {
@@ -214,11 +214,11 @@ class Stage {
    */
   formatBytes(bytes) {
     if (bytes === 0) return '0 B';
-    
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 }

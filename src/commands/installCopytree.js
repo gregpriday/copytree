@@ -11,10 +11,10 @@ import { CommandError } from '../utils/errors.js';
  */
 async function installCopytreeCommand(_options = {}) {
   const startTime = Date.now();
-  
+
   try {
     const steps = [];
-    
+
     // Step 1: Create directories
     const directories = await createDirectories();
     steps.push({
@@ -22,7 +22,7 @@ async function installCopytreeCommand(_options = {}) {
       status: 'success',
       details: `Created ${directories.length} directories`,
     });
-    
+
     // Step 2: Copy default configuration
     const configFiles = await copyDefaultConfig();
     steps.push({
@@ -30,7 +30,7 @@ async function installCopytreeCommand(_options = {}) {
       status: configFiles.copied ? 'success' : 'skipped',
       details: configFiles.message,
     });
-    
+
     // Step 3: Set up environment file
     const envSetup = await setupEnvironment();
     steps.push({
@@ -38,7 +38,7 @@ async function installCopytreeCommand(_options = {}) {
       status: envSetup.created ? 'success' : 'skipped',
       details: envSetup.message,
     });
-    
+
     // Step 4: Check dependencies
     const deps = await checkDependencies();
     steps.push({
@@ -46,7 +46,7 @@ async function installCopytreeCommand(_options = {}) {
       status: deps.allGood ? 'success' : 'warning',
       details: deps.message,
     });
-    
+
     // Step 5: Create example profiles
     const profiles = await createExampleProfiles();
     steps.push({
@@ -54,24 +54,20 @@ async function installCopytreeCommand(_options = {}) {
       status: profiles.created > 0 ? 'success' : 'skipped',
       details: `Created ${profiles.created} example profiles`,
     });
-    
+
     const duration = Date.now() - startTime;
-    
+
     return {
       steps,
       duration,
       success: true,
     };
-    
   } catch (error) {
-    logger.error('Installation failed', { 
+    logger.error('Installation failed', {
       error: error.message,
-      stack: error.stack, 
+      stack: error.stack,
     });
-    throw new CommandError(
-      `Installation failed: ${error.message}`,
-      'install:copytree',
-    );
+    throw new CommandError(`Installation failed: ${error.message}`, 'install:copytree');
   }
 }
 
@@ -89,17 +85,17 @@ async function createDirectories() {
     path.join(homeDir, '.copytree', 'external-sources'),
     path.join(homeDir, '.copytree', 'logs'),
   ];
-  
+
   const created = [];
-  
+
   for (const dir of directories) {
-    if (!await fs.pathExists(dir)) {
+    if (!(await fs.pathExists(dir))) {
       await fs.ensureDir(dir);
       created.push(dir);
       logger.info('Created directory', { path: dir });
     }
   }
-  
+
   return created;
 }
 
@@ -109,14 +105,14 @@ async function createDirectories() {
 async function copyDefaultConfig() {
   const homeDir = os.homedir();
   const userConfigPath = path.join(homeDir, '.copytree', 'config.yml');
-  
+
   if (await fs.pathExists(userConfigPath)) {
     return {
       copied: false,
       message: 'User config already exists',
     };
   }
-  
+
   // Create default configuration
   const defaultConfig = `# CopyTree User Configuration
 # This file overrides default settings
@@ -148,9 +144,9 @@ git:
   respectGitignore: true
   includeUntracked: false
 `;
-  
+
   await fs.writeFile(userConfigPath, defaultConfig, 'utf8');
-  
+
   return {
     copied: true,
     message: `Created ${userConfigPath}`,
@@ -163,14 +159,14 @@ git:
 async function setupEnvironment() {
   const homeDir = os.homedir();
   const envPath = path.join(homeDir, '.copytree', '.env');
-  
+
   if (await fs.pathExists(envPath)) {
     return {
       created: false,
       message: 'Environment file already exists',
     };
   }
-  
+
   const envContent = `# CopyTree Environment Variables
 
 # API Keys
@@ -184,9 +180,9 @@ GEMINI_API_KEY=
 # COPYTREE_CACHE_TTL=86400
 # COPYTREE_DEBUG=false
 `;
-  
+
   await fs.writeFile(envPath, envContent, 'utf8');
-  
+
   return {
     created: true,
     message: `Created ${envPath}`,
@@ -199,7 +195,7 @@ GEMINI_API_KEY=
 async function checkDependencies() {
   const checks = [];
   const missing = [];
-  
+
   // Check for Git
   try {
     execSync('git --version', { stdio: 'ignore' });
@@ -207,7 +203,7 @@ async function checkDependencies() {
   } catch (_error) {
     missing.push('Git (required for git integration features)');
   }
-  
+
   // Check for Pandoc (optional)
   try {
     execSync('pandoc --version', { stdio: 'ignore' });
@@ -215,21 +211,21 @@ async function checkDependencies() {
   } catch (_error) {
     // Optional dependency
   }
-  
+
   // Check for Node version
   const nodeVersion = process.version;
   const majorVersion = parseInt(nodeVersion.split('.')[0].substring(1));
   if (majorVersion < 16) {
     missing.push(`Node.js 16+ (current: ${nodeVersion})`);
   }
-  
+
   if (missing.length > 0) {
     return {
       allGood: false,
       message: `Missing: ${missing.join(', ')}`,
     };
   }
-  
+
   return {
     allGood: true,
     message: 'All dependencies found',
@@ -243,7 +239,7 @@ async function createExampleProfiles() {
   const homeDir = os.homedir();
   const profilesDir = path.join(homeDir, '.copytree', 'profiles');
   let created = 0;
-  
+
   // Example minimal profile
   const minimalProfile = `name: minimal
 description: Minimal profile for quick outputs
@@ -276,13 +272,13 @@ output:
   format: xml
   characterLimit: 50000
 `;
-  
+
   const minimalPath = path.join(profilesDir, 'minimal.yml');
-  if (!await fs.pathExists(minimalPath)) {
+  if (!(await fs.pathExists(minimalPath))) {
     await fs.writeFile(minimalPath, minimalProfile, 'utf8');
     created++;
   }
-  
+
   // Example documentation profile
   const docsProfile = `name: documentation
 description: Profile optimized for documentation
@@ -311,13 +307,13 @@ output:
   format: markdown
   includeMetadata: false
 `;
-  
+
   const docsPath = path.join(profilesDir, 'documentation.yml');
-  if (!await fs.pathExists(docsPath)) {
+  if (!(await fs.pathExists(docsPath))) {
     await fs.writeFile(docsPath, docsProfile, 'utf8');
     created++;
   }
-  
+
   return { created };
 }
 

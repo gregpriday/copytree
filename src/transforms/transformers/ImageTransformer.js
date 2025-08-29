@@ -11,15 +11,12 @@ class ImageTransformer extends BaseTransformer {
   constructor(options = {}) {
     super(options);
     this.description = 'Extracts text from images using OCR and provides metadata';
-    this.supportedExtensions = [
-      '.jpg', '.jpeg', '.png', '.gif', '.bmp', 
-      '.tiff', '.tif', '.webp',
-    ];
+    this.supportedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp'];
     this.enableOCR = options.enableOCR ?? true;
     this.language = options.language || 'eng';
     this.includeMetadata = options.includeMetadata ?? true;
     this.isHeavy = true; // OCR is a heavy operation
-    
+
     // Initialize Tesseract worker
     this.worker = null;
   }
@@ -28,7 +25,7 @@ class ImageTransformer extends BaseTransformer {
     try {
       let imagePath = file.absolutePath;
       let tempFile = null;
-      
+
       // If content is base64, write to temp file
       if (!imagePath && file.content && file.encoding === 'base64') {
         const { tmpdir } = await import('os');
@@ -38,7 +35,7 @@ class ImageTransformer extends BaseTransformer {
         await fs.writeFile(tempFile, buffer);
         imagePath = tempFile;
       }
-      
+
       if (!imagePath) {
         return {
           ...file,
@@ -49,7 +46,7 @@ class ImageTransformer extends BaseTransformer {
       }
 
       let output = '';
-      
+
       // Add image metadata
       if (this.includeMetadata) {
         output += '=== Image Information ===\n';
@@ -62,12 +59,12 @@ class ImageTransformer extends BaseTransformer {
       // Perform OCR if enabled
       if (this.enableOCR) {
         const ocrResult = await this.performOCR(imagePath);
-        
+
         if (ocrResult.confidence > 0) {
           output += '=== Extracted Text (OCR) ===\n';
           output += `Confidence: ${ocrResult.confidence}%\n\n`;
           output += ocrResult.text;
-          
+
           if (ocrResult.blocks && ocrResult.blocks.length > 0) {
             output += '\n\n=== Text Blocks ===\n';
             ocrResult.blocks.forEach((block, index) => {
@@ -81,7 +78,7 @@ class ImageTransformer extends BaseTransformer {
       } else {
         output += '[OCR disabled - image content not extracted]\n';
       }
-      
+
       // Clean up temp file if created
       if (tempFile) {
         await fs.remove(tempFile).catch(() => {});
@@ -97,7 +94,7 @@ class ImageTransformer extends BaseTransformer {
       };
     } catch (error) {
       this.logger.error(`Failed to process image ${file.path}: ${error.message}`);
-      
+
       return {
         ...file,
         content: `[Error processing image: ${error.message}]`,
@@ -122,7 +119,7 @@ class ImageTransformer extends BaseTransformer {
 
       // Perform OCR
       const { data } = await this.worker.recognize(imagePath);
-      
+
       return {
         text: data.text,
         confidence: data.confidence,
@@ -159,7 +156,7 @@ class ImageTransformer extends BaseTransformer {
       '.tif': 'TIFF Image',
       '.webp': 'WebP Image',
     };
-    
+
     return typeMap[ext] || 'Image';
   }
 

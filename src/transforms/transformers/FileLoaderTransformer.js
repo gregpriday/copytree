@@ -21,22 +21,25 @@ class FileLoaderTransformer extends BaseTransformer {
     // Load content from disk
     try {
       let content;
-      
+
       if (file.isBinary) {
         // For binary files, return placeholder or base64 based on config
         const binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
-        
+
         switch (binaryAction) {
-        case 'base64': {
-          const buffer = await fs.readFile(file.absolutePath);
-          content = buffer.toString('base64');
-          break;
-        }
-        case 'skip':
-          return null;
-        case 'placeholder':
-        default:
-          content = this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]');
+          case 'base64': {
+            const buffer = await fs.readFile(file.absolutePath);
+            content = buffer.toString('base64');
+            break;
+          }
+          case 'skip':
+            return null;
+          case 'placeholder':
+          default:
+            content = this.config.get(
+              'copytree.binaryPlaceholderText',
+              '[Binary file not included]',
+            );
         }
       } else {
         // Load text content
@@ -51,7 +54,7 @@ class FileLoaderTransformer extends BaseTransformer {
       };
     } catch (error) {
       this.logger.error(`Failed to load ${file.path}: ${error.message}`);
-      
+
       return {
         ...file,
         content: `[Error loading file: ${error.message}]`,
@@ -64,7 +67,7 @@ class FileLoaderTransformer extends BaseTransformer {
 
   validateInput(file) {
     super.validateInput(file);
-    
+
     if (!file.absolutePath) {
       throw new Error('File absolute path is required');
     }

@@ -29,8 +29,8 @@ class MarkdownLinkStripperTransformer extends BaseTransformer {
   async doTransform(file) {
     try {
       // Get content as string
-      let content = Buffer.isBuffer(file.content) 
-        ? file.content.toString('utf8') 
+      let content = Buffer.isBuffer(file.content)
+        ? file.content.toString('utf8')
         : String(file.content);
 
       const originalLength = content.length;
@@ -51,7 +51,7 @@ class MarkdownLinkStripperTransformer extends BaseTransformer {
         content = content.replace(/!\[([^\]]*)\]\([^)]+\)/g, (match, alt) => {
           return alt ? `[Image: ${alt}]` : '[Image]';
         });
-        
+
         // Reference-style images: ![alt][ref] -> alt
         content = content.replace(/!\[([^\]]*)\]\[[^\]]*\]/g, (match, alt) => {
           return alt ? `[Image: ${alt}]` : '[Image]';
@@ -61,7 +61,7 @@ class MarkdownLinkStripperTransformer extends BaseTransformer {
       // Strip footnotes if requested: [^1] -> ''
       if (this.stripFootnotes) {
         content = content.replace(/\[\^[^\]]+\]/g, '');
-        
+
         // Strip footnote definitions: [^1]: text
         content = content.replace(/^\[\^[^\]]+\]:\s+.+$/gm, '');
       }
@@ -73,9 +73,10 @@ class MarkdownLinkStripperTransformer extends BaseTransformer {
         .trim();
 
       const strippedLength = content.length;
-      const reduction = originalLength > 0 
-        ? Math.round((originalLength - strippedLength) / originalLength * 100)
-        : 0;
+      const reduction =
+        originalLength > 0
+          ? Math.round(((originalLength - strippedLength) / originalLength) * 100)
+          : 0;
 
       return {
         ...file,
@@ -111,12 +112,12 @@ class MarkdownLinkStripperTransformer extends BaseTransformer {
    */
   formatOutput(file, content, reduction) {
     const filename = path.basename(file.path);
-    
+
     if (reduction > 0) {
       const header = `[Markdown links stripped: ${filename} - ${reduction}% reduction]\n\n`;
       return header + content;
     }
-    
+
     // No changes made
     return content;
   }

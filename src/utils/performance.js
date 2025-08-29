@@ -12,7 +12,7 @@ class PerformanceMonitor {
       memoryThreshold: options.memoryThreshold ?? 50 * 1024 * 1024, // 50MB
       ...options,
     };
-    
+
     this.timers = new Map();
     this.metrics = new Map();
     this.logger = logger.child('Performance');
@@ -23,7 +23,7 @@ class PerformanceMonitor {
    */
   startTimer(name) {
     if (!this.options.enabled) return;
-    
+
     this.timers.set(name, {
       startTime: performance.now(),
       startMemory: process.memoryUsage(),
@@ -35,7 +35,7 @@ class PerformanceMonitor {
    */
   endTimer(name, metadata = {}) {
     if (!this.options.enabled) return null;
-    
+
     const timer = this.timers.get(name);
     if (!timer) {
       this.logger.warn(`Timer '${name}' was not started`);
@@ -44,7 +44,7 @@ class PerformanceMonitor {
 
     const endTime = performance.now();
     const endMemory = process.memoryUsage();
-    
+
     const duration = endTime - timer.startTime;
     const memoryDelta = {
       rss: endMemory.rss - timer.startMemory.rss,
@@ -175,7 +175,7 @@ class PerformanceMonitor {
   getSystemStats() {
     const memory = process.memoryUsage();
     const cpu = process.cpuUsage();
-    
+
     return {
       memory: {
         rss: memory.rss,
@@ -198,7 +198,7 @@ class PerformanceMonitor {
    */
   logSystemStats(context = '') {
     if (!this.options.enabled) return;
-    
+
     const stats = this.getSystemStats();
     this.logger.debug('System stats', { context, ...stats });
   }
@@ -209,15 +209,15 @@ class PerformanceMonitor {
  */
 function measureMethod(target, propertyName, descriptor) {
   const originalMethod = descriptor.value;
-  
-  descriptor.value = async function(...args) {
+
+  descriptor.value = async function (...args) {
     const monitor = new PerformanceMonitor();
     const className = this.constructor.name;
     const methodName = `${className}.${propertyName}`;
-    
+
     return await monitor.measureOnly(methodName, () => originalMethod.apply(this, args));
   };
-  
+
   return descriptor;
 }
 
@@ -226,8 +226,8 @@ function measureMethod(target, propertyName, descriptor) {
  */
 function measureFunction(name, fn) {
   const monitor = new PerformanceMonitor();
-  
-  return async function(...args) {
+
+  return async function (...args) {
     return await monitor.measureOnly(name, () => fn.apply(this, args));
   };
 }

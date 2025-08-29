@@ -9,26 +9,26 @@ const mockConfig = {
       ttl: 86400000,
       driver: 'file',
       prefix: 'copytree_',
-      defaultTtl: 3600
-    }
+      defaultTtl: 3600,
+    },
   },
   log: {
     level: 'error',
-    format: 'simple'
+    format: 'simple',
   },
   pipeline: {
     continueOnError: false,
-    emitProgress: true
+    emitProgress: true,
   },
   app: {
-    maxConcurrency: 5
+    maxConcurrency: 5,
   },
   cache: {
     enabled: false,
     driver: 'file',
     prefix: 'copytree_',
-    defaultTtl: 3600
-  }
+    defaultTtl: 3600,
+  },
 };
 
 function config() {
@@ -36,7 +36,7 @@ function config() {
     get: (key, defaultValue = null) => {
       const keys = key.split('.');
       let value = mockConfig;
-      
+
       for (const k of keys) {
         if (value && typeof value === 'object' && k in value) {
           value = value[k];
@@ -44,27 +44,27 @@ function config() {
           return defaultValue;
         }
       }
-      
+
       return value;
     },
     set: (key, value) => {
       const keys = key.split('.');
       let target = mockConfig;
-      
+
       for (let i = 0; i < keys.length - 1; i++) {
         if (!(keys[i] in target)) {
           target[keys[i]] = {};
         }
         target = target[keys[i]];
       }
-      
+
       target[keys[keys.length - 1]] = value;
     },
     all: () => ({ ...mockConfig }),
     has: (key) => {
       const keys = key.split('.');
       let value = mockConfig;
-      
+
       for (const k of keys) {
         if (value && typeof value === 'object' && k in value) {
           value = value[k];
@@ -72,9 +72,9 @@ function config() {
           return false;
         }
       }
-      
+
       return true;
-    }
+    },
   };
 }
 

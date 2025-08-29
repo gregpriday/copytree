@@ -13,9 +13,9 @@ jest.mock('../../../src/services/CacheService.js', () => ({
   CacheService: {
     create: jest.fn(() => ({
       get: jest.fn(() => null),
-      set: jest.fn()
-    }))
-  }
+      set: jest.fn(),
+    })),
+  },
 }));
 
 // Test implementation of BaseTransformer - defined in beforeAll
@@ -29,7 +29,7 @@ beforeAll(async () => {
         ...file,
         content: `transformed: ${file.content}`,
         transformed: true,
-        transformedBy: 'TestTransformer'
+        transformedBy: 'TestTransformer',
       };
     }
   }
@@ -55,9 +55,9 @@ describe('BaseTransformer', () => {
       const customTransformer = new TestTransformer({
         cache: false,
         cacheTTL: 3600,
-        custom: 'value'
+        custom: 'value',
       });
-      
+
       expect(customTransformer.options.custom).toBe('value');
       expect(customTransformer.cacheEnabled).toBe(false);
       expect(customTransformer.cacheTTL).toBe(3600);
@@ -72,17 +72,17 @@ describe('BaseTransformer', () => {
           debug: jest.fn(),
           info: jest.fn(),
           warn: jest.fn(),
-          error: jest.fn()
-        }
+          error: jest.fn(),
+        },
       });
-      
+
       const file = {
         path: 'test.js',
-        content: 'console.log("hello");'
+        content: 'console.log("hello");',
       };
-      
+
       const result = await customTransformer.transform(file);
-      
+
       expect(result.content).toBe('transformed: console.log("hello");');
       expect(result.transformed).toBe(true);
       expect(result.transformedBy).toBe('TestTransformer');
@@ -90,14 +90,12 @@ describe('BaseTransformer', () => {
 
     test('should validate input', async () => {
       const customTransformer = new TestTransformer({
-        logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }
+        logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
       });
-      
-      await expect(customTransformer.transform(null))
-        .rejects.toThrow('File object is required');
-      
-      await expect(customTransformer.transform({}))
-        .rejects.toThrow('File path is required');
+
+      await expect(customTransformer.transform(null)).rejects.toThrow('File object is required');
+
+      await expect(customTransformer.transform({})).rejects.toThrow('File path is required');
     });
 
     test('should handle transformation errors', async () => {
@@ -109,79 +107,78 @@ describe('BaseTransformer', () => {
 
       const errorTransformer = new ErrorTransformer();
       const file = { path: 'test.js', content: 'test' };
-      
-      await expect(errorTransformer.transform(file))
-        .rejects.toThrow(TransformError);
+
+      await expect(errorTransformer.transform(file)).rejects.toThrow(TransformError);
     });
   });
 
   describe('caching', () => {
     test('should not cache transformations by default', async () => {
       const { CacheService } = require('../../../src/services/CacheService');
-      
+
       const customTransformer = new TestTransformer({
         cache: false, // Explicitly disable
-        logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }
+        logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
       });
-      
+
       const file = {
         path: 'test.js',
-        content: 'test content'
+        content: 'test content',
       };
 
       await customTransformer.transform(file);
-      
+
       // Check that cache was not created
       expect(CacheService.create).not.toHaveBeenCalled();
     });
 
     test('should not cache when disabled', async () => {
       const { CacheService } = require('../../../src/services/CacheService');
-      
+
       // Clear previous calls
       CacheService.create.mockClear();
-      
-      const noCacheTransformer = new TestTransformer({ 
+
+      const noCacheTransformer = new TestTransformer({
         cache: false,
-        logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }
+        logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
       });
-      
+
       const file = {
         path: 'test.js',
-        content: 'test content'
+        content: 'test content',
       };
 
       await noCacheTransformer.transform(file);
-      
+
       expect(CacheService.create).not.toHaveBeenCalled();
     });
 
     test('should use cached results when available', async () => {
       const { CacheService } = require('../../../src/services/CacheService');
-      
+
       // Set up cache mock to return cached data
       CacheService.create.mockReturnValueOnce({
         get: jest.fn().mockResolvedValueOnce({
           content: 'cached content',
           transformed: true,
-          transformedBy: 'TestTransformer'
+          transformedBy: 'TestTransformer',
         }),
-        set: jest.fn()
+        set: jest.fn(),
       });
-      
+
       // Create a new transformer with caching enabled
       const cachedTransformer = new TestTransformer({
         cache: true,
-        logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }
+        logger: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
       });
 
       const file = {
         path: 'test.js',
-        content: 'original content'
+        content: 'original content',
       };
 
       const result = await cachedTransformer.transform(file);
-      
+
       expect(result.content).toBe('cached content');
       expect(result.fromCache).toBe(true);
     });
@@ -202,12 +199,12 @@ describe('BaseTransformer', () => {
     });
 
     test('should detect encoding', () => {
-      const utf8Bom = Buffer.from([0xEF, 0xBB, 0xBF, 0x68, 0x65]);
+      const utf8Bom = Buffer.from([0xef, 0xbb, 0xbf, 0x68, 0x65]);
       expect(transformer.detectEncoding(utf8Bom)).toBe('utf8');
-      
-      const utf16le = Buffer.from([0xFF, 0xFE, 0x68, 0x00]);
+
+      const utf16le = Buffer.from([0xff, 0xfe, 0x68, 0x00]);
       expect(transformer.detectEncoding(utf16le)).toBe('utf16le');
-      
+
       const noBom = Buffer.from('hello');
       expect(transformer.detectEncoding(noBom)).toBe('utf8');
     });
@@ -216,16 +213,17 @@ describe('BaseTransformer', () => {
   describe('abstract methods', () => {
     test('should require doTransform implementation', async () => {
       const baseTransformer = new BaseTransformer();
-      
-      await expect(baseTransformer.doTransform({}))
-        .rejects.toThrow('doTransform() must be implemented by subclass');
+
+      await expect(baseTransformer.doTransform({})).rejects.toThrow(
+        'doTransform() must be implemented by subclass',
+      );
     });
   });
 
   describe('metadata', () => {
     test('should return transformer metadata', () => {
       const metadata = transformer.getMetadata();
-      
+
       expect(metadata.name).toBe('TestTransformerImpl');
       expect(metadata.options).toEqual({});
     });

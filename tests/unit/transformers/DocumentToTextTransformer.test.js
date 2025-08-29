@@ -3,7 +3,7 @@ jest.mock('child_process');
 jest.mock('fs-extra', () => ({
   mkdtemp: jest.fn(),
   writeFile: jest.fn(),
-  remove: jest.fn()
+  remove: jest.fn(),
 }));
 jest.mock('os');
 jest.mock('../../../src/utils/logger.js', () => ({
@@ -12,19 +12,19 @@ jest.mock('../../../src/utils/logger.js', () => ({
       error: jest.fn(),
       warn: jest.fn(),
       info: jest.fn(),
-      debug: jest.fn()
-    })
-  }
+      debug: jest.fn(),
+    }),
+  },
 }));
 jest.mock('../../../src/config/ConfigManager.js', () => ({
   config: () => ({
-    get: jest.fn((key, defaultValue) => defaultValue)
-  })
+    get: jest.fn((key, defaultValue) => defaultValue),
+  }),
 }));
 jest.mock('../../../src/services/CacheService.js', () => ({
   CacheService: {
-    create: jest.fn(() => null)
-  }
+    create: jest.fn(() => null),
+  },
 }));
 
 import DocumentToTextTransformer from '../../../src/transforms/transformers/DocumentToTextTransformer.js';
@@ -37,7 +37,7 @@ describe('DocumentToTextTransformer', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Mock execSync for Pandoc check and conversion
     execSync.mockImplementation((command) => {
       if (command.includes('--version')) {
@@ -53,10 +53,10 @@ describe('DocumentToTextTransformer', () => {
     fs.mkdtemp.mockResolvedValue('/tmp/copytree-doc-123456');
     fs.writeFile.mockResolvedValue(undefined);
     fs.remove.mockResolvedValue(undefined);
-    
+
     // Mock os
     os.tmpdir.mockReturnValue('/tmp');
-    
+
     transformer = new DocumentToTextTransformer();
   });
 
@@ -72,9 +72,9 @@ describe('DocumentToTextTransformer', () => {
     it('should accept custom options', () => {
       const transformer = new DocumentToTextTransformer({
         maxDocSize: 10 * 1024 * 1024,
-        pandocPath: '/usr/local/bin/pandoc'
+        pandocPath: '/usr/local/bin/pandoc',
       });
-      
+
       expect(transformer.maxDocSize).toBe(10 * 1024 * 1024);
       expect(transformer.pandocPath).toBe('/usr/local/bin/pandoc');
     });
@@ -88,11 +88,15 @@ describe('DocumentToTextTransformer', () => {
       execSync.mockImplementation(() => {
         throw new Error('Command not found');
       });
-      
+
       const transformer = new DocumentToTextTransformer();
       expect(transformer.pandocAvailable).toBe(false);
-      expect(transformer.logger.warn).toHaveBeenCalledWith('Pandoc not found. Document conversion will be disabled.');
-      expect(transformer.logger.warn).toHaveBeenCalledWith('Install pandoc: https://pandoc.org/installing.html');
+      expect(transformer.logger.warn).toHaveBeenCalledWith(
+        'Pandoc not found. Document conversion will be disabled.',
+      );
+      expect(transformer.logger.warn).toHaveBeenCalledWith(
+        'Install pandoc: https://pandoc.org/installing.html',
+      );
     });
   });
 
@@ -105,10 +109,10 @@ describe('DocumentToTextTransformer', () => {
         { path: 'rich.rtf' },
         { path: 'book.epub' },
         { path: 'page.html' },
-        { path: 'web.htm' }
+        { path: 'web.htm' },
       ];
 
-      supportedFiles.forEach(file => {
+      supportedFiles.forEach((file) => {
         expect(transformer.canTransform(file)).toBe(true);
       });
     });
@@ -119,17 +123,17 @@ describe('DocumentToTextTransformer', () => {
         { path: 'script.js' },
         { path: 'data.json' },
         { path: 'presentation.pptx' },
-        { path: 'sheet.xlsx' }
+        { path: 'sheet.xlsx' },
       ];
 
-      unsupportedFiles.forEach(file => {
+      unsupportedFiles.forEach((file) => {
         expect(transformer.canTransform(file)).toBe(false);
       });
     });
 
     it('should not transform when Pandoc is not available', () => {
       transformer.pandocAvailable = false;
-      
+
       expect(transformer.canTransform({ path: 'document.docx' })).toBe(false);
     });
 
@@ -144,7 +148,7 @@ describe('DocumentToTextTransformer', () => {
       const file = {
         path: 'test.docx',
         content: Buffer.from('fake docx content'),
-        stats: { size: 1024 }
+        stats: { size: 1024 },
       };
 
       const result = await transformer.doTransform(file);
@@ -153,10 +157,10 @@ describe('DocumentToTextTransformer', () => {
       expect(fs.writeFile).toHaveBeenCalledWith('/tmp/copytree-doc-123456/test.docx', file.content);
       expect(execSync).toHaveBeenCalledWith(
         'pandoc -f docx -t plain --wrap=none --strip-comments "/tmp/copytree-doc-123456/test.docx"',
-        { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
+        { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 },
       );
       expect(fs.remove).toHaveBeenCalledWith('/tmp/copytree-doc-123456');
-      
+
       expect(result.transformed).toBe(true);
       expect(result.transformedBy).toBe('DocumentToTextTransformer');
       expect(result.content).toContain('[Document: test.docx - Original size: 1 KB]');
@@ -165,7 +169,7 @@ describe('DocumentToTextTransformer', () => {
       expect(result.metadata).toEqual({
         originalSize: 1024,
         originalFormat: 'docx',
-        convertedSize: expect.any(Number)
+        convertedSize: expect.any(Number),
       });
     });
 
@@ -173,22 +177,22 @@ describe('DocumentToTextTransformer', () => {
       const file = {
         path: 'test.html',
         content: '<html><body>Test</body></html>',
-        stats: { size: 100 }
+        stats: { size: 100 },
       };
 
       await transformer.doTransform(file);
 
       expect(fs.writeFile).toHaveBeenCalledWith(
-        '/tmp/copytree-doc-123456/test.html', 
-        file.content, 
-        'utf8'
+        '/tmp/copytree-doc-123456/test.html',
+        file.content,
+        'utf8',
       );
     });
 
     it('should calculate size from content when stats missing', async () => {
       const file = {
         path: 'test.docx',
-        content: 'test content'
+        content: 'test content',
         // No stats property
       };
 
@@ -201,7 +205,7 @@ describe('DocumentToTextTransformer', () => {
       const file = {
         path: 'huge.docx',
         content: Buffer.from('content'),
-        stats: { size: 100 * 1024 * 1024 } // 100MB
+        stats: { size: 100 * 1024 * 1024 }, // 100MB
       };
 
       const result = await transformer.doTransform(file);
@@ -210,7 +214,7 @@ describe('DocumentToTextTransformer', () => {
       expect(result.transformed).toBe(true);
       expect(result.metadata).toEqual({
         originalSize: 100 * 1024 * 1024,
-        skippedReason: 'size_limit_exceeded'
+        skippedReason: 'size_limit_exceeded',
       });
       expect(execSync).not.toHaveBeenCalledWith(expect.stringContaining('pandoc -f'));
     });
@@ -228,17 +232,19 @@ describe('DocumentToTextTransformer', () => {
       const file = {
         path: 'corrupt.docx',
         content: Buffer.from('corrupt content'),
-        stats: { size: 1024 }
+        stats: { size: 1024 },
       };
 
       const result = await transformer.doTransform(file);
 
       expect(result.transformed).toBe(true);
       expect(result.content).toContain('[Document: corrupt.docx - 1 KB]');
-      expect(result.content).toContain('[Conversion failed: Conversion failed: unsupported format]');
+      expect(result.content).toContain(
+        '[Conversion failed: Conversion failed: unsupported format]',
+      );
       expect(result.metadata).toEqual({
         originalSize: 1024,
-        error: 'Conversion failed: unsupported format'
+        error: 'Conversion failed: unsupported format',
       });
       expect(transformer.logger.error).toHaveBeenCalled();
     });
@@ -249,16 +255,15 @@ describe('DocumentToTextTransformer', () => {
       const file = {
         path: 'test.docx',
         content: Buffer.from('content'),
-        stats: { size: 1024 }
+        stats: { size: 1024 },
       };
 
       const result = await transformer.doTransform(file);
 
       expect(result.transformed).toBe(true);
-      expect(transformer.logger.warn).toHaveBeenCalledWith(
-        'Failed to clean up temp files',
-        { error: 'Permission denied' }
-      );
+      expect(transformer.logger.warn).toHaveBeenCalledWith('Failed to clean up temp files', {
+        error: 'Permission denied',
+      });
     });
 
     // Removed test for temp directory creation failure since it's covered by general error handling tests
@@ -269,7 +274,7 @@ describe('DocumentToTextTransformer', () => {
       const file = {
         path: 'test.docx',
         content: Buffer.from('content'),
-        stats: { size: 1024 }
+        stats: { size: 1024 },
       };
 
       const result = await transformer.doTransform(file);
@@ -285,7 +290,7 @@ describe('DocumentToTextTransformer', () => {
         { path: 'rich.rtf', format: 'rtf' },
         { path: 'book.epub', format: 'epub' },
         { path: 'page.html', format: 'html' },
-        { path: 'web.htm', format: 'html' }
+        { path: 'web.htm', format: 'html' },
       ];
 
       for (const testCase of testCases) {
@@ -298,14 +303,14 @@ describe('DocumentToTextTransformer', () => {
         const file = {
           path: testCase.path,
           content: Buffer.from('content'),
-          stats: { size: 100 }
+          stats: { size: 100 },
         };
 
         const result = await transformer.doTransform(file);
 
         expect(execSync).toHaveBeenCalledWith(
           expect.stringContaining(`-f ${testCase.format}`),
-          expect.any(Object)
+          expect.any(Object),
         );
         expect(result.metadata.originalFormat).toBe(testCase.format);
       }
@@ -322,10 +327,10 @@ describe('DocumentToTextTransformer', () => {
         { path: 'book.epub', expected: 'epub' },
         { path: 'page.html', expected: 'html' },
         { path: 'web.htm', expected: 'html' },
-        { path: 'unknown.xyz', expected: 'markdown' }
+        { path: 'unknown.xyz', expected: 'markdown' },
       ];
 
-      testCases.forEach(testCase => {
+      testCases.forEach((testCase) => {
         expect(transformer.getInputFormat(testCase.path)).toBe(testCase.expected);
       });
     });
@@ -365,9 +370,9 @@ describe('DocumentToTextTransformer', () => {
   describe('checkPandoc', () => {
     it('should return true when Pandoc is available', () => {
       execSync.mockReturnValue('pandoc 2.19.2');
-      
+
       const result = transformer.checkPandoc();
-      
+
       expect(result).toBe(true);
       expect(execSync).toHaveBeenCalledWith('pandoc --version', { stdio: 'ignore' });
     });
@@ -376,19 +381,23 @@ describe('DocumentToTextTransformer', () => {
       execSync.mockImplementation(() => {
         throw new Error('Command not found');
       });
-      
+
       const result = transformer.checkPandoc();
-      
+
       expect(result).toBe(false);
-      expect(transformer.logger.warn).toHaveBeenCalledWith('Pandoc not found. Document conversion will be disabled.');
-      expect(transformer.logger.warn).toHaveBeenCalledWith('Install pandoc: https://pandoc.org/installing.html');
+      expect(transformer.logger.warn).toHaveBeenCalledWith(
+        'Pandoc not found. Document conversion will be disabled.',
+      );
+      expect(transformer.logger.warn).toHaveBeenCalledWith(
+        'Install pandoc: https://pandoc.org/installing.html',
+      );
     });
 
     it('should use custom pandoc path', () => {
-      const transformer = new DocumentToTextTransformer({ 
-        pandocPath: '/custom/path/pandoc' 
+      const transformer = new DocumentToTextTransformer({
+        pandocPath: '/custom/path/pandoc',
       });
-      
+
       expect(execSync).toHaveBeenCalledWith('/custom/path/pandoc --version', { stdio: 'ignore' });
     });
   });
@@ -404,7 +413,7 @@ describe('DocumentToTextTransformer', () => {
       const file = {
         path: 'large.docx',
         content: Buffer.from('content'),
-        stats: { size: 1024 }
+        stats: { size: 1024 },
       };
 
       const result = await transformer.doTransform(file);
@@ -418,35 +427,36 @@ describe('DocumentToTextTransformer', () => {
       const file = {
         path: 'test file with spaces & symbols.docx',
         content: Buffer.from('content'),
-        stats: { size: 1024 }
+        stats: { size: 1024 },
       };
 
       await transformer.doTransform(file);
 
       expect(fs.writeFile).toHaveBeenCalledWith(
         '/tmp/copytree-doc-123456/test file with spaces & symbols.docx',
-        file.content
+        file.content,
       );
     });
 
     it('should handle binary content correctly', async () => {
-      const binaryContent = Buffer.from([0x50, 0x4B, 0x03, 0x04]); // ZIP header
+      const binaryContent = Buffer.from([0x50, 0x4b, 0x03, 0x04]); // ZIP header
       const file = {
         path: 'binary.docx',
         content: binaryContent,
-        stats: { size: 1024 }
+        stats: { size: 1024 },
       };
 
       await transformer.doTransform(file);
 
       expect(fs.writeFile).toHaveBeenCalledWith(
         '/tmp/copytree-doc-123456/binary.docx',
-        binaryContent
+        binaryContent,
       );
     });
 
     it('should handle documents with complex formatting', async () => {
-      const complexOutput = 'Title\n\n# Heading\n\n*bold* and _italic_ text\n\n1. List item\n2. Another item';
+      const complexOutput =
+        'Title\n\n# Heading\n\n*bold* and _italic_ text\n\n1. List item\n2. Another item';
       execSync.mockImplementation((command) => {
         if (command.includes('--version')) return 'pandoc 2.19.2';
         if (command.includes('pandoc -f')) return complexOutput;
@@ -455,7 +465,7 @@ describe('DocumentToTextTransformer', () => {
       const file = {
         path: 'complex.docx',
         content: Buffer.from('content'),
-        stats: { size: 2048 }
+        stats: { size: 2048 },
       };
 
       const result = await transformer.doTransform(file);

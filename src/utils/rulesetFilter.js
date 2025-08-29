@@ -28,8 +28,7 @@ class RulesetFilter {
 
     // Check include rules
     // If no include rules, accept all non-excluded files
-    return this.includeRules.length === 0 || 
-           this.matchesAny(file, this.includeRules);
+    return this.includeRules.length === 0 || this.matchesAny(file, this.includeRules);
   }
 
   /**
@@ -87,7 +86,7 @@ class RulesetFilter {
    */
   matchesCondition(file, field, condition) {
     const value = this.getFieldValue(file, field);
-    
+
     if (typeof condition === 'string') {
       // Simple equality
       return value === condition;
@@ -95,7 +94,7 @@ class RulesetFilter {
       // Complex condition with operators
       return this.matchesOperator(value, condition);
     }
-    
+
     return false;
   }
 
@@ -104,33 +103,33 @@ class RulesetFilter {
    */
   getFieldValue(file, field) {
     switch (field) {
-    case 'path':
-    case 'relativePath':
-      return file.relativePath;
-        
-    case 'folder':
-    case 'directory':
-      return path.dirname(file.relativePath);
-        
-    case 'filename':
-    case 'name':
-      return path.basename(file.relativePath);
-        
-    case 'extension':
-    case 'ext':
-      return path.extname(file.relativePath).toLowerCase();
-        
-    case 'size':
-      return file.stats?.size || 0;
-        
-    case 'content':
-      return file.content?.toString() || '';
-        
-    case 'type':
-      return file.type || 'unknown';
-        
-    default:
-      return file[field];
+      case 'path':
+      case 'relativePath':
+        return file.relativePath;
+
+      case 'folder':
+      case 'directory':
+        return path.dirname(file.relativePath);
+
+      case 'filename':
+      case 'name':
+        return path.basename(file.relativePath);
+
+      case 'extension':
+      case 'ext':
+        return path.extname(file.relativePath).toLowerCase();
+
+      case 'size':
+        return file.stats?.size || 0;
+
+      case 'content':
+        return file.content?.toString() || '';
+
+      case 'type':
+        return file.type || 'unknown';
+
+      default:
+        return file[field];
     }
   }
 
@@ -140,58 +139,58 @@ class RulesetFilter {
   matchesOperator(value, condition) {
     const operator = condition.operator || condition.op || '=';
     const compareValue = condition.value || condition.val;
-    
+
     switch (operator) {
-    case '=':
-    case '==':
-    case 'equals':
-      return value === compareValue;
-        
-    case '!=':
-    case 'not':
-    case 'notEquals':
-      return value !== compareValue;
-        
-    case 'contains':
-    case 'includes':
-      return String(value).includes(String(compareValue));
-        
-    case 'startsWith':
-    case 'begins':
-      return String(value).startsWith(String(compareValue));
-        
-    case 'endsWith':
-    case 'ends':
-      return String(value).endsWith(String(compareValue));
-        
-    case 'regex':
-    case 'matches':
-      return new RegExp(compareValue).test(String(value));
-        
-    case '>':
-    case 'gt':
-      return Number(value) > Number(compareValue);
-        
-    case '>=':
-    case 'gte':
-      return Number(value) >= Number(compareValue);
-        
-    case '<':
-    case 'lt':
-      return Number(value) < Number(compareValue);
-        
-    case '<=':
-    case 'lte':
-      return Number(value) <= Number(compareValue);
-        
-    case 'in':
-      return Array.isArray(compareValue) && compareValue.includes(value);
-        
-    case 'notIn':
-      return Array.isArray(compareValue) && !compareValue.includes(value);
-        
-    default:
-      return false;
+      case '=':
+      case '==':
+      case 'equals':
+        return value === compareValue;
+
+      case '!=':
+      case 'not':
+      case 'notEquals':
+        return value !== compareValue;
+
+      case 'contains':
+      case 'includes':
+        return String(value).includes(String(compareValue));
+
+      case 'startsWith':
+      case 'begins':
+        return String(value).startsWith(String(compareValue));
+
+      case 'endsWith':
+      case 'ends':
+        return String(value).endsWith(String(compareValue));
+
+      case 'regex':
+      case 'matches':
+        return new RegExp(compareValue).test(String(value));
+
+      case '>':
+      case 'gt':
+        return Number(value) > Number(compareValue);
+
+      case '>=':
+      case 'gte':
+        return Number(value) >= Number(compareValue);
+
+      case '<':
+      case 'lt':
+        return Number(value) < Number(compareValue);
+
+      case '<=':
+      case 'lte':
+        return Number(value) <= Number(compareValue);
+
+      case 'in':
+        return Array.isArray(compareValue) && compareValue.includes(value);
+
+      case 'notIn':
+        return Array.isArray(compareValue) && !compareValue.includes(value);
+
+      default:
+        return false;
     }
   }
 

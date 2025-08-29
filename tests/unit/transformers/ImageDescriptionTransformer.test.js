@@ -7,20 +7,20 @@ jest.mock('../../../src/transforms/BaseTransformer.js', () => {
         debug: jest.fn(),
         warn: jest.fn(),
         error: jest.fn(),
-        info: jest.fn()
+        info: jest.fn(),
       };
       this.config = {
-        get: jest.fn((key, defaultValue) => defaultValue)
+        get: jest.fn((key, defaultValue) => defaultValue),
       };
       this.cacheEnabled = false;
       this.isHeavy = false;
     }
-    
+
     async transform(file) {
       this.logger.debug(`Transforming ${file.path}`);
       return this.doTransform(file);
     }
-    
+
     formatBytes(bytes) {
       if (bytes === 0) return '0 B';
       const k = 1024;
@@ -45,26 +45,26 @@ describe('ImageDescriptionTransformer', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Set up the mock for GoogleGenerativeAI
     mockModel = {
       generateContent: jest.fn(),
-      model: 'gemini-1.5-flash'
+      model: 'gemini-1.5-flash',
     };
-    
+
     mockGenAI = {
-      getGenerativeModel: jest.fn().mockReturnValue(mockModel)
+      getGenerativeModel: jest.fn().mockReturnValue(mockModel),
     };
-    
+
     GoogleGenerativeAI.mockImplementation(() => mockGenAI);
-    
+
     // Set API key environment variable
     process.env.GEMINI_API_KEY = 'test-api-key';
-    
+
     // Create transformer with cache disabled
     transformer = new ImageDescriptionTransformer({ cache: false });
   });
-  
+
   afterEach(() => {
     // Clean up environment
     delete process.env.GEMINI_API_KEY;
@@ -89,7 +89,7 @@ describe('ImageDescriptionTransformer', () => {
       expect(!!transformer.canTransform({ path: 'IMAGE.JPG' })).toBe(true);
       expect(!!transformer.canTransform({ path: 'Photo.PNG' })).toBe(true);
     });
-    
+
     it('should not transform when API key is missing', () => {
       // Create transformer without API key
       delete process.env.GEMINI_API_KEY;
@@ -110,26 +110,26 @@ describe('ImageDescriptionTransformer', () => {
       const file = {
         path: 'screenshot.png',
         absolutePath: '/project/screenshot.png',
-        stats: { size: 1048576 }
+        stats: { size: 1048576 },
       };
       const mockDescription = 'A screenshot showing a login form with username and password fields';
-      
+
       mockModel.generateContent.mockResolvedValue({
         response: {
-          text: () => mockDescription
-        }
+          text: () => mockDescription,
+        },
       });
-      
+
       const result = await transformer.transform(file);
-      
+
       expect(mockModel.generateContent).toHaveBeenCalledWith([
         expect.stringContaining('Describe this image'),
         {
           inlineData: {
             mimeType: 'image/png',
-            data: mockImageBuffer.toString('base64')
-          }
-        }
+            data: mockImageBuffer.toString('base64'),
+          },
+        },
       ]);
       expect(result.content).toContain('[Image: screenshot.png');
       expect(result.content).toContain(mockDescription);
@@ -143,13 +143,13 @@ describe('ImageDescriptionTransformer', () => {
       const file = {
         path: 'image.jpg',
         absolutePath: '/project/image.jpg',
-        stats: { size: 1048576 }
+        stats: { size: 1048576 },
       };
-      
+
       mockModel.generateContent.mockRejectedValue(new Error('API error'));
-      
+
       const result = await transformer.transform(file);
-      
+
       expect(result.content).toContain('[Image: image.jpg');
       expect(result.content).toContain('[Description generation failed: API error]');
       expect(result.content).toContain('1 MB');
@@ -161,13 +161,13 @@ describe('ImageDescriptionTransformer', () => {
       const file = {
         path: 'image.png',
         absolutePath: '/project/image.png',
-        stats: { size: 1048576 }
+        stats: { size: 1048576 },
       };
-      
+
       // Create transformer without API key
       delete process.env.GEMINI_API_KEY;
       const noKeyTransformer = new ImageDescriptionTransformer();
-      
+
       // Should not be able to transform without API key
       expect(!!noKeyTransformer.canTransform(file)).toBe(false);
     });
@@ -177,22 +177,22 @@ describe('ImageDescriptionTransformer', () => {
         { size: 500, expected: '500 B' },
         { size: 1024, expected: '1 KB' },
         { size: 1048576, expected: '1 MB' },
-        { size: 1073741824, expected: '1 GB' }
+        { size: 1073741824, expected: '1 GB' },
       ];
 
       mockModel.generateContent.mockResolvedValue({
         response: {
-          text: () => 'Test description'
-        }
+          text: () => 'Test description',
+        },
       });
 
       for (const { size, expected } of testCases) {
         const result = await transformer.transform({
           path: 'test.jpg',
           absolutePath: '/test.jpg',
-          stats: { size }
+          stats: { size },
         });
-        
+
         expect(result.content).toContain(expected);
       }
     });
@@ -201,17 +201,17 @@ describe('ImageDescriptionTransformer', () => {
       const file = {
         path: 'corrupt.jpg',
         absolutePath: '/project/corrupt.jpg',
-        content: mockImageBuffer
+        content: mockImageBuffer,
       };
-      
+
       mockModel.generateContent.mockResolvedValue({
         response: {
-          text: () => 'Test description'
-        }
+          text: () => 'Test description',
+        },
       });
-      
+
       const result = await transformer.transform(file);
-      
+
       // Should use buffer length when stats.size is not available
       expect(result.content).toContain(`${mockImageBuffer.length} B`);
     });
@@ -220,11 +220,11 @@ describe('ImageDescriptionTransformer', () => {
       const file = {
         path: 'large.png',
         absolutePath: '/project/large.png',
-        stats: { size: 15 * 1024 * 1024 } // 15MB
+        stats: { size: 15 * 1024 * 1024 }, // 15MB
       };
-      
+
       const result = await transformer.transform(file);
-      
+
       expect(result.content).toContain('[Image too large for description: 15 MB]');
       expect(result.transformed).toBe(true);
       expect(result.metadata.skippedReason).toBe('size_limit_exceeded');
@@ -238,23 +238,22 @@ describe('ImageDescriptionTransformer', () => {
         metadata: {
           dimensions: {
             width: 3840,
-            height: 2160
-          }
-        }
+            height: 2160,
+          },
+        },
       };
-      
+
       mockModel.generateContent.mockResolvedValue({
         response: {
-          text: () => '4K screenshot'
-        }
+          text: () => '4K screenshot',
+        },
       });
-      
+
       const result = await transformer.transform(file);
-      
+
       expect(result.content).toContain('(3840x2160)');
       expect(result.content).toContain('5 MB');
       expect(result.content).toContain('4K screenshot');
     });
   });
-
 });

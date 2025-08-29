@@ -7,7 +7,7 @@ const mockConfig = {
       return '[Binary file not included]';
     }
     return defaultValue;
-  })
+  }),
 };
 
 // Static import
@@ -17,7 +17,9 @@ import fs from 'fs-extra';
 let BinaryTransformer;
 
 beforeAll(async () => {
-  const binaryTransformerModule = await import('../../../src/transforms/transformers/BinaryTransformer.js');
+  const binaryTransformerModule = await import(
+    '../../../src/transforms/transformers/BinaryTransformer.js'
+  );
   BinaryTransformer = binaryTransformerModule.default;
 });
 
@@ -32,7 +34,7 @@ describe('BinaryTransformer', () => {
       error: jest.fn(),
       warn: jest.fn(),
       info: jest.fn(),
-      debug: jest.fn()
+      debug: jest.fn(),
     };
   });
 
@@ -68,7 +70,7 @@ describe('BinaryTransformer', () => {
     it('should transform binary file with size info', async () => {
       const file = {
         path: 'image.png',
-        size: 2048576 // 2MB
+        size: 2048576, // 2MB
       };
 
       const result = await transformer.doTransform(file);
@@ -84,7 +86,7 @@ describe('BinaryTransformer', () => {
 
     it('should handle missing stats', async () => {
       const file = {
-        path: 'file.zip'
+        path: 'file.zip',
       };
 
       const result = await transformer.doTransform(file);
@@ -98,7 +100,7 @@ describe('BinaryTransformer', () => {
     it('should handle files with no size', async () => {
       const file = {
         path: 'empty.bin',
-        size: 0
+        size: 0,
       };
 
       const result = await transformer.doTransform(file);
@@ -113,13 +115,13 @@ describe('BinaryTransformer', () => {
         { size: 1024, expected: '1 KB' },
         { size: 1536, expected: '1.5 KB' },
         { size: 1048576, expected: '1 MB' },
-        { size: 1073741824, expected: '1 GB' }
+        { size: 1073741824, expected: '1 GB' },
       ];
 
       for (const testCase of testCases) {
         const file = {
           path: 'test.bin',
-          size: testCase.size
+          size: testCase.size,
         };
 
         const result = await transformer.doTransform(file);
@@ -132,7 +134,7 @@ describe('BinaryTransformer', () => {
         path: 'archive.zip',
         absolutePath: '/project/archive.zip',
         size: 1024,
-        customProp: 'value'
+        customProp: 'value',
       };
 
       const result = await transformer.doTransform(file);
@@ -143,13 +145,7 @@ describe('BinaryTransformer', () => {
     });
 
     it('should support audio files', async () => {
-      const audioFiles = [
-        'song.mp3',
-        'audio.wav',
-        'sound.ogg',
-        'music.m4a',
-        'track.flac'
-      ];
+      const audioFiles = ['song.mp3', 'audio.wav', 'sound.ogg', 'music.m4a', 'track.flac'];
 
       for (const filename of audioFiles) {
         const ext = filename.match(/\.[^.]+$/)[0];
@@ -170,7 +166,7 @@ describe('BinaryTransformer', () => {
         'film.mkv',
         'show.webm',
         'video.wmv',
-        'animation.flv'
+        'animation.flv',
       ];
 
       for (const filename of videoFiles) {
@@ -189,15 +185,9 @@ describe('BinaryTransformer', () => {
     });
 
     it('should support archive files', () => {
-      const archiveFiles = [
-        'backup.zip',
-        'files.tar',
-        'archive.gz',
-        'compressed.rar',
-        'data.7z'
-      ];
+      const archiveFiles = ['backup.zip', 'files.tar', 'archive.gz', 'compressed.rar', 'data.7z'];
 
-      archiveFiles.forEach(filename => {
+      archiveFiles.forEach((filename) => {
         expect(transformer.canTransform({ path: filename })).toBe(true);
       });
     });
@@ -208,7 +198,7 @@ describe('BinaryTransformer', () => {
         'typeface.otf',
         'webfont.woff',
         'webfont2.woff2',
-        'embedded.eot'
+        'embedded.eot',
       ];
 
       for (const filename of fontFiles) {
@@ -219,13 +209,7 @@ describe('BinaryTransformer', () => {
     });
 
     it('should support executable and library files', () => {
-      const execFiles = [
-        'program.exe',
-        'library.dll',
-        'shared.so',
-        'dynamic.dylib',
-        'app'
-      ];
+      const execFiles = ['program.exe', 'library.dll', 'shared.so', 'dynamic.dylib', 'app'];
 
       for (const filename of execFiles) {
         const result = transformer.canTransform({ path: filename });
@@ -251,7 +235,7 @@ describe('BinaryTransformer', () => {
       const file = {
         path: 'small.png',
         absolutePath: '/project/small.png',
-        size: 1024 // 1KB
+        size: 1024, // 1KB
       };
 
       const result = await transformer.doTransform(file);
@@ -275,7 +259,7 @@ describe('BinaryTransformer', () => {
       const file = {
         path: 'large.png',
         absolutePath: '/project/large.png',
-        size: 2048 // 2KB, over limit
+        size: 2048, // 2KB, over limit
       };
 
       const result = await transformer.doTransform(file);
@@ -293,7 +277,7 @@ describe('BinaryTransformer', () => {
 
       const file = {
         path: 'skip.png',
-        size: 1024
+        size: 1024,
       };
 
       const result = await transformer.doTransform(file);

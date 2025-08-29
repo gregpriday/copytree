@@ -16,31 +16,32 @@ class ConfigManager {
     this.config = {};
     this.configPath = path.join(__dirname, '../../config');
     this.userConfigPath = path.join(os.homedir(), '.copytree');
-    
+
     // Check if validation should be disabled via options or environment
-    this.validationEnabled = !options.noValidate && 
-                            process.env.COPYTREE_NO_VALIDATE !== 'true' &&
-                            process.env.NODE_ENV !== 'test';
-    
+    this.validationEnabled =
+      !options.noValidate &&
+      process.env.COPYTREE_NO_VALIDATE !== 'true' &&
+      process.env.NODE_ENV !== 'test';
+
     // Initialize AJV validator
-    this.ajv = new Ajv({ 
-      allErrors: true, 
+    this.ajv = new Ajv({
+      allErrors: true,
       removeAdditional: false,
       strict: false,
-      coerceTypes: true
+      coerceTypes: true,
     });
     addFormats(this.ajv);
-    
+
     this.schema = null;
     this.validate = null;
     this.schemaVersion = '1.0.0';
-    
+
     // Track configuration sources for provenance
     this.configSources = {};
     this.defaultConfig = {};
     this.userConfig = {};
     this.envOverrides = {};
-    
+
     // Load configuration asynchronously
     this.loadConfiguration().catch(console.error);
   }
@@ -48,16 +49,16 @@ class ConfigManager {
   async loadConfiguration() {
     // 1. Load schema for validation
     await this.loadSchema();
-    
+
     // 2. Load default configuration files
     await this.loadDefaults();
-    
+
     // 3. Load user configuration overrides
     await this.loadUserConfig();
-    
+
     // 4. Apply environment variable overrides
     this.applyEnvironmentOverrides();
-    
+
     // 5. Validate final configuration if enabled
     if (this.validationEnabled) {
       this.validateConfig();
@@ -66,7 +67,7 @@ class ConfigManager {
 
   async loadDefaults() {
     const configFiles = fs.readdirSync(this.configPath).filter((file) => file.endsWith('.js'));
-    
+
     for (const file of configFiles) {
       const configName = path.basename(file, '.js');
       try {
@@ -85,13 +86,14 @@ class ConfigManager {
       return;
     }
 
-    const userConfigFiles = fs.readdirSync(this.userConfigPath)
+    const userConfigFiles = fs
+      .readdirSync(this.userConfigPath)
       .filter((file) => file.endsWith('.js') || file.endsWith('.json'));
-    
+
     for (const file of userConfigFiles) {
       const configName = path.basename(file).replace(/\.(js|json)$/, '');
       const filePath = path.join(this.userConfigPath, file);
-      
+
       try {
         let userConfigData;
         if (file.endsWith('.json')) {
@@ -102,10 +104,10 @@ class ConfigManager {
           const configModule = await import(moduleUrl);
           userConfigData = configModule.default || configModule;
         }
-        
+
         // Store user config for provenance tracking
         this.userConfig[configName] = _.cloneDeep(userConfigData);
-        
+
         // Deep merge with existing config
         this.config[configName] = _.merge({}, this.config[configName] || {}, userConfigData);
       } catch (error) {
@@ -126,20 +128,20 @@ class ConfigManager {
       } else {
         const envKey = `${prefix ? prefix + '_' : ''}${key}`.toUpperCase();
         const envValue = process.env[envKey];
-        
+
         if (envValue !== undefined) {
           // Convert string values to appropriate types
           let parsedValue = envValue;
-          
+
           if (envValue === 'true') parsedValue = true;
           else if (envValue === 'false') parsedValue = false;
           else if (envValue.match(/^\d+$/)) parsedValue = parseInt(envValue);
           else if (envValue.match(/^\d+\.\d+$/)) parsedValue = parseFloat(envValue);
-          
+
           // Track environment override for provenance
           const configPath = prefix ? `${prefix}.${key}` : key;
           _.set(this.envOverrides, configPath, { envKey, value: parsedValue });
-          
+
           _.set(obj, key, parsedValue);
         }
       }
@@ -190,18 +192,18 @@ class ConfigManager {
    */
   env(key, defaultValue = null) {
     const value = process.env[key];
-    
+
     if (value === undefined) {
       return defaultValue;
     }
-    
+
     // Type conversion
     if (value === 'true') return true;
     if (value === 'false') return false;
     if (value === 'null') return null;
     if (value.match(/^\d+$/)) return parseInt(value);
     if (value.match(/^\d+\.\d+$/)) return parseFloat(value);
-    
+
     return value;
   }
 
@@ -211,16 +213,16 @@ class ConfigManager {
   async loadSchema() {
     try {
       const schemaPath = path.join(this.configPath, 'schema.json');
-      
+
       if (await fs.pathExists(schemaPath)) {
         this.schema = await fs.readJson(schemaPath);
-        
+
         // Create a unique schema ID to avoid conflicts
         const uniqueSchema = {
           ...this.schema,
-          $id: `${this.schema.$id || 'copytree-config'}-${Date.now()}`
+          $id: `${this.schema.$id || 'copytree-config'}-${Date.now()}`,
         };
-        
+
         this.validate = this.ajv.compile(uniqueSchema);
       } else {
         console.warn('Configuration schema not found. Validation disabled.');
@@ -239,27 +241,27 @@ class ConfigManager {
     if (!this.validationEnabled || !this.validate) {
       return; // Validation disabled or schema not loaded, skip validation
     }
-    
+
     const isValid = this.validate(this.config);
-    
+
     if (!isValid) {
       const errors = this.validate.errors
-        .map(err => {
+        .map((err) => {
           const path = err.instancePath || '(root)';
           const message = err.message;
           const value = err.data !== undefined ? ` (got: ${JSON.stringify(err.data)})` : '';
           return `${path}: ${message}${value}`;
         })
         .join('; ');
-      
+
       throw new ConfigurationError(
         `Configuration validation failed: ${errors}`,
         'SCHEMA_VALIDATION_ERROR',
-        { 
+        {
           validationErrors: this.validate.errors,
           schemaVersion: this.schemaVersion,
-          config: this.config
-        }
+          config: this.config,
+        },
       );
     }
   }
@@ -304,7 +306,7 @@ class ConfigManager {
       loaded: this.schema !== null,
       validationEnabled: this.validationEnabled,
       schemaId: this.schema?.$id || null,
-      title: this.schema?.title || null
+      title: this.schema?.title || null,
     };
   }
 
@@ -326,23 +328,23 @@ class ConfigManager {
   effective(options = {}) {
     const { redact = true, section = null } = options;
     const result = {};
-    
+
     // Get the config to walk through
-    const configToWalk = section ? (this.config[section] || {}) : this.config;
+    const configToWalk = section ? this.config[section] || {} : this.config;
     const prefix = section || '';
-    
+
     this._walkConfig(configToWalk, prefix, (path, value) => {
       const source = this._getConfigSource(path, value);
       const shouldRedact = redact && this._shouldRedact(path);
-      
+
       result[path] = {
         value: shouldRedact ? '***' : value,
         source,
         type: typeof value,
-        redacted: shouldRedact
+        redacted: shouldRedact,
       };
     });
-    
+
     return result;
   }
 
@@ -353,7 +355,7 @@ class ConfigManager {
   _walkConfig(obj, prefix, callback) {
     for (const [key, value] of Object.entries(obj)) {
       const path = prefix ? `${prefix}.${key}` : key;
-      
+
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         // Handle nested objects
         this._walkConfig(value, path, callback);
@@ -374,18 +376,18 @@ class ConfigManager {
       const envOverride = _.get(this.envOverrides, path);
       return `environment:${envOverride.envKey}`;
     }
-    
+
     // Check if value exists in user config
     if (this._isFromUserConfig(path, value)) {
       return 'user-config';
     }
-    
+
     // Check if this value likely came from an environment variable via env() function
     const envSource = this._detectEnvSource(path, value);
     if (envSource) {
       return envSource;
     }
-    
+
     // Default to default config
     return 'default';
   }
@@ -407,14 +409,32 @@ class ConfigManager {
       { pattern: /^ai\.defaults\.topP$/, envVar: 'AI_DEFAULT_TOP_P' },
       { pattern: /^ai\.defaults\.topK$/, envVar: 'AI_DEFAULT_TOP_K' },
       { pattern: /^ai\.defaults\.stream$/, envVar: 'AI_DEFAULT_STREAM' },
-      { pattern: /^ai\.tasks\.summarization\.temperature$/, envVar: 'AI_SUMMARIZATION_TEMPERATURE' },
+      {
+        pattern: /^ai\.tasks\.summarization\.temperature$/,
+        envVar: 'AI_SUMMARIZATION_TEMPERATURE',
+      },
       { pattern: /^ai\.tasks\.summarization\.maxTokens$/, envVar: 'AI_SUMMARIZATION_MAX_TOKENS' },
-      { pattern: /^ai\.tasks\.classification\.temperature$/, envVar: 'AI_CLASSIFICATION_TEMPERATURE' },
+      {
+        pattern: /^ai\.tasks\.classification\.temperature$/,
+        envVar: 'AI_CLASSIFICATION_TEMPERATURE',
+      },
       { pattern: /^ai\.tasks\.classification\.maxTokens$/, envVar: 'AI_CLASSIFICATION_MAX_TOKENS' },
-      { pattern: /^ai\.tasks\.codeDescription\.temperature$/, envVar: 'AI_CODE_DESCRIPTION_TEMPERATURE' },
-      { pattern: /^ai\.tasks\.codeDescription\.maxTokens$/, envVar: 'AI_CODE_DESCRIPTION_MAX_TOKENS' },
-      { pattern: /^ai\.tasks\.imageDescription\.temperature$/, envVar: 'AI_IMAGE_DESCRIPTION_TEMPERATURE' },
-      { pattern: /^ai\.tasks\.imageDescription\.maxTokens$/, envVar: 'AI_IMAGE_DESCRIPTION_MAX_TOKENS' },
+      {
+        pattern: /^ai\.tasks\.codeDescription\.temperature$/,
+        envVar: 'AI_CODE_DESCRIPTION_TEMPERATURE',
+      },
+      {
+        pattern: /^ai\.tasks\.codeDescription\.maxTokens$/,
+        envVar: 'AI_CODE_DESCRIPTION_MAX_TOKENS',
+      },
+      {
+        pattern: /^ai\.tasks\.imageDescription\.temperature$/,
+        envVar: 'AI_IMAGE_DESCRIPTION_TEMPERATURE',
+      },
+      {
+        pattern: /^ai\.tasks\.imageDescription\.maxTokens$/,
+        envVar: 'AI_IMAGE_DESCRIPTION_MAX_TOKENS',
+      },
       { pattern: /^ai\.tasks\.profileCreation\.temperature$/, envVar: 'AI_PROFILE_TEMPERATURE' },
       { pattern: /^ai\.tasks\.profileCreation\.maxTokens$/, envVar: 'AI_PROFILE_MAX_TOKENS' },
       { pattern: /^ai\.cache\.enabled$/, envVar: 'AI_CACHE_ENABLED' },
@@ -425,25 +445,25 @@ class ConfigManager {
       { pattern: /^ai\.retry\.backoffMultiplier$/, envVar: 'AI_RETRY_BACKOFF' },
       { pattern: /^ai\.promptsPath$/, envVar: 'AI_PROMPTS_PATH' },
     ];
-    
+
     for (const { pattern, envVar } of envPatterns) {
       if (pattern.test(path) && process.env[envVar] !== undefined) {
         // Check if the environment value matches the current value
         let envValue = process.env[envVar];
-        
+
         // Type conversion (same as in env() function)
         if (envValue === 'true') envValue = true;
         else if (envValue === 'false') envValue = false;
         else if (envValue === 'null') envValue = null;
         else if (envValue.match(/^\d+$/)) envValue = parseInt(envValue);
         else if (envValue.match(/^\d+\.\d+$/)) envValue = parseFloat(envValue);
-        
+
         if (_.isEqual(envValue, value)) {
           return `environment:${envVar}`;
         }
       }
     }
-    
+
     return null;
   }
 
@@ -454,11 +474,11 @@ class ConfigManager {
   _isFromUserConfig(path, value) {
     const pathParts = path.split('.');
     const configSection = pathParts[0];
-    
+
     if (!this.userConfig[configSection]) {
       return false;
     }
-    
+
     // Get the value from user config at this path
     const userValue = _.get(this.userConfig, path);
     return userValue !== undefined && _.isEqual(userValue, value);
@@ -471,7 +491,7 @@ class ConfigManager {
   _shouldRedact(path) {
     const redactKeys = ['apikey', 'password', 'secret', 'token', 'key', 'auth'];
     const lowerPath = path.toLowerCase();
-    return redactKeys.some(key => lowerPath.includes(key));
+    return redactKeys.some((key) => lowerPath.includes(key));
   }
 
   /**

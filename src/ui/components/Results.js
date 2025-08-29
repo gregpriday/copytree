@@ -30,11 +30,7 @@ const TreeNode = ({ node, depth = 0, isLast = false, prefix = '' }) => {
     return React.createElement(
       Box,
       { flexDirection: 'column' },
-      React.createElement(
-        Text,
-        { color: 'cyan', bold: true },
-        nodePrefix + node.name + '/',
-      ),
+      React.createElement(Text, { color: 'cyan', bold: true }, nodePrefix + node.name + '/'),
       ...children.map((child, index) =>
         React.createElement(TreeNode, {
           key: child.name,
@@ -63,11 +59,7 @@ const Results = ({ results, output, format, showOutput = false }) => {
     return React.createElement(
       Box,
       { flexDirection: 'column' },
-      React.createElement(
-        Text,
-        { color: 'yellow', bold: true },
-        'File Structure:',
-      ),
+      React.createElement(Text, { color: 'yellow', bold: true }, 'File Structure:'),
       React.createElement(TreeNode, { node: results }),
     );
   }
@@ -76,16 +68,10 @@ const Results = ({ results, output, format, showOutput = false }) => {
     return React.createElement(
       Box,
       { flexDirection: 'column' },
-      React.createElement(
-        Text,
-        { color: 'yellow', bold: true },
-        `Output (${format}):`,
-      ),
-      results && results.instructions && React.createElement(
-        Text,
-        { color: 'gray' },
-        'Instructions: included',
-      ),
+      React.createElement(Text, { color: 'yellow', bold: true }, `Output (${format}):`),
+      results &&
+        results.instructions &&
+        React.createElement(Text, { color: 'gray' }, 'Instructions: included'),
       React.createElement(
         Box,
         { borderStyle: 'single', borderColor: 'gray', padding: 1 },

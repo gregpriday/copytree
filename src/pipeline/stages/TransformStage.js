@@ -13,20 +13,23 @@ class TransformStage extends Stage {
     this.transformerConfig = options.transformers || {};
     this.maxConcurrency = options.maxConcurrency || appConfig.maxConcurrency || 5;
     this.noCache = options.noCache;
-    
+
     // Initialize cache for transformations (disabled if noCache is true)
     // Only create cache if not disabled
-    this.cache = options.noCache ? null : (options.cache || CacheService.create('transformations', {
-      enabled: options.cacheEnabled ?? true,
-      defaultTtl: 86400, // 24 hours
-    }));
+    this.cache = options.noCache
+      ? null
+      : options.cache ||
+        CacheService.create('transformations', {
+          enabled: options.cacheEnabled ?? true,
+          defaultTtl: 86400, // 24 hours
+        });
   }
 
   async process(input) {
     this.log(`Transforming ${input.files.length} files`, 'debug');
     return this.processWithDisplay(input);
   }
-  
+
   // New method that handles display of active transformations
   async processWithDisplay(input) {
     const { files } = input;
@@ -45,19 +48,23 @@ class TransformStage extends Stage {
       const pLimit = await import('p-limit');
       limit = pLimit.default ? pLimit.default(this.maxConcurrency) : pLimit(this.maxConcurrency);
     }
-    
+
     // First pass: identify files that need transformation
     const filesToTransform = [];
     const cachedResults = new Map();
     let hasHeavyTransformers = false;
-    
+
     for (const file of files) {
       const transformer = this.getTransformerForFile(file);
       if (!transformer) continue;
-      
+
       const transformerName = transformer.constructor.name;
-      const cacheKey = generateTransformCacheKey(file, transformerName, this.transformerConfig[transformerName]);
-      
+      const cacheKey = generateTransformCacheKey(
+        file,
+        transformerName,
+        this.transformerConfig[transformerName],
+      );
+
       // Only check cache for heavy transformers
       if (transformer.isHeavy && this.cache) {
         const cached = await this.cache.get(cacheKey);
@@ -67,14 +74,14 @@ class TransformStage extends Stage {
           continue;
         }
       }
-      
+
       filesToTransform.push({ file, transformer, cacheKey });
       // Check if any transformer is heavy
       if (transformer.isHeavy) {
         hasHeavyTransformers = true;
       }
     }
-    
+
     // Show multi-line display if we have heavy transformers
     const activeTransforms = filesToTransform.length;
     const showMultiLine = hasHeavyTransformers && activeTransforms > 0;
@@ -82,63 +89,63 @@ class TransformStage extends Stage {
     let completedCount = 0;
 
     // Process files with active transform display
-    const transformPromises = files.map((file) => 
+    const transformPromises = files.map((file) =>
       limit(async () => {
         // Check if this file is cached
         if (cachedResults.has(file)) {
           return cachedResults.get(file);
         }
-        
+
         // Find the transform info for this file
         const transformInfo = filesToTransform.find((t) => t.file === file);
         if (!transformInfo) {
           return file; // No transformation needed
         }
-        
+
         const { transformer, cacheKey } = transformInfo;
         const filename = path.basename(file.path);
-        
+
         try {
           // Update display if showing multi-line
           if (showMultiLine) {
             activeFiles.push(filename);
             updateTransformDisplay();
           }
-          
+
           // Perform transformation
           const transformed = await transformer.transform(file);
-          
+
           if (transformed) {
             if (transformed.transformed) {
               transformCount++;
             }
-            
+
             // Cache the result only for heavy transformers
             if (transformer.isHeavy && this.cache) {
               await this.cache.set(cacheKey, transformed);
             }
-            
+
             // Update display
             completedCount++;
             if (showMultiLine) {
               activeFiles = activeFiles.filter((f) => f !== filename);
               updateTransformDisplay();
             }
-            
+
             return transformed;
           }
-          
+
           return file;
         } catch (error) {
           errorCount++;
           this.log(`Failed to transform ${file.path}: ${error.message}`, 'warn');
-          
+
           // Update display on error
           if (showMultiLine) {
             activeFiles = activeFiles.filter((f) => f !== filename);
             updateTransformDisplay();
           }
-          
+
           return {
             ...file,
             content: `[Transform error: ${error.message}]`,
@@ -148,11 +155,11 @@ class TransformStage extends Stage {
         }
       }),
     );
-    
+
     // Helper function to update the multi-line display
     const updateTransformDisplay = () => {
       if (!process.stdout.isTTY) return;
-      
+
       // Clear previous lines
       const linesToClear = Math.min(activeFiles.length + 1, this.maxConcurrency + 1);
       for (let i = 0; i < linesToClear; i++) {
@@ -162,10 +169,10 @@ class TransformStage extends Stage {
         }
         process.stdout.write('\r'); // Return to start
       }
-      
+
       // Write current status
       logger.updateSpinner(`Transforming (${completedCount}/${activeTransforms})`);
-      
+
       // Write active files
       activeFiles.slice(0, this.maxConcurrency).forEach((file) => {
         process.stdout.write(`\n  → ${file}`);
@@ -179,7 +186,7 @@ class TransformStage extends Stage {
 
     // Wait for all transformations to complete
     const transformedFiles = await Promise.all(transformPromises);
-    
+
     // Clear multi-line display if it was shown
     if (showMultiLine && process.stdout.isTTY) {
       const linesToClear = Math.min(activeFiles.length + 1, this.maxConcurrency + 1);
@@ -221,23 +228,23 @@ class TransformStage extends Stage {
 
   /**
    * Handle errors during transformation with recovery mechanism
-   * 
+   *
    * This implementation provides graceful recovery for transformation failures,
    * particularly useful for AI-powered transformers that may fail intermittently.
-   * 
+   *
    * @param {Error} error - Error that occurred during transformation
    * @param {Object} input - Input data containing files to transform
    * @returns {Promise<Object>} - Recovered result with error logging
    */
   async handleError(error, input) {
     this.log(`Transform stage encountered error: ${error.message}`, 'warn');
-    
+
     // Check if this is a recoverable error type
     const isRecoverable = this._isRecoverableError(error);
-    
+
     if (isRecoverable && input && input.files) {
       this.log('Attempting recovery by skipping transformation for affected files', 'info');
-      
+
       // Return input with transformation skipped but files preserved
       return {
         ...input,
@@ -249,7 +256,7 @@ class TransformStage extends Stage {
         },
       };
     }
-    
+
     // If not recoverable, rethrow the error
     throw error;
   }
@@ -267,11 +274,9 @@ class TransformStage extends Stage {
       'ETIMEDOUT', // Timeout errors
       'ECONNRESET', // Connection reset
     ];
-    
-    return recoverableTypes.some(type => 
-      error.name === type || 
-      error.code === type || 
-      error.message.includes(type)
+
+    return recoverableTypes.some(
+      (type) => error.name === type || error.code === type || error.message.includes(type),
     );
   }
 
@@ -282,22 +287,23 @@ class TransformStage extends Stage {
 
     try {
       const transformer = this.registry.getForFile(file);
-      
+
       // Check if transformer is enabled in config
       const transformerName = transformer.constructor.name;
-      const config = this.transformerConfig[transformerName] || 
-                    this.transformerConfig[transformerName.toLowerCase()] ||
-                    this.transformerConfig[transformerName.replace(/Transformer$/, '').toLowerCase()];
-      
+      const config =
+        this.transformerConfig[transformerName] ||
+        this.transformerConfig[transformerName.toLowerCase()] ||
+        this.transformerConfig[transformerName.replace(/Transformer$/, '').toLowerCase()];
+
       if (config && config.enabled === false) {
         return null;
       }
-      
+
       // Set noCache option on transformer if specified
       if (this.noCache) {
         transformer.cacheEnabled = false;
       }
-      
+
       return transformer;
     } catch (_error) {
       // No transformer found, return null

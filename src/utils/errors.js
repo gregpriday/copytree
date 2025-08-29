@@ -8,7 +8,7 @@ class CopyTreeError extends Error {
     this.code = code;
     this.details = details;
     this.timestamp = new Date().toISOString();
-    
+
     // Capture stack trace
     Error.captureStackTrace(this, this.constructor);
   }
@@ -142,11 +142,7 @@ class InstructionsError extends CopyTreeError {
  * Handle errors consistently
  */
 function handleError(error, options = {}) {
-  const { 
-    exit = true, 
-    verbose = false,
-    logger = console.error, 
-  } = options;
+  const { exit = true, verbose = false, logger = console.error } = options;
 
   // Convert to CopyTreeError if not already
   if (!(error instanceof CopyTreeError)) {
@@ -183,7 +179,7 @@ const ProviderError = AIProviderError;
 export const RETRYABLE_ERROR_CODES = [
   'RATE_LIMIT',
   'TIMEOUT',
-  'SERVICE_UNAVAILABLE', 
+  'SERVICE_UNAVAILABLE',
   'NETWORK_ERROR',
   'TEMPORARY_FAILURE',
   'ENOTFOUND',
@@ -219,7 +215,7 @@ export function isRetryableError(error) {
     const specificCode = error.details?.code;
     return specificCode && RETRYABLE_ERROR_CODES.includes(specificCode);
   }
-  
+
   // Check for common network error codes on the error object
   const errorCode = error.code || error.name || '';
   return RETRYABLE_ERROR_CODES.includes(errorCode);
@@ -234,7 +230,7 @@ export function categorizeError(error) {
   if (isRetryableError(error)) {
     return 'retryable';
   }
-  
+
   if (error instanceof ProviderError) {
     // For ProviderError, the specific error code is in details.code
     const specificCode = error.details?.code;
@@ -242,12 +238,12 @@ export function categorizeError(error) {
       return 'non-retryable';
     }
   }
-  
+
   const errorCode = error.code || error.name || '';
   if (NON_RETRYABLE_ERROR_CODES.includes(errorCode)) {
     return 'non-retryable';
   }
-  
+
   return 'unknown';
 }
 

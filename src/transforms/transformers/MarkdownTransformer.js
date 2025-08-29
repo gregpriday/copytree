@@ -16,7 +16,7 @@ class MarkdownTransformer extends BaseTransformer {
   async doTransform(file) {
     // First load the content if not already loaded
     let content = file.content;
-    
+
     if (content === undefined && file.absolutePath) {
       const fs = await import('fs-extra');
       content = await fs.readFile(file.absolutePath, 'utf8');
@@ -32,15 +32,15 @@ class MarkdownTransformer extends BaseTransformer {
     }
 
     let transformedContent;
-    
+
     switch (this.mode) {
-    case 'html':
-      transformedContent = this.convertToHtml(content);
-      break;
-    case 'strip':
-    default:
-      transformedContent = this.stripMarkdown(content);
-      break;
+      case 'html':
+        transformedContent = this.convertToHtml(content);
+        break;
+      case 'strip':
+      default:
+        transformedContent = this.stripMarkdown(content);
+        break;
     }
 
     return {

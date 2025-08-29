@@ -41,16 +41,16 @@ class BaseProvider {
     this.name = 'gemini';
     this.config = config();
     this.logger = logger.child(this.constructor.name);
-    
+
     // Provider configuration
     this.apiKey = options.apiKey || this.getApiKey();
     this.model = options.model || this.getDefaultModel();
     this.maxTokens = options.maxTokens || this.config.get('ai.defaults.maxTokens', 2048);
     this.temperature = options.temperature ?? this.config.get('ai.defaults.temperature', 0.7);
-    
+
     // Response caching
     this.cacheEnabled = options.cache ?? this.config.get('cache.ai.enabled', true);
-    
+
     // Validate configuration
     this.validateConfig();
   }
@@ -82,12 +82,9 @@ class BaseProvider {
         this.name,
       );
     }
-    
+
     if (!this.model) {
-      throw new ProviderError(
-        'Default model not configured for Gemini',
-        this.name,
-      );
+      throw new ProviderError('Default model not configured for Gemini', this.name);
     }
   }
 
@@ -146,13 +143,13 @@ class BaseProvider {
       latencyMs: options.latencyMs || 0,
       requestId: options.requestId || crypto.randomUUID(),
       rateLimit: {
-        requests: { 
-          limit: options.rateLimit?.requests?.limit || null, 
-          remaining: options.rateLimit?.requests?.remaining || null 
+        requests: {
+          limit: options.rateLimit?.requests?.limit || null,
+          remaining: options.rateLimit?.requests?.remaining || null,
         },
-        tokens: { 
-          limit: options.rateLimit?.tokens?.limit || null, 
-          remaining: options.rateLimit?.tokens?.remaining || null 
+        tokens: {
+          limit: options.rateLimit?.tokens?.limit || null,
+          remaining: options.rateLimit?.tokens?.remaining || null,
         },
         resetTime: options.rateLimit?.resetTime || null,
       },
@@ -193,7 +190,7 @@ class BaseProvider {
    */
   async processStream(stream, onChunk) {
     let fullResponse = '';
-    
+
     try {
       for await (const chunk of stream) {
         const content = this.extractContentFromChunk(chunk);
@@ -205,13 +202,11 @@ class BaseProvider {
         }
       }
     } catch (error) {
-      throw new ProviderError(
-        `Stream processing failed: ${error.message}`,
-        this.name,
-        { originalError: error },
-      );
+      throw new ProviderError(`Stream processing failed: ${error.message}`, this.name, {
+        originalError: error,
+      });
     }
-    
+
     return fullResponse;
   }
 
@@ -252,11 +247,8 @@ class BaseProvider {
       temperature: options.temperature || this.temperature,
       maxTokens: options.maxTokens || this.maxTokens,
     };
-    
-    return crypto
-      .createHash('sha256')
-      .update(JSON.stringify(data))
-      .digest('hex');
+
+    return crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
   }
 
   /**
@@ -269,11 +261,11 @@ class BaseProvider {
   handleError(error, operation, envelope = {}) {
     let message = `${this.name} ${operation} failed: ${error.message}`;
     let code = 'PROVIDER_ERROR';
-    
+
     // Handle common API errors
     if (error.response) {
       const status = error.response.status;
-      
+
       if (status === 401 || status === 403) {
         message = `Invalid ${this.name} API key`;
         code = 'INVALID_API_KEY';
@@ -285,7 +277,7 @@ class BaseProvider {
         code = 'SERVICE_UNAVAILABLE';
       }
     }
-    
+
     throw new ProviderError(message, this.name, {
       code,
       originalError: error,

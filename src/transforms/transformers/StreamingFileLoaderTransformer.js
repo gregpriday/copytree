@@ -23,7 +23,7 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
       }
 
       // Check file size
-      const stats = file.stats || await fs.stat(file.absolutePath);
+      const stats = file.stats || (await fs.stat(file.absolutePath));
       if (stats.size > this.maxSize) {
         return {
           ...file,
@@ -37,10 +37,10 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
 
       // Check if binary
       const isBinary = await this.isBinaryFile(file.absolutePath, stats.size);
-      
+
       if (isBinary) {
         const binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
-        
+
         if (binaryAction === 'skip') {
           return null;
         } else if (binaryAction === 'base64') {
@@ -58,7 +58,10 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
           // Placeholder
           return {
             ...file,
-            content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
+            content: this.config.get(
+              'copytree.binaryPlaceholderText',
+              '[Binary file not included]',
+            ),
             isBinary: true,
             transformed: true,
             transformedBy: this.constructor.name,
@@ -68,7 +71,7 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
 
       // Stream text file content
       const content = await this.streamTextFile(file.absolutePath);
-      
+
       return {
         ...file,
         content,
@@ -78,7 +81,7 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
       };
     } catch (error) {
       this.logger.error(`Failed to load file ${file.path}: ${error.message}`);
-      
+
       return {
         ...file,
         content: `[Error reading file: ${error.message}]`,
@@ -130,47 +133,98 @@ class StreamingFileLoaderTransformer extends BaseTransformer {
    */
   async isBinaryFile(filePath, size) {
     if (size === 0) return false;
-    
+
     // Common binary file extensions
     const binaryExtensions = [
-      '.exe', '.dll', '.so', '.dylib', '.zip', '.tar', '.gz', 
-      '.7z', '.rar', '.pdf', '.doc', '.docx', '.xls', '.xlsx',
-      '.ppt', '.pptx', '.odt', '.ods', '.odp', '.jpg', '.jpeg',
-      '.png', '.gif', '.bmp', '.ico', '.svg', '.webp', '.mp3',
-      '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv',
-      '.wav', '.flac', '.aac', '.ogg', '.wma', '.ttf', '.otf',
-      '.woff', '.woff2', '.eot', '.pyc', '.pyo', '.class',
-      '.o', '.obj', '.a', '.lib', '.pdb', '.idb', '.jar',
-      '.war', '.ear', '.db', '.sqlite', '.sqlite3',
+      '.exe',
+      '.dll',
+      '.so',
+      '.dylib',
+      '.zip',
+      '.tar',
+      '.gz',
+      '.7z',
+      '.rar',
+      '.pdf',
+      '.doc',
+      '.docx',
+      '.xls',
+      '.xlsx',
+      '.ppt',
+      '.pptx',
+      '.odt',
+      '.ods',
+      '.odp',
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.bmp',
+      '.ico',
+      '.svg',
+      '.webp',
+      '.mp3',
+      '.mp4',
+      '.avi',
+      '.mov',
+      '.wmv',
+      '.flv',
+      '.webm',
+      '.mkv',
+      '.wav',
+      '.flac',
+      '.aac',
+      '.ogg',
+      '.wma',
+      '.ttf',
+      '.otf',
+      '.woff',
+      '.woff2',
+      '.eot',
+      '.pyc',
+      '.pyo',
+      '.class',
+      '.o',
+      '.obj',
+      '.a',
+      '.lib',
+      '.pdb',
+      '.idb',
+      '.jar',
+      '.war',
+      '.ear',
+      '.db',
+      '.sqlite',
+      '.sqlite3',
     ];
-    
+
     const ext = (filePath.match(/\.[^.]+$/) || [''])[0].toLowerCase();
     if (binaryExtensions.includes(ext)) {
       return true;
     }
-    
+
     // Check file content
     const bytesToCheck = Math.min(8000, size);
     const buffer = Buffer.alloc(bytesToCheck);
-    
+
     const fd = await fs.open(filePath, 'r');
     try {
       await fs.read(fd, buffer, 0, bytesToCheck, 0);
-      
+
       // Check for null bytes or high percentage of non-printable chars
       let nonPrintable = 0;
       for (let i = 0; i < bytesToCheck; i++) {
         const byte = buffer[i];
         if (byte === 0) return true; // Null byte found
-        
+
         // Count non-printable characters (excluding common whitespace)
         if (byte < 32 && byte !== 9 && byte !== 10 && byte !== 13) {
           nonPrintable++;
         }
       }
-      
+
       // If more than 30% non-printable, consider binary
-      return (nonPrintable / bytesToCheck) > 0.3;
+      return nonPrintable / bytesToCheck > 0.3;
     } finally {
       await fs.close(fd);
     }

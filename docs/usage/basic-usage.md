@@ -118,11 +118,12 @@ copytree --clipboard
 ### 2. File Output
 
 ```bash
-# Save to specific file
-copytree --output project-snapshot.xml
+# Save to specific file (default markdown)
+copytree --output project-snapshot.md
 
 # Different formats
 copytree --output snapshot.json --format json
+copytree --output snapshot.xml --format xml
 ```
 
 ### 3. Console Display
@@ -160,19 +161,35 @@ copytree --instructions default
 
 ## Output Formats
 
-### XML (Default)
+### Markdown (Default)
 
 ```bash
-copytree --format xml
+copytree --format markdown
 ```
 
 Output structure:
-```xml
-<project>
-  <file path="src/index.js">
-    <content>// File content here</content>
-  </file>
-</project>
+```markdown
+---
+format: copytree-md@1
+...
+---
+
+# CopyTree Export — project
+
+## Directory Tree
+```text
+├── src/
+└── README.md
+```
+
+## Files
+
+<!-- copytree:file-begin path="@src/index.js" size=123 ... -->
+### @src/index.js
+```js
+// File content here
+```
+<!-- copytree:file-end path="@src/index.js" -->
 ```
 
 ### JSON
@@ -208,6 +225,14 @@ project/
 │       └── App.js
 └── package.json
 ```
+
+### XML
+
+```bash
+copytree --format xml
+```
+
+Produces XML metadata and files; useful when integrating with XML-based tooling.
 
 ## Common Workflows
 

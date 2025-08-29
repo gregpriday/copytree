@@ -17,7 +17,9 @@ class ProfileGuesser {
    * Framework-specific profiles have been removed in favor of using default + .gitignore/.copytreeignore
    */
   async guess() {
-    this.logger.debug('Framework auto-detection disabled, using default profile', { path: this.projectPath });
+    this.logger.debug('Framework auto-detection disabled, using default profile', {
+      path: this.projectPath,
+    });
     return 'default';
   }
 
@@ -33,7 +35,12 @@ class ProfileGuesser {
       buildTools: [],
       testFrameworks: [],
       hasDocker: await this.hasFile('Dockerfile', 'docker-compose.yml'),
-      hasCI: await this.hasAnyFile(['.github/workflows', '.gitlab-ci.yml', '.circleci', 'Jenkinsfile']),
+      hasCI: await this.hasAnyFile([
+        '.github/workflows',
+        '.gitlab-ci.yml',
+        '.circleci',
+        'Jenkinsfile',
+      ]),
       hasTests: await this.hasAnyDirectory(['test', 'tests', '__tests__', 'spec']),
       hasDocs: await this.hasAnyDirectory(['docs', 'documentation']),
       packageManagers: [],
@@ -43,7 +50,8 @@ class ProfileGuesser {
     if (await this.hasFile('package.json')) analysis.languages.push('javascript');
     if (await this.hasFile('tsconfig.json')) analysis.languages.push('typescript');
     if (await this.hasFile('composer.json')) analysis.languages.push('php');
-    if (await this.hasFile('requirements.txt', 'Pipfile', 'pyproject.toml')) analysis.languages.push('python');
+    if (await this.hasFile('requirements.txt', 'Pipfile', 'pyproject.toml'))
+      analysis.languages.push('python');
     if (await this.hasFile('Gemfile')) analysis.languages.push('ruby');
     if (await this.hasFile('go.mod')) analysis.languages.push('go');
     if (await this.hasFile('Cargo.toml')) analysis.languages.push('rust');
@@ -59,7 +67,6 @@ class ProfileGuesser {
 
     return analysis;
   }
-
 
   // Helper methods
 
@@ -103,9 +110,6 @@ class ProfileGuesser {
     }
     return false;
   }
-
-
-
 }
 
 export default ProfileGuesser;

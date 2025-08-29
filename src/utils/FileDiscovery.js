@@ -13,7 +13,7 @@ class FileDiscovery {
     this.gitignorePatterns = [];
     this.config = config();
     this.logger = options.logger || logger;
-    
+
     // Options
     this.options = {
       respectGitignore: options.respectGitignore ?? true,
@@ -36,7 +36,7 @@ class FileDiscovery {
 
     try {
       // Validate base path exists
-      if (!await fs.pathExists(this.basePath)) {
+      if (!(await fs.pathExists(this.basePath))) {
         throw new FileSystemError(
           `Base path does not exist: ${this.basePath}`,
           this.basePath,
@@ -58,7 +58,7 @@ class FileDiscovery {
       const duration = Date.now() - startTime;
       this.logger.info(
         `Discovered ${filteredFiles.length} files in ${duration}ms ` +
-        `(${files.length} total, ${files.length - filteredFiles.length} excluded)`,
+          `(${files.length} total, ${files.length - filteredFiles.length} excluded)`,
       );
 
       return filteredFiles;
@@ -77,7 +77,7 @@ class FileDiscovery {
    */
   async loadGitignore() {
     const gitignorePath = path.join(this.basePath, '.gitignore');
-    
+
     if (await fs.pathExists(gitignorePath)) {
       try {
         const content = await fs.readFile(gitignorePath, 'utf8');
@@ -94,21 +94,21 @@ class FileDiscovery {
    */
   parseGitignoreContent(content) {
     const lines = content.split('\n');
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
-      
+
       // Skip empty lines and comments
       if (!trimmed || trimmed.startsWith('#')) continue;
-      
+
       // Convert gitignore pattern to minimatch pattern
       let pattern = trimmed;
       const isNegated = pattern.startsWith('!');
-      
+
       if (isNegated) {
         pattern = pattern.substring(1);
       }
-      
+
       // If pattern doesn't start with /, it matches anywhere
       if (!pattern.startsWith('/')) {
         pattern = '**/' + pattern;
@@ -116,12 +116,12 @@ class FileDiscovery {
         // Remove leading slash for relative matching
         pattern = pattern.substring(1);
       }
-      
+
       // If pattern ends with /, it only matches directories
       if (pattern.endsWith('/')) {
         pattern = pattern + '**';
       }
-      
+
       this.gitignorePatterns.push({
         pattern,
         isNegated,
@@ -208,7 +208,7 @@ class FileDiscovery {
       }
 
       // Apply custom filter if provided
-      if (this.options.filter && !await this.options.filter(file)) {
+      if (this.options.filter && !(await this.options.filter(file))) {
         continue;
       }
 
@@ -236,19 +236,19 @@ class FileDiscovery {
 
     // Process patterns in order - last match wins for gitignore compatibility
     let ignored = false;
-    
+
     for (const { pattern, isNegated } of this.gitignorePatterns) {
       const options = {
         dot: true,
         matchBase: true,
         nocase: process.platform === 'win32',
       };
-      
+
       if (minimatch(filePath, pattern, options)) {
         ignored = !isNegated;
       }
     }
-    
+
     return ignored;
   }
 
@@ -265,11 +265,11 @@ class FileDiscovery {
 
     for (const file of files) {
       stats.totalSize += file.size;
-      
+
       if (!stats.largestFile || file.size > stats.largestFile.size) {
         stats.largestFile = file;
       }
-      
+
       const ext = path.extname(file.path).toLowerCase() || 'no-extension';
       stats.fileTypes[ext] = (stats.fileTypes[ext] || 0) + 1;
     }

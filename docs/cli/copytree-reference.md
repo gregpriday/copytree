@@ -94,11 +94,13 @@ copytree --no-clipboard --display
 ### Format Options
 
 #### `--format=<type>`
-Output format: `xml` (default), `json`, or `tree`.
+Output format: `markdown|md` (default), `xml`, `json`, or `tree`.
 
 ```bash
 copytree --format json
 copytree --format tree
+copytree --format markdown
+copytree --format xml
 ```
 
 ### Display Control Options

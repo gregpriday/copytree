@@ -6,7 +6,7 @@ import { logger } from '../utils/logger.js';
 class Pipeline extends EventEmitter {
   constructor(options = {}) {
     super();
-    
+
     this.stages = [];
     this.stageInstances = []; // Track instantiated stages for lifecycle hooks
     this.options = {
@@ -16,7 +16,7 @@ class Pipeline extends EventEmitter {
       maxConcurrency: options.maxConcurrency ?? config().get('app.maxConcurrency', 5),
       ...options,
     };
-    
+
     this.stats = {
       startTime: null,
       endTime: null,
@@ -36,7 +36,7 @@ class Pipeline extends EventEmitter {
         info: () => {},
         warn: () => {},
         error: () => {},
-        success: () => {}
+        success: () => {},
       },
       options: this.options,
       stats: this.stats,
@@ -54,7 +54,7 @@ class Pipeline extends EventEmitter {
     if (!Array.isArray(stages)) {
       stages = [stages];
     }
-    
+
     this.stages.push(...stages);
     return this;
   }
@@ -69,12 +69,12 @@ class Pipeline extends EventEmitter {
       // Already initialized
       return;
     }
-    
+
     // Instantiate all stages and call onInit hooks
     for (let i = 0; i < this.stages.length; i++) {
-      const Stage = this.stages[i]; 
+      const Stage = this.stages[i];
       let stageInstance;
-      
+
       if (typeof Stage === 'function' && !Stage.prototype) {
         // It's a plain function, use it directly
         stageInstance = Stage;
@@ -85,16 +85,18 @@ class Pipeline extends EventEmitter {
         // It's a constructor, instantiate it with pipeline reference
         stageInstance = new Stage({ ...this.options, pipeline: this });
       }
-      
+
       this.stageInstances.push(stageInstance);
-      
+
       // Call onInit hook if it exists
       if (typeof stageInstance.onInit === 'function') {
         try {
           await stageInstance.onInit(this.context);
         } catch (error) {
           // Log initialization error but don't fail pipeline creation
-          this.context.logger.warn(`Stage ${this._getStageName(Stage, i)} onInit hook failed: ${error.message}`);
+          this.context.logger.warn(
+            `Stage ${this._getStageName(Stage, i)} onInit hook failed: ${error.message}`,
+          );
         }
       }
     }
@@ -108,7 +110,7 @@ class Pipeline extends EventEmitter {
   async process(input) {
     // Initialize stages if not already done
     await this._initializeStages();
-    
+
     this.stats.startTime = Date.now();
     this.stats.stagesCompleted = 0;
     this.stats.stagesFailed = 0;
@@ -117,7 +119,7 @@ class Pipeline extends EventEmitter {
     this.stats.perStageMetrics = {};
     this.stats.totalStageTime = 0;
     this.stats.averageStageTime = 0;
-    
+
     this.emit('pipeline:start', {
       input,
       stages: this.stages.length,
@@ -132,23 +134,23 @@ class Pipeline extends EventEmitter {
       } else {
         result = await this._processSequential(result);
       }
-      
+
       this.stats.endTime = Date.now();
-      
+
       this.emit('pipeline:complete', {
         result,
         stats: this.getStats(),
       });
-      
+
       return result;
     } catch (error) {
       this.stats.endTime = Date.now();
-      
+
       this.emit('pipeline:error', {
         error,
         stats: this.getStats(),
       });
-      
+
       throw error;
     }
   }
@@ -159,64 +161,74 @@ class Pipeline extends EventEmitter {
    */
   async _processSequential(input) {
     let result = input;
-    
+
     for (let i = 0; i < this.stageInstances.length; i++) {
       const stageInstance = this.stageInstances[i];
       const Stage = this.stages[i]; // For name resolution
       const stageName = this._getStageName(Stage, i);
-      
+
       try {
         this.emit('stage:start', {
           stage: stageName,
           index: i,
           input: result,
         });
-        
+
         const processMethod = stageInstance.process || stageInstance;
-        
+
         if (typeof processMethod !== 'function') {
           throw new Error(`Stage ${stageName} does not have a process method`);
         }
-        
+
         // Call beforeRun hook if it exists
         if (typeof stageInstance.beforeRun === 'function') {
           try {
             await stageInstance.beforeRun(result);
           } catch (hookError) {
-            this.context.logger.warn(`Stage ${stageName} beforeRun hook failed: ${hookError.message}`);
+            this.context.logger.warn(
+              `Stage ${stageName} beforeRun hook failed: ${hookError.message}`,
+            );
             // Continue processing - hook failures shouldn't stop pipeline
           }
         }
-        
+
         // Validate input before processing if validate method exists
         if (typeof stageInstance.validate === 'function') {
           try {
             stageInstance.validate(result);
           } catch (error) {
-            const validationError = error instanceof ValidationError ? 
-              error : new ValidationError(`Stage validation failed: ${error.message}`, stageName, result);
-            
+            const validationError =
+              error instanceof ValidationError
+                ? error
+                : new ValidationError(
+                    `Stage validation failed: ${error.message}`,
+                    stageName,
+                    result,
+                  );
+
             if (this.options.continueOnError) {
-              console.warn(`[Pipeline] Validation warning in ${stageName}: ${validationError.message}`);
+              console.warn(
+                `[Pipeline] Validation warning in ${stageName}: ${validationError.message}`,
+              );
             } else {
               throw validationError;
             }
           }
         }
-        
+
         // Capture timing and metrics for this stage
         const stageStart = Date.now();
         const stageStartMemory = process.memoryUsage();
         const inputSize = result?.files?.length || (Array.isArray(result) ? result.length : 1);
-        
+
         // Execute main stage processing
         const output = await processMethod.call(stageInstance, result);
-        
+
         const stageEnd = Date.now();
         const stageEndMemory = process.memoryUsage();
         const stageDuration = stageEnd - stageStart;
         const outputSize = output?.files?.length || (Array.isArray(output) ? output.length : 1);
-        
+
         // Store stage timings and metrics
         this.stats.perStageTimings[stageName] = stageDuration;
         this.stats.perStageMetrics[stageName] = {
@@ -229,27 +241,29 @@ class Pipeline extends EventEmitter {
               rss: stageEndMemory.rss - stageStartMemory.rss,
               heapUsed: stageEndMemory.heapUsed - stageStartMemory.heapUsed,
               heapTotal: stageEndMemory.heapTotal - stageStartMemory.heapTotal,
-            }
+            },
           },
           timestamp: stageEnd,
         };
-        
+
         // Update totals
         this.stats.totalStageTime += stageDuration;
-        
+
         // Call afterRun hook if it exists
         if (typeof stageInstance.afterRun === 'function') {
           try {
             await stageInstance.afterRun(output);
           } catch (hookError) {
-            this.context.logger.warn(`Stage ${stageName} afterRun hook failed: ${hookError.message}`);
+            this.context.logger.warn(
+              `Stage ${stageName} afterRun hook failed: ${hookError.message}`,
+            );
             // Continue processing - hook failures shouldn't stop pipeline
           }
         }
-        
+
         result = output;
         this.stats.stagesCompleted++;
-        
+
         this.emit('stage:complete', {
           stage: stageName,
           index: i,
@@ -261,18 +275,19 @@ class Pipeline extends EventEmitter {
           memoryUsage: this.stats.perStageMetrics[stageName].memoryUsage,
           timestamp: stageEnd,
         });
-        
       } catch (error) {
         // Call onError hook if it exists (before handleError)
         if (typeof stageInstance.onError === 'function') {
           try {
             await stageInstance.onError(error, result);
           } catch (hookError) {
-            this.context.logger.warn(`Stage ${stageName} onError hook failed: ${hookError.message}`);
+            this.context.logger.warn(
+              `Stage ${stageName} onError hook failed: ${hookError.message}`,
+            );
             // Continue with original error handling
           }
         }
-        
+
         // Try stage-specific error handling
         if (typeof stageInstance.handleError === 'function') {
           try {
@@ -293,7 +308,7 @@ class Pipeline extends EventEmitter {
             error = handlerError;
           }
         }
-        
+
         // Existing error handling continues here...
         this.stats.stagesFailed++;
         this.stats.errors.push({
@@ -301,19 +316,19 @@ class Pipeline extends EventEmitter {
           error: error.message,
           stack: error.stack,
         });
-        
+
         this.emit('stage:error', {
           stage: stageName,
           index: i,
           error,
         });
-        
+
         if (!this.options.continueOnError) {
           throw error;
         }
       }
     }
-    
+
     return result;
   }
 
@@ -324,11 +339,11 @@ class Pipeline extends EventEmitter {
   async _processParallel(input) {
     const chunks = Array.isArray(input) ? input : [input];
     const results = [];
-    
+
     // Process chunks in batches
     for (let i = 0; i < chunks.length; i += this.options.maxConcurrency) {
       const batch = chunks.slice(i, i + this.options.maxConcurrency);
-      
+
       const batchResults = await Promise.all(
         batch.map(async (chunk, _index) => {
           try {
@@ -341,10 +356,10 @@ class Pipeline extends EventEmitter {
           }
         }),
       );
-      
+
       results.push(...batchResults);
     }
-    
+
     return Array.isArray(input) ? results : results[0];
   }
 
@@ -369,13 +384,13 @@ class Pipeline extends EventEmitter {
     if (totalStages > 0 && this.stats.totalStageTime > 0) {
       this.stats.averageStageTime = this.stats.totalStageTime / totalStages;
     }
-    
+
     return {
       ...this.stats,
-      duration: this.stats.endTime ? this.stats.endTime - this.stats.startTime : (Date.now() - this.stats.startTime),
-      successRate: totalStages > 0 
-        ? this.stats.stagesCompleted / totalStages
-        : 1,
+      duration: this.stats.endTime
+        ? this.stats.endTime - this.stats.startTime
+        : Date.now() - this.stats.startTime,
+      successRate: totalStages > 0 ? this.stats.stagesCompleted / totalStages : 1,
     };
   }
 

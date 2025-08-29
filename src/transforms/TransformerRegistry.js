@@ -13,7 +13,7 @@ class TransformerRegistry {
     this.mimeTypeMap = new Map();
     this.defaultTransformer = null;
     this.logger = logger.child('TransformerRegistry');
-    
+
     // Traits system
     this.traits = new Map(); // transformer name -> traits
     this.validationEnabled = true;
@@ -110,7 +110,7 @@ class TransformerRegistry {
       const sorted = uniqueNames
         .map((name) => ({ name, ...this.transformers.get(name) }))
         .sort((a, b) => b.priority - a.priority);
-      
+
       return this.get(sorted[0].name);
     }
 
@@ -119,11 +119,7 @@ class TransformerRegistry {
       return this.get(this.defaultTransformer);
     }
 
-    throw new TransformError(
-      `No transformer found for file: ${file.path}`,
-      'unknown',
-      file.path,
-    );
+    throw new TransformError(`No transformer found for file: ${file.path}`, 'unknown', file.path);
   }
 
   /**
@@ -209,7 +205,7 @@ class TransformerRegistry {
     return {
       valid: issues.length === 0,
       issues,
-      warnings
+      warnings,
     };
   }
 
@@ -220,10 +216,10 @@ class TransformerRegistry {
    */
   optimizePlan(stages) {
     if (!stages || stages.length <= 1) {
-      return { 
-        optimized: stages || [], 
-        changes: [], 
-        reasoning: [] 
+      return {
+        optimized: stages || [],
+        changes: [],
+        reasoning: [],
       };
     }
 
@@ -232,24 +228,24 @@ class TransformerRegistry {
     const reasoning = [];
 
     // Sort by dependency requirements (order-sensitive transformers first)
-    const withTraits = optimized.map(name => ({
+    const withTraits = optimized.map((name) => ({
       name,
-      traits: this.traits.get(name) || {}
+      traits: this.traits.get(name) || {},
     }));
 
     // Move order-sensitive transformers to appropriate positions
-    const orderSensitive = withTraits.filter(t => t.traits.orderSensitive);
-    const orderInsensitive = withTraits.filter(t => !t.traits.orderSensitive);
-    const heavy = withTraits.filter(t => t.traits.heavy);
+    const orderSensitive = withTraits.filter((t) => t.traits.orderSensitive);
+    const orderInsensitive = withTraits.filter((t) => !t.traits.orderSensitive);
+    const heavy = withTraits.filter((t) => t.traits.heavy);
 
     // Rebuild order: order-sensitive first, then light operations, then heavy operations
     const reordered = [
-      ...orderSensitive.filter(t => !t.traits.heavy),
-      ...orderInsensitive.filter(t => !t.traits.heavy),
-      ...heavy
+      ...orderSensitive.filter((t) => !t.traits.heavy),
+      ...orderInsensitive.filter((t) => !t.traits.heavy),
+      ...heavy,
     ];
 
-    const optimizedNames = reordered.map(t => t.name);
+    const optimizedNames = reordered.map((t) => t.name);
 
     // Track changes
     for (let i = 0; i < stages.length; i++) {
@@ -257,7 +253,7 @@ class TransformerRegistry {
         changes.push({
           from: stages.indexOf(optimizedNames[i]),
           to: i,
-          transformer: optimizedNames[i]
+          transformer: optimizedNames[i],
         });
       }
     }
@@ -272,7 +268,7 @@ class TransformerRegistry {
     return {
       optimized: optimizedNames,
       changes,
-      reasoning
+      reasoning,
     };
   }
 
@@ -308,7 +304,7 @@ class TransformerRegistry {
       stateful: traits.stateful ?? false,
       conflictsWith: traits.conflictsWith || [],
       requirements: traits.requirements || {},
-      tags: traits.tags || []
+      tags: traits.tags || [],
     };
 
     // Validate trait values
@@ -350,30 +346,34 @@ class TransformerRegistry {
         type: 'conflict',
         severity: 'error',
         message: `Transformer '${transformer1}' conflicts with '${transformer2}'`,
-        transformers: [transformer1, transformer2]
+        transformers: [transformer1, transformer2],
       });
     }
 
     if (traits2.conflictsWith.includes(transformer1)) {
       issues.push({
-        type: 'conflict', 
+        type: 'conflict',
         severity: 'error',
         message: `Transformer '${transformer2}' conflicts with '${transformer1}'`,
-        transformers: [transformer1, transformer2]
+        transformers: [transformer1, transformer2],
       });
     }
 
     // Check input/output type compatibility
-    const hasCompatibleTypes = traits1.outputTypes.some(output => 
-      traits2.inputTypes.includes(output)
+    const hasCompatibleTypes = traits1.outputTypes.some((output) =>
+      traits2.inputTypes.includes(output),
     );
-    
-    if (!hasCompatibleTypes && traits1.outputTypes[0] !== 'any' && traits2.inputTypes[0] !== 'any') {
+
+    if (
+      !hasCompatibleTypes &&
+      traits1.outputTypes[0] !== 'any' &&
+      traits2.inputTypes[0] !== 'any'
+    ) {
       issues.push({
         type: 'incompatible_types',
         severity: 'warning',
         message: `Output types of '${transformer1}' (${traits1.outputTypes.join(', ')}) may not be compatible with input types of '${transformer2}' (${traits2.inputTypes.join(', ')})`,
-        transformers: [transformer1, transformer2]
+        transformers: [transformer1, transformer2],
       });
     }
 
@@ -401,7 +401,7 @@ class TransformerRegistry {
               type: 'ordering',
               severity: 'warning',
               message: `Order-sensitive transformer '${stages[i]}' follows non-idempotent transformer '${stages[j]}', which may cause unpredictable results`,
-              transformers: [stages[j], stages[i]]
+              transformers: [stages[j], stages[i]],
             });
           }
         }
@@ -409,17 +409,17 @@ class TransformerRegistry {
 
       // Check if heavy transformer is placed optimally
       if (traits.heavy && i < stages.length - 2) {
-        const remainingHeavy = stages.slice(i + 1).filter(name => {
+        const remainingHeavy = stages.slice(i + 1).filter((name) => {
           const t = this.traits.get(name);
           return t && t.heavy;
         });
-        
+
         if (remainingHeavy.length === 0) {
           issues.push({
             type: 'performance',
             severity: 'info',
             message: `Heavy transformer '${stages[i]}' could be moved later in the pipeline for better performance`,
-            transformers: [stages[i]]
+            transformers: [stages[i]],
           });
         }
       }
@@ -446,12 +446,16 @@ class TransformerRegistry {
       }
 
       // Check specific requirements
-      if (traits.requirements.apiKey && !process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+      if (
+        traits.requirements.apiKey &&
+        !process.env.GEMINI_API_KEY &&
+        !process.env.OPENAI_API_KEY
+      ) {
         issues.push({
           type: 'missing_resource',
           severity: 'error',
           message: `Transformer '${stage}' requires an API key but none is configured`,
-          transformers: [stage]
+          transformers: [stage],
         });
       }
 
@@ -471,7 +475,7 @@ class TransformerRegistry {
     const warnings = [];
 
     // Check for too many heavy operations
-    const heavyCount = stages.filter(name => {
+    const heavyCount = stages.filter((name) => {
       const traits = this.traits.get(name);
       return traits && traits.heavy;
     }).length;
@@ -481,16 +485,16 @@ class TransformerRegistry {
         type: 'performance',
         severity: 'warning',
         message: `Pipeline contains ${heavyCount} heavy transformers, which may impact performance`,
-        suggestion: 'Consider reducing the number of AI or computationally intensive transformers'
+        suggestion: 'Consider reducing the number of AI or computationally intensive transformers',
       });
     }
 
     // Check for redundant transformers
     const duplicateTags = new Map();
-    stages.forEach(name => {
+    stages.forEach((name) => {
       const traits = this.traits.get(name);
       if (traits && traits.tags) {
-        traits.tags.forEach(tag => {
+        traits.tags.forEach((tag) => {
           if (!duplicateTags.has(tag)) {
             duplicateTags.set(tag, []);
           }
@@ -505,7 +509,7 @@ class TransformerRegistry {
           type: 'redundancy',
           severity: 'info',
           message: `Multiple transformers with similar functionality detected: ${transformers.join(', ')} (tag: ${tag})`,
-          suggestion: 'Consider using only one transformer per functional category'
+          suggestion: 'Consider using only one transformer per functional category',
         });
       }
     }
@@ -528,149 +532,205 @@ class TransformerRegistry {
    */
   static async createDefault() {
     const registry = new TransformerRegistry();
-    
+
     // Register default transformers - using dynamic imports for better ESM compatibility
-    const { default: FileLoaderTransformer } = await import('./transformers/FileLoaderTransformer.js');
+    const { default: FileLoaderTransformer } = await import(
+      './transformers/FileLoaderTransformer.js'
+    );
     const { default: MarkdownTransformer } = await import('./transformers/MarkdownTransformer.js');
     const { default: CSVTransformer } = await import('./transformers/CSVTransformer.js');
     const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
     const { default: PDFTransformer } = await import('./transformers/PDFTransformer.js');
     const { default: ImageTransformer } = await import('./transformers/ImageTransformer.js');
-    const { default: AISummaryTransformer } = await import('./transformers/AISummaryTransformer.js');
-    
+    const { default: AISummaryTransformer } = await import(
+      './transformers/AISummaryTransformer.js'
+    );
+
     // File Loader - default transformer
-    registry.register('file-loader', new FileLoaderTransformer(), {
-      isDefault: true,
-      priority: 0,
-    }, {
-      inputTypes: ['any'],
-      outputTypes: ['text', 'binary'],
-      idempotent: true,
-      orderSensitive: false,
-      heavy: false,
-      stateful: false,
-      dependencies: [],
-      conflictsWith: [],
-      requirements: {},
-      tags: ['loader', 'default']
-    });
+    registry.register(
+      'file-loader',
+      new FileLoaderTransformer(),
+      {
+        isDefault: true,
+        priority: 0,
+      },
+      {
+        inputTypes: ['any'],
+        outputTypes: ['text', 'binary'],
+        idempotent: true,
+        orderSensitive: false,
+        heavy: false,
+        stateful: false,
+        dependencies: [],
+        conflictsWith: [],
+        requirements: {},
+        tags: ['loader', 'default'],
+      },
+    );
 
     // Markdown transformer
-    registry.register('markdown', new MarkdownTransformer(), {
-      extensions: [], // Must be explicitly enabled - not applied automatically
-      priority: 10,
-    }, {
-      inputTypes: ['text'],
-      outputTypes: ['text'],
-      idempotent: true,
-      orderSensitive: false,
-      heavy: false,
-      stateful: false,
-      dependencies: [],
-      conflictsWith: [],
-      requirements: {},
-      tags: ['text-processing', 'markdown']
-    });
+    registry.register(
+      'markdown',
+      new MarkdownTransformer(),
+      {
+        extensions: [], // Must be explicitly enabled - not applied automatically
+        priority: 10,
+      },
+      {
+        inputTypes: ['text'],
+        outputTypes: ['text'],
+        idempotent: true,
+        orderSensitive: false,
+        heavy: false,
+        stateful: false,
+        dependencies: [],
+        conflictsWith: [],
+        requirements: {},
+        tags: ['text-processing', 'markdown'],
+      },
+    );
 
     // CSV transformer
-    registry.register('csv', new CSVTransformer(), {
-      extensions: [], // Must be explicitly enabled - not applied automatically
-      mimeTypes: [], // Must be explicitly enabled - not applied automatically
-      priority: 10,
-    }, {
-      inputTypes: ['text'],
-      outputTypes: ['text'],
-      idempotent: true,
-      orderSensitive: false,
-      heavy: false,
-      stateful: false,
-      dependencies: [],
-      conflictsWith: [],
-      requirements: {},
-      tags: ['data-processing', 'csv', 'formatting']
-    });
+    registry.register(
+      'csv',
+      new CSVTransformer(),
+      {
+        extensions: [], // Must be explicitly enabled - not applied automatically
+        mimeTypes: [], // Must be explicitly enabled - not applied automatically
+        priority: 10,
+      },
+      {
+        inputTypes: ['text'],
+        outputTypes: ['text'],
+        idempotent: true,
+        orderSensitive: false,
+        heavy: false,
+        stateful: false,
+        dependencies: [],
+        conflictsWith: [],
+        requirements: {},
+        tags: ['data-processing', 'csv', 'formatting'],
+      },
+    );
 
     // PDF transformer
-    registry.register('pdf', new PDFTransformer(), {
-      extensions: ['.pdf'],
-      mimeTypes: ['application/pdf'],
-      priority: 15,
-    }, {
-      inputTypes: ['binary'],
-      outputTypes: ['text'],
-      idempotent: true,
-      orderSensitive: false,
-      heavy: true,
-      stateful: false,
-      dependencies: [],
-      conflictsWith: [],
-      requirements: {
-        memory: '50MB'
+    registry.register(
+      'pdf',
+      new PDFTransformer(),
+      {
+        extensions: ['.pdf'],
+        mimeTypes: ['application/pdf'],
+        priority: 15,
       },
-      tags: ['text-extraction', 'document', 'pdf']
-    });
+      {
+        inputTypes: ['binary'],
+        outputTypes: ['text'],
+        idempotent: true,
+        orderSensitive: false,
+        heavy: true,
+        stateful: false,
+        dependencies: [],
+        conflictsWith: [],
+        requirements: {
+          memory: '50MB',
+        },
+        tags: ['text-extraction', 'document', 'pdf'],
+      },
+    );
 
     // Image transformer (OCR)
-    registry.register('image', new ImageTransformer(), {
-      extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp'],
-      mimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff', 'image/webp'],
-      priority: 15,
-    }, {
-      inputTypes: ['binary'],
-      outputTypes: ['text'],
-      idempotent: true,
-      orderSensitive: false,
-      heavy: true,
-      stateful: false,
-      dependencies: ['tesseract'],
-      conflictsWith: ['image-description'],
-      requirements: {
-        memory: '100MB'
+    registry.register(
+      'image',
+      new ImageTransformer(),
+      {
+        extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp'],
+        mimeTypes: [
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'image/bmp',
+          'image/tiff',
+          'image/webp',
+        ],
+        priority: 15,
       },
-      tags: ['text-extraction', 'image', 'ocr']
-    });
+      {
+        inputTypes: ['binary'],
+        outputTypes: ['text'],
+        idempotent: true,
+        orderSensitive: false,
+        heavy: true,
+        stateful: false,
+        dependencies: ['tesseract'],
+        conflictsWith: ['image-description'],
+        requirements: {
+          memory: '100MB',
+        },
+        tags: ['text-extraction', 'image', 'ocr'],
+      },
+    );
 
     // Binary transformer
-    registry.register('binary', new BinaryTransformer(), {
-      extensions: [
-        '.doc', '.docx', '.xls', '.xlsx',
-        '.zip', '.tar', '.gz', '.rar', '.7z',
-        '.exe', '.dll', '.so', '.dylib',
-      ],
-      priority: 5,
-    }, {
-      inputTypes: ['binary'],
-      outputTypes: ['text'],
-      idempotent: true,
-      orderSensitive: false,
-      heavy: false,
-      stateful: false,
-      dependencies: [],
-      conflictsWith: [],
-      requirements: {},
-      tags: ['binary-handler', 'placeholder']
-    });
-    
-    // AI Summary transformer (optional, not enabled by default)
-    registry.register('ai-summary', new AISummaryTransformer(), {
-      extensions: [], // Must be explicitly enabled
-      priority: 20,
-    }, {
-      inputTypes: ['text'],
-      outputTypes: ['text'],
-      idempotent: true,
-      orderSensitive: false,
-      heavy: true,
-      stateful: false,
-      dependencies: ['network'],
-      conflictsWith: ['file-summary'],
-      requirements: {
-        apiKey: true,
-        network: true,
-        memory: '200MB'
+    registry.register(
+      'binary',
+      new BinaryTransformer(),
+      {
+        extensions: [
+          '.doc',
+          '.docx',
+          '.xls',
+          '.xlsx',
+          '.zip',
+          '.tar',
+          '.gz',
+          '.rar',
+          '.7z',
+          '.exe',
+          '.dll',
+          '.so',
+          '.dylib',
+        ],
+        priority: 5,
       },
-      tags: ['ai', 'summary', 'expensive', 'text-processing']
-    });
+      {
+        inputTypes: ['binary'],
+        outputTypes: ['text'],
+        idempotent: true,
+        orderSensitive: false,
+        heavy: false,
+        stateful: false,
+        dependencies: [],
+        conflictsWith: [],
+        requirements: {},
+        tags: ['binary-handler', 'placeholder'],
+      },
+    );
+
+    // AI Summary transformer (optional, not enabled by default)
+    registry.register(
+      'ai-summary',
+      new AISummaryTransformer(),
+      {
+        extensions: [], // Must be explicitly enabled
+        priority: 20,
+      },
+      {
+        inputTypes: ['text'],
+        outputTypes: ['text'],
+        idempotent: true,
+        orderSensitive: false,
+        heavy: true,
+        stateful: false,
+        dependencies: ['network'],
+        conflictsWith: ['file-summary'],
+        requirements: {
+          apiKey: true,
+          network: true,
+          memory: '200MB',
+        },
+        tags: ['ai', 'summary', 'expensive', 'text-processing'],
+      },
+    );
 
     return registry;
   }

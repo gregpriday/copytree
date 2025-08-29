@@ -11,8 +11,8 @@ class ConfigManager {
           path: null,
           extension: '.cache',
           gcProbability: 0.01,
-          maxAge: 7 * 24 * 60 * 60 * 1000
-        }
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        },
       },
       copytree: {
         globalExcludedDirectories: [],
@@ -31,25 +31,25 @@ class ConfigManager {
             path: null,
             extension: '.cache',
             gcProbability: 0.01,
-            maxAge: 7 * 24 * 60 * 60 * 1000
-          }
-        }
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+          },
+        },
       },
       app: {
         debug: false,
-        prettyPrint: true
+        prettyPrint: true,
       },
       log: {
         level: 'error',
-        format: 'simple'
-      }
+        format: 'simple',
+      },
     };
   }
 
   get(key, defaultValue = null) {
     const keys = key.split('.');
     let value = this.config;
-    
+
     for (const k of keys) {
       if (value && typeof value === 'object' && k in value) {
         value = value[k];
@@ -57,21 +57,21 @@ class ConfigManager {
         return defaultValue;
       }
     }
-    
+
     return value;
   }
 
   set(key, value) {
     const keys = key.split('.');
     let target = this.config;
-    
+
     for (let i = 0; i < keys.length - 1; i++) {
       if (!(keys[i] in target)) {
         target[keys[i]] = {};
       }
       target = target[keys[i]];
     }
-    
+
     target[keys[keys.length - 1]] = value;
   }
 

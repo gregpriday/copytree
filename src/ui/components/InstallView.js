@@ -27,8 +27,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const InstallStep = ({ step, isActive, isCompleted }) => {
   const getIcon = () => {
     if (isCompleted) {
-      return step.status === 'success' ? '✓' : 
-				   step.status === 'warning' ? '⚠' : '○';
+      return step.status === 'success' ? '✓' : step.status === 'warning' ? '⚠' : '○';
     }
     if (isActive) {
       return '⏳';
@@ -38,8 +37,7 @@ const InstallStep = ({ step, isActive, isCompleted }) => {
 
   const getColor = () => {
     if (isCompleted) {
-      return step.status === 'success' ? 'green' :
-				   step.status === 'warning' ? 'yellow' : 'gray';
+      return step.status === 'success' ? 'green' : step.status === 'warning' ? 'yellow' : 'gray';
     }
     if (isActive) {
       return 'blue';
@@ -62,32 +60,16 @@ const NextSteps = () => {
   return React.createElement(
     Box,
     { flexDirection: 'column', marginTop: 1 },
-    React.createElement(
-      Text,
-      { bold: true, color: 'yellow' },
-      'Next Steps:',
-    ),
+    React.createElement(Text, { bold: true, color: 'yellow' }, 'Next Steps:'),
     React.createElement(
       Box,
       { marginTop: 1, flexDirection: 'column', marginLeft: 2 },
       React.createElement(Text, null, '1. Create your first profile:'),
-      React.createElement(
-        Text,
-        { dimColor: true, marginLeft: 2 },
-        'copytree profile:create',
-      ),
+      React.createElement(Text, { dimColor: true, marginLeft: 2 }, 'copytree profile:create'),
       React.createElement(Text, { marginTop: 1 }, '2. Run copytree on your project:'),
-      React.createElement(
-        Text,
-        { dimColor: true, marginLeft: 2 },
-        'copytree --profile default',
-      ),
+      React.createElement(Text, { dimColor: true, marginLeft: 2 }, 'copytree --profile default'),
       React.createElement(Text, { marginTop: 1 }, '3. Use AI-powered transformers:'),
-      React.createElement(
-        Text,
-        { dimColor: true, marginLeft: 2 },
-        'copytree --transform',
-      ),
+      React.createElement(Text, { dimColor: true, marginLeft: 2 }, 'copytree --transform'),
     ),
   );
 };
@@ -103,7 +85,7 @@ const InstallView = () => {
   useEffect(() => {
     const runInstallation = async () => {
       const startTime = Date.now();
-			
+
       try {
         const installSteps = [
           { name: 'Create directories', details: '' },
@@ -179,7 +161,6 @@ const InstallView = () => {
         setDuration(Date.now() - startTime);
         setIsCompleted(true);
         setCurrentStep(-1);
-
       } catch (err) {
         setError(err.message);
         updateState({ error: err });
@@ -193,33 +174,17 @@ const InstallView = () => {
     return React.createElement(
       Box,
       { flexDirection: 'column' },
-      React.createElement(
-        Text,
-        { color: 'red', bold: true },
-        '✗ Installation Failed',
-      ),
-      React.createElement(
-        Text,
-        { color: 'red' },
-        error,
-      ),
+      React.createElement(Text, { color: 'red', bold: true }, '✗ Installation Failed'),
+      React.createElement(Text, { color: 'red' }, error),
     );
   }
 
   return React.createElement(
     Box,
     { flexDirection: 'column' },
-    React.createElement(
-      Text,
-      { bold: true, color: 'yellow' },
-      'CopyTree Installation Setup',
-    ),
+    React.createElement(Text, { bold: true, color: 'yellow' }, 'CopyTree Installation Setup'),
     React.createElement(Box, { marginTop: 1 }, null),
-    React.createElement(
-      Text,
-      { bold: true },
-      'Installation Summary:',
-    ),
+    React.createElement(Text, { bold: true }, 'Installation Summary:'),
     React.createElement(Box, { marginTop: 1 }, null),
     ...steps.map((step, index) =>
       React.createElement(InstallStep, {
@@ -229,15 +194,16 @@ const InstallView = () => {
         isCompleted: currentStep > index || isCompleted,
       }),
     ),
-    isCompleted && React.createElement(
-      Box,
-      { marginTop: 1 },
+    isCompleted &&
       React.createElement(
-        Text,
-        { color: 'green', bold: true },
-        `✓ Installation completed in ${duration}ms`,
+        Box,
+        { marginTop: 1 },
+        React.createElement(
+          Text,
+          { color: 'green', bold: true },
+          `✓ Installation completed in ${duration}ms`,
+        ),
       ),
-    ),
     isCompleted && React.createElement(NextSteps),
   );
 };
@@ -260,7 +226,7 @@ async function createDirectories() {
   const created = [];
 
   for (const dir of directories) {
-    if (!await fs.pathExists(dir)) {
+    if (!(await fs.pathExists(dir))) {
       await fs.ensureDir(dir);
       created.push(dir);
     }
@@ -444,7 +410,7 @@ output:
 `;
 
   const minimalPath = path.join(profilesDir, 'minimal.yml');
-  if (!await fs.pathExists(minimalPath)) {
+  if (!(await fs.pathExists(minimalPath))) {
     await fs.writeFile(minimalPath, minimalProfile, 'utf8');
     created++;
   }
@@ -479,7 +445,7 @@ output:
 `;
 
   const docsPath = path.join(profilesDir, 'documentation.yml');
-  if (!await fs.pathExists(docsPath)) {
+  if (!(await fs.pathExists(docsPath))) {
     await fs.writeFile(docsPath, docsProfile, 'utf8');
     created++;
   }
@@ -493,25 +459,25 @@ output:
 async function setupGeminiApiKey() {
   const homeDir = os.homedir();
   const envPath = path.join(homeDir, '.copytree', '.env');
-	
+
   try {
     // Read existing .env file
     let envContent = '';
     if (await fs.pathExists(envPath)) {
       envContent = await fs.readFile(envPath, 'utf8');
     }
-		
+
     // Check if API key is already set
-    const hasApiKey = envContent.includes('GEMINI_API_KEY=') && 
-						  !envContent.match(/GEMINI_API_KEY=\s*$/m);
-		
+    const hasApiKey =
+      envContent.includes('GEMINI_API_KEY=') && !envContent.match(/GEMINI_API_KEY=\s*$/m);
+
     if (hasApiKey) {
       return {
         status: 'skipped',
         message: 'API key already configured',
       };
     }
-		
+
     // Prompt for API key
     console.log('\n'); // Add space for inquirer prompt
     const answers = await inquirer.prompt([
@@ -536,7 +502,7 @@ async function setupGeminiApiKey() {
         default: true,
       },
     ]);
-		
+
     // Optionally validate the API key
     if (answers.validateKey) {
       try {
@@ -562,11 +528,14 @@ async function setupGeminiApiKey() {
         }
       }
     }
-		
+
     // Update .env file with the API key
     if (envContent.includes('GEMINI_API_KEY=')) {
       // Replace existing empty key
-      envContent = envContent.replace(/GEMINI_API_KEY=.*$/m, `GEMINI_API_KEY=${answers.apiKey.trim()}`);
+      envContent = envContent.replace(
+        /GEMINI_API_KEY=.*$/m,
+        `GEMINI_API_KEY=${answers.apiKey.trim()}`,
+      );
     } else {
       // Add new key
       const apiSection = envContent.indexOf('# API Keys');
@@ -587,14 +556,13 @@ async function setupGeminiApiKey() {
         envContent += `\nGEMINI_API_KEY=${answers.apiKey.trim()}\n`;
       }
     }
-		
+
     await fs.writeFile(envPath, envContent, 'utf8');
-		
+
     return {
       status: 'success',
       message: 'API key configured successfully',
     };
-		
   } catch (error) {
     return {
       status: 'warning',

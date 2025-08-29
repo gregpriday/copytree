@@ -15,26 +15,23 @@ async function copyDocsCommand(options) {
   try {
     // Determine docs directory
     const docsDir = path.join(__dirname, '../../docs');
-    
+
     // Get topic from options
     const topic = options.topic;
-    
+
     if (!topic) {
       // List available topics
       await listAvailableTopics(docsDir);
       return;
     }
-    
+
     // Find and load documentation
     const docContent = await loadDocumentation(docsDir, topic);
-    
+
     if (!docContent) {
-      throw new CommandError(
-        `Documentation not found for topic: ${topic}`,
-        'copy:docs',
-      );
+      throw new CommandError(`Documentation not found for topic: ${topic}`, 'copy:docs');
     }
-    
+
     // Handle output
     if (options.output) {
       // Write to file
@@ -43,7 +40,7 @@ async function copyDocsCommand(options) {
       // Copy to clipboard (default)
       await clipboardy.write(docContent);
     }
-    
+
     // Return result for UI
     return {
       content: docContent,
@@ -51,25 +48,23 @@ async function copyDocsCommand(options) {
         lines: docContent.split('\n').length,
         characters: docContent.length,
       },
-      action: options.output ? `Documentation written to ${options.output}` :
-        options.clipboard !== false ? `Documentation for "${topic}" copied to clipboard` :
-          'Documentation displayed',
+      action: options.output
+        ? `Documentation written to ${options.output}`
+        : options.clipboard !== false
+          ? `Documentation for "${topic}" copied to clipboard`
+          : 'Documentation displayed',
     };
-    
   } catch (error) {
-    logger.error('Copy docs command failed', { 
+    logger.error('Copy docs command failed', {
       error: error.message,
-      stack: error.stack, 
+      stack: error.stack,
     });
-    
+
     if (error instanceof CommandError) {
       throw error;
     }
-    
-    throw new CommandError(
-      `Failed to copy documentation: ${error.message}`,
-      'copy:docs',
-    );
+
+    throw new CommandError(`Failed to copy documentation: ${error.message}`, 'copy:docs');
   }
 }
 
@@ -84,7 +79,7 @@ async function listAvailableTopics(docsDir) {
   if (await fs.pathExists(frameworksDir)) {
     const frameworks = await fs.readdir(frameworksDir);
     const frameworkItems = [];
-    
+
     for (const file of frameworks) {
       if (file.endsWith('.md')) {
         const name = path.basename(file, '.md');
@@ -94,7 +89,7 @@ async function listAvailableTopics(docsDir) {
         });
       }
     }
-    
+
     if (frameworkItems.length > 0) {
       topics.push({
         title: 'Frameworks',
@@ -109,7 +104,7 @@ async function listAvailableTopics(docsDir) {
   if (await fs.pathExists(topicsDir)) {
     const topicFiles = await fs.readdir(topicsDir);
     const topicItems = [];
-    
+
     for (const file of topicFiles) {
       if (file.endsWith('.md')) {
         const name = path.basename(file, '.md');
@@ -117,7 +112,7 @@ async function listAvailableTopics(docsDir) {
         topicItems.push({ name, description });
       }
     }
-    
+
     if (topicItems.length > 0) {
       topics.push({
         title: 'Topics',
@@ -152,19 +147,19 @@ async function loadDocumentation(docsDir, topic) {
     path.join(docsDir, 'topics', `${topic}.md`),
     path.join(docsDir, `${topic}.md`),
   ];
-  
+
   for (const location of locations) {
     if (await fs.pathExists(location)) {
       return await fs.readFile(location, 'utf8');
     }
   }
-  
+
   // Check for built-in documentation
   const builtInDocs = await getBuiltInDocumentation(topic);
   if (builtInDocs) {
     return builtInDocs;
   }
-  
+
   return null;
 }
 
@@ -175,7 +170,7 @@ async function getTopicDescription(filePath) {
   try {
     const content = await fs.readFile(filePath, 'utf8');
     const lines = content.split('\n');
-    
+
     // Look for description in first few lines
     for (let i = 0; i < Math.min(10, lines.length); i++) {
       const line = lines[i].trim();
@@ -187,7 +182,7 @@ async function getTopicDescription(filePath) {
         return line;
       }
     }
-    
+
     return 'Documentation available';
   } catch (_error) {
     return 'Documentation available';
@@ -534,7 +529,7 @@ transformers:
 \`\`\`
 `,
   };
-  
+
   return docs[topic] || null;
 }
 

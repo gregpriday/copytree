@@ -1,5 +1,16 @@
 // Use dynamic import for module under test
-let CopyTreeError, CommandError, ConfigurationError, FileSystemError, ProfileError, TransformError, AIProviderError, GitError, ValidationError, PipelineError, InstructionsError, handleError;
+let CopyTreeError,
+  CommandError,
+  ConfigurationError,
+  FileSystemError,
+  ProfileError,
+  TransformError,
+  AIProviderError,
+  GitError,
+  ValidationError,
+  PipelineError,
+  InstructionsError,
+  handleError;
 
 beforeAll(async () => {
   const errorsModule = await import('../../../src/utils/errors.js');
@@ -15,7 +26,7 @@ beforeAll(async () => {
     ValidationError,
     PipelineError,
     InstructionsError,
-    handleError
+    handleError,
   } = errorsModule);
 });
 
@@ -23,7 +34,7 @@ describe('Error Classes', () => {
   describe('CopyTreeError', () => {
     test('should create error with message and code', () => {
       const error = new CopyTreeError('Test message', 'TEST_CODE');
-      
+
       expect(error.message).toBe('Test message');
       expect(error.code).toBe('TEST_CODE');
       expect(error.timestamp).toBeDefined();
@@ -34,14 +45,14 @@ describe('Error Classes', () => {
     test('should include details if provided', () => {
       const details = { key: 'value', nested: { prop: 123 } };
       const error = new CopyTreeError('Test message', 'TEST_CODE', details);
-      
+
       expect(error.details).toEqual(details);
     });
 
     test('should have proper JSON serialization', () => {
       const error = new CopyTreeError('Test message', 'TEST_CODE', { key: 'value' });
       const json = error.toJSON();
-      
+
       expect(json.name).toBe('CopyTreeError');
       expect(json.message).toBe('Test message');
       expect(json.code).toBe('TEST_CODE');
@@ -53,7 +64,7 @@ describe('Error Classes', () => {
   describe('CommandError', () => {
     test('should create command error with command info', () => {
       const error = new CommandError('Command failed', 'copy', { exitCode: 1 });
-      
+
       expect(error.message).toBe('Command failed');
       expect(error.command).toBe('copy');
       expect(error.details).toEqual({ command: 'copy', exitCode: 1 });
@@ -64,7 +75,7 @@ describe('Error Classes', () => {
   describe('ConfigurationError', () => {
     test('should create configuration error with config key', () => {
       const error = new ConfigurationError('Invalid config value', 'maxFileSize', { value: '1TB' });
-      
+
       expect(error.message).toBe('Invalid config value');
       expect(error.configKey).toBe('maxFileSize');
       expect(error.details).toEqual({ configKey: 'maxFileSize', value: '1TB' });
@@ -75,7 +86,7 @@ describe('Error Classes', () => {
   describe('FileSystemError', () => {
     test('should create filesystem error with path and operation', () => {
       const error = new FileSystemError('File not found', '/test/path', 'read', { errno: -2 });
-      
+
       expect(error.message).toBe('File not found');
       expect(error.path).toBe('/test/path');
       expect(error.operation).toBe('read');
@@ -87,7 +98,7 @@ describe('Error Classes', () => {
   describe('ProfileError', () => {
     test('should create profile error with profile name', () => {
       const error = new ProfileError('Invalid profile', 'test-profile', { line: 5 });
-      
+
       expect(error.message).toBe('Invalid profile');
       expect(error.profile).toBe('test-profile');
       expect(error.details).toEqual({ profile: 'test-profile', line: 5 });
@@ -97,17 +108,18 @@ describe('Error Classes', () => {
 
   describe('TransformError', () => {
     test('should create transform error with transformer and file info', () => {
-      const error = new TransformError(
-        'Transform failed', 
-        'pdf-transformer', 
-        '/test/file.pdf', 
-        { stage: 'parsing' }
-      );
-      
+      const error = new TransformError('Transform failed', 'pdf-transformer', '/test/file.pdf', {
+        stage: 'parsing',
+      });
+
       expect(error.message).toBe('Transform failed');
       expect(error.transformer).toBe('pdf-transformer');
       expect(error.file).toBe('/test/file.pdf');
-      expect(error.details).toEqual({ transformer: 'pdf-transformer', file: '/test/file.pdf', stage: 'parsing' });
+      expect(error.details).toEqual({
+        transformer: 'pdf-transformer',
+        file: '/test/file.pdf',
+        stage: 'parsing',
+      });
       expect(error.name).toBe('TransformError');
     });
   });
@@ -115,7 +127,7 @@ describe('Error Classes', () => {
   describe('AIProviderError', () => {
     test('should create AI provider error with provider info', () => {
       const error = new AIProviderError('API failed', 'gemini', { status: 429 });
-      
+
       expect(error.message).toBe('API failed');
       expect(error.provider).toBe('gemini');
       expect(error.details).toEqual({ provider: 'gemini', status: 429 });
@@ -126,7 +138,7 @@ describe('Error Classes', () => {
   describe('GitError', () => {
     test('should create git error with operation info', () => {
       const error = new GitError('Git command failed', 'status', { exitCode: 128 });
-      
+
       expect(error.message).toBe('Git command failed');
       expect(error.operation).toBe('status');
       expect(error.details).toEqual({ operation: 'status', exitCode: 128 });
@@ -137,7 +149,7 @@ describe('Error Classes', () => {
   describe('ValidationError', () => {
     test('should create validation error with field and value info', () => {
       const error = new ValidationError('Invalid value', 'maxSize', '100MB', { expected: '10MB' });
-      
+
       expect(error.message).toBe('Invalid value');
       expect(error.field).toBe('maxSize');
       expect(error.value).toBe('100MB');
@@ -149,7 +161,7 @@ describe('Error Classes', () => {
   describe('PipelineError', () => {
     test('should create pipeline error with stage info', () => {
       const error = new PipelineError('Stage failed', 'FileDiscovery', { files: 0 });
-      
+
       expect(error.message).toBe('Stage failed');
       expect(error.stage).toBe('FileDiscovery');
       expect(error.details).toEqual({ stage: 'FileDiscovery', files: 0 });
@@ -159,8 +171,10 @@ describe('Error Classes', () => {
 
   describe('InstructionsError', () => {
     test('should create instructions error with instructions name', () => {
-      const error = new InstructionsError('Instructions not found', 'custom-template', { path: '/custom/path' });
-      
+      const error = new InstructionsError('Instructions not found', 'custom-template', {
+        path: '/custom/path',
+      });
+
       expect(error.message).toBe('Instructions not found');
       expect(error.instructionsName).toBe('custom-template');
       expect(error.details).toEqual({ instructionsName: 'custom-template', path: '/custom/path' });
@@ -180,10 +194,10 @@ describe('Error Classes', () => {
         new GitError('test', 'status'),
         new ValidationError('test', 'field', 'value'),
         new PipelineError('test', 'stage'),
-        new InstructionsError('test', 'instructions')
+        new InstructionsError('test', 'instructions'),
       ];
-      
-      errors.forEach(error => {
+
+      errors.forEach((error) => {
         expect(error).toBeInstanceOf(CopyTreeError);
         expect(error).toBeInstanceOf(Error);
       });
@@ -205,20 +219,20 @@ describe('Error Classes', () => {
 
   describe('handleError', () => {
     let mockLogger;
-    
+
     beforeEach(() => {
       mockLogger = jest.fn();
     });
 
     test('should handle CopyTreeError instances', () => {
       const error = new CopyTreeError('Test error', 'TEST_CODE');
-      
-      const result = handleError(error, { 
-        exit: false, 
-        verbose: false, 
-        logger: mockLogger 
+
+      const result = handleError(error, {
+        exit: false,
+        verbose: false,
+        logger: mockLogger,
       });
-      
+
       expect(result).toBe(error);
       expect(mockLogger).toHaveBeenCalledWith('Error: Test error');
       expect(mockLogger).toHaveBeenCalledWith('Code: TEST_CODE');
@@ -226,13 +240,13 @@ describe('Error Classes', () => {
 
     test('should convert regular errors to CopyTreeError', () => {
       const error = new Error('Regular error');
-      
-      const result = handleError(error, { 
-        exit: false, 
-        verbose: false, 
-        logger: mockLogger 
+
+      const result = handleError(error, {
+        exit: false,
+        verbose: false,
+        logger: mockLogger,
       });
-      
+
       expect(result).toBeInstanceOf(CopyTreeError);
       expect(result.message).toBe('Regular error');
       expect(result.code).toBe('UNKNOWN_ERROR');
@@ -241,26 +255,26 @@ describe('Error Classes', () => {
 
     test('should log verbose information when requested', () => {
       const error = new CopyTreeError('Test error', 'TEST_CODE', { key: 'value' });
-      
-      handleError(error, { 
-        exit: false, 
-        verbose: true, 
-        logger: mockLogger 
+
+      handleError(error, {
+        exit: false,
+        verbose: true,
+        logger: mockLogger,
       });
-      
+
       expect(mockLogger).toHaveBeenCalledWith(error.toJSON());
     });
 
     test('should not exit in test environment', () => {
       const mockExit = jest.spyOn(process, 'exit').mockImplementation(() => {});
       const error = new CopyTreeError('Test error', 'TEST_CODE');
-      
-      handleError(error, { 
-        exit: true, 
-        verbose: false, 
-        logger: mockLogger 
+
+      handleError(error, {
+        exit: true,
+        verbose: false,
+        logger: mockLogger,
       });
-      
+
       expect(mockExit).not.toHaveBeenCalled();
       mockExit.mockRestore();
     });

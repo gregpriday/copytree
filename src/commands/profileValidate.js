@@ -15,17 +15,13 @@ async function profileValidateCommand(profile, _options) {
       message: 'Validation handled by UI component',
       profile: profile || 'default',
     };
-    
   } catch (error) {
-    logger.error('Failed to validate profile', { 
-      profile, 
+    logger.error('Failed to validate profile', {
+      profile,
       error: error.message,
-      stack: error.stack, 
+      stack: error.stack,
     });
-    throw new CommandError(
-      `Failed to validate profile: ${error.message}`,
-      'profile:validate',
-    );
+    throw new CommandError(`Failed to validate profile: ${error.message}`, 'profile:validate');
   }
 }
 

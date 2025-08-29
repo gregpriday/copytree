@@ -16,12 +16,12 @@ class GitUtils {
       maxConcurrentProcesses: 6,
       trimmed: true,
     });
-    
+
     this.logger = options.logger || logger.child('GitUtils');
-    
+
     // Cache for git operations (5 minute TTL)
     this.cache = createCache(300000);
-    
+
     this._isRepo = null;
   }
 
@@ -54,13 +54,13 @@ class GitUtils {
     if (cached) return cached;
 
     try {
-      if (!await this.isGitRepository()) {
+      if (!(await this.isGitRepository())) {
         throw new GitError('Not a git repository', 'getModifiedFiles');
       }
 
       // Get status
       const status = await this.git.status();
-      
+
       // Combine all modified files
       const modifiedFiles = [
         ...status.modified,
@@ -70,20 +70,16 @@ class GitUtils {
       ];
 
       // Remove duplicates and normalize paths
-      const uniqueFiles = [...new Set(modifiedFiles)].map((file) => 
-        path.normalize(file),
-      );
+      const uniqueFiles = [...new Set(modifiedFiles)].map((file) => path.normalize(file));
 
       this.cache.set(cacheKey, uniqueFiles);
       this.logger.debug(`Found ${uniqueFiles.length} modified files`);
-      
+
       return uniqueFiles;
     } catch (error) {
-      throw new GitError(
-        `Failed to get modified files: ${error.message}`,
-        'getModifiedFiles',
-        { originalError: error },
-      );
+      throw new GitError(`Failed to get modified files: ${error.message}`, 'getModifiedFiles', {
+        originalError: error,
+      });
     }
   }
 
@@ -99,12 +95,12 @@ class GitUtils {
     if (cached) return cached;
 
     try {
-      if (!await this.isGitRepository()) {
+      if (!(await this.isGitRepository())) {
         throw new GitError('Not a git repository', 'getChangedFiles');
       }
 
       let diffSummary;
-      
+
       if (toRef) {
         // Diff between two refs
         diffSummary = await this.git.diffSummary([fromRef, toRef]);
@@ -121,14 +117,14 @@ class GitUtils {
       this.logger.debug(
         `Found ${changedFiles.length} changed files between ${fromRef} and ${toRef || 'working directory'}`,
       );
-      
+
       return changedFiles;
     } catch (error) {
-      throw new GitError(
-        `Failed to get changed files: ${error.message}`,
-        'getChangedFiles',
-        { fromRef, toRef, originalError: error },
-      );
+      throw new GitError(`Failed to get changed files: ${error.message}`, 'getChangedFiles', {
+        fromRef,
+        toRef,
+        originalError: error,
+      });
     }
   }
 
@@ -143,7 +139,7 @@ class GitUtils {
     }
 
     try {
-      if (!await this.isGitRepository()) {
+      if (!(await this.isGitRepository())) {
         return {};
       }
 
@@ -163,14 +159,14 @@ class GitUtils {
 
       files.forEach((file) => {
         const normalizedPath = path.normalize(file);
-        
+
         for (const [statusType, fileList] of Object.entries(allStatuses)) {
           if (fileList.includes(file) || fileList.includes(normalizedPath)) {
             statusMap[file] = statusType;
             break;
           }
         }
-        
+
         // Default to 'unmodified' if not in any status list
         if (!statusMap[file]) {
           statusMap[file] = 'unmodified';
@@ -194,13 +190,13 @@ class GitUtils {
     if (cached) return cached;
 
     try {
-      if (!await this.isGitRepository()) {
+      if (!(await this.isGitRepository())) {
         return null;
       }
 
       const branch = await this.git.revparse(['--abbrev-ref', 'HEAD']);
       this.cache.set(cacheKey, branch);
-      
+
       return branch;
     } catch (error) {
       this.logger.warn(`Failed to get current branch: ${error.message}`);
@@ -218,13 +214,13 @@ class GitUtils {
     if (cached) return cached;
 
     try {
-      if (!await this.isGitRepository()) {
+      if (!(await this.isGitRepository())) {
         return null;
       }
 
       const log = await this.git.log({ n: 1 });
       const commit = log.latest;
-      
+
       if (commit) {
         const commitInfo = {
           hash: commit.hash,
@@ -232,11 +228,11 @@ class GitUtils {
           author: commit.author_name,
           date: commit.date,
         };
-        
+
         this.cache.set(cacheKey, commitInfo);
         return commitInfo;
       }
-      
+
       return null;
     } catch (error) {
       this.logger.warn(`Failed to get last commit: ${error.message}`);
@@ -250,7 +246,7 @@ class GitUtils {
    */
   async hasUncommittedChanges() {
     try {
-      if (!await this.isGitRepository()) {
+      if (!(await this.isGitRepository())) {
         return false;
       }
 

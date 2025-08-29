@@ -13,7 +13,7 @@ class ProfileFilterStage extends Stage {
     const startTime = Date.now();
 
     const originalCount = input.files.length;
-    
+
     // Filter files
     const filteredFiles = input.files.filter((file) => {
       // Check if file should be always included
@@ -31,7 +31,7 @@ class ProfileFilterStage extends Stage {
           return false;
         }
       }
-      
+
       // Check exclusion patterns
       for (const pattern of this.exclude) {
         if (minimatch(file.path, pattern, { dot: true })) {
@@ -39,12 +39,12 @@ class ProfileFilterStage extends Stage {
           return false;
         }
       }
-      
+
       return true;
     });
 
     const excludedCount = originalCount - filteredFiles.length;
-    
+
     this.log(
       `Filtered ${excludedCount} files (${filteredFiles.length} remaining) in ${this.getElapsedTime(startTime)}`,
       'info',

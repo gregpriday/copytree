@@ -14,7 +14,7 @@ const PipelineStatus = ({ currentStage, isLoading, message, progress }) => {
 
   let displayMessage = message || currentStage || 'Processing...';
   let icon = isLoading ? '⏳ ' : '🟢 ';
-	
+
   // Check if the message contains an icon prefix
   if (displayMessage.startsWith('ICON:')) {
     const parts = displayMessage.split(':');
@@ -23,9 +23,9 @@ const PipelineStatus = ({ currentStage, isLoading, message, progress }) => {
       displayMessage = parts.slice(2).join(':');
     }
   }
-	
+
   const progressText = progress > 0 ? ` (${Math.round(progress)}%)` : '';
-	
+
   return React.createElement(
     components.Text,
     { color: isLoading ? 'blue' : 'green' },

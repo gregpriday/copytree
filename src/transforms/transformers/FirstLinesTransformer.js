@@ -28,8 +28,8 @@ class FirstLinesTransformer extends BaseTransformer {
   async doTransform(file) {
     try {
       // Get content as string
-      const content = Buffer.isBuffer(file.content) 
-        ? file.content.toString('utf8') 
+      const content = Buffer.isBuffer(file.content)
+        ? file.content.toString('utf8')
         : String(file.content);
 
       // Split into lines
@@ -52,9 +52,10 @@ class FirstLinesTransformer extends BaseTransformer {
       let processedLines;
       if (this.includeLineNumbers) {
         processedLines = firstLines.map((line, index) => {
-          const lineNum = this.skipEmptyLines && line._originalIndex !== undefined
-            ? line._originalIndex + 1
-            : index + 1;
+          const lineNum =
+            this.skipEmptyLines && line._originalIndex !== undefined
+              ? line._originalIndex + 1
+              : index + 1;
           return `${String(lineNum).padStart(4)} | ${line}`;
         });
       } else {
@@ -67,7 +68,7 @@ class FirstLinesTransformer extends BaseTransformer {
       // Add truncation notice if needed
       const remainingLines = totalLines - firstLines.length;
       let finalContent = truncatedContent;
-      
+
       if (remainingLines > 0) {
         finalContent += `\n\n... (${remainingLines} more lines truncated)`;
       }
@@ -106,7 +107,7 @@ class FirstLinesTransformer extends BaseTransformer {
   formatOutput(file, content, totalLines, shownLines) {
     const filename = path.basename(file.path);
     const header = `[First ${shownLines} of ${totalLines} lines from: ${filename}]\n\n`;
-    
+
     return header + content;
   }
 }
