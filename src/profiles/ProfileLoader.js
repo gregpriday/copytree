@@ -392,7 +392,7 @@ class ProfileLoader {
       },
 
       output: {
-        format: 'markdown',
+        format: 'xml',
         includeMetadata: true,
         addLineNumbers: false,
         prettyPrint: true,

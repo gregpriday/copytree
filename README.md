@@ -1,142 +1,143 @@
 # CopyTree
 
-A powerful Node.js CLI tool that transforms codebases into structured, AI-friendly formats.
+> Turn any codebase into a structured, AI-friendly format that fits in context windows.
+
+[![npm version](https://img.shields.io/npm/v/copytree)](https://www.npmjs.com/package/copytree)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 🌐 **[copytree.dev](https://copytree.dev)**
 
-## 🚀 Features
-
-### Core Functionality
-- **Smart File Discovery** - Intelligent file selection with gitignore support
-- **15+ File Transformers** - PDF text extraction, image OCR/descriptions, code summaries
-- **Multiple Output Formats** - XML, JSON, tree view, and markdown
-- **Profile System** - Default profile with customizable overrides
-- **Custom Instructions** - Include context-specific instructions for AI analysis
-- **External Sources** - Include files from GitHub repos or other directories
-- **Character Limiting** - Stay within AI context windows automatically
-
-### AI Integration (Gemini)
-- **AI-Powered Summaries** - Automatic code and test file summarization
-- **Image Analysis** - Generate descriptions for images and diagrams
-
-### Advanced Features
-
-- **Git Integration** - Filter by modified, staged, or untracked files
-- **Deduplication** - Remove duplicate files based on content
-- **Always Include** - Force include critical files regardless of filters
+**Who is this for?**
+- Engineers sharing code context with AI tools (Claude, ChatGPT, etc.)
+- Code reviewers capturing diffs and changes
+- Documentation writers exporting structured code snippets
 
 ## 📦 Installation
 
-### Global Installation
 ```bash
 npm install -g copytree
 ```
 
-### Local Development
-```bash
-git clone https://github.com/gregpriday/copytree.git
-cd copytree
-npm install
-npm link  # Makes 'copytree' available globally
-```
-
-## 🚀 Quick Start
+## ⚡ Quick Start
 
 ```bash
-# Copy current directory to clipboard
-copytree
-
-# Use default profile (automatic)
+# Copy current directory to markdown
 copytree -o project-structure.md
+
+# Copy to clipboard
+copytree
 
 # Copy from GitHub repository
 copytree https://github.com/user/repo
 
-# Copy specific branch/path from GitHub
-copytree https://github.com/user/repo/tree/main/src -o repo-src.xml
+# Display in terminal instead
+copytree --display
 ```
 
-## 📖 Usage Examples
+## 🎯 Why CopyTree?
 
-### Basic Operations
+- **Smart File Discovery** - Intelligent selection with gitignore support
+- **15+ File Transformers** - PDF text extraction, image OCR/descriptions, AI summaries
+- **Multiple Output Formats** - Markdown, XML, JSON, tree view
+- **Profile System** - Default profile with customizable overrides
+- **Git Integration** - Filter by modified files, branch diffs, staged changes
+- **External Sources** - Include files from GitHub repos or other directories
+- **Character Limiting** - Stay within AI context windows automatically
+
+## 🍳 Common Recipes
+
 ```bash
-# Copy current directory (default: to clipboard)
-copytree
+# Only modified files
+copytree -m
+copytree --git-modified
 
-# Copy to file
-copytree -o structure.xml
+# Compare with main branch
+copytree -c main
+copytree --changed main
 
-# Display to console instead of clipboard
-copytree -i
+# Include JS/TS files, exclude node_modules
+copytree -f "*.js" -f "*.ts" --exclude "node_modules"
 
-# Copy file path reference to clipboard
-copytree -r
+# Copy GitHub folder to XML
+copytree https://github.com/user/repo/tree/main/src -o repo-src.xml
 
-# Dry run (preview files without copying)
+# Apply AI transformers (summaries, OCR)
+copytree --transform
+
+# Dry run (preview without copying)
 copytree --dry-run
 
-# Show only directory tree structure (no file contents)
+# Show only tree structure (no file contents)
 copytree -t
+copytree --tree-only
 
 # Different output formats
 copytree --format json -o structure.json
-copytree --format xml  -o structure.xml
-copytree --format tree  # Tree view in console
+copytree --format xml -o structure.xml
+copytree --format markdown -o structure.md
 ```
 
-### Advanced Filtering
-```bash
-# Include/exclude patterns
-copytree -f "*.js" -f "*.ts" --exclude "node_modules"
+## 📋 Profiles (60-second guide)
 
-# Git-based filtering
-copytree -m                 # Only modified files
-copytree -c main            # Files changed from main branch
+Profiles control which files are included and how they're processed.
 
-# Combine filters
-copytree -m
+**Create a custom profile:**
+```yaml
+# .copytree/my-profile.yml
+name: my-profile
+include: ["src/**/*.js", "README.md"]
+exclude: ["**/*.test.js"]
+transformers:
+  file-loader: true
+  markdown: true
+output:
+  format: markdown
 ```
 
-### Custom Instructions
+**Use your profile:**
 ```bash
-# Use custom instructions for specific analysis
-copytree --instructions react-review
-copytree --instructions api-docs
+# Validate first
+copytree profile:validate my-profile
 
-# Disable instructions entirely
-copytree --no-instructions
-```
+# Then use it
+copytree -p my-profile -o summary.md
+copytree --profile my-profile
 
-### Profile Usage
-```bash
-# List available profiles
+# List all available profiles
 copytree profile:list
-
-# Validate a profile
-copytree profile:validate default
-
-# Use default profile (automatic) or specify custom
-copytree                 # Uses default profile
-copytree -p mycustom     # Use custom profile
 ```
 
-### AI Features
+## 🤖 AI Integration
+
+CopyTree can call AI providers for intelligent summaries, image descriptions, and code analysis.
+
+**Supported providers:**
+- **Gemini** (Google AI) - Set `GEMINI_API_KEY`
+- **OpenAI** - Set `OPENAI_API_KEY` (when configured)
+- More providers can be added via configuration
+
+**Enable AI features:**
 ```bash
-# AI-powered file summaries
-copytree --transform  # Apply all transformers including AI summaries
+# Set API key
+export GEMINI_API_KEY=your_key_here
+
+# Use AI transformers
+copytree --transform
 ```
+
+**Note:** When you enable AI transformers, file content may be sent to your configured AI provider. Review your organization's policies, scrub secrets, and use `.copytreeignore` to exclude sensitive files.
 
 ## ⚙️ Configuration
 
-Use `.copytreeignore` files in your project directory for custom exclusions (similar to `.gitignore` syntax).
-
 ### Environment Variables
+
 Create a `.env` file in your project or home directory:
 
 ```bash
-# AI Configuration (Google Gemini)
+# AI Configuration
 GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_DEFAULT_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-2.5-flash
+OPENAI_API_KEY=your_openai_key_here  # Optional
 
 # Performance Settings
 COPYTREE_MAX_FILE_SIZE=10485760      # 10MB
@@ -149,6 +150,7 @@ COPYTREE_CACHE_TTL=86400000          # 24 hours
 ```
 
 ### Configuration Files
+
 - **Global**: `~/.copytree/config/`
 - **Project**: `.copytree/config/`
 
@@ -162,201 +164,101 @@ module.exports = {
 };
 ```
 
-## 📚 Commands Reference
+### Ignore Files
 
-### Core Commands
-- `copytree [path]` - Copy directory structure to XML/JSON
-### Profile Management
-- `copytree profile:list` - List all available profiles
-- `copytree profile:validate <name>` - Validate profile configuration
+Use `.copytreeignore` in your project directory for custom exclusions (uses `.gitignore` syntax).
 
-### Documentation & Setup
-- `copytree copy:docs` - Copy built-in documentation
-- `copytree install:copytree` - Set up CopyTree environment
+## 🛠️ Requirements
 
-### Utility Commands
-- `copytree cache:clear` - Clear AI and file processing caches
-- `copytree config:validate` - Validate application configuration
-
-## 🔧 File Transformers
-
-CopyTree includes 15+ specialized transformers:
-
-### Text Processing
-- **FileLoader**: Default transformer, loads content as-is
-- **FirstLines**: Show only first N lines of files
-- **MarkdownTransformer**: Strip formatting or convert markdown
-- **MarkdownLinkStripper**: Remove links while preserving text
-- **HTMLStripper**: Convert HTML to plain text
-
-### AI-Powered (Gemini)
-- **AISummary**: General AI-powered summaries
-- **FileSummary**: Summarize any text file in 2-3 sentences
-- **UnitTestSummary**: Specialized summaries for test files
-- **ImageDescription**: Describe images using vision AI
-- **SvgDescription**: Analyze and describe SVG files
-
-### Document Conversion
-- **PDFTransformer**: Extract text from PDF files
-- **DocumentToText**: Convert Word/ODT documents (requires Pandoc)
-- **CSVTransformer**: Preview or full CSV content with formatting
-
-### Binary & Media
-- **BinaryTransformer**: Replace binary content with metadata
-- **ImageTransformer**: Handle images with OCR (Tesseract) or AI descriptions
-
-## 🔌 Integration
-
-### Git Integration
-CopyTree integrates with Git to provide context-aware file filtering:
-
-```bash
-# Show only files modified in working directory
-copytree -m
-
-# Show files changed from main branch
-copytree -c main
-
-# Include git status in output
-copytree --with-git-status
-
-# Compare with specific branch
-copytree -c develop
-```
-
-## 🏗️ Architecture
-
-CopyTree uses an event-driven pipeline architecture with 16 processing stages:
-
-1. **FileDiscoveryStage** - Find files matching patterns
-2. **ProfileFilterStage** - Apply profile-based rules
-3. **GitFilterStage** - Apply git-based filtering
-4. **ExternalSourceStage** - Include external files
-5. **TransformStage** - Apply file transformations
-7. **DeduplicationStage** - Remove duplicate files
-8. **CharacterLimitStage** - Enforce size limits
-9. **OutputFormattingStage** - Format output (XML/JSON/tree)
-10. **StreamingOutputStage** - Write to destination
-
-And additional stages for caching, metadata, sorting, and more.
-
-## ⚡ Performance
-
-CopyTree is optimized for large codebases:
-
-- **Streaming processing** for memory efficiency
-- **Parallel file processing** where possible
-- **Smart caching** for AI operations and file transformations
-- **Configurable limits** to prevent resource exhaustion
-
-### Performance Targets
-- Process 10,000 files in < 30 seconds
-- Memory usage < 500MB for large projects  
-- Support projects up to 100MB total size
-- Stream files > 10MB without loading into memory
-
-Run benchmarks: `npm run benchmark`
-
-## 🛠️ Development
-
-### Setup
-```bash
-git clone https://github.com/gregpriday/copytree.git
-cd copytree
-npm install
-
-# Run tests
-npm test
-npm run test:watch
-npm run test:coverage
-
-# Linting
-npm run lint
-npm run lint:fix
-
-# Formatting
-npm run format
-npm run format:check
-```
-
-### Project Structure
-```
-copytree/
-├── src/
-│   ├── commands/        # CLI command implementations
-│   ├── pipeline/        # Processing pipeline stages
-│   ├── services/        # Core services (AI, Cache, Git)
-│   ├── transforms/      # File transformers
-│   └── utils/          # Utility functions
-├── config/             # Default configurations
-├── profiles/           # Example custom profiles (user-created)
-├── docs/               # Documentation
-└── tests/              # Test suites
-```
-
-### Testing
-- **Unit tests**: `tests/unit/`
-- **Integration tests**: `tests/integration/`
-- **Performance tests**: `tests/performance/`
-- **Test fixtures**: `tests/fixtures/`
+- **Node.js** 18+ (LTS recommended)
+- **Optional dependencies:**
+  - [Pandoc](https://pandoc.org) - For Word/ODT document conversion
+  - [Tesseract](https://github.com/tesseract-ocr/tesseract) - For image OCR capabilities
 
 ## 📖 Documentation
 
-Comprehensive documentation is available in the `docs/` directory:
+For detailed guides, see the `docs/` directory:
 
 - **[Getting Started](docs/index.md)** - Introduction and quick start
-- **[Installation Guide](docs/installation/installation-guide.md)** - Detailed setup instructions
-- **[CLI Reference](docs/cli/copytree-reference.md)** - Complete command documentation
-- **[Profile Overview](docs/profiles/profile-overview.md)** - Understanding profiles
-- **[Transformer Reference](docs/profiles/transformer-reference.md)** - All transformers explained
+- **[CLI Reference](docs/cli/copytree-reference.md)** - Complete command options
+- **[Profile Overview](docs/profiles/profile-overview.md)** - Creating and using profiles
+- **[Transformer Reference](docs/profiles/transformer-reference.md)** - All 15+ transformers explained
+- **[Architecture](docs/technical/architecture.md)** - Pipeline and system design
 - **[Troubleshooting](docs/usage/troubleshooting.md)** - Common issues and solutions
+
+## 📚 Commands Reference
+
+### Main Commands
+- `copytree [path]` - Copy directory structure
+- `copytree profile:list` - List available profiles
+- `copytree profile:validate <name>` - Validate a profile
+- `copytree cache:clear` - Clear caches
+- `copytree config:validate` - Validate configuration
+- `copytree copy:docs` - Copy built-in documentation
 
 ## 🐛 Troubleshooting
 
-### Common Issues
+### Quick Fixes
 
-**Large file errors**: Adjust `COPYTREE_MAX_FILE_SIZE` environment variable
+**Large file errors**
+→ Adjust `COPYTREE_MAX_FILE_SIZE` environment variable
 
-**Memory issues**: Reduce `COPYTREE_MAX_TOTAL_SIZE` or use streaming mode
+**Memory issues**
+→ Reduce `COPYTREE_MAX_TOTAL_SIZE` or enable streaming mode
 
-**AI features not working**: Verify `GEMINI_API_KEY` is set correctly
+**AI features not working**
+→ Verify `GEMINI_API_KEY` is set correctly and valid
 
-**Slow performance**: Enable caching and check file exclusion patterns
+**Slow performance**
+→ Enable caching, use lighter transformers, add more exclusion patterns
+
+**Profile not found**
+→ Check search paths: project `.copytree/` → user `~/.copytree/profiles/` → built-in `profiles/`
+
+**Git errors**
+→ Ensure directory is a git repository with `git status`
 
 ### Debug Mode
+
 ```bash
 # Enable verbose logging
 DEBUG=copytree:* copytree /path/to/project
 
 # Performance monitoring
 COPYTREE_PERFORMANCE=true copytree /path/to/project
+
+# Validate configuration
+copytree config:validate
+copytree config:inspect
+
+# Clear cache
+copytree cache:clear
 ```
 
+For more solutions, see the [Troubleshooting Guide](docs/usage/troubleshooting.md).
 
-## 🎯 Creating Profiles with AI Assistance
+## 🛠️ Development
 
-CopyTree includes a default profile that works for most projects. You can also create custom profiles using AI assistants like Claude Code:
+### Setup
 
 ```bash
-# Create a profile in one conversation
-claude -p "Please create a CopyTree profile for this project.  
-Start by running \`copytree copy:docs --display\` to read the profile docs,  
-then walk through an iterative process to create an optimal profile."
-
-# Or build a .copytreeignore file instead
-claude -p "Please create a .copytreeignore file for this project.  
-Start by running \`copytree copy:docs --display\` to review ignore rules,  
-then create project-specific exclusions."
+git clone https://github.com/gregpriday/copytree.git
+cd copytree
+npm install
+npm link  # Makes 'copytree' available globally
 ```
 
-The `copytree copy:docs --display` step provides the AI with CopyTree's documentation to ensure accurate profile creation without hallucinated options.
+### Testing
 
 ```bash
-# Validate the custom YAML profile
-copytree profile:validate myprofile      # Returns 0 if valid
+npm test                   # Run all tests
+npm run test:watch         # Watch mode
+npm run test:coverage      # Coverage report
+npm run lint               # Lint code
+npm run format             # Format code
 ```
 
-For detailed guidance: [Profile Creation Guide](docs/profiles/profile-creation-guide.md)
+For detailed testing information, see [tests/README.md](tests/README.md).
 
 ## 🤝 Contributing
 
@@ -364,10 +266,46 @@ For detailed guidance: [Profile Creation Guide](docs/profiles/profile-creation-g
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
 4. Add tests for new functionality
-5. Ensure tests pass (`npm test`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
+5. Ensure tests pass (`npm test`) and coverage meets thresholds (80%)
+6. Run linting (`npm run lint`) and formatting (`npm run format`)
+7. Commit your changes
+8. Push to your branch
+9. Open a Pull Request
+
+See our [Testing Guide](tests/README.md) for more details on writing and running tests.
+
+## ⚡ Performance
+
+CopyTree is optimized for large codebases:
+
+- **Streaming processing** - Memory efficient for large files (>10MB)
+- **Parallel file processing** - Faster for many files
+- **Smart caching** - Avoid redundant AI calls and transformations
+- **Configurable limits** - Prevent resource exhaustion
+
+**Performance targets:**
+- Process 10,000 files in < 30 seconds
+- Memory usage < 500MB for large projects
+- Support projects up to 100MB total size
+
+## 🎯 Creating Profiles with AI
+
+You can create custom profiles using AI assistants like Claude Code:
+
+```bash
+# Create a profile interactively
+claude -p "Please create a CopyTree profile for this project.
+Start by running \`copytree copy:docs --display\` to read the docs,
+then create an optimal profile."
+
+# Or build a .copytreeignore file
+claude -p "Please create a .copytreeignore file for this project.
+Start by running \`copytree copy:docs --display\` to review ignore rules."
+```
+
+The `copytree copy:docs --display` step provides accurate documentation to ensure quality profile creation.
+
+For detailed guidance: [Profile Creation Guide](docs/profiles/profile-creation-guide.md)
 
 ## 📄 License
 
@@ -376,3 +314,7 @@ MIT License. See [LICENSE](LICENSE) file for details.
 ## 📝 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
+
+---
+
+**Need help?** Check the [docs](docs/) or open an [issue](https://github.com/gregpriday/copytree/issues).

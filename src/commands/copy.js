@@ -247,11 +247,11 @@ async function setupPipelineStages(basePath, profile, options) {
   // 11. Output Formatting Stage
   // Determine output format (default to tree if --only-tree is used)
   const rawFormat =
-    options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'markdown');
+    options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'xml');
   const outputFormat =
-    (rawFormat || 'markdown').toString().toLowerCase() === 'md'
+    (rawFormat || 'xml').toString().toLowerCase() === 'md'
       ? 'markdown'
-      : (rawFormat || 'markdown').toString().toLowerCase();
+      : (rawFormat || 'xml').toString().toLowerCase();
 
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
@@ -346,7 +346,7 @@ async function displayOutput(outputResult, options) {
 
   // Handle --as-reference option
   if (options.asReference) {
-    const f = (options.format || 'markdown').toString().toLowerCase();
+    const f = (options.format || 'xml').toString().toLowerCase();
     const format = f === 'md' ? 'markdown' : f;
     const extension =
       format === 'json' ? 'json' : format === 'markdown' ? 'md' : format === 'tree' ? 'txt' : 'xml';
@@ -393,7 +393,7 @@ async function displayOutput(outputResult, options) {
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
     } catch (_error) {
       // If clipboard fails, save to temporary file
-      const f = (options.format || 'markdown').toString().toLowerCase();
+      const f = (options.format || 'xml').toString().toLowerCase();
       const format = f === 'md' ? 'markdown' : f;
       const extension =
         format === 'json'

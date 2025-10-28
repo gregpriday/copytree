@@ -100,6 +100,7 @@ export class PipelineEventCollector extends EventEmitter {
       'stage:start',
       'stage:complete',
       'stage:error',
+      'stage:recover',
       'file:batch',
       'progress'
     ];
@@ -160,7 +161,7 @@ export class PipelineEventCollector extends EventEmitter {
    */
   getStageCompletions() {
     return this.getEvents('stage:complete').map(e => ({
-      stage: e.data.stage.name,
+      stage: typeof e.data.stage === 'string' ? e.data.stage : e.data.stage.name,
       duration: e.data.duration,
       memoryUsage: e.data.memoryUsage,
       timestamp: e.timestamp
@@ -238,7 +239,8 @@ export function createMockFiles(count = 10, options = {}) {
       absolutePath: `/project/src/${prefix}${i}${extension}`,
       relativePath: `src/${prefix}${i}${extension}`,
       size: 100 + i * 10,
-      mtime: new Date('2025-01-01'),
+      modified: new Date('2025-01-01T00:00:00.000Z'),
+      mtime: new Date('2025-01-01T00:00:00.000Z'),
       isDirectory: false
     };
 
@@ -265,6 +267,7 @@ export class MockStage {
     this.description = options.description || `Mock stage ${name}`;
     this.processFunc = options.process || ((input) => input);
     this.shouldError = options.shouldError || false;
+    this.shouldRecover = options.shouldRecover !== false; // Default to true for graceful degradation
     this.delay = options.delay || 0;
     this.calls = [];
   }
@@ -288,6 +291,9 @@ export class MockStage {
   }
 
   async handleError(error, input) {
+    if (!this.shouldRecover) {
+      throw error; // Re-throw to fail the pipeline
+    }
     return input; // Graceful degradation
   }
 

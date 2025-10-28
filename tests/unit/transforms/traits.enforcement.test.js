@@ -47,6 +47,13 @@ describe('Transformer Trait Enforcement', () => {
 
   beforeEach(() => {
     registry = new TransformerRegistry();
+    // Mock logger to avoid undefined errors
+    registry.logger = {
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn()
+    };
   });
 
   afterEach(() => {
@@ -273,17 +280,97 @@ describe('Transformer Trait Enforcement', () => {
     });
 
     it('detects circular dependencies', () => {
-      const a = new MockTransformer('a', { dependencies: ['b'] });
-      const b = new MockTransformer('b', { dependencies: ['a'] });
+      // Register transformers with circular dependency
+      registry.register(
+        'transformer-a',
+        new MockTransformer('transformer-a', { dependencies: ['transformer-b'] }),
+        {},
+        { dependencies: ['transformer-b'] }
+      );
 
-      registry.register(a);
-      registry.register(b);
+      registry.register(
+        'transformer-b',
+        new MockTransformer('transformer-b', { dependencies: ['transformer-a'] }),
+        {},
+        { dependencies: ['transformer-a'] }
+      );
 
       // Registry should detect this circular dependency
-      // (Implementation detail: registry should validate this)
       expect(() => {
         registry.validateDependencies();
-      }).toThrow(/circular|dependency/i);
+      }).toThrow(/circular.*dependency/i);
+    });
+
+    it('detects self-referencing dependencies', () => {
+      registry.register(
+        'self-ref',
+        new MockTransformer('self-ref', { dependencies: ['self-ref'] }),
+        {},
+        { dependencies: ['self-ref'] }
+      );
+
+      expect(() => {
+        registry.validateDependencies();
+      }).toThrow(/circular.*dependency/i);
+    });
+
+    it('detects complex circular dependencies (A->B->C->A)', () => {
+      registry.register(
+        'a',
+        new MockTransformer('a', { dependencies: ['b'] }),
+        {},
+        { dependencies: ['b'] }
+      );
+
+      registry.register(
+        'b',
+        new MockTransformer('b', { dependencies: ['c'] }),
+        {},
+        { dependencies: ['c'] }
+      );
+
+      registry.register(
+        'c',
+        new MockTransformer('c', { dependencies: ['a'] }),
+        {},
+        { dependencies: ['a'] }
+      );
+
+      expect(() => {
+        registry.validateDependencies();
+      }).toThrow(/circular.*dependency/i);
+    });
+
+    it('validates transformer dependencies exist', () => {
+      registry.register(
+        'dependent',
+        new MockTransformer('dependent', { dependencies: ['missing'] }),
+        {},
+        { dependencies: ['missing'] }
+      );
+
+      // Should not throw for external dependencies like 'tesseract' or 'network'
+      // Only throws for missing transformer dependencies
+      expect(() => {
+        registry.validateDependencies();
+      }).not.toThrow();
+    });
+
+    it('returns topological order for valid dependencies', () => {
+      const base = new MockTransformer('base', { dependencies: [] });
+      const mid = new MockTransformer('mid', { dependencies: ['base'] });
+      const top = new MockTransformer('top', { dependencies: ['mid'] });
+
+      registry.register('base', base, {}, { dependencies: [] });
+      registry.register('mid', mid, {}, { dependencies: ['base'] });
+      registry.register('top', top, {}, { dependencies: ['mid'] });
+
+      const order = registry.validateDependencies();
+
+      // Order should be: base, mid, top (dependencies first)
+      expect(order).toEqual(expect.arrayContaining(['base', 'mid', 'top']));
+      expect(order.indexOf('base')).toBeLessThan(order.indexOf('mid'));
+      expect(order.indexOf('mid')).toBeLessThan(order.indexOf('top'));
     });
   });
 

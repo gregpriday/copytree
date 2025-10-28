@@ -10,6 +10,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import { tmpPath, cleanTmpDir } from '../../helpers/fixtures.js';
+import { setupEnvIsolation, restoreEnv } from '../../helpers/envCleanup.js';
 import os from 'os';
 
 // Mock ConfigManager for testing hierarchy
@@ -109,15 +110,14 @@ class MockConfigManager {
 
 describe('Configuration Hierarchy', () => {
   let configManager;
-  let originalEnv;
 
   beforeEach(() => {
     configManager = new MockConfigManager();
-    originalEnv = { ...process.env };
+    setupEnvIsolation();
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    restoreEnv();
     cleanTmpDir();
   });
 

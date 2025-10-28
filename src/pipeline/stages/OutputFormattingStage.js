@@ -6,8 +6,8 @@ import MarkdownFormatter from '../formatters/MarkdownFormatter.js';
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
     super(options);
-    // Normalize and default format (markdown is default)
-    const raw = (options.format || 'markdown').toString().toLowerCase();
+    // Normalize and default format (xml is default)
+    const raw = (options.format || 'xml').toString().toLowerCase();
     this.format = raw === 'md' ? 'markdown' : raw;
     this.addLineNumbers =
       options.addLineNumbers ??

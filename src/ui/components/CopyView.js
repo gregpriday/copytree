@@ -142,11 +142,11 @@ const CopyView = () => {
           profile: profileName,
           hasTransformers: !options.noTransform,
           format:
-            (options.format ? String(options.format).toLowerCase() : 'markdown') === 'md'
+            (options.format ? String(options.format).toLowerCase() : 'xml') === 'md'
               ? 'markdown'
               : options.format
                 ? String(options.format).toLowerCase()
-                : 'markdown',
+                : 'xml',
           outputDestination: options.output ? 'file' : options.display ? 'terminal' : 'clipboard',
         });
       }
@@ -289,11 +289,11 @@ const CopyView = () => {
     return {
       content: String(content),
       format:
-        (options.format ? String(options.format).toLowerCase() : 'markdown') === 'md'
+        (options.format ? String(options.format).toLowerCase() : 'xml') === 'md'
           ? 'markdown'
           : options.format
             ? String(options.format).toLowerCase()
-            : 'markdown',
+            : 'xml',
       stats: result.stats || {},
     };
   };
@@ -317,7 +317,7 @@ const CopyView = () => {
 
     // Handle --as-reference option
     if (options.asReference) {
-      const f = options.format ? String(options.format).toLowerCase() : 'markdown';
+      const f = options.format ? String(options.format).toLowerCase() : 'xml';
       const format = f === 'md' ? 'markdown' : f;
       const extension =
         format === 'json'
@@ -359,7 +359,7 @@ const CopyView = () => {
         action = 'copied';
       } catch (error) {
         // If clipboard fails, save to temporary file
-        const f = options.format ? String(options.format).toLowerCase() : 'markdown';
+        const f = options.format ? String(options.format).toLowerCase() : 'xml';
         const format = f === 'md' ? 'markdown' : f;
         const extension =
           format === 'json'
@@ -431,11 +431,11 @@ const CopyView = () => {
           results,
           output,
           format:
-            (options.format ? String(options.format).toLowerCase() : 'markdown') === 'md'
+            (options.format ? String(options.format).toLowerCase() : 'xml') === 'md'
               ? 'markdown'
               : options.format
                 ? String(options.format).toLowerCase()
-                : 'markdown',
+                : 'xml',
           showOutput: options.display,
         }),
         React.createElement(SummaryTable, {

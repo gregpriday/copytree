@@ -18,7 +18,7 @@ import { hashFile, hashContent } from '../../utils/fileHash.js';
 class StreamingOutputStage extends Stage {
   constructor(options = {}) {
     super(options);
-    const raw = (options.format || 'markdown').toString().toLowerCase();
+    const raw = (options.format || 'xml').toString().toLowerCase();
     this.format = raw === 'md' ? 'markdown' : raw;
     this.outputStream = options.outputStream || process.stdout;
     this.addLineNumbers =
