@@ -15,7 +15,7 @@ class XMLFormatter {
     // Add metadata
     xml += '  <ct:metadata>\n';
     xml += `    <ct:generated>${new Date().toISOString()}</ct:generated>\n`;
-    xml += `    <ct:fileCount>${input.files.length}</ct:fileCount>\n`;
+    xml += `    <ct:fileCount>${input.files.filter(f => f !== null).length}</ct:fileCount>\n`;
     xml += `    <ct:totalSize>${this.stage.calculateTotalSize(input.files)}</ct:totalSize>\n`;
 
     if (input.profile) {

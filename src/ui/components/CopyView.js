@@ -137,7 +137,9 @@ const CopyView = () => {
       // Record performance telemetry if info mode is enabled
       if (options.info && result.stats) {
         const duration = Date.now() - startTime;
-        const fileCount = result.stats.filesProcessed || result.stats.totalFiles || 0;
+        // Count only non-null files (nulls are placeholders for filtered binary files)
+        const fileCount = result.files ? result.files.filter(f => f !== null).length :
+                         (result.stats.filesProcessed || result.stats.totalFiles || 0);
         globalTelemetry.recordSession(result.stats, duration, fileCount, {
           profile: profileName,
           hasTransformers: !options.noTransform,
@@ -300,7 +302,9 @@ const CopyView = () => {
 
   const handleOutputAndCreateMessage = async (outputResult, options, result) => {
     const stats = result.stats || {};
-    const fileCount = stats.totalFiles || stats.processedFiles || stats.fileCount || 0;
+    // Count only non-null files (nulls are placeholders for filtered binary files)
+    const fileCount = result.files ? result.files.filter(f => f !== null).length :
+                     (stats.totalFiles || stats.processedFiles || stats.fileCount || 0);
     const totalSize = outputResult.content ? outputResult.content.length : 0;
 
     // Helper function to format bytes

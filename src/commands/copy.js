@@ -75,8 +75,8 @@ async function copyCommand(targetPath = '.', options = {}) {
       await displayOutput(outputResult, options);
     } else if (options.dryRun) {
       logger.info('🔍 Dry run mode - no files were processed.');
-      const fileCount = result.files.length;
-      const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
+      const fileCount = result.files.filter(f => f !== null).length;
+      const totalSize = result.files.filter(f => f !== null).reduce((sum, file) => sum + (file.size || 0), 0);
       logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}] would be processed`);
     }
 
@@ -298,8 +298,8 @@ async function setupPipelineStages(basePath, profile, options) {
 async function prepareOutput(result, options) {
   // If streaming was used, output has already been handled
   if (result.streamed) {
-    const fileCount = result.files.length;
-    const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
+    const fileCount = result.files.filter(f => f !== null).length;
+    const totalSize = result.files.filter(f => f !== null).reduce((sum, file) => sum + (file.size || 0), 0);
 
     return {
       type: 'streamed',
@@ -317,7 +317,7 @@ async function prepareOutput(result, options) {
 
   // Calculate output size
   const outputSize = Buffer.byteLength(output, 'utf8');
-  const fileCount = result.files.length;
+  const fileCount = result.files.filter(f => f !== null).length;
 
   return {
     type: 'normal',

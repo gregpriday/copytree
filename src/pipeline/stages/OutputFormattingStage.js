@@ -66,7 +66,7 @@ class OutputFormattingStage extends Stage {
       directory: input.basePath,
       metadata: {
         generated: new Date().toISOString(),
-        fileCount: input.files.length,
+        fileCount: input.files.filter(f => f !== null).length,
         totalSize: this.calculateTotalSize(input.files),
         profile: input.profile?.name || 'default',
         directoryStructure: this.generateDirectoryStructure(input.files),
@@ -119,7 +119,7 @@ class OutputFormattingStage extends Stage {
     // Add summary
     lines.push('');
     lines.push(
-      `${input.files.length} files, ${this.formatBytes(this.calculateTotalSize(input.files))}`,
+      `${input.files.filter(f => f !== null).length} files, ${this.formatBytes(this.calculateTotalSize(input.files))}`,
     );
 
     return lines.join('\n');
