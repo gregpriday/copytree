@@ -21,24 +21,30 @@ npm install -g copytree
 ## ⚡ Quick Start
 
 ```bash
-# Copy current directory to markdown
-copytree -o project-structure.md
-
-# Copy to clipboard
+# Copy to clipboard (default: XML format)
 copytree
+
+# Copy as file reference (useful for pasting into LLMs)
+copytree -r
+
+# Save to file
+copytree -o project-structure.xml
+
+# Display tree structure only (no file contents)
+copytree -t
 
 # Copy from GitHub repository
 copytree https://github.com/user/repo
 
-# Display in terminal instead
+# Display in terminal
 copytree --display
 ```
 
 ## 🎯 Why CopyTree?
 
-- **Smart File Discovery** - Intelligent selection with gitignore support
+- **Smart File Discovery** - Intelligent selection with `.gitignore`, `.copytreeignore`, and `.copytreeinclude` support
 - **15+ File Transformers** - PDF text extraction, image OCR/descriptions, AI summaries
-- **Multiple Output Formats** - Markdown, XML, JSON, tree view
+- **Multiple Output Formats** - XML (default), Markdown, JSON, tree view
 - **Profile System** - Default profile with customizable overrides
 - **Git Integration** - Filter by modified files, branch diffs, staged changes
 - **External Sources** - Include files from GitHub repos or other directories
@@ -166,7 +172,26 @@ module.exports = {
 
 ### Ignore Files
 
-Use `.copytreeignore` in your project directory for custom exclusions (uses `.gitignore` syntax).
+Use `.copytreeignore` in your project directory for custom exclusions (uses `.gitignore` syntax):
+
+```bash
+# .copytreeignore
+node_modules/
+*.log
+.env
+dist/
+```
+
+Use `.copytreeinclude` to force-include specific files that would otherwise be excluded (e.g., hidden files):
+
+```bash
+# .copytreeinclude
+.example/**
+.env.example
+config/**
+```
+
+**Note:** `.copytreeinclude` patterns have the highest precedence and will override all other exclusion rules, including `.gitignore`, `.copytreeignore`, and profile excludes.
 
 ## 🛠️ Requirements
 
