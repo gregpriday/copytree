@@ -19,6 +19,9 @@ Deep dive into advanced features like inheritance, external sources, and complex
 ### [.copytreeignore Guide](./copytreeignore.md)
 Documentation on using .copytreeignore files for project-specific exclusions.
 
+### [Force Include Guide](./force-include.md)
+Documentation on forcing specific files to be included regardless of other filters.
+
 ### [Transformer Reference](./transformer-reference.md)
 Complete reference for all available file transformers and their options.
 

@@ -54,13 +54,18 @@ class GitFilterStage extends Stage {
       if (this.modified || this.changed) {
         const gitFileSet = new Set(gitFiles.map((f) => path.normalize(f)));
 
-        filteredFiles = input.files.filter((file) => {
+        const gitLimited = input.files.filter((file) => {
           const normalizedPath = path.normalize(file.path);
           return gitFileSet.has(normalizedPath) || gitFileSet.has(file.path);
         });
 
+        // Preserve files marked as alwaysInclude even if not in git set
+        const always = input.files.filter((f) => f.alwaysInclude);
+        const byPath = new Map([...gitLimited, ...always].map((f) => [f.path, f]));
+        filteredFiles = [...byPath.values()];
+
         this.log(
-          `Filtered to ${filteredFiles.length} files (from ${input.files.length}) based on git status`,
+          `Filtered to ${filteredFiles.length} files (from ${input.files.length}, ${always.length} force-included) based on git status`,
           'info',
         );
       }

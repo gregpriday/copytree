@@ -35,7 +35,7 @@ class AlwaysIncludeStage extends Stage {
         alwaysIncludeCount++;
 
         logger.debug('File marked as always-include', {
-          path: file.relativePath,
+          path: file.path || file.relativePath,
           patterns: this.alwaysPatterns,
         });
 
@@ -62,7 +62,7 @@ class AlwaysIncludeStage extends Stage {
    * Check if a file matches any of the always patterns
    */
   matchesAlwaysPatterns(file) {
-    const filePath = file.relativePath;
+    const filePath = file.path || file.relativePath;
 
     for (const pattern of this.alwaysPatterns) {
       // Support both glob patterns and exact matches

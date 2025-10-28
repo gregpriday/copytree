@@ -138,6 +138,13 @@ async function loadProfile(profileLoader, profileName, options) {
 async function setupPipelineStages(basePath, profile, options) {
   const stages = [];
 
+  // Merge force-include patterns from all sources (CLI, profile, .copytreeinclude)
+  const mergedAlways = [
+    ...(Array.isArray(options.always) ? options.always : options.always ? [options.always] : []),
+    ...(Array.isArray(profile.always) ? profile.always : []),
+    // .copytreeinclude is loaded by the stage itself
+  ];
+
   // 1. File Discovery Stage
   const { default: FileDiscoveryStage } = await import('../pipeline/stages/FileDiscoveryStage.js');
   stages.push(
@@ -150,10 +157,19 @@ async function setupPipelineStages(basePath, profile, options) {
       maxFileSize: profile.options?.maxFileSize,
       maxTotalSize: profile.options?.maxTotalSize,
       maxFileCount: profile.options?.maxFileCount,
+      forceInclude: mergedAlways,
     }),
   );
 
-  // 2. Git Filter Stage (if --modified or --changed is used)
+  // 2. Always Include Stage (mark files before any filtering)
+  if (mergedAlways.length > 0) {
+    const { default: AlwaysIncludeStage } = await import(
+      '../pipeline/stages/AlwaysIncludeStage.js'
+    );
+    stages.push(new AlwaysIncludeStage(mergedAlways));
+  }
+
+  // 3. Git Filter Stage (if --modified or --changed is used)
   if (options.modified || options.changed) {
     const { default: GitFilterStage } = await import('../pipeline/stages/GitFilterStage.js');
     stages.push(
@@ -166,7 +182,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 3. Profile Filter Stage (applies exclude patterns)
+  // 4. Profile Filter Stage (applies exclude patterns)
   const { default: ProfileFilterStage } = await import('../pipeline/stages/ProfileFilterStage.js');
   stages.push(
     new ProfileFilterStage({
@@ -174,18 +190,6 @@ async function setupPipelineStages(basePath, profile, options) {
       filter: profile.filter || [],
     }),
   );
-
-  // 4. Always Include Stage (if --always option is used)
-  if (options.always) {
-    const { default: AlwaysIncludeStage } = await import(
-      '../pipeline/stages/AlwaysIncludeStage.js'
-    );
-    stages.push(
-      new AlwaysIncludeStage({
-        patterns: Array.isArray(options.always) ? options.always : [options.always],
-      }),
-    );
-  }
 
   // 5. External Source Stage (if external sources are configured)
   if (profile.external && profile.external.length > 0) {

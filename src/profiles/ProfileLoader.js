@@ -292,7 +292,7 @@ class ProfileLoader {
     });
 
     // Arrays - concatenate and deduplicate
-    ['include', 'exclude', 'filter'].forEach((prop) => {
+    ['include', 'exclude', 'filter', 'always'].forEach((prop) => {
       if (overlay[prop]) {
         merged[prop] = [...new Set([...(base[prop] || []), ...(overlay[prop] || [])])];
       }

@@ -16,6 +16,11 @@ class ProfileFilterStage extends Stage {
 
     // Filter files
     const filteredFiles = input.files.filter((file) => {
+      // Always include files marked as force-include
+      if (file.alwaysInclude) {
+        return true;
+      }
+
       // Check if file should be always included
       if (this.filter.length > 0) {
         let matched = false;
