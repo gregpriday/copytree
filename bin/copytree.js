@@ -141,9 +141,15 @@ program
 // 8. Copy docs command
 program
   .command('copy:docs')
-  .description('Copy framework/library documentation')
-  .option('--topic <name>', 'Documentation topic to copy')
+  .description('Copy CopyTree documentation (use --display to read all docs)')
+  .option('--topic <name>', 'Legacy: documentation topic to copy')
+  .option('--section <id...>', 'Copy specific section(s) by ID')
+  .option('--group <id...>', 'Copy documentation group(s) by ID')
+  .option('--task <id>', 'Copy task bundle with intro and checklist')
+  .option('--list [kind]', 'List available items: all|sections|groups|tasks (default: all)')
+  .option('--meta <format>', 'Output metadata in json or yaml format')
   .option('-o, --output <file>', 'Output file instead of clipboard')
+  .option('-i, --display', 'Display to console (recommended for AI agents)')
   .option('--no-clipboard', 'Display to console instead of clipboard')
   .action(async (options) => {
     if (!render || !App) {

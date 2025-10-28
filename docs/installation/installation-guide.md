@@ -193,11 +193,13 @@ mkdir -p ~/.copytree/profiles
 CopyTree caches external repositories and AI responses:
 
 ```bash
-# Clear all caches
-copytree cache:clear --all
+# Clear specific caches
+copytree cache:clear --transformations
+copytree cache:clear --ai
+copytree cache:clear --git
 
 # View cache settings
-copytree config:validate --verbose
+copytree config:inspect
 ```
 
 ## Verification
@@ -218,8 +220,10 @@ copytree config:validate
 ### AI Features Test
 
 ```bash
-# Test transformations (requires API key for AI transforms)
-copytree --transform --dry-run
+# Test with dry run (requires API key for AI transformers)
+copytree --dry-run
+
+# Note: Transformers are configured in profiles, not via CLI flags
 ```
 
 ## Troubleshooting
@@ -269,8 +273,11 @@ copytree config:validate --verbose
 ### API Key Issues
 
 ```bash
-# Validate AI configuration
-copytree config:validate ai
+# Validate configuration
+copytree config:validate
+
+# Inspect AI configuration
+copytree config:inspect --section ai
 
 # Re-run setup
 copytree install:copytree

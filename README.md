@@ -320,15 +320,28 @@ You can create custom profiles using AI assistants like Claude Code:
 ```bash
 # Create a profile interactively
 claude -p "Please create a CopyTree profile for this project.
-Start by running \`copytree copy:docs --display\` to read the docs,
+Start by running \`copytree copy:docs --topic all --display\` to read the docs,
 then create an optimal profile."
 
 # Or build a .copytreeignore file
 claude -p "Please create a .copytreeignore file for this project.
-Start by running \`copytree copy:docs --display\` to review ignore rules."
+Start by running \`copytree copy:docs --topic ignore-files --display\` to review ignore rules."
 ```
 
-The `copytree copy:docs --display` step provides accurate documentation to ensure quality profile creation.
+The `copytree copy:docs` command provides comprehensive documentation:
+
+```bash
+# Display all documentation (recommended for AI agents)
+copytree copy:docs --topic all --display
+
+# Display specific topics
+copytree copy:docs --topic ignore-files --display
+copytree copy:docs --topic profiles --display
+copytree copy:docs --topic transformers --display
+
+# List available topics
+copytree copy:docs
+```
 
 For detailed guidance: [Profile Creation Guide](docs/profiles/profile-creation-guide.md)
 

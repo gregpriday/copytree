@@ -8,11 +8,11 @@ CopyTree is a powerful Node.js CLI tool that intelligently copies directory stru
 # Install globally
 npm install -g copytree
 
-# Copy current directory to clipboard
+# Copy current directory to clipboard (uses default profile)
 copytree
 
-# Copy with a specific profile
-copytree --profile laravel
+# Copy with a custom profile
+copytree --profile myproject
 ```
 
 ## 📚 Documentation Sections
@@ -37,7 +37,7 @@ In-depth technical documentation for developers and contributors:
 ## ✨ Key Features
 
 ### 1. **Intelligent File Selection**
-- **Profile System**: Pre-configured profiles for popular frameworks (React, Laravel, Django, etc.)
+- **Profile System**: Default profile included; create custom profiles for project-specific needs
 - **Git Integration**: Copy only modified or changed files
 - **Pattern Matching**: Flexible include/exclude rules
 
@@ -51,7 +51,7 @@ In-depth technical documentation for developers and contributors:
 - **Clipboard**: Default output for easy pasting
 - **File Output**: Save to file
 - **Streaming**: Real-time output for large projects
-- **Multiple Formats**: XML (default), JSON, or tree view
+- **Multiple Formats**: Markdown (default), XML, JSON, or tree view
 
 ### 4. **Developer-Friendly**
 - **External Sources**: Include files from GitHub or other directories
@@ -61,29 +61,29 @@ In-depth technical documentation for developers and contributors:
 
 ### Share Code with AI
 ```bash
-# Copy entire project
+# Copy entire project (uses default profile)
 copytree
 
-# Copy only Python files
-copytree --profile python
+# Copy with custom profile
+copytree --profile myproject
 ```
 
 ### Document Generation
 ```bash
-# Generate project overview
-copytree --output project-overview.xml
+# Generate project overview (Markdown by default)
+copytree --output project-overview.md
 
-# Create API documentation
-copytree --profile api --transform
+# Generate as XML
+copytree --output project-overview.xml --format xml
 ```
 
 ### Code Review
 ```bash
-# Copy recent changes
+# Copy only git modified files
 copytree --modified
 
-# Copy changes between commits
-copytree --changes main..feature-branch
+# Copy files changed since a specific ref
+copytree --changed HEAD~5
 ```
 
 
@@ -112,7 +112,7 @@ copytree cache:clear
 
 - [Basic Usage Guide](./usage/basic-usage.md) - Complete usage documentation
 - [Troubleshooting Guide](./usage/troubleshooting.md) - Solve common issues
-- [Built-in Profiles](./profiles/builtin-profiles.md) - Explore available profiles
+- [Profile Examples](./profiles/profile-examples.md) - Example custom profiles
 - [Creating Custom Profiles](./profiles/profile-creation-guide.md) - Build your own profiles
 - [Transformer Reference](./profiles/transformer-reference.md) - File transformation options
 - [Advanced Features](./profiles/profile-advanced.md) - Power user features
@@ -120,7 +120,6 @@ copytree cache:clear
 ## 🤝 Integration Guides
 
 - [Claude Code Integration](./installation/claude-integration.md) - Use with Claude Code
-- [Cursor Integration](./installation/cursor-integration.md) - Set up with Cursor IDE
 
 ## 📘 Usage Guides
 

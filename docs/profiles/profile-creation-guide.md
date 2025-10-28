@@ -176,13 +176,15 @@ CopyTree uses glob patterns:
 Build on existing profiles:
 
 ```yaml
-extends: react
+extends: default
 
-rules:
-  # Inherits all react rules
-  # Add your customizations
-  - include: "src/custom/**"
-  - exclude: "src/legacy/**"
+# Inherits all default rules
+# Add your customizations
+include:
+  - "src/custom/**"
+
+exclude:
+  - "src/legacy/**"
 ```
 
 ### Multiple Inheritance
