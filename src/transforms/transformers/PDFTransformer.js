@@ -104,6 +104,8 @@ class PDFTransformer extends BaseTransformer {
         ...file,
         content: output,
         originalContent: file.content,
+        isBinary: false, // Mark as text after successful conversion
+        encoding: 'utf8',
         transformed: true,
         transformedBy: this.constructor.name,
         metadata: {

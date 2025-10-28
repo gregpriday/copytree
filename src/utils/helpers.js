@@ -169,6 +169,44 @@ function isBinaryExtension(filePath) {
 }
 
 /**
+ * Check if a file is an image based on extension
+ * @param {string} filePath - Path to check
+ * @returns {boolean} True if file is an image
+ */
+function isImageExtension(filePath) {
+  const imageExtensions = new Set([
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'bmp',
+    'ico',
+    'webp',
+    'svg',
+    'tiff',
+    'tif',
+  ]);
+
+  const ext = getExtension(filePath).toLowerCase();
+  return imageExtensions.has(ext);
+}
+
+/**
+ * Sanitize a string for use in XML/HTML comments
+ * Replaces characters that could break comment syntax
+ * @param {string} str - String to sanitize
+ * @returns {string} Sanitized string
+ */
+function sanitizeForComment(str) {
+  if (!str) return '';
+  return str
+    .replace(/--/g, '—') // Replace double hyphen with em dash
+    .replace(/</g, '‹') // Replace angle brackets
+    .replace(/>/g, '›')
+    .trim();
+}
+
+/**
  * Truncate string to specified length
  */
 function truncate(str, maxLength, suffix = '...') {
@@ -335,6 +373,8 @@ export {
   normalizePath,
   getExtension,
   isBinaryExtension,
+  isImageExtension,
+  sanitizeForComment,
   truncate,
   formatBytes,
   formatDuration,

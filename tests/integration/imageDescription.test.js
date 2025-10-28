@@ -48,8 +48,16 @@ describe('ImageDescriptionTransformer Integration Test', () => {
 
     // Instantiate the ImageDescription transformer with explicit model
     const transformer = new ImageDescriptionTransformer({
-      model: 'gemini-1.5-flash', // Use a specific model for testing
+      model: 'gemini-2.5-flash', // Use a specific model for testing
     });
+
+    // Initialize logger to avoid undefined errors
+    transformer.logger = {
+      error: jest.fn(),
+      warn: jest.fn(),
+      info: jest.fn(),
+      debug: jest.fn(),
+    };
 
     // Check if transformer can handle this file
     expect(transformer.canTransform(file)).toBe(true);

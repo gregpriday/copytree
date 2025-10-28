@@ -1,3 +1,5 @@
+import { sanitizeForComment, isImageExtension } from '../../utils/helpers.js';
+
 class XMLFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
     this.stage = stage;
@@ -75,6 +77,10 @@ class XMLFormatter {
         }
       }
 
+      if (file.binaryCategory) {
+        xml += ` binaryCategory="${file.binaryCategory}"`;
+      }
+
       if (file.gitStatus) {
         xml += ` gitStatus="${file.gitStatus}"`;
       }
@@ -83,15 +89,32 @@ class XMLFormatter {
 
       // Add content directly to file element (unless --only-tree is set)
       if (!this.onlyTree) {
-        let content = file.content || '';
+        // Check if this file should be rendered as a comment
+        const policy = this.stage.config.get('copytree.binaryPolicy', {})[file.binaryCategory] ||
+                       this.stage.config.get('copytree.binaryFileAction', 'placeholder');
 
-        if (this.addLineNumbers && !file.isBinary) {
-          content = this.stage.addLineNumbersToContent(content);
+        if (file.excluded || (file.isBinary && policy === 'comment')) {
+          // Emit comment instead of CDATA
+          const tpl = this.stage.config.get('copytree.binaryCommentTemplates.xml',
+            '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->');
+          const categoryName = (file.binaryCategory || 'Binary').toUpperCase();
+          const msg = tpl
+            .replace('{TYPE}', sanitizeForComment(categoryName))
+            .replace('{PATH}', sanitizeForComment(`@${file.path}`))
+            .replace('{SIZE}', this.stage.formatBytes(file.size || 0));
+          xml += msg;
+        } else {
+          // Regular content handling
+          let content = file.content || '';
+
+          if (this.addLineNumbers && !file.isBinary) {
+            content = this.stage.addLineNumbersToContent(content);
+          }
+
+          // Wrap content in CDATA to ensure well-formed XML
+          const c = content.toString().split(']]>').join(']]]]><![CDATA[>');
+          xml += `<![CDATA[${c}]]>`;
         }
-
-        // Wrap content in CDATA to ensure well-formed XML
-        const c = content.toString().split(']]>').join(']]]]><![CDATA[>');
-        xml += `<![CDATA[${c}]]>`;
       }
 
       xml += '</ct:file>\n';
