@@ -1,7 +1,7 @@
 import Stage from '../Stage.js';
 import { CacheService } from '../../services/CacheService.js';
 import { generateTransformCacheKey } from '../../utils/fileHash.js';
-import { AIProviderError, TransformError } from '../../utils/errors.js';
+import { TransformError } from '../../utils/errors.js';
 import path from 'path';
 import appConfig from '../../../config/app.js';
 import { logger } from '../../utils/logger.js';
@@ -262,9 +262,8 @@ class TransformStage extends Stage {
    * @private
    */
   _isRecoverableError(error) {
-    // Recoverable errors include AI failures, network issues, etc.
+    // Recoverable errors include transformation failures, network issues, etc.
     const recoverableTypes = [
-      'AIProviderError',
       'TransformError',
       'ENOTFOUND', // Network errors
       'ETIMEDOUT', // Timeout errors
