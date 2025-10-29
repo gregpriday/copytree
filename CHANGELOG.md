@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.13.1] - 2025-10-29
+
+### Fixed
+- **Critical**: Remove remaining AIProviderError import in TransformStage.js that caused runtime error
+- Remove AIProviderError from recoverable error types list
+
 ## [0.13.0] - 2025-10-29
 
 ### Major Changes
