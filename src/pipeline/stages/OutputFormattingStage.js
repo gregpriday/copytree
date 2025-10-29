@@ -171,7 +171,7 @@ class OutputFormattingStage extends Stage {
     return tree;
   }
 
-  renderTree(node, lines, prefix, _isLast) {
+  renderTree(node, lines, prefix, _isLast, showSizes = true) {
     const entries = Object.entries(node).sort(([a], [b]) => {
       // Directories first, then files
       const aIsFile = node[a].isFile;
@@ -190,7 +190,8 @@ class OutputFormattingStage extends Stage {
         : this.config.get('copytree.treeConnectors.middle', '├── ');
 
       if (value.isFile) {
-        lines.push(`${prefix}${connector}${name} (${this.formatBytes(value.size)})`);
+        const sizeStr = showSizes ? ` (${this.formatBytes(value.size)})` : '';
+        lines.push(`${prefix}${connector}${name}${sizeStr}`);
       } else {
         lines.push(`${prefix}${connector}${name}/`);
 
@@ -198,7 +199,7 @@ class OutputFormattingStage extends Stage {
           ? this.config.get('copytree.treeConnectors.empty', '    ')
           : this.config.get('copytree.treeConnectors.vertical', '│   ');
 
-        this.renderTree(value, lines, prefix + extension, false);
+        this.renderTree(value, lines, prefix + extension, false, showSizes);
       }
     });
   }
@@ -231,37 +232,11 @@ class OutputFormattingStage extends Stage {
     // Build tree structure
     const tree = this.buildTreeStructure(validFiles);
 
-    // Render tree to string
+    // Render tree to string (reuse renderTree with showSizes=false)
     const lines = [];
-    this.renderDirectoryTree(tree, lines, '', true);
+    this.renderTree(tree, lines, '', true, false);
 
     return lines.join('\n');
-  }
-
-  renderDirectoryTree(node, lines, prefix, _isRoot) {
-    const entries = Object.entries(node).sort(([a], [b]) => {
-      // Directories first, then files
-      const aIsFile = node[a].isFile;
-      const bIsFile = node[b].isFile;
-
-      if (aIsFile && !bIsFile) return 1;
-      if (!aIsFile && bIsFile) return -1;
-
-      return a.localeCompare(b);
-    });
-
-    entries.forEach(([name, value], index) => {
-      const isLastEntry = index === entries.length - 1;
-      const connector = isLastEntry ? '└── ' : '├── ';
-      const isFile = value.isFile;
-
-      lines.push(`${prefix}${connector}${name}${isFile ? '' : '/'}`);
-
-      if (!isFile) {
-        const extension = isLastEntry ? '    ' : '│   ';
-        this.renderDirectoryTree(value, lines, prefix + extension, false);
-      }
-    });
   }
 }
 

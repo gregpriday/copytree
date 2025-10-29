@@ -1,4 +1,4 @@
-import { sanitizeForComment, isImageExtension } from '../../utils/helpers.js';
+import { sanitizeForComment } from '../../utils/helpers.js';
 
 class XMLFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
@@ -9,12 +9,12 @@ class XMLFormatter {
 
   /**
    * Properly escape content for CDATA sections.
-   * Splits on ']]>' and rejoins with the correct escape sequence.
+   * Replaces occurrences of ']]>' with the correct escape sequence.
    * @param {string} content - Content to escape
    * @returns {string} Escaped content safe for CDATA
    */
   escapeCdata(content) {
-    return content.toString().split(']]>').join(']]]]><![CDATA[>');
+    return content.toString().replaceAll(']]>', ']]]]><![CDATA[>');
   }
 
   async format(input) {

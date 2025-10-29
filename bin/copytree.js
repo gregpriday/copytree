@@ -50,14 +50,14 @@ program
 program
   .command('copy [path]', { isDefault: true })
   .description(
-    'Copy directory structure to markdown (default) or XML/JSON/tree with customizable profiles and filters',
+    'Copy directory structure to XML (default) or Markdown/JSON/tree with customizable profiles and filters',
   )
   .option('-p, --profile <name>', 'Use a predefined profile (default: default)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
   .option('-o, --output <file>', 'Save output to file')
-  .option('--format <format>', 'Output format: markdown|md, xml, json, tree (default: markdown)')
+  .option('--format <format>', 'Output format: xml, markdown|md, json, tree (default: xml)')
   .option('-i, --display', 'Display output to console')
   .option('-S, --stream', 'Stream output')
   .option('--dry-run', 'Show what would be copied without doing it')

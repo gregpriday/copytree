@@ -7,7 +7,7 @@ import {
   escapeYamlScalar,
 } from '../../utils/markdown.js';
 import { hashFile, hashContent } from '../../utils/fileHash.js';
-import { sanitizeForComment, isImageExtension } from '../../utils/helpers.js';
+import { sanitizeForComment } from '../../utils/helpers.js';
 
 class MarkdownFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {

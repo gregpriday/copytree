@@ -3,7 +3,7 @@ import { env } from '../src/config/ConfigManager.js';
 export default {
   // Application metadata
   name: env('APP_NAME', 'CopyTree'),
-  version: '1.0.0',
+  version: '0.12.0',
   description: 'A Node.js CLI tool that copies directory structures and file contents into structured XML format',
   
   // Environment

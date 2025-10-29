@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { config } from '../config/ConfigManager.js';
 import { EventEmitter } from 'events';
+import { formatBytes, formatDuration } from './helpers.js';
 
 class Logger extends EventEmitter {
   constructor(options = {}) {
@@ -274,25 +275,17 @@ class Logger extends EventEmitter {
   }
 
   /**
-   * Format bytes to human readable
+   * Format bytes to human readable (delegates to helpers)
    */
   formatBytes(bytes) {
-    if (bytes === 0) return '0 B';
-
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return formatBytes(bytes, 1);
   }
 
   /**
-   * Format duration
+   * Format duration (delegates to helpers)
    */
   formatDuration(ms) {
-    if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-    return `${(ms / 60000).toFixed(1)}m`;
+    return formatDuration(ms);
   }
 
   /**
@@ -302,14 +295,22 @@ class Logger extends EventEmitter {
     if (this.options.silent) return;
 
     const percentage = Math.round((current / total) * 100);
-    const bar = this.createProgressBar(percentage);
+    const progressMsg = `${percentage}% ${message}`;
 
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
-    process.stdout.write(`${bar} ${percentage}% ${message}`);
+    if (process.stdout.isTTY) {
+      const bar = this.createProgressBar(percentage);
+      process.stdout.clearLine(0);
+      process.stdout.cursorTo(0);
+      process.stdout.write(`${bar} ${progressMsg}`);
 
-    if (current >= total) {
-      process.stdout.write('\n');
+      if (current >= total) {
+        process.stdout.write('\n');
+      }
+    } else {
+      // Fallback for non-TTY environments
+      if (current >= total) {
+        this.info(progressMsg);
+      }
     }
   }
 
