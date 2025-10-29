@@ -32,12 +32,19 @@ copytree -o project-structure.xml
 
 # Display tree structure only (no file contents)
 copytree -t
+copytree --only-tree
 
 # Copy from GitHub repository
 copytree https://github.com/user/repo
 
 # Display in terminal
 copytree --display
+
+# Note: Destination behavior
+# - default (no flags): copies to clipboard
+# - --display: prints to terminal
+# - -o/--output: writes to a file
+# - -S/--stream: streams to stdout/file (best for large outputs or CI)
 ```
 
 ## 🎯 Why CopyTree?
@@ -50,12 +57,29 @@ copytree --display
 - **External Sources** - Include files from GitHub repos or other directories
 - **Character Limiting** - Stay within AI context windows automatically
 
+## 🔧 Frequently Used Flags
+
+- `--format <xml|json|markdown|tree>` – Output format (default: **xml**)
+- `-t, --only-tree` – Tree structure only (no file contents)
+- `-i, --display` – Print to terminal instead of clipboard
+- `--clipboard` – Force copy to clipboard
+- `-S, --stream` – Stream output to stdout/file (ideal for large projects or CI)
+- `-C, --char-limit <n>` – Enforce character budget per file
+- `--with-line-numbers` – Add line numbers to file contents
+- `--info` – Include file metadata (size, modified date)
+- `--show-size` – Show file sizes in output
+- `--with-git-status` – Include git status for each file
+- `-r, --as-reference` – Generate file and copy its reference (for LLMs)
+- `--always <pattern...>` – Force include specific patterns
+- `--dedupe` – Remove duplicate files
+- `--sort <path|size|modified|name|extension>` – Sort files
+
 ## 🍳 Common Recipes
 
 ```bash
 # Only modified files
 copytree -m
-copytree --git-modified
+copytree --modified
 
 # Compare with main branch
 copytree -c main
@@ -67,6 +91,13 @@ copytree -f "*.js" -f "*.ts" --exclude "node_modules"
 # Copy GitHub folder to XML
 copytree https://github.com/user/repo/tree/main/src -o repo-src.xml
 
+# Include external source explicitly
+copytree --external https://github.com/user/repo -o repo.xml
+
+# Stream output (great for CI or large projects)
+copytree -S --format markdown > output.md
+copytree --stream --format json | jq .
+
 # Apply AI transformers (summaries, OCR)
 copytree --transform
 
@@ -75,7 +106,7 @@ copytree --dry-run
 
 # Show only tree structure (no file contents)
 copytree -t
-copytree --tree-only
+copytree --only-tree
 
 # Different output formats
 copytree --format json -o structure.json
@@ -151,8 +182,9 @@ COPYTREE_MAX_TOTAL_SIZE=104857600    # 100MB
 COPYTREE_MAX_FILE_COUNT=10000
 
 # Cache Settings
-COPYTREE_CACHE_ENABLED=true
-COPYTREE_CACHE_TTL=86400000          # 24 hours
+CACHE_ENABLED=true
+CACHE_DEFAULT_TTL=86400              # Default TTL in seconds (24 hours)
+# Note: File cache maxAge is in milliseconds (set via config files)
 ```
 
 ### Configuration Files
@@ -195,7 +227,7 @@ config/**
 
 ## 🛠️ Requirements
 
-- **Node.js** 18+ (LTS recommended)
+- **Node.js 20+** (required by engines in package.json)
 - **Optional dependencies:**
   - [Pandoc](https://pandoc.org) - For Word/ODT document conversion
   - [Tesseract](https://github.com/tesseract-ocr/tesseract) - For image OCR capabilities
@@ -211,6 +243,8 @@ For detailed guides, see the `docs/` directory:
 - **[Architecture](docs/technical/architecture.md)** - Pipeline and system design
 - **[Troubleshooting](docs/usage/troubleshooting.md)** - Common issues and solutions
 
+**Read in terminal:** `copytree copy:docs --display` - View all documentation interactively
+
 ## 📚 Commands Reference
 
 ### Main Commands
@@ -219,7 +253,9 @@ For detailed guides, see the `docs/` directory:
 - `copytree profile:validate <name>` - Validate a profile
 - `copytree cache:clear` - Clear caches
 - `copytree config:validate` - Validate configuration
+- `copytree config:inspect` - Inspect effective configuration with source provenance (redacts secrets by default)
 - `copytree copy:docs` - Copy built-in documentation
+- `copytree install:copytree` - Set up CopyTree environment and configuration
 
 ## 🐛 Troubleshooting
 
@@ -228,8 +264,11 @@ For detailed guides, see the `docs/` directory:
 **Large file errors**
 → Adjust `COPYTREE_MAX_FILE_SIZE` environment variable
 
+**Binary files**
+→ Use `--include-binary` to include binary files; control placeholder/base64 encoding via config
+
 **Memory issues**
-→ Reduce `COPYTREE_MAX_TOTAL_SIZE` or enable streaming mode
+→ Reduce `COPYTREE_MAX_TOTAL_SIZE` or enable streaming mode with `-S/--stream`
 
 **AI features not working**
 → Verify `GEMINI_API_KEY` is set correctly and valid
