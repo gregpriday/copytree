@@ -52,8 +52,6 @@
     "dotenv": "^17.2.0",
     "fast-glob": "^3.3.2",
     "fs-extra": "^11.3.0",
-    "glob": "^11.0.3",
-    "globby": "^14.1.0",
     "ink": "^4.0.0",
     "ink-spinner": "^2.0.0",
     "inquirer": "^12.2.0",

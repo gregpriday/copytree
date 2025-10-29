@@ -195,7 +195,7 @@ class Pipeline extends EventEmitter {
         // Validate input before processing if validate method exists
         if (typeof stageInstance.validate === 'function') {
           try {
-            stageInstance.validate(result);
+            await stageInstance.validate(result);
           } catch (error) {
             const validationError =
               error instanceof ValidationError

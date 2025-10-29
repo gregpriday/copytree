@@ -2,9 +2,7 @@
 jest.mock('../../../../src/services/GitHubUrlHandler.js');
 jest.mock('../../../../src/utils/fileLoader.js');
 jest.mock('fs-extra');
-jest.mock('globby', () => ({
-  globby: jest.fn(),
-}));
+jest.mock('fast-glob');
 
 import ExternalSourceStage from '../../../../src/pipeline/stages/ExternalSourceStage.js';
 import GitHubUrlHandler from '../../../../src/services/GitHubUrlHandler.js';

@@ -7,6 +7,16 @@ class XMLFormatter {
     this.onlyTree = onlyTree;
   }
 
+  /**
+   * Properly escape content for CDATA sections.
+   * Splits on ']]>' and rejoins with the correct escape sequence.
+   * @param {string} content - Content to escape
+   * @returns {string} Escaped content safe for CDATA
+   */
+  escapeCdata(content) {
+    return content.toString().split(']]>').join(']]]]><![CDATA[>');
+  }
+
   async format(input) {
     // Manual XML construction to avoid any escaping
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
@@ -29,10 +39,7 @@ class XMLFormatter {
         xml += `      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`;
       }
       if (input.gitMetadata.lastCommit) {
-        const msg = (input.gitMetadata.lastCommit.message || '')
-          .toString()
-          .split(']]>')
-          .join(']]]]><![CDATA[>');
+        const msg = this.escapeCdata(input.gitMetadata.lastCommit.message || '');
         xml += `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}"><![CDATA[${msg}]]></ct:lastCommit>\n`;
       }
       if (input.gitMetadata.filterType) {
@@ -51,7 +58,7 @@ class XMLFormatter {
     // Add instructions if present (loaded by InstructionsStage)
     if (input.instructions) {
       const nameAttr = input.instructionsName ? ` name="${input.instructionsName}"` : '';
-      const instr = input.instructions.toString().split(']]>').join(']]]]><![CDATA[>');
+      const instr = this.escapeCdata(input.instructions);
       xml += `    <ct:instructions${nameAttr}><![CDATA[${instr}]]></ct:instructions>\n`;
     }
 
@@ -112,7 +119,7 @@ class XMLFormatter {
           }
 
           // Wrap content in CDATA to ensure well-formed XML
-          const c = content.toString().split(']]>').join(']]]]><![CDATA[>');
+          const c = this.escapeCdata(content);
           xml += `<![CDATA[${c}]]>`;
         }
       }

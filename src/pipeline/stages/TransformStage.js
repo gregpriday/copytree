@@ -88,6 +88,9 @@ class TransformStage extends Stage {
     let activeFiles = [];
     let completedCount = 0;
 
+    // Pre-index filesToTransform by file for O(1) lookup instead of O(n)
+    const transformMap = new Map(filesToTransform.map((info) => [info.file, info]));
+
     // Process files with active transform display
     const transformPromises = files.map((file) =>
       limit(async () => {
@@ -96,8 +99,8 @@ class TransformStage extends Stage {
           return cachedResults.get(file);
         }
 
-        // Find the transform info for this file
-        const transformInfo = filesToTransform.find((t) => t.file === file);
+        // Find the transform info for this file using O(1) Map lookup
+        const transformInfo = transformMap.get(file);
         if (!transformInfo) {
           return file; // No transformation needed
         }

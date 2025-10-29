@@ -25,7 +25,7 @@ class ProfileFilterStage extends Stage {
       if (this.filter.length > 0) {
         let matched = false;
         for (const pattern of this.filter) {
-          if (minimatch(file.path, pattern)) {
+          if (minimatch(file.path, pattern, { dot: true })) {
             matched = true;
             break;
           }
