@@ -5,7 +5,6 @@ let CopyTreeError,
   FileSystemError,
   ProfileError,
   TransformError,
-  AIProviderError,
   GitError,
   ValidationError,
   PipelineError,
@@ -21,7 +20,6 @@ beforeAll(async () => {
     FileSystemError,
     ProfileError,
     TransformError,
-    AIProviderError,
     GitError,
     ValidationError,
     PipelineError,
@@ -124,17 +122,6 @@ describe('Error Classes', () => {
     });
   });
 
-  describe('AIProviderError', () => {
-    test('should create AI provider error with provider info', () => {
-      const error = new AIProviderError('API failed', 'gemini', { status: 429 });
-
-      expect(error.message).toBe('API failed');
-      expect(error.provider).toBe('gemini');
-      expect(error.details).toEqual({ provider: 'gemini', status: 429 });
-      expect(error.name).toBe('AIProviderError');
-    });
-  });
-
   describe('GitError', () => {
     test('should create git error with operation info', () => {
       const error = new GitError('Git command failed', 'status', { exitCode: 128 });
@@ -190,7 +177,6 @@ describe('Error Classes', () => {
         new FileSystemError('test', '/path', 'op'),
         new ProfileError('test', 'profile'),
         new TransformError('test', 'transformer', '/file'),
-        new AIProviderError('test', 'provider'),
         new GitError('test', 'status'),
         new ValidationError('test', 'field', 'value'),
         new PipelineError('test', 'stage'),
@@ -209,7 +195,6 @@ describe('Error Classes', () => {
       expect(new FileSystemError('test', '/path', 'op').code).toBe('FILESYSTEM_ERROR');
       expect(new ProfileError('test', 'profile').code).toBe('PROFILE_ERROR');
       expect(new TransformError('test', 'transformer', '/file').code).toBe('TRANSFORM_ERROR');
-      expect(new AIProviderError('test', 'provider').code).toBe('AI_PROVIDER_ERROR');
       expect(new GitError('test', 'status').code).toBe('GIT_ERROR');
       expect(new ValidationError('test', 'field', 'value').code).toBe('VALIDATION_ERROR');
       expect(new PipelineError('test', 'stage').code).toBe('PIPELINE_ERROR');
