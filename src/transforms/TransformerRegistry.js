@@ -170,6 +170,74 @@ class TransformerRegistry {
   }
 
   /**
+   * Validate transformer dependencies and detect circular dependencies
+   * @returns {Array<string>} Topologically sorted transformer names
+   * @throws {TransformError} If circular dependencies or missing dependencies are detected
+   */
+  validateDependencies() {
+    const VISITING = 1;
+    const DONE = 2;
+    const state = new Map();
+    const order = [];
+
+    const getDeps = (name) => {
+      const traits = this.traits.get(name);
+      if (!traits || !traits.dependencies) {
+        return [];
+      }
+      return Array.isArray(traits.dependencies) ? traits.dependencies : [];
+    };
+
+    const visit = (name, stack = []) => {
+      const mark = state.get(name) || 0;
+
+      if (mark === VISITING) {
+        const cycle = [...stack, name].join(' -> ');
+        throw new TransformError(
+          `Circular dependency detected: ${cycle}`,
+          'CIRCULAR_DEPENDENCY',
+        );
+      }
+
+      if (mark === DONE) {
+        return;
+      }
+
+      // Check if transformer exists
+      if (!this.transformers.has(name)) {
+        throw new TransformError(
+          `Missing transformer dependency: ${name}`,
+          'MISSING_DEPENDENCY',
+        );
+      }
+
+      state.set(name, VISITING);
+      stack.push(name);
+
+      for (const dep of getDeps(name)) {
+        // Dependencies can be external resources (like 'tesseract', 'network')
+        // Only validate dependencies that are registered transformers
+        if (this.transformers.has(dep)) {
+          visit(dep, stack);
+        }
+      }
+
+      stack.pop();
+      state.set(name, DONE);
+      order.push(name);
+    };
+
+    // Visit all registered transformers
+    for (const name of this.transformers.keys()) {
+      if (!state.has(name) || state.get(name) === 0) {
+        visit(name);
+      }
+    }
+
+    return order;
+  }
+
+  /**
    * Validate a transformer execution plan
    * @param {Array<string>} stages - Array of transformer names in execution order
    * @returns {Object} Validation result with issues and warnings
@@ -181,6 +249,22 @@ class TransformerRegistry {
 
     const issues = [];
     const warnings = [];
+
+    // First, validate dependencies for circular references
+    try {
+      this.validateDependencies();
+    } catch (error) {
+      if (error.code === 'CIRCULAR_DEPENDENCY' || error.code === 'MISSING_DEPENDENCY') {
+        issues.push({
+          type: 'dependency_error',
+          severity: 'error',
+          message: error.message,
+          transformers: stages,
+        });
+        return { valid: false, issues, warnings };
+      }
+      throw error;
+    }
 
     // Check for conflicts between transformers
     for (let i = 0; i < stages.length; i++) {
@@ -542,9 +626,6 @@ class TransformerRegistry {
     const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
     const { default: PDFTransformer } = await import('./transformers/PDFTransformer.js');
     const { default: ImageTransformer } = await import('./transformers/ImageTransformer.js');
-    const { default: AISummaryTransformer } = await import(
-      './transformers/AISummaryTransformer.js'
-    );
 
     // File Loader - default transformer
     registry.register(
@@ -703,32 +784,6 @@ class TransformerRegistry {
         conflictsWith: [],
         requirements: {},
         tags: ['binary-handler', 'placeholder'],
-      },
-    );
-
-    // AI Summary transformer (optional, not enabled by default)
-    registry.register(
-      'ai-summary',
-      new AISummaryTransformer(),
-      {
-        extensions: [], // Must be explicitly enabled
-        priority: 20,
-      },
-      {
-        inputTypes: ['text'],
-        outputTypes: ['text'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: true,
-        stateful: false,
-        dependencies: ['network'],
-        conflictsWith: ['file-summary'],
-        requirements: {
-          apiKey: true,
-          network: true,
-          memory: '200MB',
-        },
-        tags: ['ai', 'summary', 'expensive', 'text-processing'],
       },
     );
 

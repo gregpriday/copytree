@@ -137,16 +137,18 @@ const CopyView = () => {
       // Record performance telemetry if info mode is enabled
       if (options.info && result.stats) {
         const duration = Date.now() - startTime;
-        const fileCount = result.stats.filesProcessed || result.stats.totalFiles || 0;
+        // Count only non-null files (nulls are placeholders for filtered binary files)
+        const fileCount = result.files ? result.files.filter((f) => f !== null).length :
+          (result.stats.filesProcessed || result.stats.totalFiles || 0);
         globalTelemetry.recordSession(result.stats, duration, fileCount, {
           profile: profileName,
           hasTransformers: !options.noTransform,
           format:
-            (options.format ? String(options.format).toLowerCase() : 'markdown') === 'md'
+            (options.format ? String(options.format).toLowerCase() : 'xml') === 'md'
               ? 'markdown'
               : options.format
                 ? String(options.format).toLowerCase()
-                : 'markdown',
+                : 'xml',
           outputDestination: options.output ? 'file' : options.display ? 'terminal' : 'clipboard',
         });
       }
@@ -289,18 +291,20 @@ const CopyView = () => {
     return {
       content: String(content),
       format:
-        (options.format ? String(options.format).toLowerCase() : 'markdown') === 'md'
+        (options.format ? String(options.format).toLowerCase() : 'xml') === 'md'
           ? 'markdown'
           : options.format
             ? String(options.format).toLowerCase()
-            : 'markdown',
+            : 'xml',
       stats: result.stats || {},
     };
   };
 
   const handleOutputAndCreateMessage = async (outputResult, options, result) => {
     const stats = result.stats || {};
-    const fileCount = stats.totalFiles || stats.processedFiles || stats.fileCount || 0;
+    // Count only non-null files (nulls are placeholders for filtered binary files)
+    const fileCount = result.files ? result.files.filter((f) => f !== null).length :
+      (stats.totalFiles || stats.processedFiles || stats.fileCount || 0);
     const totalSize = outputResult.content ? outputResult.content.length : 0;
 
     // Helper function to format bytes
@@ -317,7 +321,7 @@ const CopyView = () => {
 
     // Handle --as-reference option
     if (options.asReference) {
-      const f = options.format ? String(options.format).toLowerCase() : 'markdown';
+      const f = options.format ? String(options.format).toLowerCase() : 'xml';
       const format = f === 'md' ? 'markdown' : f;
       const extension =
         format === 'json'
@@ -359,7 +363,7 @@ const CopyView = () => {
         action = 'copied';
       } catch (error) {
         // If clipboard fails, save to temporary file
-        const f = options.format ? String(options.format).toLowerCase() : 'markdown';
+        const f = options.format ? String(options.format).toLowerCase() : 'xml';
         const format = f === 'md' ? 'markdown' : f;
         const extension =
           format === 'json'
@@ -431,11 +435,11 @@ const CopyView = () => {
           results,
           output,
           format:
-            (options.format ? String(options.format).toLowerCase() : 'markdown') === 'md'
+            (options.format ? String(options.format).toLowerCase() : 'xml') === 'md'
               ? 'markdown'
               : options.format
                 ? String(options.format).toLowerCase()
-                : 'markdown',
+                : 'xml',
           showOutput: options.display,
         }),
         React.createElement(SummaryTable, {

@@ -108,16 +108,11 @@ mkdir -p ~/.copytree
 # Create configuration file
 cat > ~/.copytree/config.json << EOF
 {
-  "ai": {
-    "provider": "gemini",
-    "gemini": {
-      "apiKey": "your-api-key-here",
-      "model": "gemini-1.5-pro"
-    }
-  },
   "app": {
     "name": "CopyTree",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "maxFileSize": 10485760,
+    "maxTotalSize": 104857600
   },
   "cache": {
     "enabled": true,
@@ -133,9 +128,9 @@ You can also use environment variables:
 
 ```bash
 # Add to ~/.bashrc, ~/.zshrc, or equivalent
-export GEMINI_API_KEY="your-api-key-here"
-export COPYTREE_AI_PROVIDER="gemini"
 export COPYTREE_CACHE_ENABLED="true"
+export COPYTREE_MAX_FILE_SIZE="10485760"    # 10MB
+export COPYTREE_MAX_TOTAL_SIZE="104857600"  # 100MB
 ```
 
 ## Installing Optional Dependencies
@@ -168,18 +163,6 @@ Follow the Ubuntu/Debian instructions within WSL.
 
 ## Configuration Options
 
-### AI Provider Setup
-
-CopyTree supports Gemini AI for intelligent features:
-
-```bash
-# Configure during setup
-copytree install:copytree
-
-# Or validate existing configuration
-copytree config:validate
-```
-
 ### Profile Directory
 
 Create a directory for custom profiles:
@@ -190,14 +173,18 @@ mkdir -p ~/.copytree/profiles
 
 ### Cache Configuration
 
-CopyTree caches external repositories and AI responses:
+CopyTree caches external repositories and transformations:
 
 ```bash
 # Clear all caches
-copytree cache:clear --all
+copytree cache:clear
+
+# Clear specific caches
+copytree cache:clear --transformations
+copytree cache:clear --git
 
 # View cache settings
-copytree config:validate --verbose
+copytree config:inspect
 ```
 
 ## Verification
@@ -215,11 +202,13 @@ copytree profile:list
 copytree config:validate
 ```
 
-### AI Features Test
+### Test Installation
 
 ```bash
-# Test transformations (requires API key for AI transforms)
-copytree --transform --dry-run
+# Test with dry run
+copytree --dry-run
+
+# Note: Transformers are configured in profiles, not via CLI flags
 ```
 
 ## Troubleshooting
@@ -266,17 +255,20 @@ copytree config:validate --verbose
 # Install missing dependencies based on your OS (see above)
 ```
 
-### API Key Issues
+### Configuration Issues
 
 ```bash
-# Validate AI configuration
-copytree config:validate ai
+# Validate configuration
+copytree config:validate
+
+# Inspect configuration
+copytree config:inspect
 
 # Re-run setup
 copytree install:copytree
 
 # Check environment variables
-echo $GEMINI_API_KEY
+echo $COPYTREE_MAX_FILE_SIZE
 ```
 
 ### Node.js Version Issues
@@ -307,7 +299,7 @@ nvm use 18
 
 ## Next Steps
 
-1. [Configure AI Integration](./claude-integration.md) - Set up Claude Code integration
+1. [Configure Claude Code Integration](./claude-integration.md) - Set up Claude Code integration
 2. [Explore Profiles](../profiles/profile-overview.md) - Learn about file selection profiles
 3. [Read CLI Reference](../cli/copytree-reference.md) - Explore all available commands
 

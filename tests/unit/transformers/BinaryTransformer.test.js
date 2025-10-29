@@ -84,20 +84,18 @@ describe('BinaryTransformer', () => {
       expect(result.binaryAction).toBe('placeholder');
     });
 
-    it('should handle missing stats', async () => {
+    it('should exclude non-image binaries', async () => {
       const file = {
         path: 'file.zip',
       };
 
       const result = await transformer.doTransform(file);
 
-      expect(result.content).toMatch(/Type: ZIP Archive/);
-      expect(result.content).toMatch(/Size: 0 B/);
-      expect(result.transformed).toBe(true);
-      expect(result.transformedBy).toBe('BinaryTransformer');
+      // Non-image binaries are now excluded (return null)
+      expect(result).toBeNull();
     });
 
-    it('should handle files with no size', async () => {
+    it('should exclude non-image binaries (bin files)', async () => {
       const file = {
         path: 'empty.bin',
         size: 0,
@@ -105,11 +103,11 @@ describe('BinaryTransformer', () => {
 
       const result = await transformer.doTransform(file);
 
-      expect(result.content).toMatch(/Type: Binary File \(\.bin\)/);
-      expect(result.content).toMatch(/Size: 0 B/);
+      // Non-image binaries are now excluded (return null)
+      expect(result).toBeNull();
     });
 
-    it('should format various file sizes correctly', async () => {
+    it('should format various file sizes correctly for images', async () => {
       const testCases = [
         { size: 512, expected: '512 B' },
         { size: 1024, expected: '1 KB' },
@@ -120,7 +118,7 @@ describe('BinaryTransformer', () => {
 
       for (const testCase of testCases) {
         const file = {
-          path: 'test.bin',
+          path: 'test.png', // Use image extension
           size: testCase.size,
         };
 
@@ -129,18 +127,18 @@ describe('BinaryTransformer', () => {
       }
     });
 
-    it('should maintain file object properties', async () => {
+    it('should maintain file object properties for images', async () => {
       const file = {
-        path: 'archive.zip',
-        absolutePath: '/project/archive.zip',
+        path: 'photo.jpg', // Use image extension
+        absolutePath: '/project/photo.jpg',
         size: 1024,
         customProp: 'value',
       };
 
       const result = await transformer.doTransform(file);
 
-      expect(result.path).toBe('archive.zip');
-      expect(result.absolutePath).toBe('/project/archive.zip');
+      expect(result.path).toBe('photo.jpg');
+      expect(result.absolutePath).toBe('/project/photo.jpg');
       expect(result.customProp).toBe('value');
     });
 

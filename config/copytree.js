@@ -102,8 +102,35 @@ export default {
   preserveEmptyDirs: env('COPYTREE_PRESERVE_EMPTY_DIRS', false),
   
   // Binary file handling
-  binaryFileAction: env('COPYTREE_BINARY_ACTION', 'placeholder'), // placeholder, skip, base64
+  binaryFileAction: env('COPYTREE_BINARY_ACTION', 'placeholder'), // placeholder, skip, base64, comment (legacy)
   binaryPlaceholderText: '[Binary file not included]',
+
+  // Binary detection configuration
+  binaryDetect: {
+    sampleBytes: 8192,
+    nonPrintableThreshold: 0.3,
+  },
+
+  // Binary policy per category (overrides binaryFileAction)
+  // Options: comment | skip | placeholder | base64 | convert
+  binaryPolicy: {
+    image: 'comment', // Images: show comment placeholder
+    media: 'comment', // Audio/video: show comment placeholder
+    archive: 'comment', // ZIP/TAR/etc: show comment placeholder
+    exec: 'comment', // Executables: show comment placeholder
+    font: 'comment', // Font files: show comment placeholder
+    database: 'comment', // Database files: show comment placeholder
+    cert: 'comment', // Certificates: show comment placeholder
+    document: 'convert', // PDF/DOC/etc: convert to text if possible
+    other: 'comment', // Unknown binaries: show comment placeholder
+    text: 'load', // Text files: load normally
+  },
+
+  // Template strings for binary file comments
+  binaryCommentTemplates: {
+    xml: '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
+    markdown: '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
+  },
   
   // Line number options
   addLineNumbers: env('COPYTREE_LINE_NUMBERS', false),

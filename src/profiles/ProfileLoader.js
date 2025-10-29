@@ -152,28 +152,28 @@ class ProfileLoader {
 
     let data;
     switch (ext) {
-      case '.yml':
-      case '.yaml':
+    case '.yml':
+    case '.yaml':
+      data = yaml.load(content);
+      break;
+    case '.json':
+      data = JSON.parse(content);
+      break;
+    default:
+      // For files without recognized extensions, try YAML first, then JSON
+      try {
         data = yaml.load(content);
-        break;
-      case '.json':
-        data = JSON.parse(content);
-        break;
-      default:
-        // For files without recognized extensions, try YAML first, then JSON
+      } catch (yamlError) {
         try {
-          data = yaml.load(content);
-        } catch (yamlError) {
-          try {
-            data = JSON.parse(content);
-          } catch (jsonError) {
-            throw new ProfileError(
-              `Unable to parse profile file as YAML or JSON: ${filePath}`,
-              filePath,
-              { yamlError: yamlError.message, jsonError: jsonError.message },
-            );
-          }
+          data = JSON.parse(content);
+        } catch (jsonError) {
+          throw new ProfileError(
+            `Unable to parse profile file as YAML or JSON: ${filePath}`,
+            filePath,
+            { yamlError: yamlError.message, jsonError: jsonError.message },
+          );
         }
+      }
     }
 
     // Add metadata
@@ -292,7 +292,7 @@ class ProfileLoader {
     });
 
     // Arrays - concatenate and deduplicate
-    ['include', 'exclude', 'filter'].forEach((prop) => {
+    ['include', 'exclude', 'filter', 'always'].forEach((prop) => {
       if (overlay[prop]) {
         merged[prop] = [...new Set([...(base[prop] || []), ...(overlay[prop] || [])])];
       }
@@ -392,7 +392,7 @@ class ProfileLoader {
       },
 
       output: {
-        format: 'markdown',
+        format: 'xml',
         includeMetadata: true,
         addLineNumbers: false,
         prettyPrint: true,

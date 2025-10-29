@@ -423,12 +423,87 @@
         },
         "binaryFileAction": {
           "type": "string",
-          "enum": ["placeholder", "skip", "base64"],
-          "description": "Binary file handling action"
+          "enum": ["placeholder", "skip", "base64", "comment"],
+          "description": "Binary file handling action (legacy, use binaryPolicy)"
         },
         "binaryPlaceholderText": {
           "type": "string",
           "description": "Placeholder text for binary files"
+        },
+        "binaryDetect": {
+          "type": "object",
+          "description": "Binary detection configuration",
+          "properties": {
+            "sampleBytes": {
+              "type": "number",
+              "description": "Number of bytes to sample for detection"
+            },
+            "nonPrintableThreshold": {
+              "type": "number",
+              "description": "Threshold ratio for non-printable characters"
+            }
+          },
+          "additionalProperties": false
+        },
+        "binaryPolicy": {
+          "type": "object",
+          "description": "Binary handling policy per category",
+          "properties": {
+            "image": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "media": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "archive": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "exec": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "font": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "database": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "cert": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "document": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "other": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "text": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert", "load"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "binaryCommentTemplates": {
+          "type": "object",
+          "description": "Template strings for binary file comments",
+          "properties": {
+            "xml": {
+              "type": "string"
+            },
+            "markdown": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         },
         "addLineNumbers": {
           "type": "boolean",

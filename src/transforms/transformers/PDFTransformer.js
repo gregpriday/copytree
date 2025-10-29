@@ -1,6 +1,6 @@
 import BaseTransformer from '../BaseTransformer.js';
 import fs from 'fs-extra';
-import pdf from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 
 /**
  * PDF transformer - extracts text from PDF files
@@ -56,20 +56,17 @@ class PDFTransformer extends BaseTransformer {
       };
     }
 
+    // PDF parser instance
+    let parser = null;
+
     try {
-      // Parse PDF
-      const data = await pdf(buffer, {
-        max: this.maxPages,
-        // Disable some features for better performance
-        pagerender: (pageData) => {
-          return pageData.getTextContent().then((textContent) => {
-            let text = '';
-            for (const item of textContent.items) {
-              text += item.str + ' ';
-            }
-            return text;
-          });
-        },
+      // Create parser with buffer (pdf-parse v2 API)
+      parser = new PDFParse({ data: buffer });
+
+      // Get text content from PDF
+      const data = await parser.getText({
+        // Limit pages if needed
+        ...(this.maxPages && { partial: Array.from({ length: this.maxPages }, (_, i) => i + 1) }),
       });
 
       // Build output
@@ -104,6 +101,8 @@ class PDFTransformer extends BaseTransformer {
         ...file,
         content: output,
         originalContent: file.content,
+        isBinary: false, // Mark as text after successful conversion
+        encoding: 'utf8',
         transformed: true,
         transformedBy: this.constructor.name,
         metadata: {
@@ -122,6 +121,15 @@ class PDFTransformer extends BaseTransformer {
         transformedBy: this.constructor.name,
         error: error.message,
       };
+    } finally {
+      // Clean up parser resources
+      if (parser) {
+        try {
+          await parser.destroy();
+        } catch (cleanupError) {
+          this.logger.warn(`Failed to cleanup PDF parser: ${cleanupError.message}`);
+        }
+      }
     }
   }
 

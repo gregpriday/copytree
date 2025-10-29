@@ -1,241 +1,146 @@
-# CLAUDE.md
+# CopyTree — Project Constitution for Claude Code
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Rules and constraints for working with CopyTree. Keep this file lean; detailed docs live in `@docs/`.
 
-## Project Overview
+## Stack & Boundaries
 
-CopyTree is a sophisticated CLI tool for intelligently copying and transforming project structures for AI consumption. It features:
+- **Node.js ≥20.0.0**, **ES Modules only** (no CommonJS)
+- CopyTree: CLI for AI-ready project exports via event-driven pipeline
+- Tech: Commander.js, Ink (React for terminal), Jest+Babel
 
-- **Intelligent file selection** using profiles
-- **15+ file transformers** for PDFs, images, code, and documents
-- **Deep Git integration** for tracking changes and modifications
+<critical_notes>
+**MUST:**
+- Use ESM exclusively (`import`/`export`). Never `require()`/`module.exports`.
+- Respect file/size limits; auto-stream files >10MB; avoid heavy transformers unless requested.
+- Use custom error classes from `@src/utils/errors.js` and central logger service.
+- Follow Git Flow: develop → feature/* → develop → release/* → main.
+- Achieve 80% test coverage (global threshold).
 
-- **External sources** support (GitHub repositories)
+**NEVER:**
+- Commit directly to `main` or `develop` without explicit user request.
+- Auto-generate commits or CHANGELOG entries (except on release/* branch when asked).
+- Leave TODOs, mocks, stubs, or partial implementations in final code.
+- Touch generated/vendor/lock files or Git metadata.
+</critical_notes>
 
-## Architecture
-
-### Core Components
-
-**Pipeline System** (`src/pipeline/`)
-- Event-driven processing pipeline with 16 specialized stages
-- Memory-efficient streaming for large files
-- Error recovery and graceful degradation
-- Comprehensive lifecycle hooks and event emission
-- See [Architecture Guide](./docs/technical/architecture.md) for detailed contracts and patterns
-
-**Commands** (`src/commands/`)
-- `copy.js` - Main copy command with extensive options
-- Profile commands: `profileList.js`, `profileValidate.js`
-- Utility commands: `configValidate.js`, `cacheClear.js`, `copyDocs.js`
-- Installation helpers: `installCopytree.js`
-
-**Transformers** (`src/transforms/transformers/`)
-- Text: FirstLines, Markdown, HTMLStripper, MarkdownLinkStripper
-- Documents: PDF, DocumentToText, CSV
-- Images: Image (OCR), ImageDescription (AI), SVGDescription
-- AI-powered: AISummary, FileSummary, UnitTestSummary
-- Utilities: FileLoader, Binary
-
-**Services** (`src/services/`)
-- `AIService.js` - Gemini AI integration
-- `CacheService.js` - Response caching
-- `GitHubUrlHandler.js` - GitHub repository handling
-- `ProfileGuesser.js` - Auto-detect project types
-
-### Configuration System
-
-Hierarchical configuration with multiple sources:
-1. Default configs in `config/`
-2. User overrides in `~/.copytree/`
-3. Environment variables
-4. Runtime options
-
-### Profile System
-
-- **Default profile**: Includes default profile with framework auto-detection removed
-- **Custom profiles**: Users can create YAML-based profiles
-- **YAML-based** configuration for custom profiles
-- **Inheritance** support for profile composition
-
-## Documentation
-
-Comprehensive documentation available in `docs/`:
-
-- **[docs/index.md](./docs/index.md)** - Getting started guide
-- **[docs/cli/copytree-reference.md](./docs/cli/copytree-reference.md)** - Complete CLI reference
-- **[docs/profiles/transformer-reference.md](./docs/profiles/transformer-reference.md)** - All transformers documented
-- **[docs/technical/architecture.md](./docs/technical/architecture.md)** - Pipeline architecture and stage contracts
-- **[docs/usage/troubleshooting.md](./docs/usage/troubleshooting.md)** - Common issues
-
-## Quick Reference
+## Commands (Daily Use)
 
 ```bash
-# Basic usage
-copytree                         # Copy current directory
-copytree /path/to/project        # Copy specific directory
-copytree https://github.com/...  # Copy GitHub repository
+# Development
+npm install              # Install dependencies
+npm link                 # Link CLI locally
+npm start               # Run CLI
 
-# Profiles & filtering
-copytree --profile default       # Use default profile
-copytree --profile customname    # Use custom profile
-copytree --git-modified          # Only modified files
-copytree --git-branch main       # Compare with branch
+# Testing (REQUIRED before commits)
+npm test                # All tests
+npm run test:coverage   # Coverage report (80% threshold)
+npm run test:unit       # Unit tests only
 
-# Transformers
-copytree --transform             # Enable all transformers
-copytree --no-transform          # Disable transformers
+# Code Quality (REQUIRED before commits)
+npm run lint            # ESLint check
+npm run format:check    # Prettier check
+npm run format          # Auto-format
 
-# Output options
-copytree --output output.xml     # Save to file
-copytree --display               # Show in terminal
-copytree --clipboard             # Copy to clipboard
-
-# Profile management
-copytree profile:list            # List profiles
-copytree profile:validate        # Validate profile
+# Debugging
+DEBUG=copytree:* copytree        # Verbose logging
+copytree config:validate         # Check config
+copytree profile:validate NAME   # Check profile
 ```
 
-## Development Guidelines
+<paved_path>
+## Canonical Workflows (The Happy Path)
 
-### Git Workflow
+### Add a New Transformer
+1. Create class in `@src/transforms/transformers/`, extend `BaseTransformer`
+2. Define traits: `inputTypes`, `outputTypes`, `heavy`, `idempotent`
+3. Implement `async transform(file)` method
+4. Register in `@src/transforms/TransformerRegistry.js`
+5. Add tests in `@tests/unit/transformers/`
+6. Document in `@docs/profiles/transformer-reference.md`
+7. Run `npm run test:coverage` (must pass 80%)
 
-- **Git Flow** - This project follows Git Flow branching model
-- **No automatic commits** - NEVER make commits unless explicitly asked by the user
-- **No automatic changelog** - NEVER create or update CHANGELOG entries unless:
-  - Explicitly asked by the user AND
-  - Currently on a release branch (e.g., `release/x.y.z`)
-- **Branch naming**:
-  - Feature branches: `feature/description`
-  - Release branches: `release/x.y.z`
-  - Hotfix branches: `hotfix/description`
-  - Development branch: `develop`
-  - Production branch: `main` or `master`
+### Add a New Pipeline Stage
+1. Create class in `@src/pipeline/stages/`, extend `Stage`
+2. Implement `async process(input)` + lifecycle hooks (`onInit`, `beforeRun`, `afterRun`, `handleError`)
+3. Emit events: `stage:start`, `stage:complete`, `stage:error`, `file:batch`
+4. Insert in pipeline order (see `@docs/technical/architecture.md`)
+5. Add tests in `@tests/unit/pipeline/stages/`
+6. Update `@docs/technical/architecture.md`
+7. Run `npm run test:coverage` (must pass 80%)
 
-### Code Style
+### Diagnose Slow/Large Runs
+1. Use git filters first: `--git-modified`, `--changed <ref>`
+2. Enable streaming: `--stream` or `-S`
+3. Set limits: `--limit N`, `--max-file-size`, `--max-total-size`
+4. Check cache: `copytree cache:clear` if stale
+5. Profile with: `DEBUG=copytree:* copytree --dry-run`
+</paved_path>
 
-- **CommonJS modules** - Use `require()` and `module.exports`
-- **Async/await** - No callbacks, use promises
-- **Error handling** - Use custom error classes
-- **Logging** - Use the logger service consistently
+## Review Checklist (Read Before Submitting)
 
-### Testing
+Before finishing any code changes, verify:
 
-```bash
-npm test                  # Run all tests
-npm run test:unit         # Unit tests only
-npm run test:integration  # Integration tests
-npm run test:coverage     # Coverage report
-```
+1. ✅ **ESM only** - No `require()` or `module.exports`
+2. ✅ **Tests pass** - `npm test` succeeds, coverage ≥80%
+3. ✅ **Linting clean** - `npm run lint` and `npm run format:check` pass
+4. ✅ **No partial code** - No TODOs, mocks, stubs, or placeholders
+5. ✅ **Git Flow followed** - Correct branch type, no direct commits to main/develop
+6. ✅ **Docs updated** - If public API changed, update relevant `@docs/` files
 
-Test structure:
-- Unit tests: `tests/unit/`
-- Integration tests: `tests/integration/`
-- Performance benchmarks: `tests/performance/`
-- Test fixtures: `tests/fixtures/`
+## Prompting Patterns (For Users)
 
-### Performance Targets
+Increase adherence by starting sessions with:
+- "Review `@CLAUDE.md` before proceeding with this task."
+- "Follow the paved path for [transformer/stage/etc.] and confirm each step."
+- "Run through the Review Checklist and report pass/fail for each item."
 
-- Process 10,000 files in < 30 seconds
-- Memory usage < 500MB for large projects
-- Support projects up to 100MB total size
-- Stream files > 10MB
+## Key Architecture (Details in Docs)
 
-### Error Handling
+- **Pipeline**: Event-driven stages, streaming >10MB (`@src/pipeline/Pipeline.js`, `@docs/technical/architecture.md`)
+- **Configuration**: Hierarchical (CLI > env > project > user > default) (`@src/config/ConfigManager.js`, `@config/schema.json`)
+- **Profiles**: YAML-based file selection + transformers (`@src/profiles/ProfileLoader.js`, `@profiles/default.yml`)
+- **Transformers**: Multiple file processors with traits system (`@src/transforms/transformers/`, `@docs/profiles/transformer-reference.md`)
+- **Commands**: 8 CLI commands (`@bin/copytree.js`): copy, profile:list, profile:validate, copy:docs, config:validate, config:inspect, cache:clear, install:copytree
 
-```javascript
-const { CommandError, ValidationError } = require('./utils/errors');
+## Critical Files
 
-// Throw specific errors
-throw new CommandError('Message', 'ERROR_CODE', { details });
+- `bin/copytree.js` - CLI entry
+- `src/pipeline/Pipeline.js` - Pipeline orchestration
+- `src/pipeline/Stage.js` - Stage base class
+- `src/config/ConfigManager.js` - Config system
+- `src/profiles/ProfileLoader.js` - Profile loading
+- `src/transforms/TransformerRegistry.js` - Transformer registry
+- `src/utils/errors.js` - Custom errors
 
-// Handle in commands
-try {
-  await operation();
-} catch (error) {
-  if (error instanceof ValidationError) {
-    logger.error('Validation failed:', error.message);
-  }
-  throw error;
-}
-```
+## Error Handling Rules
 
-## Key Features
+**Use Custom Errors** (`@src/utils/errors.js`):
+`CommandError`, `FileSystemError`, `ConfigurationError`, `ValidationError`, `PipelineError`, `AIProviderError`, `TransformError`, `GitError`, `ProfileError`
 
-### AI Integration
-- **Provider**: Google Gemini (gemini-1.5-flash/pro)
-- **Features**: Summaries, image descriptions
-- **Caching**: Responses cached for performance
+**Retry Logic**:
+- Retryable: `RATE_LIMIT`, `TIMEOUT`, `SERVICE_UNAVAILABLE`, network errors (max 3 attempts, exponential backoff)
+- Non-retryable: `INVALID_API_KEY`, `SAFETY_FILTER`, `QUOTA_EXCEEDED`, validation errors
 
-### Git Integration
-- Track modified files (`--git-modified`)
-- Compare branches (`--git-branch`)
-- Filter by commit range
-- Respect `.gitignore` patterns
+## Performance Constraints
 
-### External Sources
-- Include files from GitHub repositories
-- Support for specific branches/tags
-- Local directory inclusion
-- Rule-based filtering for external files
+- Process 10,000 files in <30s
+- Memory usage <500MB for large projects
+- Stream files >10MB automatically
+- Heavy transformers (PDF, Image, AI) only when requested
 
-### Transform Pipeline
-1. **File Discovery** - Find files based on patterns
-2. **Profile Filtering** - Apply profile rules
-3. **Git Filtering** - Apply git-based filters
-4. **Transformation** - Apply file transformers
-5. **Output Formatting** - XML/JSON output
+## Module-Specific Context
 
-## Current Status
+**Note**: Due to Claude Code bug #2571, subdirectory CLAUDE.md files don't auto-load yet. When working on:
+- **Pipeline code**: Read @src/pipeline/CLAUDE.md first
+- **Transformers**: Read @src/transforms/CLAUDE.md first
+- **Tests**: Read @tests/CLAUDE.md first
 
-- ✅ **Feature complete** - All planned features implemented
-- ✅ **15+ transformers** - Comprehensive file processing
-- ✅ **Full pipeline** - 16 processing stages
-- ✅ **AI integration** - Gemini provider with caching
-- ✅ **Git integration** - Complete git functionality
-- 📝 **Documentation** - Comprehensive user docs
+When bug #2571 is fixed, these will load automatically.
 
-## Dependencies
+## Imports (Detailed Documentation)
 
-All dependencies are installed and managed via npm:
-
-### Core
-- CLI: commander, chalk, ora, inquirer
-- File System: fs-extra, glob, fast-glob
-- Config: dotenv, js-yaml
-- Git: simple-git
-- Utilities: lodash, rimraf, adm-zip
-
-### Transformers
-- PDF: pdf-parse
-- Images: sharp, tesseract.js, canvas
-- Markdown: marked
-- CSV: csv-parse
-- Documents: External tools (pandoc)
-
-### AI
-- Google Generative AI SDK
-
-## Resources
-
-- **Documentation**: `./docs/` - User and developer guides
-- **Test Fixtures**: `tests/fixtures/` - Sample projects
-- **Example Profiles**: `profiles/` - Example custom profile templates
-- **Configuration**: `config/` - Default settings
-
-## Best Practices
-
-1. **Use profiles** for consistent file selection
-2. **Enable caching** for AI operations
-3. **Set file limits** to prevent memory issues
-4. **Test with dry-run** before large operations
-5. **Use .copytreeignore** for exclusions
-6. **Monitor memory** usage for large projects
-
-## Troubleshooting
-
-See [docs/usage/troubleshooting.md](./docs/usage/troubleshooting.md) for:
-- Common errors and solutions
-- Performance optimization tips
-- Configuration debugging
-- AI provider issues
-- Memory management
+@README.md
+@docs/index.md
+@docs/technical/architecture.md
+@docs/profiles/transformer-reference.md
+@tests/README.md

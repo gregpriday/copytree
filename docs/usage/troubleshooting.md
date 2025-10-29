@@ -72,15 +72,15 @@ nvm use 18
 
 ## Configuration Problems
 
-### API Key Not Working
+### Configuration Validation
 
-**Problem**: AI features fail with authentication errors
+**Problem**: Configuration errors or validation failures
 
 **Solutions**:
 
-1. **Verify API key configuration**:
+1. **Validate configuration**:
    ```bash
-   copytree config:validate ai
+   copytree config:validate
    ```
 
 2. **Re-run setup**:
@@ -90,19 +90,13 @@ nvm use 18
 
 3. **Check environment variables**:
    ```bash
-   echo $GEMINI_API_KEY
+   echo $COPYTREE_MAX_FILE_SIZE
+   echo $COPYTREE_MAX_TOTAL_SIZE
    ```
 
-4. **Manual configuration**:
+4. **Inspect effective configuration**:
    ```bash
-   # Edit ~/.copytree/config.json
-   {
-     "ai": {
-       "gemini": {
-         "apiKey": "your-actual-api-key"
-       }
-     }
-   }
+   copytree config:inspect
    ```
 
 ### Configuration File Not Found
@@ -267,34 +261,6 @@ copytree --format tree
    git diff --name-only main..HEAD
    ```
 
-## AI-Related Errors
-
-### AI Response Timeout
-
-**Problem**: AI operations timing out
-
-**Solutions**:
-
-1. **Increase timeout**:
-   ```bash
-   # Set in config
-   {
-     "ai": {
-       "timeout": 60000
-     }
-   }
-   ```
-
-2. **Use smaller scope**:
-   ```bash
-   copytree src/ --profile minimal
-   ```
-
-3. **Skip AI features**:
-   ```bash
-   copytree --filter "*.js"  # Use patterns instead
-   ```
-
 ## Performance Issues
 
 ### Slow Execution
@@ -437,11 +403,6 @@ ls -la ~/.copytree/cache/
 - Current directory might be empty
 - Profile rules might be too restrictive
 - Check .gitignore and .copytreeignore
-
-### "API rate limit exceeded"
-- Wait before retrying
-- Use non-AI features temporarily
-- Check API quota on provider dashboard
 
 ### "Invalid configuration"
 - Run `copytree config:validate`

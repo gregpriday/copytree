@@ -331,4 +331,67 @@ describe('GitFilterStage', () => {
       expect(result.files).toHaveLength(1);
     });
   });
+
+  describe('alwaysInclude behavior', () => {
+    it('should preserve files marked as alwaysInclude even when they are not modified', async () => {
+      mockGitUtils.getModifiedFiles.mockResolvedValue(['src/file1.js']);
+      stage = new GitFilterStage({ modified: true, basePath: '/project' });
+      const input = {
+        files: [
+          { path: 'src/file1.js', content: 'file1' },
+          { path: 'src/file2.js', content: 'file2', alwaysInclude: true },
+          { path: 'src/file3.js', content: 'file3' },
+        ],
+        stats: { totalFiles: 3 },
+      };
+
+      const result = await stage.process(input);
+
+      expect(result.files).toHaveLength(2);
+      expect(result.files.map((f) => f.path)).toContain('src/file1.js');
+      expect(result.files.map((f) => f.path)).toContain('src/file2.js');
+      expect(result.files.map((f) => f.path)).not.toContain('src/file3.js');
+    });
+
+    it('should preserve files marked as alwaysInclude even when using changed filter', async () => {
+      mockGitUtils.getChangedFiles.mockResolvedValue(['src/file1.js']);
+      stage = new GitFilterStage({ changed: 'HEAD~3', basePath: '/project' });
+      const input = {
+        files: [
+          { path: 'src/file1.js', content: 'file1' },
+          { path: 'src/file2.js', content: 'file2', alwaysInclude: true },
+          { path: 'src/file3.js', content: 'file3' },
+          { path: 'src/file4.js', content: 'file4', alwaysInclude: true },
+        ],
+        stats: { totalFiles: 4 },
+      };
+
+      const result = await stage.process(input);
+
+      expect(result.files).toHaveLength(3);
+      expect(result.files.map((f) => f.path)).toContain('src/file1.js');
+      expect(result.files.map((f) => f.path)).toContain('src/file2.js');
+      expect(result.files.map((f) => f.path)).toContain('src/file4.js');
+      expect(result.files.map((f) => f.path)).not.toContain('src/file3.js');
+    });
+
+    it('should deduplicate files when alwaysInclude file is also in git set', async () => {
+      mockGitUtils.getModifiedFiles.mockResolvedValue(['src/file1.js', 'src/file2.js']);
+      stage = new GitFilterStage({ modified: true, basePath: '/project' });
+      const input = {
+        files: [
+          { path: 'src/file1.js', content: 'file1' },
+          { path: 'src/file2.js', content: 'file2', alwaysInclude: true },
+          { path: 'src/file3.js', content: 'file3' },
+        ],
+        stats: { totalFiles: 3 },
+      };
+
+      const result = await stage.process(input);
+
+      // Should have 2 files, not 3 (file2.js should not be duplicated)
+      expect(result.files).toHaveLength(2);
+      expect(result.files.map((f) => f.path)).toEqual(['src/file1.js', 'src/file2.js']);
+    });
+  });
 });

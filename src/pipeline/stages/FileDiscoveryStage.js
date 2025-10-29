@@ -11,6 +11,7 @@ class FileDiscoveryStage extends Stage {
     this.patterns = options.patterns || ['**/*'];
     this.respectGitignore = options.respectGitignore !== false;
     this.gitignorePatterns = [];
+    this.forceInclude = options.forceInclude || [];
   }
 
   async process(input) {
@@ -28,6 +29,7 @@ class FileDiscoveryStage extends Stage {
       loadTasks.push(this.loadGitignore());
       loadTasks.push(this.loadCopytreeIgnore());
     }
+    loadTasks.push(this.loadCopytreeInclude());
     if (loadTasks.length > 0) {
       await Promise.all(loadTasks);
     }
@@ -38,18 +40,49 @@ class FileDiscoveryStage extends Stage {
     // Filter out excluded files
     const filteredFiles = this.filterFiles(files);
 
+    // Discover force-include patterns with dot:true and no ignores
+    let forcedEntries = [];
+    if (this.forceInclude.length > 0) {
+      this.log(`Force-including ${this.forceInclude.length} pattern(s)`, 'debug');
+      const globOptions = {
+        cwd: this.basePath,
+        absolute: false,
+        dot: true, // ensure hidden files/dirs are discovered
+        onlyFiles: true,
+        stats: true,
+        ignore: [], // bypass all ignore patterns
+        concurrency: this.options.maxConcurrency || 100,
+      };
+
+      forcedEntries = await fastGlob(this.forceInclude, globOptions);
+    }
+
+    // Convert entries to file objects and merge with deduplication
+    const toFileObj = (entry) => ({
+      path: entry.path || entry,
+      absolutePath: path.join(this.basePath, entry.path || entry),
+      size: entry.stats?.size || 0,
+      modified: entry.stats?.mtime || null,
+      stats: entry.stats,
+    });
+
+    const merged = [...filteredFiles, ...forcedEntries.map(toFileObj)];
+    const byPath = new Map(merged.map((f) => [f.path, f]));
+    const finalFiles = [...byPath.values()];
+
     this.log(
-      `Discovered ${filteredFiles.length} files in ${this.getElapsedTime(startTime)}`,
+      `Discovered ${finalFiles.length} files (${forcedEntries.length} force-included) in ${this.getElapsedTime(startTime)}`,
       'info',
     );
 
     return {
       ...input,
       basePath: this.basePath,
-      files: filteredFiles,
+      files: finalFiles,
       stats: {
         totalFiles: files.length,
         filteredFiles: filteredFiles.length,
+        forcedFiles: forcedEntries.length,
         excludedFiles: files.length - filteredFiles.length,
       },
     };
@@ -72,6 +105,23 @@ class FileDiscoveryStage extends Stage {
       const copytreeignoreContent = await fs.readFile(copytreeignorePath, 'utf8');
       this.parseGitignoreContent(copytreeignoreContent);
       this.log('Loaded .copytreeignore rules', 'debug');
+    }
+  }
+
+  async loadCopytreeInclude() {
+    const copytreeincludePath = path.join(this.basePath, '.copytreeinclude');
+
+    if (await fs.pathExists(copytreeincludePath)) {
+      const copytreeincludeContent = await fs.readFile(copytreeincludePath, 'utf8');
+      const patterns = copytreeincludeContent
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#'));
+
+      if (patterns.length > 0) {
+        this.forceInclude = [...this.forceInclude, ...patterns];
+        this.log(`Loaded ${patterns.length} .copytreeinclude pattern(s)`, 'debug');
+      }
     }
   }
 

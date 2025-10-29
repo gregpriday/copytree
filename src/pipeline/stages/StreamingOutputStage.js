@@ -18,7 +18,7 @@ import { hashFile, hashContent } from '../../utils/fileHash.js';
 class StreamingOutputStage extends Stage {
   constructor(options = {}) {
     super(options);
-    const raw = (options.format || 'markdown').toString().toLowerCase();
+    const raw = (options.format || 'xml').toString().toLowerCase();
     this.format = raw === 'md' ? 'markdown' : raw;
     this.outputStream = options.outputStream || process.stdout;
     this.addLineNumbers =
@@ -92,8 +92,8 @@ class StreamingOutputStage extends Stage {
 
     // Header and front matter
     stream.write('---\n');
-    stream.write(`format: copytree-md@1\n`);
-    stream.write(`tool: copytree\n`);
+    stream.write('format: copytree-md@1\n');
+    stream.write('tool: copytree\n');
     stream.write(`generated: ${escapeYamlScalar(new Date().toISOString())}\n`);
     stream.write(`base_path: ${escapeYamlScalar(input.basePath)}\n`);
     stream.write(`profile: ${escapeYamlScalar(input.profile?.name || 'default')}\n`);
@@ -151,7 +151,9 @@ class StreamingOutputStage extends Stage {
       try {
         if (file.absolutePath) sha = await hashFile(file.absolutePath, 'sha256');
         else if (typeof file.content === 'string') sha = hashContent(file.content, 'sha256');
-      } catch (_e) {}
+      } catch (_e) {
+        // Ignore hash computation errors
+      }
       const binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
       // Prepare attributes for the file-begin marker (include meta here instead of inline <small>)
       const attrs = {

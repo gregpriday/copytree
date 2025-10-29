@@ -75,8 +75,8 @@ async function copyCommand(targetPath = '.', options = {}) {
       await displayOutput(outputResult, options);
     } else if (options.dryRun) {
       logger.info('🔍 Dry run mode - no files were processed.');
-      const fileCount = result.files.length;
-      const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
+      const fileCount = result.files.filter((f) => f !== null).length;
+      const totalSize = result.files.filter((f) => f !== null).reduce((sum, file) => sum + (file.size || 0), 0);
       logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}] would be processed`);
     }
 
@@ -138,6 +138,13 @@ async function loadProfile(profileLoader, profileName, options) {
 async function setupPipelineStages(basePath, profile, options) {
   const stages = [];
 
+  // Merge force-include patterns from all sources (CLI, profile, .copytreeinclude)
+  const mergedAlways = [
+    ...(Array.isArray(options.always) ? options.always : options.always ? [options.always] : []),
+    ...(Array.isArray(profile.always) ? profile.always : []),
+    // .copytreeinclude is loaded by the stage itself
+  ];
+
   // 1. File Discovery Stage
   const { default: FileDiscoveryStage } = await import('../pipeline/stages/FileDiscoveryStage.js');
   stages.push(
@@ -150,10 +157,19 @@ async function setupPipelineStages(basePath, profile, options) {
       maxFileSize: profile.options?.maxFileSize,
       maxTotalSize: profile.options?.maxTotalSize,
       maxFileCount: profile.options?.maxFileCount,
+      forceInclude: mergedAlways,
     }),
   );
 
-  // 2. Git Filter Stage (if --modified or --changed is used)
+  // 2. Always Include Stage (mark files before any filtering)
+  if (mergedAlways.length > 0) {
+    const { default: AlwaysIncludeStage } = await import(
+      '../pipeline/stages/AlwaysIncludeStage.js'
+    );
+    stages.push(new AlwaysIncludeStage(mergedAlways));
+  }
+
+  // 3. Git Filter Stage (if --modified or --changed is used)
   if (options.modified || options.changed) {
     const { default: GitFilterStage } = await import('../pipeline/stages/GitFilterStage.js');
     stages.push(
@@ -166,7 +182,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 3. Profile Filter Stage (applies exclude patterns)
+  // 4. Profile Filter Stage (applies exclude patterns)
   const { default: ProfileFilterStage } = await import('../pipeline/stages/ProfileFilterStage.js');
   stages.push(
     new ProfileFilterStage({
@@ -174,18 +190,6 @@ async function setupPipelineStages(basePath, profile, options) {
       filter: profile.filter || [],
     }),
   );
-
-  // 4. Always Include Stage (if --always option is used)
-  if (options.always) {
-    const { default: AlwaysIncludeStage } = await import(
-      '../pipeline/stages/AlwaysIncludeStage.js'
-    );
-    stages.push(
-      new AlwaysIncludeStage({
-        patterns: Array.isArray(options.always) ? options.always : [options.always],
-      }),
-    );
-  }
 
   // 5. External Source Stage (if external sources are configured)
   if (profile.external && profile.external.length > 0) {
@@ -243,11 +247,11 @@ async function setupPipelineStages(basePath, profile, options) {
   // 11. Output Formatting Stage
   // Determine output format (default to tree if --only-tree is used)
   const rawFormat =
-    options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'markdown');
+    options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'xml');
   const outputFormat =
-    (rawFormat || 'markdown').toString().toLowerCase() === 'md'
+    (rawFormat || 'xml').toString().toLowerCase() === 'md'
       ? 'markdown'
-      : (rawFormat || 'markdown').toString().toLowerCase();
+      : (rawFormat || 'xml').toString().toLowerCase();
 
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
@@ -294,8 +298,8 @@ async function setupPipelineStages(basePath, profile, options) {
 async function prepareOutput(result, options) {
   // If streaming was used, output has already been handled
   if (result.streamed) {
-    const fileCount = result.files.length;
-    const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
+    const fileCount = result.files.filter((f) => f !== null).length;
+    const totalSize = result.files.filter((f) => f !== null).reduce((sum, file) => sum + (file.size || 0), 0);
 
     return {
       type: 'streamed',
@@ -313,7 +317,7 @@ async function prepareOutput(result, options) {
 
   // Calculate output size
   const outputSize = Buffer.byteLength(output, 'utf8');
-  const fileCount = result.files.length;
+  const fileCount = result.files.filter((f) => f !== null).length;
 
   return {
     type: 'normal',
@@ -342,7 +346,7 @@ async function displayOutput(outputResult, options) {
 
   // Handle --as-reference option
   if (options.asReference) {
-    const f = (options.format || 'markdown').toString().toLowerCase();
+    const f = (options.format || 'xml').toString().toLowerCase();
     const format = f === 'md' ? 'markdown' : f;
     const extension =
       format === 'json' ? 'json' : format === 'markdown' ? 'md' : format === 'tree' ? 'txt' : 'xml';
@@ -389,7 +393,7 @@ async function displayOutput(outputResult, options) {
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
     } catch (_error) {
       // If clipboard fails, save to temporary file
-      const f = (options.format || 'markdown').toString().toLowerCase();
+      const f = (options.format || 'xml').toString().toLowerCase();
       const format = f === 'md' ? 'markdown' : f;
       const extension =
         format === 'json'

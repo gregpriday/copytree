@@ -1,5 +1,6 @@
 import BaseTransformer from '../BaseTransformer.js';
 import path from 'path';
+import { isImageExtension } from '../../utils/helpers.js';
 
 /**
  * Binary file transformer
@@ -57,18 +58,27 @@ class BinaryTransformer extends BaseTransformer {
   }
 
   async doTransform(file) {
+    // Hard-exclude all non-image binary files
+    const isImage = isImageExtension(file.path);
+
+    if (!isImage) {
+      // Non-image binary files are completely excluded (no output)
+      return null;
+    }
+
+    // For image files, use configured action
     const action = this.config.get('copytree.binaryFileAction', 'placeholder');
 
     switch (action) {
-      case 'skip':
-        return null;
+    case 'skip':
+      return null;
 
-      case 'base64':
-        return await this.transformToBase64(file);
+    case 'base64':
+      return await this.transformToBase64(file);
 
-      case 'placeholder':
-      default:
-        return this.transformToPlaceholder(file);
+    case 'placeholder':
+    default:
+      return this.transformToPlaceholder(file);
     }
   }
 

@@ -28,7 +28,7 @@ class Clipboard {
     if (process.platform === 'win32') {
       try {
         // Use PowerShell to copy the file reference on Windows
-        const command = `powershell -Command "Set-Clipboard -Path '${filePath.replace(/'/g, "''")}'"`;
+        const command = `powershell -Command "Set-Clipboard -Path '${filePath.replace(/'/g, '\'\'')}'"`;
         execSync(command, { stdio: 'pipe' });
       } catch (error) {
         logger.debug(
@@ -49,7 +49,7 @@ class Clipboard {
     } else if (process.platform === 'darwin') {
       try {
         // Use AppleScript to copy file reference
-        const escapedFilePath = filePath.replace(/"/g, '"');
+        const escapedFilePath = filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
         const script = `
           set aFile to POSIX file "${escapedFilePath}"
           tell app "Finder" to set the clipboard to aFile

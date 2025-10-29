@@ -1,5 +1,6 @@
 import fs from 'fs-extra';
 import path from 'path';
+import fastGlob from 'fast-glob';
 import { logger } from './logger.js';
 
 /**
@@ -20,11 +21,8 @@ class FileLoader {
     const { include = ['**/*'], exclude = [] } = patterns;
 
     try {
-      // Dynamic import for ESM-only globby
-      const { globby } = await import('globby');
-
-      // Get file paths using globby
-      const filePaths = await globby(include, {
+      // Get file paths using fast-glob
+      const filePaths = await fastGlob(include, {
         cwd: this.basePath,
         ignore: exclude,
         dot: this.includeHidden,

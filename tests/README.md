@@ -1,106 +1,492 @@
 # CopyTree Test Suite
 
-This directory contains comprehensive tests for CopyTree, organized by type:
+Welcome to the CopyTree test suite! This directory contains comprehensive tests covering unit, integration, e2e, and performance scenarios.
 
-## Test Structure
-
-```
-tests/
-├── unit/                 # Unit tests for individual components
-│   ├── commands/        # Test each command in isolation
-│   ├── pipeline/        # Test pipeline stages
-│   ├── transformers/    # Test each transformer
-│   ├── services/        # Test services (AI, Cache, etc.)
-│   └── utils/          # Test utility functions
-├── integration/         # Integration tests
-│   ├── pipeline/       # Full pipeline tests
-│   ├── profiles/       # Profile loading and validation
-│   └── external/       # External source integration
-├── e2e/                # End-to-end command tests
-│   └── copy.test.js
-└── fixtures/           # Test data and mock projects
-    ├── projects/       # Sample projects
-    ├── files/         # Individual test files
-    └── profiles/      # Test profiles
-```
-
-## Running Tests
+## Quick Start
 
 ```bash
 # Run all tests
 npm test
 
-# Run unit tests only
+# Run specific test categories
 npm run test:unit
-
-# Run integration tests
 npm run test:integration
-
-# Run e2e tests
 npm run test:e2e
 
-# Run with coverage
+# Generate coverage report
 npm run test:coverage
 
+# Run tests in watch mode
+npm test -- --watch
+
+# Run a specific test file
+npm test -- tests/unit/config/config.hierarchy.test.js
+
+# Update golden files (use sparingly!)
+UPDATE_GOLDEN=true npm test
 ```
 
-## Test Coverage Goals
+## Directory Structure
 
-- **Overall**: 80%+ coverage
-- **Critical paths**: 95%+ coverage
-- **Commands**: 100% coverage
-- **Error handling**: 100% coverage
+```
+tests/
+├── unit/                  # Fast, isolated unit tests
+│   ├── commands/          # CLI command tests
+│   ├── config/            # Configuration system tests
+│   │   └── config.hierarchy.test.js  ✅ Config precedence & env mapping
+│   ├── pipeline/          # Pipeline and stage tests
+│   │   ├── events.contract.test.js  ✅ Event emission validation
+│   │   └── ...
+│   ├── services/          # Service layer tests
+│   │   ├── AIService.retry.test.js  ✅ Retry/fallback logic
+│   │   └── ...
+│   ├── transformers/      # Individual transformer tests
+│   ├── transforms/        # Transform system tests
+│   │   └── traits.enforcement.test.js  ✅ Trait-based scheduling
+│   ├── ui/                # UI component tests
+│   └── utils/             # Utility function tests
+├── integration/           # Multi-module integration tests
+├── e2e/                   # End-to-end CLI tests
+├── performance/           # Performance benchmarks
+├── helpers/               # 🆕 Test utilities (NEW!)
+│   ├── determinism.js     # Normalization for stable outputs
+│   ├── fixtures.js        # Fixture management & golden files
+│   └── pipeline.js        # Pipeline testing utilities
+├── fixtures/              # Test data
+│   ├── goldens/           # 🆕 Expected outputs for regression tests
+│   ├── simple-project/    # Small test project
+│   ├── images/            # Image test files
+│   └── pdfs/              # PDF test files
+└── mocks/                 # Mock implementations
+```
 
-## Writing Tests
+## Test Categories
 
-### Unit Test Example
+### Unit Tests (`tests/unit/`)
 
+**Purpose:** Test individual modules in isolation.
+
+**Characteristics:**
+- Fast (< 10ms per test)
+- No external dependencies
+- Deterministic
+- High coverage (80%+ target)
+
+**Example:**
 ```javascript
-// tests/unit/transformers/ImageDescriptionTransformer.test.js
-describe('ImageDescriptionTransformer', () => {
-  it('should generate description for valid image', async () => {
-    // Test implementation
-  });
-  
-  it('should handle API errors gracefully', async () => {
-    // Test error handling
-  });
+import { isRetryableError } from '../../../src/utils/errors.js';
+
+it('identifies RATE_LIMIT as retryable', () => {
+  const error = new Error('Rate limit exceeded');
+  expect(isRetryableError(error)).toBe(true);
 });
 ```
 
-### Integration Test Example
+### Integration Tests (`tests/integration/`)
 
+**Purpose:** Test interaction between modules.
+
+**Characteristics:**
+- Medium speed (< 100ms per test)
+- Local resources only (no network)
+- Test data flows
+- Validate subsystem contracts
+
+**Example:**
 ```javascript
-// tests/integration/pipeline/external-sources.test.js
-describe('External Sources Pipeline', () => {
-  it('should clone and process GitHub repository', async () => {
-    // Test GitHub integration
-  });
+import { createLocalGitRepo } from '../helpers/fixtures.js';
+
+it('clones and caches local repo', async () => {
+  const repo = createLocalGitRepo('test', files);
+  const first = await copy({ source: repo.path });
+  const second = await copy({ source: repo.path });
+
+  expect(second.stats.fromCache).toBe(true);
 });
 ```
 
-### E2E Test Example
+### E2E Tests (`tests/e2e/`)
 
+**Purpose:** Test complete CLI workflows.
+
+**Characteristics:**
+- Slower (< 1s per test)
+- Full CLI invocation
+- Golden file comparisons
+- Cover user scenarios
+
+**Example:**
 ```javascript
-// tests/e2e/copy.test.js
-describe('Copy Command E2E', () => {
-  it('should copy project with AI filter', async () => {
-    // Test full command execution
-  });
+import { normalizeForGolden } from '../helpers/determinism.js';
+
+it.each(['xml', 'json', 'markdown'])('produces stable %s output', async (format) => {
+  const output = await runCLI(['--format', format, 'simple-project']);
+  const normalized = normalizeForGolden(output);
+  expect(normalized).toMatchGolden(`simple.${format}`);
 });
 ```
 
-## Mocking
+### Performance Tests (`tests/performance/`)
 
-- **AI Service**: Mock Gemini API responses
-- **File System**: Use mock-fs for file operations
-- **Git**: Mock simple-git operations
-- **External APIs**: Use nock for HTTP mocking
+**Purpose:** Ensure performance within budgets.
 
-## Performance Tests
+**Characteristics:**
+- Run on schedule (nightly/weekly)
+- Track trends over time
+- Fail on regressions > 10%
+- Generate reports
 
-Located in `tests/performance/`:
-- Large file handling
-- Memory usage monitoring
-- Streaming performance
-- Cache effectiveness
+## New Test Helpers 🆕
+
+### `tests/helpers/determinism.js`
+
+Utilities for normalizing nondeterministic data:
+
+```javascript
+import {
+  normalizeForGolden,    // Normalize everything
+  normalizePaths,        // Paths (absolute → relative)
+  normalizeTimestamps,   // Timestamps (ISO, Unix)
+  normalizeIds,          // UUIDs, request IDs
+  normalizeMetrics,      // Durations, memory, sizes
+  normalizeTokens        // AI token counts
+} from './helpers/determinism.js';
+
+// Comprehensive normalization for golden files
+const normalized = normalizeForGolden(output, { basePath: projectRoot });
+
+// Selective normalization
+const pathsOnly = normalizePaths(content, { placeholder: '<ROOT>' });
+```
+
+**Key Features:**
+- OS-agnostic path normalization
+- Timestamp → `<TIMESTAMP>` placeholder
+- UUIDs → `<UUID>` placeholder
+- Performance metrics → `<DURATION>`, `<MEMORY>`
+- Line ending normalization
+
+### `tests/helpers/fixtures.js`
+
+Fixture management and golden file utilities:
+
+```javascript
+import {
+  createSimpleProject,    // Create test project
+  createLargeProject,     // Create perf test project
+  createLocalGitRepo,     // Create local git repo
+  createRobustnessFixtures, // Edge case fixtures
+  fixturePath,            // Get fixture path
+  goldenPath,             // Get golden file path
+  tmpPath,                // Get temp path
+  cleanTmpDir,            // Clean temp directory
+  toMatchGolden           // Jest matcher
+} from './helpers/fixtures.js';
+
+// Create a simple test project
+const project = createSimpleProject('test', {
+  withGit: true,
+  files: {
+    'README.md': '# Test',
+    'src/index.js': 'console.log("hello");'
+  }
+});
+
+// Create local git repo for testing external sources
+const repo = createLocalGitRepo('repo', {
+  'file.js': 'content'
+});
+repo.addFiles({ 'file2.js': 'more content' });
+repo.createBranch('feature');
+
+// Compare against golden file
+expect(normalizedOutput).toMatchGolden('expected.xml');
+```
+
+### `tests/helpers/pipeline.js`
+
+Pipeline testing utilities:
+
+```javascript
+import {
+  createTestPipeline,       // Create minimal pipeline
+  createFullPipeline,       // Create full 16-stage pipeline
+  PipelineEventCollector,   // Collect & validate events
+  MockStage,                // Mock pipeline stage
+  createMockFiles,          // Create mock file objects
+  runPipelineWithEvents,    // Run pipeline with event capture
+  assertStageContract       // Validate stage contracts
+} from './helpers/pipeline.js';
+
+// Collect and validate pipeline events
+const pipeline = createTestPipeline([stage1, stage2]);
+const collector = new PipelineEventCollector(pipeline);
+
+await pipeline.run(input);
+
+const validation = collector.validateContract();
+expect(validation.valid).toBe(true);
+
+// Check specific events
+const stageCompletes = collector.getEvents('stage:complete');
+expect(stageCompletes.length).toBe(2);
+```
+
+## Golden File Testing
+
+Golden files in `tests/fixtures/goldens/` represent expected outputs for regression testing.
+
+**Workflow:**
+
+1. **Create Test:**
+   ```javascript
+   it('produces stable XML output', async () => {
+     const output = await generateOutput('simple-project', 'xml');
+     const normalized = normalizeForGolden(output);
+     expect(normalized).toMatchGolden('simple.xml');
+   });
+   ```
+
+2. **First Run (Creates Golden):**
+   ```bash
+   UPDATE_GOLDEN=true npm test -- tests/e2e/outputs.test.js
+   ```
+
+3. **Subsequent Runs (Compares):**
+   ```bash
+   npm test -- tests/e2e/outputs.test.js
+   ```
+
+4. **Review Changes:**
+   ```bash
+   git diff tests/fixtures/goldens/
+   ```
+
+**Best Practices:**
+- ✅ Always normalize before comparison
+- ✅ Review diffs carefully before committing
+- ✅ Use meaningful golden file names
+- ❌ Don't update goldens without understanding why they changed
+- ❌ Don't commit machine-specific or nondeterministic data
+
+## Coverage Targets
+
+### Global: 80%
+
+All metrics (branches, functions, lines, statements) must meet 80% coverage.
+
+### Critical Paths: 95%
+
+- `src/pipeline/Pipeline.js`
+- `src/pipeline/Stage.js`
+- `src/config/ConfigManager.js`
+- `src/transforms/TransformerRegistry.js`
+- `src/services/AIService.js`
+- `src/utils/GitUtils.js`
+
+### Commands: 100%
+
+All CLI commands should have comprehensive test coverage.
+
+## Recently Added Tests ✅
+
+### Pipeline Event Contract Tests
+
+**File:** `tests/unit/pipeline/events.contract.test.js`
+
+**Coverage:**
+- ✅ Pipeline lifecycle events (`pipeline:start`, `pipeline:complete`)
+- ✅ Stage events (`stage:start`, `stage:complete`)
+- ✅ File batch events
+- ✅ Event timing and ordering
+- ✅ Error recovery flow
+
+**Key Validations:**
+- All required event fields present
+- Events emitted in correct order
+- Timing/memory data accurate
+- Error events include context
+
+### Transformer Trait Enforcement Tests
+
+**File:** `tests/unit/transforms/traits.enforcement.test.js`
+
+**Coverage:**
+- ✅ Heavy transformer scheduling
+- ✅ Idempotent trait behavior
+- ✅ Input/output type matching
+- ✅ Dependency resolution
+- ✅ Priority-based ordering
+
+**Key Validations:**
+- Heavy transformers respect budgets
+- Idempotent transformers safe to reapply
+- Type chains validated
+- Dependencies resolved correctly
+
+### Configuration Hierarchy Tests
+
+**File:** `tests/unit/config/config.hierarchy.test.js`
+
+**Coverage:**
+- ✅ Precedence: default < user < project < env < CLI
+- ✅ Nested object merging
+- ✅ Environment variable mapping
+- ✅ Provenance tracking
+- ✅ Dot notation access
+
+**Key Validations:**
+- Correct precedence order enforced
+- Deep merging works correctly
+- Env vars map to config keys
+- Provenance tracks sources
+
+### AIService Retry & Fallback Tests
+
+**File:** `tests/unit/services/AIService.retry.test.js`
+
+**Coverage:**
+- ✅ Retryable error identification
+- ✅ Non-retryable immediate failure
+- ✅ Exponential backoff
+- ✅ Retry-after header respect
+- ✅ Provider fallback
+
+**Key Validations:**
+- Retries up to 3 times on retryable errors
+- Fails immediately on non-retryable errors
+- Backoff delays increase exponentially
+- Falls back to secondary providers
+
+## Test Writing Guidelines
+
+### 1. Use AAA Pattern
+
+```javascript
+it('description', () => {
+  // Arrange
+  const input = setup();
+
+  // Act
+  const result = process(input);
+
+  // Assert
+  expect(result).toEqual(expected);
+});
+```
+
+### 2. Descriptive Names
+
+```javascript
+✅ it('retries retryable errors up to max attempts', () => { ... });
+❌ it('works', () => { ... });
+```
+
+### 3. Isolate Tests
+
+```javascript
+afterEach(() => {
+  cleanTmpDir();
+  resetMocks();
+});
+```
+
+### 4. Mock External Dependencies
+
+```javascript
+jest.mock('../../../src/services/AIService.js');
+```
+
+### 5. Use Helpers
+
+```javascript
+import { createTestPipeline, normalizeForGolden } from '../helpers';
+```
+
+## Common Commands
+
+```bash
+# Run tests matching pattern
+npm test -- --testNamePattern="retry"
+
+# Run tests in specific file
+npm test -- tests/unit/config/config.hierarchy.test.js
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode (useful during development)
+npm test -- --watch
+
+# Run only failed tests from last run
+npm test -- --onlyFailures
+
+# Run tests in debug mode
+node --inspect-brk node_modules/.bin/jest --runInBand
+
+# Update snapshots (use carefully!)
+npm test -- --updateSnapshot
+
+# Update golden files (use carefully!)
+UPDATE_GOLDEN=true npm test
+```
+
+## Debugging Tests
+
+### VS Code Configuration
+
+Add to `.vscode/launch.json`:
+
+```json
+{
+  "type": "node",
+  "request": "launch",
+  "name": "Jest Current File",
+  "program": "${workspaceFolder}/node_modules/.bin/jest",
+  "args": ["${fileBasename}", "--runInBand"],
+  "console": "integratedTerminal",
+  "internalConsoleOptions": "neverOpen"
+}
+```
+
+### Chrome DevTools
+
+```bash
+node --inspect-brk node_modules/.bin/jest --runInBand tests/unit/config/config.hierarchy.test.js
+```
+
+Then open `chrome://inspect` in Chrome.
+
+## CI/CD
+
+Tests run automatically on:
+- **Every push** to any branch
+- **Every pull request** creation/update
+- **Nightly** (performance benchmarks)
+
+**Required for PR merge:**
+- ✅ All tests pass
+- ✅ Coverage thresholds met
+- ✅ No linting errors
+
+## Contributing
+
+When adding new features:
+
+1. **Write tests first** (TDD encouraged)
+2. **Choose appropriate test type** (unit/integration/e2e)
+3. **Use existing helpers** for common patterns
+4. **Maintain coverage targets** (80% global, 95% critical)
+5. **Add golden files** for CLI output changes
+6. **Update this README** if adding new test categories
+
+## Resources
+
+- **Full Testing Strategy:** [docs/technical/testing-strategy.md](../docs/technical/testing-strategy.md)
+- **Project Architecture:** [docs/technical/architecture.md](../docs/technical/architecture.md)
+- **Jest Documentation:** https://jestjs.io/docs/getting-started
+- **Testing Best Practices:** https://github.com/goldbergyoni/javascript-testing-best-practices
+
+## Questions?
+
+Open an issue or discussion on GitHub if you need help with testing!

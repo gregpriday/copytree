@@ -1,8 +1,20 @@
+import { sanitizeForComment } from '../../utils/helpers.js';
+
 class XMLFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
     this.stage = stage;
     this.addLineNumbers = addLineNumbers;
     this.onlyTree = onlyTree;
+  }
+
+  /**
+   * Properly escape content for CDATA sections.
+   * Replaces occurrences of ']]>' with the correct escape sequence.
+   * @param {string} content - Content to escape
+   * @returns {string} Escaped content safe for CDATA
+   */
+  escapeCdata(content) {
+    return content.toString().replaceAll(']]>', ']]]]><![CDATA[>');
   }
 
   async format(input) {
@@ -13,7 +25,7 @@ class XMLFormatter {
     // Add metadata
     xml += '  <ct:metadata>\n';
     xml += `    <ct:generated>${new Date().toISOString()}</ct:generated>\n`;
-    xml += `    <ct:fileCount>${input.files.length}</ct:fileCount>\n`;
+    xml += `    <ct:fileCount>${input.files.filter((f) => f !== null).length}</ct:fileCount>\n`;
     xml += `    <ct:totalSize>${this.stage.calculateTotalSize(input.files)}</ct:totalSize>\n`;
 
     if (input.profile) {
@@ -27,10 +39,7 @@ class XMLFormatter {
         xml += `      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`;
       }
       if (input.gitMetadata.lastCommit) {
-        const msg = (input.gitMetadata.lastCommit.message || '')
-          .toString()
-          .split(']]>')
-          .join(']]]]><![CDATA[>');
+        const msg = this.escapeCdata(input.gitMetadata.lastCommit.message || '');
         xml += `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}"><![CDATA[${msg}]]></ct:lastCommit>\n`;
       }
       if (input.gitMetadata.filterType) {
@@ -49,7 +58,7 @@ class XMLFormatter {
     // Add instructions if present (loaded by InstructionsStage)
     if (input.instructions) {
       const nameAttr = input.instructionsName ? ` name="${input.instructionsName}"` : '';
-      const instr = input.instructions.toString().split(']]>').join(']]]]><![CDATA[>');
+      const instr = this.escapeCdata(input.instructions);
       xml += `    <ct:instructions${nameAttr}><![CDATA[${instr}]]></ct:instructions>\n`;
     }
 
@@ -75,6 +84,10 @@ class XMLFormatter {
         }
       }
 
+      if (file.binaryCategory) {
+        xml += ` binaryCategory="${file.binaryCategory}"`;
+      }
+
       if (file.gitStatus) {
         xml += ` gitStatus="${file.gitStatus}"`;
       }
@@ -83,15 +96,32 @@ class XMLFormatter {
 
       // Add content directly to file element (unless --only-tree is set)
       if (!this.onlyTree) {
-        let content = file.content || '';
+        // Check if this file should be rendered as a comment
+        const policy = this.stage.config.get('copytree.binaryPolicy', {})[file.binaryCategory] ||
+                       this.stage.config.get('copytree.binaryFileAction', 'placeholder');
 
-        if (this.addLineNumbers && !file.isBinary) {
-          content = this.stage.addLineNumbersToContent(content);
+        if (file.excluded || (file.isBinary && policy === 'comment')) {
+          // Emit comment instead of CDATA
+          const tpl = this.stage.config.get('copytree.binaryCommentTemplates.xml',
+            '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->');
+          const categoryName = (file.binaryCategory || 'Binary').toUpperCase();
+          const msg = tpl
+            .replace('{TYPE}', sanitizeForComment(categoryName))
+            .replace('{PATH}', sanitizeForComment(`@${file.path}`))
+            .replace('{SIZE}', this.stage.formatBytes(file.size || 0));
+          xml += msg;
+        } else {
+          // Regular content handling
+          let content = file.content || '';
+
+          if (this.addLineNumbers && !file.isBinary) {
+            content = this.stage.addLineNumbersToContent(content);
+          }
+
+          // Wrap content in CDATA to ensure well-formed XML
+          const c = this.escapeCdata(content);
+          xml += `<![CDATA[${c}]]>`;
         }
-
-        // Wrap content in CDATA to ensure well-formed XML
-        const c = content.toString().split(']]>').join(']]]]><![CDATA[>');
-        xml += `<![CDATA[${c}]]>`;
       }
 
       xml += '</ct:file>\n';
