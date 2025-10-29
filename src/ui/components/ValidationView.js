@@ -346,9 +346,7 @@ const ValidationView = ({ successMessage, type }) => {
           modulesOk++;
 
           // Module-specific validation
-          if (moduleName === 'ai') {
-            validateAIConfig(moduleConfig, validationWarnings);
-          } else if (moduleName === 'copytree') {
+          if (moduleName === 'copytree') {
             validateCopytreeConfig(moduleConfig, validationWarnings);
           } else if (moduleName === 'cache') {
             validateCacheConfig(moduleConfig, validationWarnings);
@@ -432,18 +430,6 @@ const ValidationView = ({ successMessage, type }) => {
   };
 
   // Helper validation functions
-  const validateAIConfig = (config, warnings) => {
-    if (!config.provider) {
-      warnings.push('No AI provider configured');
-    }
-    if (config.provider === 'gemini' && !config.gemini?.apiKey) {
-      warnings.push('Gemini provider selected but no API key configured');
-    }
-    if (!config.cacheEnabled) {
-      warnings.push('AI caching is disabled - this may increase API costs');
-    }
-  };
-
   const validateCopytreeConfig = (config, warnings) => {
     if (config.maxFileSize && config.maxFileSize < 1024) {
       warnings.push('maxFileSize is very small (< 1KB)');

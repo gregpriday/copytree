@@ -50,7 +50,7 @@ copytree --display
 ## 🎯 Why CopyTree?
 
 - **Smart File Discovery** - Intelligent selection with `.gitignore`, `.copytreeignore`, and `.copytreeinclude` support
-- **15+ File Transformers** - PDF text extraction, image OCR/descriptions, AI summaries
+- **File Transformers** - PDF text extraction, image OCR, CSV formatting, and more
 - **Multiple Output Formats** - XML (default), Markdown, JSON, tree view
 - **Profile System** - Default profile with customizable overrides
 - **Git Integration** - Filter by modified files, branch diffs, staged changes
@@ -98,9 +98,6 @@ copytree --external https://github.com/user/repo -o repo.xml
 copytree -S --format markdown > output.md
 copytree --stream --format json | jq .
 
-# Apply AI transformers (summaries, OCR)
-copytree --transform
-
 # Dry run (preview without copying)
 copytree --dry-run
 
@@ -144,26 +141,6 @@ copytree --profile my-profile
 copytree profile:list
 ```
 
-## 🤖 AI Integration
-
-CopyTree can call AI providers for intelligent summaries, image descriptions, and code analysis.
-
-**Supported providers:**
-- **Gemini** (Google AI) - Set `GEMINI_API_KEY`
-- **OpenAI** - Set `OPENAI_API_KEY` (when configured)
-- More providers can be added via configuration
-
-**Enable AI features:**
-```bash
-# Set API key
-export GEMINI_API_KEY=your_key_here
-
-# Use AI transformers
-copytree --transform
-```
-
-**Note:** When you enable AI transformers, file content may be sent to your configured AI provider. Review your organization's policies, scrub secrets, and use `.copytreeignore` to exclude sensitive files.
-
 ## ⚙️ Configuration
 
 ### Environment Variables
@@ -171,11 +148,6 @@ copytree --transform
 Create a `.env` file in your project or home directory:
 
 ```bash
-# AI Configuration
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-OPENAI_API_KEY=your_openai_key_here  # Optional
-
 # Performance Settings
 COPYTREE_MAX_FILE_SIZE=10485760      # 10MB
 COPYTREE_MAX_TOTAL_SIZE=104857600    # 100MB
@@ -269,9 +241,6 @@ For detailed guides, see the `docs/` directory:
 
 **Memory issues**
 → Reduce `COPYTREE_MAX_TOTAL_SIZE` or enable streaming mode with `-S/--stream`
-
-**AI features not working**
-→ Verify `GEMINI_API_KEY` is set correctly and valid
 
 **Slow performance**
 → Enable caching, use lighter transformers, add more exclusion patterns

@@ -15,23 +15,6 @@ async function configValidateCommand(_options = {}) {
 }
 
 /**
- * Validate AI configuration
- */
-function validateAIConfig(config, warnings) {
-  if (!config.provider) {
-    warnings.push('No AI provider configured');
-  }
-
-  if (config.provider === 'gemini' && !config.gemini?.apiKey) {
-    warnings.push('Gemini provider selected but no API key configured');
-  }
-
-  if (!config.cacheEnabled) {
-    warnings.push('AI caching is disabled - this may increase API costs');
-  }
-}
-
-/**
  * Validate copytree configuration
  */
 function validateCopytreeConfig(config, warnings) {
