@@ -3,13 +3,12 @@ import fs from 'fs-extra';
 import ora from 'ora';
 
 // Use dynamic imports for modules under test
-let copy, Pipeline, ProfileLoader, ProfileGuesser, AIService, Clipboard;
+let copy, Pipeline, ProfileLoader, ProfileGuesser, Clipboard;
 
 // Mock all dependencies
 jest.mock('../../../src/pipeline/Pipeline.js');
 jest.mock('../../../src/profiles/ProfileLoader.js');
 jest.mock('../../../src/profiles/ProfileGuesser.js');
-jest.mock('../../../src/services/AIService.js');
 jest.mock('fs-extra');
 jest.mock('../../../src/utils/clipboard.js');
 jest.mock('ora');
@@ -80,7 +79,6 @@ describe('copy command', () => {
     const pipelineModule = await import('../../../src/pipeline/Pipeline.js');
     const profileLoaderModule = await import('../../../src/profiles/ProfileLoader.js');
     const profileGuesserModule = await import('../../../src/profiles/ProfileGuesser.js');
-    const aiServiceModule = await import('../../../src/services/AIService.js');
     const clipboardModule = await import('../../../src/utils/clipboard.js');
     const loggerModule = await import('../../../src/utils/logger.js');
     const errorsModule = await import('../../../src/utils/errors.js');
@@ -89,7 +87,6 @@ describe('copy command', () => {
     Pipeline = pipelineModule.default;
     ProfileLoader = profileLoaderModule.default;
     ProfileGuesser = profileGuesserModule.default;
-    AIService = aiServiceModule.default;
     Clipboard = clipboardModule.default;
     logger = loggerModule.logger;
     handleError = errorsModule.handleError;

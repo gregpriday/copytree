@@ -38,16 +38,9 @@ class TransformStage extends Stage {
     let errorCount = 0;
     // logger is already imported at the top
 
-    // Import p-limit dynamically to handle ES module
-    let limit;
-    try {
-      const pLimit = (await import('p-limit')).default;
-      limit = pLimit(this.maxConcurrency);
-    } catch (_error) {
-      // Fallback to older p-limit version syntax
-      const pLimit = await import('p-limit');
-      limit = pLimit.default ? pLimit.default(this.maxConcurrency) : pLimit(this.maxConcurrency);
-    }
+    // Import p-limit dynamically (v7+ uses default export)
+    const { default: pLimit } = await import('p-limit');
+    const limit = pLimit(this.maxConcurrency);
 
     // First pass: identify files that need transformation
     const filesToTransform = [];

@@ -38,30 +38,30 @@ class SortFilesStage extends Stage {
       let compareValue = 0;
 
       switch (this.sortBy) {
-        case 'size':
-          compareValue = this.compareBySize(a, b);
-          break;
+      case 'size':
+        compareValue = this.compareBySize(a, b);
+        break;
 
-        case 'modified':
-          compareValue = this.compareByModified(a, b);
-          break;
+      case 'modified':
+        compareValue = this.compareByModified(a, b);
+        break;
 
-        case 'name':
-          compareValue = this.compareByName(a, b);
-          break;
+      case 'name':
+        compareValue = this.compareByName(a, b);
+        break;
 
-        case 'extension':
-          compareValue = this.compareByExtension(a, b);
-          break;
+      case 'extension':
+        compareValue = this.compareByExtension(a, b);
+        break;
 
-        case 'depth':
-          compareValue = this.compareByDepth(a, b);
-          break;
+      case 'depth':
+        compareValue = this.compareByDepth(a, b);
+        break;
 
-        case 'path':
-        default:
-          compareValue = this.compareByPath(a, b);
-          break;
+      case 'path':
+      default:
+        compareValue = this.compareByPath(a, b);
+        break;
       }
 
       // Apply sort order
@@ -78,10 +78,21 @@ class SortFilesStage extends Stage {
   }
 
   /**
+   * Handle errors during sorting - return unsorted files
+   */
+  async handleError(error, input) {
+    this.log(`Sorting failed: ${error.message}, returning files unsorted`, 'warn');
+    // Return input unchanged if sorting fails
+    return input;
+  }
+
+  /**
    * Compare by file path (alphabetical)
    */
   compareByPath(a, b) {
-    return a.relativePath.localeCompare(b.relativePath, undefined, {
+    const pathA = a.relativePath || a.path || '';
+    const pathB = b.relativePath || b.path || '';
+    return pathA.localeCompare(pathB, undefined, {
       numeric: true,
       sensitivity: 'base',
     });

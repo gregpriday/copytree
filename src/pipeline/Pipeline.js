@@ -201,10 +201,10 @@ class Pipeline extends EventEmitter {
               error instanceof ValidationError
                 ? error
                 : new ValidationError(
-                    `Stage validation failed: ${error.message}`,
-                    stageName,
-                    result,
-                  );
+                  `Stage validation failed: ${error.message}`,
+                  stageName,
+                  result,
+                );
 
             if (this.options.continueOnError) {
               console.warn(
@@ -304,8 +304,9 @@ class Pipeline extends EventEmitter {
               continue; // Continue with recovered result
             }
           } catch (handlerError) {
-            // Handler failed, continue with original error handling
-            error = handlerError;
+            // Handler failed, continue with original handling
+            this.context.logger.warn(`Recovery handler for ${stageName} failed: ${handlerError.message}`);
+            // Use original issue instead of handler issue
           }
         }
 

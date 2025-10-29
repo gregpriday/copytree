@@ -17,38 +17,52 @@ class OutputFormattingStage extends Stage {
     this.onlyTree = options.onlyTree || false;
   }
 
+  /**
+   * Handle errors during output formatting - return raw input
+   */
+  async handleError(error, input) {
+    this.log(`Output formatting failed: ${error.message}, returning raw data`, 'warn');
+    // Return a minimal valid output structure
+    return {
+      ...input,
+      output: JSON.stringify({ error: error.message, files: input.files || [] }),
+      outputFormat: 'json',
+      outputSize: 0,
+    };
+  }
+
   async process(input) {
     this.log(`Formatting output as ${this.format}`, 'debug');
     const startTime = Date.now();
 
     let output;
     switch (this.format) {
-      case 'xml': {
-        const formatter = new XMLFormatter({
-          stage: this,
-          addLineNumbers: this.addLineNumbers,
-          onlyTree: this.onlyTree,
-        });
-        output = await formatter.format(input);
-        break;
-      }
-      case 'json':
-        output = this.formatAsJSON(input);
-        break;
-      case 'tree':
-        output = this.formatAsTree(input);
-        break;
-      case 'markdown': {
-        const formatter = new MarkdownFormatter({
-          stage: this,
-          addLineNumbers: this.addLineNumbers,
-          onlyTree: this.onlyTree,
-        });
-        output = await formatter.format(input);
-        break;
-      }
-      default:
-        throw new Error(`Unknown output format: ${this.format}`);
+    case 'xml': {
+      const formatter = new XMLFormatter({
+        stage: this,
+        addLineNumbers: this.addLineNumbers,
+        onlyTree: this.onlyTree,
+      });
+      output = await formatter.format(input);
+      break;
+    }
+    case 'json':
+      output = this.formatAsJSON(input);
+      break;
+    case 'tree':
+      output = this.formatAsTree(input);
+      break;
+    case 'markdown': {
+      const formatter = new MarkdownFormatter({
+        stage: this,
+        addLineNumbers: this.addLineNumbers,
+        onlyTree: this.onlyTree,
+      });
+      output = await formatter.format(input);
+      break;
+    }
+    default:
+      throw new Error(`Unknown output format: ${this.format}`);
     }
 
     this.log(`Formatted output in ${this.getElapsedTime(startTime)}`, 'info');
@@ -66,7 +80,7 @@ class OutputFormattingStage extends Stage {
       directory: input.basePath,
       metadata: {
         generated: new Date().toISOString(),
-        fileCount: input.files.filter(f => f !== null).length,
+        fileCount: input.files.filter((f) => f !== null).length,
         totalSize: this.calculateTotalSize(input.files),
         profile: input.profile?.name || 'default',
         directoryStructure: this.generateDirectoryStructure(input.files),
@@ -119,7 +133,7 @@ class OutputFormattingStage extends Stage {
     // Add summary
     lines.push('');
     lines.push(
-      `${input.files.filter(f => f !== null).length} files, ${this.formatBytes(this.calculateTotalSize(input.files))}`,
+      `${input.files.filter((f) => f !== null).length} files, ${this.formatBytes(this.calculateTotalSize(input.files))}`,
     );
 
     return lines.join('\n');

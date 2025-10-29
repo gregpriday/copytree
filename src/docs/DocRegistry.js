@@ -44,17 +44,17 @@ export class DocRegistry {
    */
   indexById() {
     // Index sections
-    (this.manifest.sections || []).forEach(s => {
+    (this.manifest.sections || []).forEach((s) => {
       this.sectionMap.set(s.id, s);
     });
 
     // Index groups
-    (this.manifest.groups || []).forEach(g => {
+    (this.manifest.groups || []).forEach((g) => {
       this.groupMap.set(g.id, g);
     });
 
     // Index tasks
-    (this.manifest.tasks || []).forEach(t => {
+    (this.manifest.tasks || []).forEach((t) => {
       this.taskMap.set(t.id, t);
     });
   }
@@ -136,7 +136,7 @@ export class DocRegistry {
   titleFromFilename(filename) {
     return path.basename(filename, '.md')
       .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
   }
 
@@ -196,7 +196,7 @@ export class DocRegistry {
     const orderedIds = [];
 
     // Add explicit sections
-    sections.forEach(id => {
+    sections.forEach((id) => {
       if (!sectionIds.has(id)) {
         sectionIds.add(id);
         orderedIds.push(id);
@@ -204,10 +204,10 @@ export class DocRegistry {
     });
 
     // Add sections from groups
-    groups.forEach(gid => {
+    groups.forEach((gid) => {
       const group = this.groupMap.get(gid);
       if (group && group.sections) {
-        group.sections.forEach(id => {
+        group.sections.forEach((id) => {
           if (!sectionIds.has(id)) {
             sectionIds.add(id);
             orderedIds.push(id);
@@ -220,10 +220,10 @@ export class DocRegistry {
     if (task) {
       const t = this.taskMap.get(task);
       if (t && t.groups) {
-        t.groups.forEach(gid => {
+        t.groups.forEach((gid) => {
           const group = this.groupMap.get(gid);
           if (group && group.sections) {
-            group.sections.forEach(id => {
+            group.sections.forEach((id) => {
               if (!sectionIds.has(id)) {
                 sectionIds.add(id);
                 orderedIds.push(id);
@@ -236,7 +236,7 @@ export class DocRegistry {
 
     // Resolve to actual section objects
     return orderedIds
-      .map(id => this.sectionMap.get(id))
+      .map((id) => this.sectionMap.get(id))
       .filter(Boolean);
   }
 
@@ -259,7 +259,7 @@ export class DocRegistry {
 
         if (task.extra.checklist) {
           parts.push('\n## Checklist\n');
-          task.extra.checklist.forEach(item => {
+          task.extra.checklist.forEach((item) => {
             parts.push(`- [ ] ${item}\n`);
           });
           parts.push('\n---\n');
@@ -306,20 +306,20 @@ export class DocRegistry {
         groups: this.manifest.groups?.length || 0,
         tasks: this.manifest.tasks?.length || 0,
       },
-      sections: this.manifest.sections?.map(s => ({
+      sections: this.manifest.sections?.map((s) => ({
         id: s.id,
         title: s.title,
         summary: s.summary,
         tags: s.tags,
         fileCount: s.files.length,
       })) || [],
-      groups: this.manifest.groups?.map(g => ({
+      groups: this.manifest.groups?.map((g) => ({
         id: g.id,
         title: g.title,
         description: g.description,
         sectionCount: g.sections.length,
       })) || [],
-      tasks: this.manifest.tasks?.map(t => ({
+      tasks: this.manifest.tasks?.map((t) => ({
         id: t.id,
         title: t.title,
         groups: t.groups,

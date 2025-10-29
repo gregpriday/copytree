@@ -1,12 +1,22 @@
-// Mock pdf-parse and fs-extra before requiring anything
-jest.mock('pdf-parse', () => jest.fn());
+// Mock pdf-parse v2 API and fs-extra before requiring anything
+jest.mock('pdf-parse', () => ({
+  PDFParse: jest.fn().mockImplementation(() => ({
+    getText: jest.fn().mockResolvedValue({
+      text: 'Mocked PDF content',
+      numpages: 1,
+      info: {},
+      version: '1.0'
+    }),
+    destroy: jest.fn().mockResolvedValue(undefined)
+  }))
+}));
 jest.mock('fs-extra');
 
 // Set NODE_ENV to avoid pdf-parse debug mode
 process.env.NODE_ENV = 'test';
 
 // Static imports
-import pdfParse from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import fs from 'fs-extra';
 
 // Use dynamic import for module under test
@@ -71,9 +81,23 @@ describe('PDFTransformer', () => {
       },
     };
 
+    // Helper to mock PDFParse with custom data
+    const mockPDFParse = (data, shouldError = false) => {
+      PDFParse.mockImplementation(() => ({
+        getText: jest.fn().mockImplementation(() => {
+          if (shouldError) {
+            return Promise.reject(data);
+          }
+          return Promise.resolve(data);
+        }),
+        destroy: jest.fn().mockResolvedValue(undefined)
+      }));
+    };
+
     beforeEach(() => {
       fs.readFile.mockResolvedValue(mockPdfBuffer);
-      pdfParse.mockResolvedValue(mockPdfData);
+      // Mock PDFParse v2 API with default data
+      mockPDFParse(mockPdfData);
     });
 
     it('should extract text from PDF', async () => {
@@ -85,8 +109,7 @@ describe('PDFTransformer', () => {
       const result = await transformer.doTransform(file);
 
       expect(fs.readFile).toHaveBeenCalledWith('/project/document.pdf');
-      expect(pdfParse).toHaveBeenCalled();
-      expect(pdfParse.mock.calls[0][0]).toEqual(mockPdfBuffer);
+      expect(PDFParse).toHaveBeenCalled();
       expect(result.content).toContain('Title: Test Document');
       expect(result.content).toContain('Author: Test Author');
       expect(result.content).toContain('Pages: 2');
@@ -108,7 +131,7 @@ describe('PDFTransformer', () => {
     });
 
     it('should handle PDFs without metadata', async () => {
-      pdfParse.mockResolvedValue({
+      mockPDFParse({
         text: 'Simple PDF content',
         numpages: 1,
         info: {},
@@ -128,7 +151,7 @@ describe('PDFTransformer', () => {
     });
 
     it('should handle empty PDFs', async () => {
-      pdfParse.mockResolvedValue({
+      mockPDFParse({
         text: '',
         numpages: 0,
       });
@@ -144,7 +167,7 @@ describe('PDFTransformer', () => {
     });
 
     it('should handle PDF parsing errors', async () => {
-      pdfParse.mockRejectedValue(new Error('Invalid PDF structure'));
+      mockPDFParse(new Error('Invalid PDF structure'), true);
 
       const file = {
         path: 'corrupt.pdf',
@@ -170,7 +193,7 @@ describe('PDFTransformer', () => {
     });
 
     it('should clean extracted text', async () => {
-      pdfParse.mockResolvedValue({
+      mockPDFParse({
         text: '  Text with   extra    spaces  \n\n\n\nAnd multiple newlines  ',
         numpages: 1,
       });
@@ -190,7 +213,7 @@ describe('PDFTransformer', () => {
 
     it('should handle large PDFs gracefully', async () => {
       const largeText = 'Lorem ipsum '.repeat(10000);
-      pdfParse.mockResolvedValue({
+      mockPDFParse({
         text: largeText,
         numpages: 100,
       });
@@ -210,7 +233,7 @@ describe('PDFTransformer', () => {
     });
 
     it('should handle special characters in text', async () => {
-      pdfParse.mockResolvedValue({
+      mockPDFParse({
         text: 'Text with special chars: €£¥ • ™ © ® "quotes"',
         numpages: 1,
       });

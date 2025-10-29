@@ -195,7 +195,7 @@ class TransformerRegistry {
         const cycle = [...stack, name].join(' -> ');
         throw new TransformError(
           `Circular dependency detected: ${cycle}`,
-          'CIRCULAR_DEPENDENCY'
+          'CIRCULAR_DEPENDENCY',
         );
       }
 
@@ -207,7 +207,7 @@ class TransformerRegistry {
       if (!this.transformers.has(name)) {
         throw new TransformError(
           `Missing transformer dependency: ${name}`,
-          'MISSING_DEPENDENCY'
+          'MISSING_DEPENDENCY',
         );
       }
 
@@ -626,9 +626,6 @@ class TransformerRegistry {
     const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
     const { default: PDFTransformer } = await import('./transformers/PDFTransformer.js');
     const { default: ImageTransformer } = await import('./transformers/ImageTransformer.js');
-    const { default: AISummaryTransformer } = await import(
-      './transformers/AISummaryTransformer.js'
-    );
 
     // File Loader - default transformer
     registry.register(
@@ -787,32 +784,6 @@ class TransformerRegistry {
         conflictsWith: [],
         requirements: {},
         tags: ['binary-handler', 'placeholder'],
-      },
-    );
-
-    // AI Summary transformer (optional, not enabled by default)
-    registry.register(
-      'ai-summary',
-      new AISummaryTransformer(),
-      {
-        extensions: [], // Must be explicitly enabled
-        priority: 20,
-      },
-      {
-        inputTypes: ['text'],
-        outputTypes: ['text'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: true,
-        stateful: false,
-        dependencies: ['network'],
-        conflictsWith: ['file-summary'],
-        requirements: {
-          apiKey: true,
-          network: true,
-          memory: '200MB',
-        },
-        tags: ['ai', 'summary', 'expensive', 'text-processing'],
       },
     );
 

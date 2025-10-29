@@ -127,15 +127,15 @@ function formatHumanList(data) {
   if (data.tasks && data.tasks.length > 0) {
     parts.push('## Tasks (Curated Documentation Bundles)\n');
     parts.push('Tasks provide all documentation needed for specific workflows:\n');
-    data.tasks.forEach(t => {
+    data.tasks.forEach((t) => {
       parts.push(`### ${t.id}`);
       parts.push(`**${t.title}**`);
       if (t.extra && t.extra.intro) {
         parts.push(`${t.extra.intro}`);
       }
-      parts.push(`\`\`\`bash`);
+      parts.push('```bash');
       parts.push(`copytree copy:docs --task ${t.id} --display`);
-      parts.push(`\`\`\``);
+      parts.push('```');
       parts.push('');
     });
   }
@@ -144,13 +144,13 @@ function formatHumanList(data) {
   if (data.groups && data.groups.length > 0) {
     parts.push('## Groups (Documentation Bundles)\n');
     parts.push('Groups combine related documentation sections:\n');
-    data.groups.forEach(g => {
+    data.groups.forEach((g) => {
       parts.push(`### ${g.id}`);
       parts.push(`**${g.title}**`);
       parts.push(`${g.description}`);
-      parts.push(`\`\`\`bash`);
+      parts.push('```bash');
       parts.push(`copytree copy:docs --group ${g.id} --display`);
-      parts.push(`\`\`\``);
+      parts.push('```');
       parts.push('');
     });
   }
@@ -159,15 +159,15 @@ function formatHumanList(data) {
   if (data.sections && data.sections.length > 0) {
     parts.push('## Sections (Individual Documentation Files)\n');
     parts.push('Individual documentation sections:\n');
-    data.sections.forEach(s => {
+    data.sections.forEach((s) => {
       parts.push(`### ${s.id}`);
       parts.push(`**${s.title}** - ${s.summary}`);
       if (s.tags && s.tags.length > 0) {
         parts.push(`Tags: ${s.tags.join(', ')}`);
       }
-      parts.push(`\`\`\`bash`);
+      parts.push('```bash');
       parts.push(`copytree copy:docs --section ${s.id} --display`);
-      parts.push(`\`\`\``);
+      parts.push('```');
       parts.push('');
     });
   }
@@ -210,7 +210,7 @@ async function handleStructured(registry, options) {
   if (sections.length === 0) {
     throw new CommandError(
       'No sections resolved from provided flags. Check IDs and try again.',
-      'copy:docs'
+      'copy:docs',
     );
   }
 
@@ -239,7 +239,7 @@ async function handleStructured(registry, options) {
  * Build summary header for structured docs
  */
 function buildSummaryHeader(sections, options) {
-  const parts = [`# CopyTree Documentation`];
+  const parts = ['# CopyTree Documentation'];
 
   if (options.task) {
     parts.push(`\n> Task: **${options.task}**`);
@@ -247,8 +247,8 @@ function buildSummaryHeader(sections, options) {
     parts.push(`\n> Groups: **${toArray(options.group).join(', ')}**`);
   }
 
-  parts.push(`\n> Sections included: ${sections.map(s => s.id).join(', ')}`);
-  parts.push(`\n---`);
+  parts.push(`\n> Sections included: ${sections.map((s) => s.id).join(', ')}`);
+  parts.push('\n---');
 
   return parts.join('\n');
 }

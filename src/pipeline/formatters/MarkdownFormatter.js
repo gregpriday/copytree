@@ -33,8 +33,8 @@ class MarkdownFormatter {
 
     // YAML front matter
     lines.push('---');
-    lines.push(`format: copytree-md@1`);
-    lines.push(`tool: copytree`);
+    lines.push('format: copytree-md@1');
+    lines.push('tool: copytree');
     lines.push(`generated: ${escapeYamlScalar(new Date().toISOString())}`);
     lines.push(`base_path: ${escapeYamlScalar(input.basePath)}`);
     lines.push(`profile: ${escapeYamlScalar(profileName)}`);
@@ -122,7 +122,9 @@ class MarkdownFormatter {
           } else if (typeof file.content === 'string') {
             sha = hashContent(file.content, 'sha256');
           }
-        } catch (_e) {}
+        } catch (_e) {
+          // Ignore hash computation errors
+        }
         let binaryMode = undefined;
         if (file.isBinary) {
           if (binaryAction === 'base64' || file.encoding === 'base64') binaryMode = 'base64';
@@ -167,9 +169,9 @@ class MarkdownFormatter {
               typeof content === 'string'
                 ? content
                 : this.stage.config.get(
-                    'copytree.binaryPlaceholderText',
-                    '[Binary file not included]',
-                  ) || '',
+                  'copytree.binaryPlaceholderText',
+                  '[Binary file not included]',
+                ) || '',
             );
           } else {
             // skip mode: emit empty block
