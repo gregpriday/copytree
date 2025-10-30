@@ -53,7 +53,7 @@ describe('Force Include Integration Tests', () => {
   });
 
   describe('.copytreeinclude file', () => {
-    it('should discover hidden files listed in .copytreeinclude', async () => {
+    it('should discover hidden files listed in .copytreeinclude with explicit glob', async () => {
       // Create .copytreeinclude file
       await fs.writeFile(
         path.join(tempDir, '.copytreeinclude'),
@@ -66,6 +66,31 @@ describe('Force Include Integration Tests', () => {
           patterns: ['**/*'],
           respectGitignore: false,
           includeHidden: false, // Hidden files should still be discovered via forceInclude
+        }),
+      ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: {},
+      });
+
+      const paths = result.files.map((f) => f.path).sort();
+      expect(paths).toContain('.example/secret.txt');
+      expect(paths).toContain('.example/config.json');
+      expect(paths).toContain('.env');
+    });
+
+    it('should discover hidden directories with bare directory pattern', async () => {
+      // Create .copytreeinclude file with bare directory name (no explicit /**)
+      await fs.writeFile(path.join(tempDir, '.copytreeinclude'), '.example\n.env\n');
+
+      pipeline.through([
+        new FileDiscoveryStage({
+          basePath: tempDir,
+          patterns: ['**/*'],
+          respectGitignore: false,
+          includeHidden: false,
         }),
       ]);
 

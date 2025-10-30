@@ -113,14 +113,41 @@ class FileDiscoveryStage extends Stage {
 
     if (await fs.pathExists(copytreeincludePath)) {
       const copytreeincludeContent = await fs.readFile(copytreeincludePath, 'utf8');
-      const patterns = copytreeincludeContent
+      const rawPatterns = copytreeincludeContent
         .split('\n')
         .map((line) => line.trim())
         .filter((line) => line && !line.startsWith('#'));
 
-      if (patterns.length > 0) {
-        this.forceInclude = [...this.forceInclude, ...patterns];
-        this.log(`Loaded ${patterns.length} .copytreeinclude pattern(s)`, 'debug');
+      // Transform patterns following gitignore conventions
+      const transformedPatterns = rawPatterns.map((pattern) => {
+        // If pattern already has glob characters, keep it as-is
+        if (pattern.includes('*') || pattern.includes('?') || pattern.includes('[')) {
+          return pattern;
+        }
+
+        // If pattern doesn't start with /, it matches anywhere
+        if (!pattern.startsWith('/')) {
+          pattern = '**/' + pattern;
+        } else {
+          // Remove leading slash for relative matching
+          pattern = pattern.substring(1);
+        }
+
+        // If pattern ends with /, it only matches directories (append /**)
+        if (pattern.endsWith('/')) {
+          pattern = pattern + '**';
+        } else {
+          // For bare directory names (no trailing slash), append /** to match directory contents
+          // This matches gitignore behavior where "foo" matches "foo/" recursively
+          pattern = pattern + '/**';
+        }
+
+        return pattern;
+      });
+
+      if (transformedPatterns.length > 0) {
+        this.forceInclude = [...this.forceInclude, ...transformedPatterns];
+        this.log(`Loaded ${transformedPatterns.length} .copytreeinclude pattern(s)`, 'debug');
       }
     }
   }

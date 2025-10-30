@@ -1,5 +1,5 @@
 import BaseTransformer from '../BaseTransformer.js';
-import marked from 'marked';
+import { marked } from 'marked';
 
 /**
  * Markdown transformer
@@ -64,8 +64,10 @@ class MarkdownTransformer extends BaseTransformer {
     // Remove HTML tags
     text = text.replace(/<[^>]*>/g, '');
 
-    // Remove images
-    text = text.replace(/!\[.*?\]\(.*?\)/g, '');
+    // Replace images with a visible marker
+    text = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, (match, alt) => {
+      return alt && alt.trim() ? `[Image: ${alt.trim()}]` : '[Image]';
+    });
 
     // Remove links but keep text
     text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
