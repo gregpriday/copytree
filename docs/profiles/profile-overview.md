@@ -315,6 +315,5 @@ copytree profile:validate my-profile
 ## Next Steps
 
 - [Profile Creation Guide](./profile-creation-guide.md) - Create custom profiles
-- [Creating Profiles](./profile-creation-guide.md) - Build custom profiles
 - [Advanced Features](./profile-advanced.md) - External sources and more
 - [Examples](./profile-examples.md) - Real-world configurations

@@ -4,9 +4,6 @@
 
 // Note: Removed @babel/register for better performance
 
-// Suppress dotenv console output
-const originalLog = console.log;
-console.log = () => {};
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -14,9 +11,14 @@ import dotenv from 'dotenv';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load .env from the project directory (copytree root)
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
-console.log = originalLog;
+// Load .env from current working directory (user's project)
+// Allow override via COPYTREE_ENV_PATH environment variable
+const envPath = process.env.COPYTREE_ENV_PATH || path.join(process.cwd(), '.env');
+// Suppress dotenv output by temporarily redirecting stdout (dotenv 17.x outputs to stdout)
+const originalStdoutWrite = process.stdout.write;
+process.stdout.write = () => {};
+dotenv.config({ path: envPath });
+process.stdout.write = originalStdoutWrite;
 
 import React from 'react';
 // Use dynamic import for ESM-only ink
@@ -42,7 +44,7 @@ const program = new Command();
 program
   .name('copytree')
   .description(
-    'Copy directory structures and file contents into Markdown (default), XML, JSON, or tree formats',
+    'Copy directory structures and file contents into XML (default), Markdown, JSON, or tree formats',
   )
   .version(pkg.version);
 

@@ -42,11 +42,27 @@ class ConfigManager {
     this.userConfig = {};
     this.envOverrides = {};
 
-    // Load configuration asynchronously
-    this.loadConfiguration().catch(console.error);
+    // Flag to track if configuration has been loaded
+    this._initialized = false;
+  }
+
+  /**
+   * Static factory method to create and initialize a ConfigManager instance
+   * @param {Object} options - Configuration options
+   * @returns {Promise<ConfigManager>} Initialized ConfigManager instance
+   */
+  static async create(options = {}) {
+    const instance = new ConfigManager(options);
+    await instance.loadConfiguration();
+    return instance;
   }
 
   async loadConfiguration() {
+    // Prevent double initialization
+    if (this._initialized) {
+      return;
+    }
+
     // 1. Load schema for validation
     await this.loadSchema();
 
@@ -63,6 +79,8 @@ class ConfigManager {
     if (this.validationEnabled) {
       this.validateConfig();
     }
+
+    this._initialized = true;
   }
 
   async loadDefaults() {
@@ -505,12 +523,23 @@ class ConfigManager {
 
 // Singleton instance
 let instance = null;
+let initPromise = null;
 
 export { ConfigManager };
 
+/**
+ * Get or create the singleton ConfigManager instance
+ * For synchronous usage (backward compatibility), creates instance without waiting
+ * Ensures initialization happens in background for first access
+ * @param {Object} options - Configuration options
+ * @returns {ConfigManager} ConfigManager instance (may not be fully initialized yet)
+ */
 export function config(options = {}) {
   if (!instance) {
     instance = new ConfigManager(options);
+    // Initialize asynchronously in background (for backward compatibility)
+    // Consumers should await config().loadConfiguration() if they need to ensure initialization
+    initPromise = instance.loadConfiguration().catch(console.error);
   } else if (options.noValidate !== undefined) {
     // Allow runtime disabling of validation
     instance.setValidationEnabled(!options.noValidate);
@@ -518,9 +547,32 @@ export function config(options = {}) {
   return instance;
 }
 
+/**
+ * Async version of config() that ensures full initialization
+ * Recommended for new code
+ * @param {Object} options - Configuration options
+ * @returns {Promise<ConfigManager>} Fully initialized ConfigManager instance
+ */
+export async function configAsync(options = {}) {
+  if (!instance) {
+    instance = await ConfigManager.create(options);
+  } else if (options.noValidate !== undefined) {
+    instance.setValidationEnabled(!options.noValidate);
+  }
+  return instance;
+}
+
+/**
+ * Get environment variable with type conversion
+ * @param {string} key - Environment variable key
+ * @param {*} defaultValue - Default value if not found
+ * @returns {*} Environment value or default
+ */
 export function env(key, defaultValue) {
   if (!instance) {
     instance = new ConfigManager();
+    // Initialize in background
+    initPromise = instance.loadConfiguration().catch(console.error);
   }
   return instance.env(key, defaultValue);
 }

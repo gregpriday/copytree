@@ -123,10 +123,16 @@ async function loadProfile(profileLoader, profileName, options) {
   let profile;
   try {
     profile = await profileLoader.load(profileName, overrides);
-  } catch (_error) {
-    // Fallback to default profile
-    logger.warn(`Failed to load profile '${profileName}', using default`);
-    profile = ProfileLoader.createDefault();
+  } catch (error) {
+    // Only fallback to default if the profile name was explicitly 'default'
+    // Otherwise, throw error to prevent silent failures
+    if (profileName === 'default') {
+      logger.warn(`Failed to load default profile, creating basic profile: ${error.message}`);
+      profile = ProfileLoader.createDefault();
+    } else {
+      // Re-throw error for non-existent profiles
+      throw error;
+    }
   }
 
   return profile;

@@ -1,9 +1,26 @@
 import { env } from '../src/config/ConfigManager.js';
+import fs from 'fs-extra';
+import path from 'path';
+
+// Read version from package.json
+// Note: This assumes config/app.js is always one level deep from project root
+// which is true for the CopyTree project structure
+let version = '0.13.1'; // Fallback version
+try {
+  const packageJsonPath = path.join(process.cwd(), 'package.json');
+  if (fs.existsSync(packageJsonPath)) {
+    const pkg = fs.readJsonSync(packageJsonPath);
+    version = pkg.version;
+  }
+} catch (error) {
+  // Use fallback version if reading fails
+  console.warn('Could not read version from package.json, using fallback');
+}
 
 export default {
   // Application metadata
   name: env('APP_NAME', 'CopyTree'),
-  version: '0.12.0',
+  version, // Single source of truth from package.json
   description: 'A Node.js CLI tool that copies directory structures and file contents into structured XML format',
   
   // Environment

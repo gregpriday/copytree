@@ -317,8 +317,11 @@ describe('copy command', () => {
 
       await copy('.', { profile: 'invalid' });
 
-      // The error is caught and a default profile is used
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('using default'));
+      // Verify that handleError was called with the profile error (not silently falling back)
+      expect(handleError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Profile not found' }),
+        expect.any(Object),
+      );
     });
 
     it('should handle file write errors', async () => {
