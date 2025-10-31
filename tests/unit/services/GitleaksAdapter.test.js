@@ -1,13 +1,25 @@
-import GitleaksAdapter from '../../../src/services/GitleaksAdapter.js';
 import { jest } from '@jest/globals';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
 import { EventEmitter } from 'events';
+
+// Create a mock execAsync wrapper  - hoisting-safe approach
+let mockExecAsyncFn = jest.fn();
 
 // Mock child_process
 jest.mock('child_process');
+
 jest.mock('util', () => ({
-  promisify: (fn) => fn,
+  promisify: (fn) => {
+    if (fn.name === 'exec') {
+      // Return a function that calls the mutable mockExecAsyncFn
+      return (...args) => mockExecAsyncFn(...args);
+    }
+    return fn;
+  },
 }));
+
+// Import after mocks are set up
+import GitleaksAdapter from '../../../src/services/GitleaksAdapter.js';
 
 describe('GitleaksAdapter', () => {
   let adapter;
@@ -16,7 +28,11 @@ describe('GitleaksAdapter', () => {
   beforeEach(() => {
     adapter = new GitleaksAdapter();
     mockSpawn = jest.fn();
+
     spawn.mockImplementation(mockSpawn);
+
+    // Reset and configure mockExecAsyncFn for each test
+    mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
   });
 
   afterEach(() => {
@@ -193,12 +209,69 @@ describe('GitleaksAdapter', () => {
         'Gitleaks exited with code 2',
       );
     });
+
+    it('should use detect mode for older gitleaks versions', async () => {
+      // Mock execAsync to return an old version
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.18.0', stderr: '' });
+
+      const mockChild = createMockProcess(0, '[]', '');
+      mockSpawn.mockReturnValue(mockChild);
+
+      await adapter.scanString('test', 'test.js');
+
+      // Should use detect mode instead of stdin
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'gitleaks',
+        expect.arrayContaining(['detect', '--no-git']),
+        expect.any(Object),
+      );
+
+      // Should use --redact instead of --redact=100
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'gitleaks',
+        expect.arrayContaining(['--redact']),
+        expect.any(Object),
+      );
+    });
+
+    it('should timeout hung scans after 10 seconds', async () => {
+      jest.useRealTimers(); // Explicitly use real timers
+
+      const mockChild = new EventEmitter();
+      mockChild.stdin = { write: jest.fn(), end: jest.fn() };
+      mockChild.stdout = new EventEmitter();
+      mockChild.stderr = new EventEmitter();
+      mockChild.kill = jest.fn(() => {
+        // When kill is called, emit the close event to resolve the promise
+        mockChild.emit('close', null); // Or some error code if needed
+      });
+
+      mockSpawn.mockReturnValue(mockChild);
+
+      // The promise will hang because the 'close' event is never emitted by default
+      const promise = adapter.scanString('test', 'test.js');
+
+      // We expect it to reject with a timeout error
+      await expect(promise).rejects.toThrow('Gitleaks scan timed out after 10 seconds');
+
+      // And we expect that the process was killed
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGKILL');
+    }, 12000); // Set a test timeout longer than the 10s in the code
   });
 
   describe('getVersion', () => {
     it('should parse version from output', async () => {
-      // This test would need proper mocking of execAsync
-      // Skipping for now as it requires more complex setup
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+
+      const version = await adapter.getVersion();
+      expect(version).toBe('8.19.0');
+    });
+
+    it('should return null if gitleaks is not available', async () => {
+      mockExecAsyncFn = jest.fn().mockRejectedValue(new Error('Command not found'));
+
+      const version = await adapter.getVersion();
+      expect(version).toBeNull();
     });
   });
 });

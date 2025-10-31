@@ -100,7 +100,7 @@ class SecretsGuardStage extends Stage {
     this.redactionMode =
       options.redactionMode || this.config.get('secretsGuard.redactionMode', 'typed');
     this.maxFileBytes =
-      options.maxFileBytes || this.config.get('secretsGuard.maxFileBytes', 1_000_000); // 1MB default
+      options.maxFileBytes || this.config.get('secretsGuard.maxFileBytes', 5_000_000); // 5MB default
     this.parallelism = options.parallelism || this.config.get('secretsGuard.parallelism', 4);
     this.failOnSecrets =
       options.failOnSecrets ?? this.config.get('secretsGuard.failOnSecrets', false);
@@ -185,6 +185,20 @@ class SecretsGuardStage extends Stage {
           secretsFound: this.secretsFound,
           secretsRedacted: this.secretsRedacted,
           filesScanned: files.length - this.filesExcluded,
+          report: {
+            summary: {
+              filesExcluded: this.filesExcluded,
+              secretsFound: this.secretsFound,
+              secretsRedacted: this.secretsRedacted,
+              filesScanned: files.length - this.filesExcluded,
+            },
+            findings: this.allFindings.map((f) => ({
+              file: f.file,
+              line: f.line,
+              rule: f.rule,
+            })),
+            excludedFiles: this.excludedFiles,
+          },
         },
       },
     };

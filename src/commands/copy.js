@@ -61,16 +61,30 @@ async function copyCommand(targetPath = '.', options = {}) {
       startTime,
     });
 
-    // 6. Prepare output
+    // 6. Write secrets report if requested
+    if (options.secretsReport && result.stats?.secretsGuard?.report) {
+      const reportPath = options.secretsReport === '-' ? null : path.resolve(options.secretsReport);
+
+      if (reportPath) {
+        await fs.ensureDir(path.dirname(reportPath));
+        await fs.writeJson(reportPath, result.stats.secretsGuard.report, { spaces: 2 });
+        logger.info(`Secrets report written to ${reportPath}`);
+      } else {
+        // Write to stdout
+        console.log(JSON.stringify(result.stats.secretsGuard.report, null, 2));
+      }
+    }
+
+    // 7. Prepare output
     let outputResult;
     if (!options.dryRun) {
       outputResult = await prepareOutput(result, options);
     }
 
-    // 7. Stop spinner before showing final result
+    // 8. Stop spinner before showing final result
     logger.stopSpinner();
 
-    // 8. Display final output
+    // 9. Display final output
     if (!options.dryRun && outputResult) {
       await displayOutput(outputResult, options);
     } else if (options.dryRun) {
@@ -80,7 +94,7 @@ async function copyCommand(targetPath = '.', options = {}) {
       logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}] would be processed`);
     }
 
-    // 9. Show summary if requested
+    // 10. Show summary if requested
     if (options.info) {
       showSummary(result, startTime);
     }
@@ -169,23 +183,7 @@ async function setupPipelineStages(basePath, profile, options) {
     stages.push(new AlwaysIncludeStage(mergedAlways));
   }
 
-  // 3. Secrets Guard Stage (automatic secret detection and redaction)
-  // Only add if explicitly enabled or not explicitly disabled
-  const secretsGuardEnabled = options.secretsGuard !== false &&
-    (options.secretsGuard === true || config().get('secretsGuard.enabled', true));
-
-  if (secretsGuardEnabled) {
-    const { default: SecretsGuardStage } = await import('../pipeline/stages/SecretsGuardStage.js');
-    stages.push(
-      new SecretsGuardStage({
-        enabled: true,
-        redactionMode: options.secretsRedactMode || config().get('secretsGuard.redactionMode', 'typed'),
-        failOnSecrets: options.failOnSecrets || config().get('secretsGuard.failOnSecrets', false),
-      }),
-    );
-  }
-
-  // 4. Git Filter Stage (if --modified or --changed is used)
+  // 3. Git Filter Stage (if --modified or --changed is used)
   if (options.modified || options.changed) {
     const { default: GitFilterStage } = await import('../pipeline/stages/GitFilterStage.js');
     stages.push(
@@ -198,7 +196,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 5. Profile Filter Stage (applies exclude patterns)
+  // 4. Profile Filter Stage (applies exclude patterns)
   const { default: ProfileFilterStage } = await import('../pipeline/stages/ProfileFilterStage.js');
   stages.push(
     new ProfileFilterStage({
@@ -207,7 +205,7 @@ async function setupPipelineStages(basePath, profile, options) {
     }),
   );
 
-  // 6. External Source Stage (if external sources are configured)
+  // 5. External Source Stage (if external sources are configured)
   if (profile.external && profile.external.length > 0) {
     const { default: ExternalSourceStage } = await import(
       '../pipeline/stages/ExternalSourceStage.js'
@@ -215,7 +213,7 @@ async function setupPipelineStages(basePath, profile, options) {
     stages.push(new ExternalSourceStage(profile.external));
   }
 
-  // 7. Limit Stage (if --head option is used)
+  // 6. Limit Stage (if --head option is used)
   if (options.head) {
     const { default: LimitStage } = await import('../pipeline/stages/LimitStage.js');
     stages.push(
@@ -225,7 +223,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 8. File Loading Stage (skip if --only-tree)
+  // 7. File Loading Stage (skip if --only-tree)
   if (!options.onlyTree) {
     const { default: FileLoadingStage } = await import('../pipeline/stages/FileLoadingStage.js');
     stages.push(
@@ -233,6 +231,22 @@ async function setupPipelineStages(basePath, profile, options) {
         encoding: 'utf8',
       }),
     );
+
+    // 8. Secrets Guard Stage (automatic secret detection and redaction)
+    // Only add if explicitly enabled or not explicitly disabled
+    const secretsGuardEnabled = options.secretsGuard !== false &&
+      (options.secretsGuard === true || config().get('secretsGuard.enabled', true));
+
+    if (secretsGuardEnabled) {
+      const { default: SecretsGuardStage } = await import('../pipeline/stages/SecretsGuardStage.js');
+      stages.push(
+        new SecretsGuardStage({
+          enabled: true,
+          redactionMode: options.secretsRedactMode || config().get('secretsGuard.redactionMode', 'typed'),
+          failOnSecrets: options.failOnSecrets || config().get('secretsGuard.failOnSecrets', false),
+        }),
+      );
+    }
 
     // 9. Transformer Stage
     const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
@@ -449,6 +463,14 @@ function showSummary(result, startTime) {
 
   if (stats.excludedFiles > 0) {
     console.log(`  Excluded files: ${stats.excludedFiles}`);
+  }
+
+  // Show secrets guard stats if present
+  if (stats.secretsGuard) {
+    const sg = stats.secretsGuard;
+    console.log(
+      `  🔒 Secrets Guard: ${sg.filesExcluded || 0} files excluded, ${sg.secretsRedacted || 0} redactions, ${sg.secretsFound || 0} findings`,
+    );
   }
 
   if (result.errors && result.errors.length > 0) {

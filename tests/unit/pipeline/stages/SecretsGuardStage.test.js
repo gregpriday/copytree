@@ -7,9 +7,17 @@ import { jest } from '@jest/globals';
 jest.mock('../../../../src/services/GitleaksAdapter.js');
 jest.mock('../../../../src/config/ConfigManager.js', () => ({
   config: () => ({
-    get: jest.fn().mockReturnValue(undefined),
+    get: jest.fn((key, defaultValue) => defaultValue),
   }),
 }));
+
+// Mock p-limit as it's a pure ESM package that Jest struggles with
+jest.mock('p-limit', () => {
+  // p-limit's default export is a function that returns a limiter.
+  // The limiter function takes an async function and returns a promise.
+  // This mock simulates that, ignoring concurrency for the test.
+  return (concurrency) => (fn) => Promise.resolve(fn());
+});
 
 describe('SecretsGuardStage', () => {
   let stage;
@@ -41,7 +49,7 @@ describe('SecretsGuardStage', () => {
       expect(stage.redactionMode).toBe('typed');
       expect(stage.failOnSecrets).toBe(false);
       expect(stage.redactInline).toBe(true);
-      expect(stage.maxFileBytes).toBe(1_000_000);
+      expect(stage.maxFileBytes).toBe(5_000_000);
       expect(stage.parallelism).toBe(4);
     });
 
@@ -180,6 +188,8 @@ describe('SecretsGuardStage', () => {
     });
 
     it('should skip files larger than maxFileBytes', async () => {
+      stage.maxFileBytes = 1_000_000; // Override for this test
+
       const input = {
         files: [
           { path: 'large.js', content: 'x'.repeat(2_000_000), size: 2_000_000 },
@@ -331,12 +341,21 @@ describe('SecretsGuardStage', () => {
   });
 
   describe('getSummary', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+      stage = new SecretsGuardStage({
+        enabled: true,
+        redactionMode: 'typed',
+        failOnSecrets: false,
+      });
+    });
+
     it('should return summary of findings', async () => {
       mockGitleaks.scanString.mockResolvedValue([
         {
           RuleID: 'aws-access-key',
-          StartLine: 12,
-          EndLine: 12,
+          StartLine: 1,
+          EndLine: 1,
           StartColumn: 1,
           EndColumn: 20,
         },
@@ -356,7 +375,7 @@ describe('SecretsGuardStage', () => {
       expect(summary.findings).toHaveLength(1);
       expect(summary.findings[0]).toEqual({
         file: 'config.js',
-        line: 12,
+        line: 1,
         rule: 'aws-access-key',
       });
     });

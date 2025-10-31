@@ -60,9 +60,22 @@ class GitleaksAdapter {
    * @throws {Error} If gitleaks execution fails
    */
   async scanString(content, logicalPath = 'stdin') {
-    // Build command arguments
-    const args = [
-      'stdin',
+    // Check gitleaks version for compatibility
+    const version = (await this.getVersion()) || '';
+    const supportsStdin = /^8\.(19|[2-9]\d)\./.test(version) || /^9\./.test(version);
+    const supportsRedactPercent = /^8\.(19|[2-9]\d)\./.test(version) || /^9\./.test(version);
+
+    // Build command arguments with version-appropriate options
+    const args = [];
+
+    // Use stdin if available, otherwise use detect
+    if (supportsStdin) {
+      args.push('stdin');
+    } else {
+      args.push('detect', '--no-git');
+    }
+
+    args.push(
       '--report-format',
       'json',
       '--report-path',
@@ -71,8 +84,14 @@ class GitleaksAdapter {
       '--no-color',
       '--log-level',
       this.logLevel,
-      '--redact=100', // Never echo secrets in logs
-    ];
+    );
+
+    // Add redaction flag based on version
+    if (supportsRedactPercent) {
+      args.push('--redact=100'); // Newer versions support percentage
+    } else {
+      args.push('--redact'); // Older versions use boolean flag
+    }
 
     // Add custom config if specified
     if (this.configPath) {
@@ -130,6 +149,18 @@ class GitleaksAdapter {
 
       let stdout = '';
       let stderr = '';
+      let timedOut = false;
+
+      // Set timeout to kill hung scans
+      const timeoutMs = 10000; // 10 seconds
+      const timer = setTimeout(() => {
+        timedOut = true;
+        try {
+          child.kill('SIGKILL');
+        } catch (e) {
+          // Process may have already exited
+        }
+      }, timeoutMs);
 
       child.stdout.on('data', (data) => {
         stdout += data.toString();
@@ -140,10 +171,17 @@ class GitleaksAdapter {
       });
 
       child.on('error', (error) => {
+        clearTimeout(timer);
         reject(new Error(`Failed to spawn gitleaks: ${error.message}`));
       });
 
       child.on('close', (code) => {
+        clearTimeout(timer);
+
+        if (timedOut) {
+          reject(new Error('Gitleaks scan timed out after 10 seconds'));
+          return;
+        }
         if (code === 0) {
           // No secrets found
           try {
