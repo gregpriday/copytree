@@ -80,6 +80,11 @@ program
   .option('--no-instructions', 'Disable including instructions in output')
   .option('--instructions <name>', 'Use custom instructions set (default: default)')
   .option('--no-validate', 'Disable configuration validation')
+  .option('--secrets-guard', 'Enable automatic secret detection and redaction (default: enabled)')
+  .option('--no-secrets-guard', 'Disable secret detection and redaction')
+  .option('--secrets-redact-mode <mode>', 'Redaction marker style: typed, generic, hash (default: typed)')
+  .option('--fail-on-secrets', 'Exit with error if secrets are found (CI mode)')
+  .option('--secrets-report <file>', 'Output secrets report to file (use - for stdout)')
   .action(async (path, options) => {
     if (!render || !App) {
       const ink = await import('ink');

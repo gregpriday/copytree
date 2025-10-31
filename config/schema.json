@@ -666,6 +666,83 @@
         }
       },
       "additionalProperties": false
+    },
+    "secretsGuard": {
+      "type": "object",
+      "description": "Secrets detection and redaction configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable automatic secret detection and redaction"
+        },
+        "exclude": {
+          "type": "array",
+          "description": "File patterns to exclude entirely (high-risk files)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowlist": {
+          "type": "array",
+          "description": "File patterns to always allow (e.g., test fixtures)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "redactInline": {
+          "type": "boolean",
+          "description": "Redact secrets inline vs exclude entire file"
+        },
+        "redactionMode": {
+          "type": "string",
+          "enum": ["typed", "generic", "hash"],
+          "description": "Redaction marker style: typed (***REDACTED:TYPE***), generic (***REDACTED***), hash (***REDACTED:TYPE:HASH***)"
+        },
+        "maxFileBytes": {
+          "type": "number",
+          "minimum": 1024,
+          "maximum": 10485760,
+          "description": "Maximum file size to scan (bytes)"
+        },
+        "parallelism": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Number of concurrent file scans"
+        },
+        "failOnSecrets": {
+          "type": "boolean",
+          "description": "Exit with error if secrets are found (CI mode)"
+        },
+        "gitleaks": {
+          "type": "object",
+          "description": "Gitleaks-specific configuration",
+          "properties": {
+            "binaryPath": {
+              "type": "string",
+              "description": "Path to gitleaks binary"
+            },
+            "configPath": {
+              "type": "string",
+              "description": "Path to .gitleaks.toml config file"
+            },
+            "extraArgs": {
+              "type": "array",
+              "description": "Additional CLI arguments for gitleaks",
+              "items": {
+                "type": "string"
+              }
+            },
+            "logLevel": {
+              "type": "string",
+              "enum": ["fatal", "error", "warn", "info", "debug"],
+              "description": "Gitleaks log level"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,
