@@ -362,13 +362,4 @@ class CacheService {
 }
 
 // Export singleton instance and class
-// Delay creation of defaultCache to avoid initialization order issues
-let defaultCache = null;
-
 export { CacheService };
-export function getCache() {
-  if (!defaultCache) {
-    defaultCache = new CacheService();
-  }
-  return defaultCache;
-}

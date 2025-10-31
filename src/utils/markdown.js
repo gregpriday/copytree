@@ -101,8 +101,6 @@ function escapeYamlScalar(s) {
 export {
   detectFenceLanguage,
   chooseFence,
-  formatTree,
-  formatSmallMeta,
   formatBeginMarker,
   formatEndMarker,
   escapeYamlScalar,
