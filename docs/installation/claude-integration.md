@@ -176,7 +176,7 @@ If important files are missing:
 
 ```bash
 # Force include specific files
-copytree --always "config/*" --always ".env.example"
+copytree --always "config/*" --always "config.example.js"
 
 # Check what profile is being used
 copytree --dry-run

@@ -47,7 +47,6 @@
     "chalk": "^4.1.2",
     "clipboardy": "^5.0.0",
     "commander": "^14.0.2",
-    "dotenv": "^17.2.3",
     "fast-glob": "^3.3.3",
     "fs-extra": "^11.3.2",
     "ink": "^4.0.0",

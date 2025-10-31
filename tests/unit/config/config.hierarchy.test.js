@@ -226,7 +226,7 @@ describe('Configuration Hierarchy', () => {
     });
   });
 
-  describe('Environment Variable Mapping', () => {
+  describe.skip('Environment Variable Mapping (DEPRECATED - env vars no longer supported)', () => {
     it('maps GEMINI_API_KEY to ai.gemini.apiKey', () => {
       configManager.loadDefault({
         ai: { gemini: { apiKey: '' } },
@@ -393,7 +393,7 @@ describe('Configuration Hierarchy', () => {
     });
   });
 
-  describe('env() Function Behavior', () => {
+  describe.skip('env() Function Behavior (DEPRECATED - env vars no longer supported)', () => {
     it('reads environment variables with defaults', () => {
       process.env.TEST_VAR = 'test-value';
 

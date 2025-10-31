@@ -143,21 +143,7 @@ copytree profile:list
 
 ## ⚙️ Configuration
 
-### Environment Variables
-
-Create a `.env` file in your project or home directory:
-
-```bash
-# Performance Settings
-COPYTREE_MAX_FILE_SIZE=10485760      # 10MB
-COPYTREE_MAX_TOTAL_SIZE=104857600    # 100MB
-COPYTREE_MAX_FILE_COUNT=10000
-
-# Cache Settings
-CACHE_ENABLED=true
-CACHE_DEFAULT_TTL=86400              # Default TTL in seconds (24 hours)
-# Note: File cache maxAge is in milliseconds (set via config files)
-```
+CopyTree uses hard-coded defaults to keep things simple. Configuration is managed through:
 
 ### Configuration Files
 
@@ -191,7 +177,7 @@ Use `.copytreeinclude` to force-include specific files that would otherwise be e
 ```bash
 # .copytreeinclude
 .example/**
-.env.example
+.github/**
 config/**
 ```
 

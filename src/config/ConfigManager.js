@@ -72,10 +72,7 @@ class ConfigManager {
     // 3. Load user configuration overrides
     await this.loadUserConfig();
 
-    // 4. Apply environment variable overrides
-    this.applyEnvironmentOverrides();
-
-    // 5. Validate final configuration if enabled
+    // 4. Validate final configuration if enabled
     if (this.validationEnabled) {
       this.validateConfig();
     }
@@ -134,37 +131,8 @@ class ConfigManager {
     }
   }
 
-  applyEnvironmentOverrides() {
-    // Apply environment variables using Laravel-like env() function
-    this.applyEnvOverrides(this.config);
-  }
-
-  applyEnvOverrides(obj, prefix = '') {
-    for (const [key, value] of Object.entries(obj)) {
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        this.applyEnvOverrides(value, prefix ? `${prefix}_${key}` : key);
-      } else {
-        const envKey = `${prefix ? prefix + '_' : ''}${key}`.toUpperCase();
-        const envValue = process.env[envKey];
-
-        if (envValue !== undefined) {
-          // Convert string values to appropriate types
-          let parsedValue = envValue;
-
-          if (envValue === 'true') parsedValue = true;
-          else if (envValue === 'false') parsedValue = false;
-          else if (envValue.match(/^\d+$/)) parsedValue = parseInt(envValue);
-          else if (envValue.match(/^\d+\.\d+$/)) parsedValue = parseFloat(envValue);
-
-          // Track environment override for provenance
-          const configPath = prefix ? `${prefix}.${key}` : key;
-          _.set(this.envOverrides, configPath, { envKey, value: parsedValue });
-
-          _.set(obj, key, parsedValue);
-        }
-      }
-    }
-  }
+  // Environment variable overrides have been removed for simplicity
+  // Configuration is now hard-coded in config files only
 
   /**
    * Get configuration value using dot notation
@@ -203,26 +171,14 @@ class ConfigManager {
   }
 
   /**
-   * Laravel-compatible env() helper
-   * @param {string} key - Environment variable key
+   * env() helper - now always returns default value (env vars no longer supported)
+   * @param {string} key - Environment variable key (ignored)
    * @param {*} defaultValue - Default value
-   * @returns {*} Environment value or default
+   * @returns {*} Always returns defaultValue
    */
   env(key, defaultValue = null) {
-    const value = process.env[key];
-
-    if (value === undefined) {
-      return defaultValue;
-    }
-
-    // Type conversion
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    if (value === 'null') return null;
-    if (value.match(/^\d+$/)) return parseInt(value);
-    if (value.match(/^\d+\.\d+$/)) return parseFloat(value);
-
-    return value;
+    // Environment variables are no longer supported - always return default
+    return defaultValue;
   }
 
   /**
@@ -389,101 +345,15 @@ class ConfigManager {
    * @private
    */
   _getConfigSource(path, value) {
-    // Check if value came from environment variable override
-    if (_.has(this.envOverrides, path)) {
-      const envOverride = _.get(this.envOverrides, path);
-      return `environment:${envOverride.envKey}`;
-    }
-
     // Check if value exists in user config
     if (this._isFromUserConfig(path, value)) {
       return 'user-config';
-    }
-
-    // Check if this value likely came from an environment variable via env() function
-    const envSource = this._detectEnvSource(path, value);
-    if (envSource) {
-      return envSource;
     }
 
     // Default to default config
     return 'default';
   }
 
-  /**
-   * Detect if a config value likely came from an environment variable via env() function
-   * @private
-   */
-  _detectEnvSource(path, value) {
-    // Common environment variable patterns for this project
-    const envPatterns = [
-      // Direct mapping patterns
-      { pattern: /^ai\.gemini\.apiKey$/, envVar: 'GEMINI_API_KEY' },
-      { pattern: /^ai\.gemini\.baseUrl$/, envVar: 'GEMINI_BASE_URL' },
-      { pattern: /^ai\.gemini\.timeout$/, envVar: 'GEMINI_TIMEOUT' },
-      { pattern: /^ai\.gemini\.model$/, envVar: 'GEMINI_MODEL' },
-      { pattern: /^ai\.defaults\.temperature$/, envVar: 'AI_DEFAULT_TEMPERATURE' },
-      { pattern: /^ai\.defaults\.maxTokens$/, envVar: 'AI_DEFAULT_MAX_TOKENS' },
-      { pattern: /^ai\.defaults\.topP$/, envVar: 'AI_DEFAULT_TOP_P' },
-      { pattern: /^ai\.defaults\.topK$/, envVar: 'AI_DEFAULT_TOP_K' },
-      { pattern: /^ai\.defaults\.stream$/, envVar: 'AI_DEFAULT_STREAM' },
-      {
-        pattern: /^ai\.tasks\.summarization\.temperature$/,
-        envVar: 'AI_SUMMARIZATION_TEMPERATURE',
-      },
-      { pattern: /^ai\.tasks\.summarization\.maxTokens$/, envVar: 'AI_SUMMARIZATION_MAX_TOKENS' },
-      {
-        pattern: /^ai\.tasks\.classification\.temperature$/,
-        envVar: 'AI_CLASSIFICATION_TEMPERATURE',
-      },
-      { pattern: /^ai\.tasks\.classification\.maxTokens$/, envVar: 'AI_CLASSIFICATION_MAX_TOKENS' },
-      {
-        pattern: /^ai\.tasks\.codeDescription\.temperature$/,
-        envVar: 'AI_CODE_DESCRIPTION_TEMPERATURE',
-      },
-      {
-        pattern: /^ai\.tasks\.codeDescription\.maxTokens$/,
-        envVar: 'AI_CODE_DESCRIPTION_MAX_TOKENS',
-      },
-      {
-        pattern: /^ai\.tasks\.imageDescription\.temperature$/,
-        envVar: 'AI_IMAGE_DESCRIPTION_TEMPERATURE',
-      },
-      {
-        pattern: /^ai\.tasks\.imageDescription\.maxTokens$/,
-        envVar: 'AI_IMAGE_DESCRIPTION_MAX_TOKENS',
-      },
-      { pattern: /^ai\.tasks\.profileCreation\.temperature$/, envVar: 'AI_PROFILE_TEMPERATURE' },
-      { pattern: /^ai\.tasks\.profileCreation\.maxTokens$/, envVar: 'AI_PROFILE_MAX_TOKENS' },
-      { pattern: /^ai\.cache\.enabled$/, envVar: 'AI_CACHE_ENABLED' },
-      { pattern: /^ai\.cache\.ttl$/, envVar: 'AI_CACHE_TTL' },
-      { pattern: /^ai\.retry\.maxAttempts$/, envVar: 'AI_RETRY_MAX_ATTEMPTS' },
-      { pattern: /^ai\.retry\.initialDelay$/, envVar: 'AI_RETRY_INITIAL_DELAY' },
-      { pattern: /^ai\.retry\.maxDelay$/, envVar: 'AI_RETRY_MAX_DELAY' },
-      { pattern: /^ai\.retry\.backoffMultiplier$/, envVar: 'AI_RETRY_BACKOFF' },
-      { pattern: /^ai\.promptsPath$/, envVar: 'AI_PROMPTS_PATH' },
-    ];
-
-    for (const { pattern, envVar } of envPatterns) {
-      if (pattern.test(path) && process.env[envVar] !== undefined) {
-        // Check if the environment value matches the current value
-        let envValue = process.env[envVar];
-
-        // Type conversion (same as in env() function)
-        if (envValue === 'true') envValue = true;
-        else if (envValue === 'false') envValue = false;
-        else if (envValue === 'null') envValue = null;
-        else if (envValue.match(/^\d+$/)) envValue = parseInt(envValue);
-        else if (envValue.match(/^\d+\.\d+$/)) envValue = parseFloat(envValue);
-
-        if (_.isEqual(envValue, value)) {
-          return `environment:${envVar}`;
-        }
-      }
-    }
-
-    return null;
-  }
 
   /**
    * Check if a configuration value comes from user config
@@ -564,15 +434,12 @@ export async function configAsync(options = {}) {
 
 /**
  * Get environment variable with type conversion
- * @param {string} key - Environment variable key
- * @param {*} defaultValue - Default value if not found
- * @returns {*} Environment value or default
+ * NOTE: Environment variables are no longer supported - this always returns defaultValue
+ * @param {string} key - Environment variable key (ignored)
+ * @param {*} defaultValue - Default value
+ * @returns {*} Always returns defaultValue
  */
 export function env(key, defaultValue) {
-  if (!instance) {
-    instance = new ConfigManager();
-    // Initialize in background
-    initPromise = instance.loadConfiguration().catch(console.error);
-  }
-  return instance.env(key, defaultValue);
+  // Environment variables are no longer supported - always return default
+  return defaultValue;
 }
