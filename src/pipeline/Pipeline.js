@@ -201,10 +201,10 @@ class Pipeline extends EventEmitter {
               error instanceof ValidationError
                 ? error
                 : new ValidationError(
-                  `Stage validation failed: ${error.message}`,
-                  stageName,
-                  result,
-                );
+                    `Stage validation failed: ${error.message}`,
+                    stageName,
+                    result,
+                  );
 
             if (this.options.continueOnError) {
               console.warn(

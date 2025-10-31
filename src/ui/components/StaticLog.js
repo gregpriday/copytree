@@ -23,31 +23,31 @@ let Static, Box, Text;
 const LogEntry = ({ log }) => {
   const getColor = (type) => {
     switch (type) {
-    case 'success':
-      return 'green';
-    case 'error':
-      return 'red';
-    case 'warning':
-      return 'yellow';
-    case 'info':
-      return 'blue';
-    default:
-      return 'white';
+      case 'success':
+        return 'green';
+      case 'error':
+        return 'red';
+      case 'warning':
+        return 'yellow';
+      case 'info':
+        return 'blue';
+      default:
+        return 'white';
     }
   };
 
   const getIcon = (type) => {
     switch (type) {
-    case 'success':
-      return '✓';
-    case 'error':
-      return '✗';
-    case 'warning':
-      return '⚠';
-    case 'info':
-      return 'ℹ';
-    default:
-      return '•';
+      case 'success':
+        return '✓';
+      case 'error':
+        return '✗';
+      case 'warning':
+        return '⚠';
+      case 'info':
+        return 'ℹ';
+      default:
+        return '•';
     }
   };
 

@@ -67,24 +67,24 @@ class SecretRedactor {
     const ruleId = (finding.RuleID || 'UNKNOWN').toUpperCase();
 
     switch (mode) {
-    case 'typed':
-      return `***REDACTED:${ruleId}***`;
+      case 'typed':
+        return `***REDACTED:${ruleId}***`;
 
-    case 'generic':
-      return '***REDACTED***';
+      case 'generic':
+        return '***REDACTED***';
 
-    case 'hash': {
-      // Generate short hash for debugging (never log the actual secret)
-      // Use Match if available (which might be redacted by gitleaks),
-      // otherwise generate a stable hash from metadata
-      const hashInput =
+      case 'hash': {
+        // Generate short hash for debugging (never log the actual secret)
+        // Use Match if available (which might be redacted by gitleaks),
+        // otherwise generate a stable hash from metadata
+        const hashInput =
           finding.Match || `${finding.File}:${finding.StartLine}:${finding.StartColumn}`;
-      const hash = crypto.createHash('sha256').update(hashInput).digest('hex').substring(0, 8);
-      return `***REDACTED:${ruleId}:${hash}***`;
-    }
+        const hash = crypto.createHash('sha256').update(hashInput).digest('hex').substring(0, 8);
+        return `***REDACTED:${ruleId}:${hash}***`;
+      }
 
-    default:
-      return '***REDACTED***';
+      default:
+        return '***REDACTED***';
     }
   }
 

@@ -281,13 +281,13 @@ const ValidationView = ({ successMessage, type }) => {
       details:
         options.verbose || options.show
           ? {
-            name: loadedProfile.name,
-            description: loadedProfile.description || 'N/A',
-            version: loadedProfile.version || 'N/A',
-            source: loadedProfile._source,
-            includePatterns: loadedProfile.include?.join(', ') || 'None',
-            excludePatterns: loadedProfile.exclude?.join(', ') || 'None',
-          }
+              name: loadedProfile.name,
+              description: loadedProfile.description || 'N/A',
+              version: loadedProfile.version || 'N/A',
+              source: loadedProfile._source,
+              includePatterns: loadedProfile.include?.join(', ') || 'None',
+              excludePatterns: loadedProfile.exclude?.join(', ') || 'None',
+            }
           : null,
     });
     setIsCompleted(true);

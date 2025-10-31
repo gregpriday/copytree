@@ -28,8 +28,9 @@ export default [
       },
     },
     rules: {
-      'indent': ['error', 2],
-      'quotes': ['error', 'single'],
+      // Disable formatting rules as Prettier handles them
+      'indent': 'off',
+      'quotes': 'off',
       'semi': ['error', 'always'],
       'no-unused-vars': 'off',
       'no-console': 'off',
