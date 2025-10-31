@@ -23,7 +23,7 @@ const createMockLogger = () => {
     setInkEventsMode: jest.fn(),
     isInkEventsMode: jest.fn().mockReturnValue(false),
     createProgressBar: jest.fn(),
-    child: jest.fn(() => createMockLogger())
+    child: jest.fn(() => createMockLogger()),
   };
   return mockLogger;
 };
@@ -31,11 +31,11 @@ const createMockLogger = () => {
 // Create the main logger instance
 const logger = createMockLogger();
 
+// Mock Logger class (matching the original export)
+const Logger = jest.fn(() => createMockLogger());
+
 // Export both the class and a default instance (matching the original export)
-export {
-  Logger: jest.fn(() => createMockLogger()),
-  logger,
-};
+export { Logger, logger };
 
 // Export convenience method exports (matching the original)
 export const info = logger.info;
