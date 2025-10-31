@@ -15,6 +15,7 @@ import fastGlob from 'fast-glob';
 import ignore from 'ignore';
 import fs from 'fs-extra';
 import path from 'path';
+import { config } from '../../config/ConfigManager.js';
 
 class FileDiscoveryStage extends Stage {
   constructor(options = {}) {
@@ -34,8 +35,32 @@ class FileDiscoveryStage extends Stage {
     this.log(`Discovering files in ${this.basePath}`, 'debug');
     const startTime = Date.now();
 
-    // Build initial layers from .gitignore if we should respect it
+    // Build initial layers with global exclusions first
     const initialLayers = [];
+
+    // 1. Add global exclusions from config (highest priority, always excluded)
+    const globalExcluded = config().get('copytree.globalExcludedDirectories', []);
+    const basePathExcluded = config().get('copytree.basePathExcludedDirectories', []);
+
+    if (globalExcluded.length > 0 || basePathExcluded.length > 0) {
+      const globalRules = [
+        ...globalExcluded.map((dir) => `${dir}/**`), // Exclude directory and all contents
+        ...globalExcluded.map((dir) => dir), // Also exclude the directory itself
+      ];
+
+      // Base path exclusions only apply at project root
+      const baseRules = basePathExcluded.map((dir) => `/${dir}/**`);
+
+      const globalLayer = ignore().add([...globalRules, ...baseRules]);
+      initialLayers.push({ base: this.basePath, ig: globalLayer });
+
+      this.log(
+        `Applied ${globalExcluded.length} global + ${basePathExcluded.length} base exclusions`,
+        'debug',
+      );
+    }
+
+    // 2. Add .gitignore layer if we should respect it
     if (this.respectGitignore) {
       const gitignoreLayer = await this.loadGitignore();
       if (gitignoreLayer) {
