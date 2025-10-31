@@ -207,6 +207,31 @@ describe('Pipeline Integration Tests', () => {
       expect(filePaths).not.toContain('node_modules/package.js');
       expect(filePaths).toContain('index.js'); // Should include non-ignored files
     });
+
+    it('should respect .copytreeignore in subdirectories', async () => {
+      // Create nested directory with its own .copytreeignore
+      await fs.ensureDir(path.join(tempDir, 'src/internal'));
+      await fs.writeFile(path.join(tempDir, 'src/internal/secret.js'), 'top secret');
+      await fs.writeFile(path.join(tempDir, 'src/.copytreeignore'), 'internal/');
+
+      pipeline.through([
+        new FileDiscoveryStage({
+          basePath: tempDir,
+          patterns: ['**/*.js'],
+          respectGitignore: true,
+        }),
+      ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: {},
+      });
+
+      const paths = result.files.map((f) => f.path);
+      expect(paths).toContain('src/app.js');
+      expect(paths).not.toContain('src/internal/secret.js');
+    });
   });
 
   // Skip transformer tests - they require external modules that aren't Jest-compatible
