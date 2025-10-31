@@ -1,6 +1,17 @@
+/**
+ * FileDiscoveryStage - Discovers files with layered .copytreeignore support
+ *
+ * This implementation uses git-style traversal with layered ignore rules:
+ * - Reads .gitignore and .copytreeignore files as encountered during traversal
+ * - Supports negations (!) for re-including files
+ * - Anchored patterns (/) are relative to the containing directory
+ * - Properly prunes excluded directories (doesn't descend into them)
+ */
+
 import Stage from '../Stage.js';
+import { walkWithIgnore } from '../../utils/ignoreWalker.js';
 import fastGlob from 'fast-glob';
-import { minimatch } from 'minimatch';
+import ignore from 'ignore';
 import fs from 'fs-extra';
 import path from 'path';
 
@@ -10,7 +21,6 @@ class FileDiscoveryStage extends Stage {
     this.basePath = options.basePath || process.cwd();
     this.patterns = options.patterns || ['**/*'];
     this.respectGitignore = options.respectGitignore !== false;
-    this.gitignorePatterns = [];
     this.forceInclude = options.forceInclude || [];
   }
 
@@ -23,24 +33,52 @@ class FileDiscoveryStage extends Stage {
     this.log(`Discovering files in ${this.basePath}`, 'debug');
     const startTime = Date.now();
 
-    // Load ignore rules in parallel
-    const loadTasks = [];
+    // Build initial layers from .gitignore if we should respect it
+    const initialLayers = [];
     if (this.respectGitignore) {
-      loadTasks.push(this.loadGitignore());
-      loadTasks.push(this.loadCopytreeIgnore());
-    }
-    loadTasks.push(this.loadCopytreeInclude());
-    if (loadTasks.length > 0) {
-      await Promise.all(loadTasks);
+      const gitignoreLayer = await this.loadGitignore();
+      if (gitignoreLayer) {
+        initialLayers.push(gitignoreLayer);
+      }
     }
 
-    // Get all files matching patterns
-    const files = await this.discoverFiles();
+    // Load .copytreeinclude patterns (force-include)
+    await this.loadCopytreeInclude();
 
-    // Filter out excluded files
-    const filteredFiles = this.filterFiles(files);
+    // Discover files using layered ignore walker
+    const discoveredFiles = [];
+    const walkOptions = {
+      ignoreFileName: '.copytreeignore',
+      includeDirectories: false,
+      followSymlinks: false,
+      explain: this.options.explain || false,
+      initialLayers,
+    };
 
-    // Discover force-include patterns with dot:true and no ignores
+    for await (const fileInfo of walkWithIgnore(this.basePath, walkOptions)) {
+      // Convert to relative path
+      const relativePath = path.relative(this.basePath, fileInfo.path);
+
+      // Check if this file matches our include patterns (if specified)
+      if (this.patterns.length > 0 && !this.patterns.includes('**/*')) {
+        const matches = this.patterns.some((pattern) => {
+          return fastGlob.isDynamicPattern(pattern)
+            ? fastGlob.sync(pattern, { cwd: this.basePath }).includes(relativePath)
+            : pattern === relativePath;
+        });
+        if (!matches) continue;
+      }
+
+      discoveredFiles.push({
+        path: relativePath,
+        absolutePath: fileInfo.path,
+        size: fileInfo.stats.size,
+        modified: fileInfo.stats.mtime,
+        stats: fileInfo.stats,
+      });
+    }
+
+    // Handle force-include patterns (.copytreeinclude)
     let forcedEntries = [];
     if (this.forceInclude.length > 0) {
       this.log(`Force-including ${this.forceInclude.length} pattern(s)`, 'debug');
@@ -54,19 +92,18 @@ class FileDiscoveryStage extends Stage {
         concurrency: this.options.maxConcurrency || 100,
       };
 
-      forcedEntries = await fastGlob(this.forceInclude, globOptions);
+      const entries = await fastGlob(this.forceInclude, globOptions);
+      forcedEntries = entries.map((entry) => ({
+        path: entry.path || entry,
+        absolutePath: path.join(this.basePath, entry.path || entry),
+        size: entry.stats?.size || 0,
+        modified: entry.stats?.mtime || null,
+        stats: entry.stats,
+      }));
     }
 
-    // Convert entries to file objects and merge with deduplication
-    const toFileObj = (entry) => ({
-      path: entry.path || entry,
-      absolutePath: path.join(this.basePath, entry.path || entry),
-      size: entry.stats?.size || 0,
-      modified: entry.stats?.mtime || null,
-      stats: entry.stats,
-    });
-
-    const merged = [...filteredFiles, ...forcedEntries.map(toFileObj)];
+    // Merge discovered files with forced entries, deduplicating by path
+    const merged = [...discoveredFiles, ...forcedEntries];
     const byPath = new Map(merged.map((f) => [f.path, f]));
     const finalFiles = [...byPath.values()];
 
@@ -80,34 +117,46 @@ class FileDiscoveryStage extends Stage {
       basePath: this.basePath,
       files: finalFiles,
       stats: {
-        totalFiles: files.length,
-        filteredFiles: filteredFiles.length,
+        totalFiles: discoveredFiles.length,
+        filteredFiles: discoveredFiles.length, // No post-filtering needed
         forcedFiles: forcedEntries.length,
-        excludedFiles: files.length - filteredFiles.length,
+        excludedFiles: 0, // Not tracked with walker approach
       },
     };
   }
 
+  /**
+   * Load .gitignore and return as an ignore layer
+   * @returns {Promise<{base: string, ig: any}|null>} Ignore layer or null
+   */
   async loadGitignore() {
     const gitignorePath = path.join(this.basePath, '.gitignore');
 
     if (await fs.pathExists(gitignorePath)) {
-      const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
-      this.parseGitignoreContent(gitignoreContent);
-      this.log('Loaded .gitignore rules', 'debug');
+      try {
+        const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
+        // Strip BOM if present
+        const cleaned = gitignoreContent.charCodeAt(0) === 0xfeff ? gitignoreContent.slice(1) : gitignoreContent;
+
+        const ig = ignore().add(cleaned);
+        this.log('Loaded .gitignore rules', 'debug');
+
+        return {
+          base: this.basePath,
+          ig,
+        };
+      } catch (error) {
+        this.log(`Error loading .gitignore: ${error.message}`, 'debug');
+        return null;
+      }
     }
+
+    return null;
   }
 
-  async loadCopytreeIgnore() {
-    const copytreeignorePath = path.join(this.basePath, '.copytreeignore');
-
-    if (await fs.pathExists(copytreeignorePath)) {
-      const copytreeignoreContent = await fs.readFile(copytreeignorePath, 'utf8');
-      this.parseGitignoreContent(copytreeignoreContent);
-      this.log('Loaded .copytreeignore rules', 'debug');
-    }
-  }
-
+  /**
+   * Load .copytreeinclude patterns for force-including files
+   */
   async loadCopytreeInclude() {
     const copytreeincludePath = path.join(this.basePath, '.copytreeinclude');
 
@@ -150,126 +199,6 @@ class FileDiscoveryStage extends Stage {
         this.log(`Loaded ${transformedPatterns.length} .copytreeinclude pattern(s)`, 'debug');
       }
     }
-  }
-
-  parseGitignoreContent(content) {
-    const lines = content.split('\n');
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-
-      // Skip empty lines and comments
-      if (!trimmed || trimmed.startsWith('#')) continue;
-
-      // Convert gitignore pattern to minimatch pattern
-      let pattern = trimmed;
-      const isNegated = pattern.startsWith('!');
-
-      if (isNegated) {
-        pattern = pattern.substring(1);
-      }
-
-      // If pattern doesn't start with /, it matches anywhere
-      if (!pattern.startsWith('/')) {
-        pattern = '**/' + pattern;
-      } else {
-        // Remove leading slash for relative matching
-        pattern = pattern.substring(1);
-      }
-
-      // If pattern ends with /, it only matches directories
-      if (pattern.endsWith('/')) {
-        pattern = pattern + '**';
-      }
-
-      this.gitignorePatterns.push({
-        pattern,
-        isNegated,
-        original: trimmed,
-      });
-    }
-  }
-
-  async discoverFiles() {
-    // Get copytree config for exclusions from ConfigManager
-    const ignorePatterns = [];
-
-    // Add default ignores from config
-    if (this.respectGitignore) {
-      // Add global excluded directories
-      const globalExcludedDirs = this.config.get('copytree.globalExcludedDirectories', []);
-      ignorePatterns.push(...globalExcludedDirs.map((dir) => `**/${dir}/**`));
-
-      // Add base path excluded directories (only at root)
-      const basePathExcludedDirs = this.config.get('copytree.basePathExcludedDirectories', []);
-      ignorePatterns.push(...basePathExcludedDirs.map((dir) => `${dir}/**`));
-
-      // Add global excluded files
-      const globalExcludedFiles = this.config.get('copytree.globalExcludedFiles', []);
-      ignorePatterns.push(...globalExcludedFiles);
-    }
-
-    // Add gitignore patterns (converted to glob format)
-    if (this.respectGitignore) {
-      for (const { pattern, isNegated } of this.gitignorePatterns) {
-        if (!isNegated) {
-          ignorePatterns.push(pattern);
-        }
-      }
-    }
-
-    // Add profile exclusions if provided
-    if (this.options.profileExclusions) {
-      ignorePatterns.push(...this.options.profileExclusions);
-    }
-
-    const globOptions = {
-      cwd: this.basePath,
-      absolute: false,
-      dot: this.options.includeHidden || false,
-      onlyFiles: true,
-      stats: true,
-      ignore: ignorePatterns,
-      // Use stream for large directories
-      concurrency: this.options.maxConcurrency || 100,
-    };
-
-    const entries = await fastGlob(this.patterns, globOptions);
-
-    return entries.map((entry) => ({
-      path: entry.path || entry,
-      absolutePath: path.join(this.basePath, entry.path || entry),
-      size: entry.stats?.size || 0,
-      modified: entry.stats?.mtime || null,
-      stats: entry.stats,
-    }));
-  }
-
-  filterFiles(files) {
-    if (!this.gitignorePatterns.length) {
-      return files;
-    }
-
-    return files.filter((file) => !this.shouldIgnore(file.path));
-  }
-
-  shouldIgnore(filePath) {
-    // Process patterns in order - last match wins for gitignore compatibility
-    let ignored = false;
-
-    for (const { pattern, isNegated } of this.gitignorePatterns) {
-      const options = {
-        dot: true,
-        matchBase: true,
-        nocase: process.platform === 'win32',
-      };
-
-      if (minimatch(filePath, pattern, options)) {
-        ignored = !isNegated;
-      }
-    }
-
-    return ignored;
   }
 }
 
