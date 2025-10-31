@@ -61,7 +61,7 @@
     "ora": "^5.4.1",
     "p-limit": "^7.2.0",
     "pdf-parse": "^2.4.5",
-    "react": "^18.2.0",
+    "react": "^19.2.0",
     "simple-git": "^3.28.0",
     "tesseract.js": "^6.0.1",
     "xmlbuilder2": "^4.0.0"
