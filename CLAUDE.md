@@ -76,27 +76,6 @@ copytree profile:validate NAME   # Check profile
 5. Profile with: `DEBUG=copytree:* copytree --dry-run`
 </paved_path>
 
-### Using Git Worktrees
-
-**Only use worktrees when user explicitly requests.** Enables parallel work on multiple branches without stashing.
-
-**Branch Naming (Git Flow):**
-- `feature/<description>` - New features (from `develop`)
-- `bugfix/<description>` - Bug fixes (from `develop`)
-- `hotfix/<description>` - Critical production fixes (from `main`, merge to both)
-- `release/<version>` - Release preparation (from `develop`, merge to both)
-- `chore/<description>` - Maintenance tasks
-- `test/<description>` - Test improvements
-
-**Workflow:**
-1. Create worktree: `git worktree add -b feature/pdf-extract ../copytree-feature-pdf develop`
-2. Switch to worktree: `cd ../copytree-feature-pdf`
-3. Install dependencies: `npm install`
-4. Make changes and test as normal
-5. Commit only when user requests (use `/commit`)
-6. Push branch and create PR: `git push -u origin feature/pdf-extract` then `gh pr create --base develop`
-7. Clean up after merge: `git worktree remove ../copytree-feature-pdf` and `git branch -d feature/pdf-extract`
-
 ## Review Checklist (Read Before Submitting)
 
 Before finishing any code changes, verify:
