@@ -330,10 +330,3 @@ const defaultLogger = new Logger();
 
 // Export both the class and a default instance
 export { Logger, defaultLogger as logger };
-
-// Convenience method exports
-export const info = defaultLogger.info.bind(defaultLogger);
-export const success = defaultLogger.success.bind(defaultLogger);
-export const warn = defaultLogger.warn.bind(defaultLogger);
-export const error = defaultLogger.error.bind(defaultLogger);
-export const debug = defaultLogger.debug.bind(defaultLogger);

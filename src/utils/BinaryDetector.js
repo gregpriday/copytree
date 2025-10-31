@@ -213,19 +213,3 @@ export function isConvertibleDocument(category, ext) {
   );
 }
 
-/**
- * Get all file categories
- * @returns {Object} Categories object
- */
-export function getCategories() {
-  return CATEGORIES;
-}
-
-/**
- * Get a category's extensions
- * @param {string} category - Category name
- * @returns {Array<string>} List of extensions
- */
-export function getCategoryExtensions(category) {
-  return CATEGORIES[category] || [];
-}

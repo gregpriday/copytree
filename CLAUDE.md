@@ -17,10 +17,12 @@ Rules and constraints for working with CopyTree. Keep this file lean; detailed d
 - Achieve 80% test coverage (global threshold).
 
 **NEVER:**
+- **COMMIT CODE WITHOUT EXPLICIT USER PERMISSION** - Always ask first, even if tests pass!
 - Commit directly to `main` or `develop` without explicit user request.
 - Auto-generate commits or CHANGELOG entries (except on release/* branch when asked).
 - Leave TODOs, mocks, stubs, or partial implementations in final code.
 - Touch generated/vendor/lock files or Git metadata.
+- **Create documentation files in the project root** (README.md, *.md reports, etc.) - Use `@docs/` instead.
 </critical_notes>
 
 ## Commands (Daily Use)
