@@ -2,52 +2,21 @@ import { env } from '../src/config/ConfigManager.js';
 
 export default {
   // Global excluded directories (always excluded regardless of location)
+  // Only includes version control directories that can't be in .gitignore
+  // Everything else (node_modules, .idea, etc.) should be in .gitignore
   globalExcludedDirectories: [
-    // Version control
-    '.git', '.svn', '.hg', '.bzr', 'CVS', '_darcs',
-    
-    // IDEs and editors
-    '.idea', '.vscode', '.vs', '.settings', 'nbproject', '.project',
-    '.buildpath', '.Rproj.user', '.spyderproject', '.spyproject',
-    '.ropeproject', '.venv', '.mypy_cache', '.dmypy.json',
-    
-    // Dependencies
-    'node_modules', 'bower_components', 'jspm_packages',
-    'venv', 'env', 'ENV', 'virtualenv', '.virtualenv',
-    'pipenv', '.pipenv', 'poetry', '.poetry',
-    'conda-meta', '.conda',
-    
-    // Build and cache
-    '__pycache__', '.pytest_cache', '.tox', '.nox',
-    '.coverage', 'htmlcov', '.nyc_output', 'coverage',
-    '.sass-cache', '.cache', '.parcel-cache', '.next',
-    '.nuxt', '.vuepress', '.docusaurus', '.serverless',
-    '.fusebox', '.dynamodb', '.temp', '.tmp', 'tmp', 'temp',
-    
-    // Mobile
-    '.gradle', '.idea/gradle.xml', '.idea/libraries',
-    'Pods', 'DerivedData', 'xcuserdata',
-    
-    // Other
-    '.vagrant', '.terraform', '.pulumi',
-    '.ipynb_checkpoints', '.jupyter',
-    'thumbs.db', '.DS_Store', 'desktop.ini',
+    '.git',      // Git repository metadata
+    '.svn',      // Subversion
+    '.hg',       // Mercurial
+    '.bzr',      // Bazaar
+    'CVS',       // CVS
+    '_darcs',    // Darcs
   ],
   
   // Base path excluded directories (only excluded at project root)
-  basePathExcludedDirectories: [
-    'vendor',      // PHP Composer
-    'Pods',        // iOS CocoaPods  
-    '.github',     // GitHub config
-    '.gitlab',     // GitLab config
-    '.circleci',   // CircleCI config
-    '.travis',     // Travis CI
-    'dist',        // Distribution/build output
-    'build',       // Build output
-    'out',         // Output directory
-    'target',      // Maven/Gradle output
-    '.webpack',    // Webpack
-  ],
+  // These are typically in .gitignore, but we exclude them as a safety net
+  // Can be overridden by .copytreeinclude if needed
+  basePathExcludedDirectories: [],
   
   // Global excluded files (excluded by name pattern)
   globalExcludedFiles: [
