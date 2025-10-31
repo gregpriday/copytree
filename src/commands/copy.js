@@ -61,16 +61,30 @@ async function copyCommand(targetPath = '.', options = {}) {
       startTime,
     });
 
-    // 6. Prepare output
+    // 6. Write secrets report if requested
+    if (options.secretsReport && result.stats?.secretsGuard?.report) {
+      const reportPath = options.secretsReport === '-' ? null : path.resolve(options.secretsReport);
+
+      if (reportPath) {
+        await fs.ensureDir(path.dirname(reportPath));
+        await fs.writeJson(reportPath, result.stats.secretsGuard.report, { spaces: 2 });
+        logger.info(`Secrets report written to ${reportPath}`);
+      } else {
+        // Write to stdout
+        console.log(JSON.stringify(result.stats.secretsGuard.report, null, 2));
+      }
+    }
+
+    // 7. Prepare output
     let outputResult;
     if (!options.dryRun) {
       outputResult = await prepareOutput(result, options);
     }
 
-    // 7. Stop spinner before showing final result
+    // 8. Stop spinner before showing final result
     logger.stopSpinner();
 
-    // 8. Display final output
+    // 9. Display final output
     if (!options.dryRun && outputResult) {
       await displayOutput(outputResult, options);
     } else if (options.dryRun) {
@@ -80,7 +94,7 @@ async function copyCommand(targetPath = '.', options = {}) {
       logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}] would be processed`);
     }
 
-    // 9. Show summary if requested
+    // 10. Show summary if requested
     if (options.info) {
       showSummary(result, startTime);
     }
@@ -224,7 +238,23 @@ async function setupPipelineStages(basePath, profile, options) {
       }),
     );
 
-    // 8. Transformer Stage
+    // 8. Secrets Guard Stage (automatic secret detection and redaction)
+    // Only add if explicitly enabled or not explicitly disabled
+    const secretsGuardEnabled = options.secretsGuard !== false &&
+      (options.secretsGuard === true || config().get('secretsGuard.enabled', true));
+
+    if (secretsGuardEnabled) {
+      const { default: SecretsGuardStage } = await import('../pipeline/stages/SecretsGuardStage.js');
+      stages.push(
+        new SecretsGuardStage({
+          enabled: true,
+          redactionMode: options.secretsRedactMode || config().get('secretsGuard.redactionMode', 'typed'),
+          failOnSecrets: options.failOnSecrets || config().get('secretsGuard.failOnSecrets', false),
+        }),
+      );
+    }
+
+    // 9. Transformer Stage
     const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
     const registry = await TransformerRegistry.createDefault();
     stages.push(
@@ -236,7 +266,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 9. Character Limit Stage (if --char-limit option is used)
+  // 10. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(
@@ -246,11 +276,11 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 10. Instructions Stage (load instructions unless disabled)
+  // 11. Instructions Stage (load instructions unless disabled)
   const { default: InstructionsStage } = await import('../pipeline/stages/InstructionsStage.js');
   stages.push(new InstructionsStage());
 
-  // 11. Output Formatting Stage
+  // 12. Output Formatting Stage
   // Determine output format (default to tree if --only-tree is used)
   const rawFormat =
     options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'xml');
@@ -439,6 +469,14 @@ function showSummary(result, startTime) {
 
   if (stats.excludedFiles > 0) {
     console.log(`  Excluded files: ${stats.excludedFiles}`);
+  }
+
+  // Show secrets guard stats if present
+  if (stats.secretsGuard) {
+    const sg = stats.secretsGuard;
+    console.log(
+      `  🔒 Secrets Guard: ${sg.filesExcluded || 0} files excluded, ${sg.secretsRedacted || 0} redactions, ${sg.secretsFound || 0} findings`,
+    );
   }
 
   if (result.errors && result.errors.length > 0) {

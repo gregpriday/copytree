@@ -128,6 +128,20 @@ class InstructionsError extends CopyTreeError {
 }
 
 /**
+ * Secrets detected error
+ * Thrown when secrets are found and failOnSecrets is enabled
+ */
+class SecretsDetectedError extends CopyTreeError {
+  constructor(secretsCount, findings = [], details = {}) {
+    const message = `Secrets detected: ${secretsCount} secret(s) found`;
+    super(message, 'SECRETS_DETECTED', { secretsCount, findings, ...details });
+    this.name = 'SecretsDetectedError';
+    this.secretsCount = secretsCount;
+    this.findings = findings;
+  }
+}
+
+/**
  * Handle errors consistently
  */
 function handleError(error, options = {}) {
@@ -225,5 +239,6 @@ export {
   GitError,
   ProfileError,
   InstructionsError,
+  SecretsDetectedError,
   handleError,
 };
