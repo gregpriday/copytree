@@ -354,7 +354,6 @@ class ConfigManager {
     return 'default';
   }
 
-
   /**
    * Check if a configuration value comes from user config
    * @private
