@@ -5,10 +5,10 @@ jest.mock('pdf-parse', () => ({
       text: 'Mocked PDF content',
       numpages: 1,
       info: {},
-      version: '1.0'
+      version: '1.0',
     }),
-    destroy: jest.fn().mockResolvedValue(undefined)
-  }))
+    destroy: jest.fn().mockResolvedValue(undefined),
+  })),
 }));
 jest.mock('fs-extra');
 
@@ -90,7 +90,7 @@ describe('PDFTransformer', () => {
           }
           return Promise.resolve(data);
         }),
-        destroy: jest.fn().mockResolvedValue(undefined)
+        destroy: jest.fn().mockResolvedValue(undefined),
       }));
     };
 

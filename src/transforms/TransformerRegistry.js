@@ -193,10 +193,7 @@ class TransformerRegistry {
 
       if (mark === VISITING) {
         const cycle = [...stack, name].join(' -> ');
-        throw new TransformError(
-          `Circular dependency detected: ${cycle}`,
-          'CIRCULAR_DEPENDENCY',
-        );
+        throw new TransformError(`Circular dependency detected: ${cycle}`, 'CIRCULAR_DEPENDENCY');
       }
 
       if (mark === DONE) {
@@ -205,10 +202,7 @@ class TransformerRegistry {
 
       // Check if transformer exists
       if (!this.transformers.has(name)) {
-        throw new TransformError(
-          `Missing transformer dependency: ${name}`,
-          'MISSING_DEPENDENCY',
-        );
+        throw new TransformError(`Missing transformer dependency: ${name}`, 'MISSING_DEPENDENCY');
       }
 
       state.set(name, VISITING);

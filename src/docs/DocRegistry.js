@@ -134,7 +134,8 @@ export class DocRegistry {
    * Convert filename to title
    */
   titleFromFilename(filename) {
-    return path.basename(filename, '.md')
+    return path
+      .basename(filename, '.md')
       .split('-')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
@@ -235,9 +236,7 @@ export class DocRegistry {
     }
 
     // Resolve to actual section objects
-    return orderedIds
-      .map((id) => this.sectionMap.get(id))
-      .filter(Boolean);
+    return orderedIds.map((id) => this.sectionMap.get(id)).filter(Boolean);
   }
 
   /**
@@ -306,24 +305,27 @@ export class DocRegistry {
         groups: this.manifest.groups?.length || 0,
         tasks: this.manifest.tasks?.length || 0,
       },
-      sections: this.manifest.sections?.map((s) => ({
-        id: s.id,
-        title: s.title,
-        summary: s.summary,
-        tags: s.tags,
-        fileCount: s.files.length,
-      })) || [],
-      groups: this.manifest.groups?.map((g) => ({
-        id: g.id,
-        title: g.title,
-        description: g.description,
-        sectionCount: g.sections.length,
-      })) || [],
-      tasks: this.manifest.tasks?.map((t) => ({
-        id: t.id,
-        title: t.title,
-        groups: t.groups,
-      })) || [],
+      sections:
+        this.manifest.sections?.map((s) => ({
+          id: s.id,
+          title: s.title,
+          summary: s.summary,
+          tags: s.tags,
+          fileCount: s.files.length,
+        })) || [],
+      groups:
+        this.manifest.groups?.map((g) => ({
+          id: g.id,
+          title: g.title,
+          description: g.description,
+          sectionCount: g.sections.length,
+        })) || [],
+      tasks:
+        this.manifest.tasks?.map((t) => ({
+          id: t.id,
+          title: t.title,
+          groups: t.groups,
+        })) || [],
     };
   }
 }

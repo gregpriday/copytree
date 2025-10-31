@@ -10,12 +10,15 @@ jest.mock('marked', () => {
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
 
     // Wrap non-heading lines in p tags
-    html = html.split('\n').map(line => {
-      if (!line.startsWith('<h1') && line.trim()) {
-        return `<p>${line}</p>`;
-      }
-      return line;
-    }).join('\n');
+    html = html
+      .split('\n')
+      .map((line) => {
+        if (!line.startsWith('<h1') && line.trim()) {
+          return `<p>${line}</p>`;
+        }
+        return line;
+      })
+      .join('\n');
 
     return html;
   });
@@ -132,7 +135,8 @@ describe('MarkdownTransformer', () => {
     it('should preserve image markers in context', async () => {
       const file = {
         path: 'test.md',
-        content: '# Documentation\n\nSee the diagram below:\n\n![Architecture diagram](arch.png)\n\nThis shows...',
+        content:
+          '# Documentation\n\nSee the diagram below:\n\n![Architecture diagram](arch.png)\n\nThis shows...',
       };
 
       const result = await transformer.doTransform(file);

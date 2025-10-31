@@ -678,7 +678,6 @@ copytree --git-modified --always "README.md"
 copytree --dry-run
 \`\`\`
 `,
-
   };
 
   // Build the 'all' documentation by combining all topics

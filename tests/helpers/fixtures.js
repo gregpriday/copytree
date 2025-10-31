@@ -143,7 +143,7 @@ export function createLocalGitRepo(name, files = {}) {
     },
     getCommitHash(ref = 'HEAD') {
       return execSync(`git rev-parse ${ref}`, { cwd: repoPath, encoding: 'utf8' }).trim();
-    }
+    },
   };
 }
 
@@ -155,15 +155,19 @@ export function createSimpleProject(name = 'test-project', options = {}) {
     withGit = false,
     files = {
       'README.md': '# Test Project\n\nThis is a test project.',
-      'package.json': JSON.stringify({
-        name: 'test-project',
-        version: '1.0.0',
-        description: 'Test project',
-        main: 'index.js'
-      }, null, 2),
+      'package.json': JSON.stringify(
+        {
+          name: 'test-project',
+          version: '1.0.0',
+          description: 'Test project',
+          main: 'index.js',
+        },
+        null,
+        2,
+      ),
       'src/index.js': 'console.log("Hello, world!");',
-      'src/utils.js': 'export function add(a, b) { return a + b; }'
-    }
+      'src/utils.js': 'export function add(a, b) { return a + b; }',
+    },
   } = options;
 
   const projectPath = tmpPath(name);
@@ -192,10 +196,7 @@ export function createSimpleProject(name = 'test-project', options = {}) {
  * Create a large project for performance testing
  */
 export function createLargeProject(name, fileCount = 100, options = {}) {
-  const {
-    avgFileSize = 1024,
-    withVariety = true
-  } = options;
+  const { avgFileSize = 1024, withVariety = true } = options;
 
   const projectPath = tmpPath(name);
   fs.ensureDirSync(projectPath);
@@ -241,7 +242,7 @@ export function createRobustnessFixtures(name = 'robustness') {
     'long-line.txt': 'x'.repeat(100000),
 
     // Non-UTF8 content (binary disguised as text)
-    'fake-text.txt': Buffer.from([0xFF, 0xFE, 0x00, 0x01]),
+    'fake-text.txt': Buffer.from([0xff, 0xfe, 0x00, 0x01]),
 
     // Path with spaces and special chars
     'path with spaces/file (1).txt': 'content',
@@ -257,7 +258,7 @@ export function createRobustnessFixtures(name = 'robustness') {
     'zero-byte.bin': Buffer.alloc(0),
 
     // Large file marker (will be created separately)
-    'LARGE_FILE_PLACEHOLDER': '# This will be replaced with actual large file'
+    LARGE_FILE_PLACEHOLDER: '# This will be replaced with actual large file',
   };
 
   for (const [filePath, content] of Object.entries(fixtures)) {
@@ -291,7 +292,7 @@ export function createRobustnessFixtures(name = 'robustness') {
       fs.ensureDirSync(path.dirname(linkPath));
       fs.symlinkSync(targetPath, linkPath);
       return linkPath;
-    }
+    },
   };
 }
 
@@ -304,7 +305,7 @@ export function toMatchGolden(received, goldenName, options = {}) {
   if (pass) {
     return {
       pass: true,
-      message: () => `Expected content not to match golden file ${goldenName}`
+      message: () => `Expected content not to match golden file ${goldenName}`,
     };
   } else {
     const golden = readGolden(goldenName);
@@ -313,7 +314,7 @@ export function toMatchGolden(received, goldenName, options = {}) {
       message: () => {
         const diff = require('jest-diff').default(golden, received);
         return `Expected content to match golden file ${goldenName}\n\n${diff}`;
-      }
+      },
     };
   }
 }

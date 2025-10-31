@@ -212,4 +212,3 @@ export function isConvertibleDocument(category, ext) {
     (ext || '').toLowerCase(),
   );
 }
-

@@ -430,5 +430,4 @@ output:
   return { created };
 }
 
-
 export default InstallView;

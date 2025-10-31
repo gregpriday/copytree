@@ -79,33 +79,33 @@ class FileLoadingStage extends Stage {
 
   handleBinaryFile(file, det, policy) {
     switch (policy) {
-    case 'skip':
-      return null;
+      case 'skip':
+        return null;
 
-    case 'comment':
-      // Return stub for formatters to emit comments
-      return {
-        ...file,
-        content: '',
-        isBinary: true,
-        excluded: true,
-        excludedReason: det.category || 'binary',
-        binaryCategory: det.category,
-        binaryName: det.name,
-      };
+      case 'comment':
+        // Return stub for formatters to emit comments
+        return {
+          ...file,
+          content: '',
+          isBinary: true,
+          excluded: true,
+          excludedReason: det.category || 'binary',
+          binaryCategory: det.category,
+          binaryName: det.name,
+        };
 
-    case 'base64':
-      return this.loadBinaryAsBase64(file, det);
+      case 'base64':
+        return this.loadBinaryAsBase64(file, det);
 
-    case 'placeholder':
-    default:
-      return {
-        ...file,
-        content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
-        isBinary: true,
-        binaryCategory: det.category,
-        binaryName: det.name,
-      };
+      case 'placeholder':
+      default:
+        return {
+          ...file,
+          content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
+          isBinary: true,
+          binaryCategory: det.category,
+          binaryName: det.name,
+        };
     }
   }
 

@@ -90,7 +90,9 @@ async function copyCommand(targetPath = '.', options = {}) {
     } else if (options.dryRun) {
       logger.info('🔍 Dry run mode - no files were processed.');
       const fileCount = result.files.filter((f) => f !== null).length;
-      const totalSize = result.files.filter((f) => f !== null).reduce((sum, file) => sum + (file.size || 0), 0);
+      const totalSize = result.files
+        .filter((f) => f !== null)
+        .reduce((sum, file) => sum + (file.size || 0), 0);
       logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}] would be processed`);
     }
 
@@ -240,15 +242,19 @@ async function setupPipelineStages(basePath, profile, options) {
 
     // 8. Secrets Guard Stage (automatic secret detection and redaction)
     // Only add if explicitly enabled or not explicitly disabled
-    const secretsGuardEnabled = options.secretsGuard !== false &&
+    const secretsGuardEnabled =
+      options.secretsGuard !== false &&
       (options.secretsGuard === true || config().get('secretsGuard.enabled', true));
 
     if (secretsGuardEnabled) {
-      const { default: SecretsGuardStage } = await import('../pipeline/stages/SecretsGuardStage.js');
+      const { default: SecretsGuardStage } = await import(
+        '../pipeline/stages/SecretsGuardStage.js'
+      );
       stages.push(
         new SecretsGuardStage({
           enabled: true,
-          redactionMode: options.secretsRedactMode || config().get('secretsGuard.redactionMode', 'typed'),
+          redactionMode:
+            options.secretsRedactMode || config().get('secretsGuard.redactionMode', 'typed'),
           failOnSecrets: options.failOnSecrets || config().get('secretsGuard.failOnSecrets', false),
         }),
       );
@@ -282,8 +288,7 @@ async function setupPipelineStages(basePath, profile, options) {
 
   // 12. Output Formatting Stage
   // Determine output format (default to tree if --only-tree is used)
-  const rawFormat =
-    options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'xml');
+  const rawFormat = options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'xml');
   const outputFormat =
     (rawFormat || 'xml').toString().toLowerCase() === 'md'
       ? 'markdown'
@@ -335,7 +340,9 @@ async function prepareOutput(result, options) {
   // If streaming was used, output has already been handled
   if (result.streamed) {
     const fileCount = result.files.filter((f) => f !== null).length;
-    const totalSize = result.files.filter((f) => f !== null).reduce((sum, file) => sum + (file.size || 0), 0);
+    const totalSize = result.files
+      .filter((f) => f !== null)
+      .reduce((sum, file) => sum + (file.size || 0), 0);
 
     return {
       type: 'streamed',

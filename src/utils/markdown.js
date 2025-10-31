@@ -98,10 +98,4 @@ function escapeYamlScalar(s) {
   return `"${str}"`;
 }
 
-export {
-  detectFenceLanguage,
-  chooseFence,
-  formatBeginMarker,
-  formatEndMarker,
-  escapeYamlScalar,
-};
+export { detectFenceLanguage, chooseFence, formatBeginMarker, formatEndMarker, escapeYamlScalar };

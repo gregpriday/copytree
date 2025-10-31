@@ -84,7 +84,10 @@ program
   .option('--no-validate', 'Disable configuration validation')
   .option('--secrets-guard', 'Enable automatic secret detection and redaction (default: enabled)')
   .option('--no-secrets-guard', 'Disable secret detection and redaction')
-  .option('--secrets-redact-mode <mode>', 'Redaction marker style: typed, generic, hash (default: typed)')
+  .option(
+    '--secrets-redact-mode <mode>',
+    'Redaction marker style: typed, generic, hash (default: typed)',
+  )
   .option('--fail-on-secrets', 'Exit with error if secrets are found (CI mode)')
   .option('--secrets-report <file>', 'Output secrets report to file (use - for stdout)')
   .action(async (path, options) => {

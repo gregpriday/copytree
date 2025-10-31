@@ -43,6 +43,7 @@ jest.mock('../../../src/utils/errors.js', () => ({
 
 // Mock stage classes
 jest.mock('../../../src/pipeline/stages/FileDiscoveryStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/AlwaysIncludeStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/ProfileFilterStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/FileLoadingStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/OutputFormattingStage.js', () => jest.fn());
@@ -52,6 +53,8 @@ jest.mock('../../../src/pipeline/stages/ExternalSourceStage.js', () => jest.fn()
 jest.mock('../../../src/pipeline/stages/LimitStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/CharLimitStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/StreamingOutputStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/SecretsGuardStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/InstructionsStage.js', () => jest.fn());
 
 // Mock TransformerRegistry
 jest.mock('../../../src/transforms/TransformerRegistry.js', () => ({

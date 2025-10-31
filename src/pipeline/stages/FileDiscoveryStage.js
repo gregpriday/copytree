@@ -10,6 +10,7 @@
 
 import Stage from '../Stage.js';
 import { walkWithIgnore } from '../../utils/ignoreWalker.js';
+import micromatch from 'micromatch';
 import fastGlob from 'fast-glob';
 import ignore from 'ignore';
 import fs from 'fs-extra';
@@ -61,11 +62,7 @@ class FileDiscoveryStage extends Stage {
 
       // Check if this file matches our include patterns (if specified)
       if (this.patterns.length > 0 && !this.patterns.includes('**/*')) {
-        const matches = this.patterns.some((pattern) => {
-          return fastGlob.isDynamicPattern(pattern)
-            ? fastGlob.sync(pattern, { cwd: this.basePath }).includes(relativePath)
-            : pattern === relativePath;
-        });
+        const matches = micromatch.isMatch(relativePath, this.patterns);
         if (!matches) continue;
       }
 
@@ -136,7 +133,8 @@ class FileDiscoveryStage extends Stage {
       try {
         const gitignoreContent = await fs.readFile(gitignorePath, 'utf8');
         // Strip BOM if present
-        const cleaned = gitignoreContent.charCodeAt(0) === 0xfeff ? gitignoreContent.slice(1) : gitignoreContent;
+        const cleaned =
+          gitignoreContent.charCodeAt(0) === 0xfeff ? gitignoreContent.slice(1) : gitignoreContent;
 
         const ig = ignore().add(cleaned);
         this.log('Loaded .gitignore rules', 'debug');

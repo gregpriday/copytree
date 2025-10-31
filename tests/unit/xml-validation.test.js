@@ -67,7 +67,8 @@ describe('XML Format Validation', () => {
   it('should handle instructions with CDATA end sequences', async () => {
     const stage = new OutputFormattingStage({ format: 'xml' });
 
-    const instructionsWithCDATA = 'Example instruction:\nUse pattern <![CDATA[...]]> for embedding.';
+    const instructionsWithCDATA =
+      'Example instruction:\nUse pattern <![CDATA[...]]> for embedding.';
 
     const result = await stage.process({
       basePath: '/test',

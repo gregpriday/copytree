@@ -1,5 +1,6 @@
 // Unmock fs-extra for integration tests
 jest.unmock('fs-extra');
+jest.unmock('fast-glob');
 
 // Static imports for Node.js modules
 import fs from 'fs-extra';
@@ -55,6 +56,7 @@ describe('Pipeline Integration Tests', () => {
 
     // Create test files
     await fs.writeFile(path.join(tempDir, 'index.js'), 'console.log("Hello");');
+    console.log('index.js content after creation:', await fs.readFile(path.join(tempDir, 'index.js'), 'utf8'));
     await fs.writeFile(path.join(tempDir, 'utils.js'), 'export const util = () => {};');
     await fs.writeFile(path.join(tempDir, 'test.spec.js'), 'describe("test", () => {});');
     await fs.writeFile(path.join(tempDir, 'README.md'), '# Test Project');
@@ -145,6 +147,8 @@ describe('Pipeline Integration Tests', () => {
         profile: {},
         options: {},
       });
+
+      console.log('index.js content from pipeline:', result.files.find(f => f.path === 'index.js').content);
 
       expect(result.output).toContain('<ct:directory');
       expect(result.output).toContain('<ct:file path="@index.js"');

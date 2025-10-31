@@ -30,9 +30,9 @@ describe('ignoreWalker', () => {
 
   const getIgnored = async (allFiles, options) => {
     const keptFiles = await getAllFiles(tempDir, options);
-    const keptPaths = new Set(keptFiles.map(f => f.path));
-    return allFiles.filter(f => !keptPaths.has(f));
-  }
+    const keptPaths = new Set(keptFiles.map((f) => f.path));
+    return allFiles.filter((f) => !keptPaths.has(f));
+  };
 
   it('should ignore a file specified in .copytreeignore', async () => {
     const allFiles = await createProject({
@@ -61,7 +61,7 @@ describe('ignoreWalker', () => {
       path.join(tempDir, 'nested/b.txt'),
     ].sort();
 
-    const ignoredPaths = ignored.map(p => path.join(p));
+    const ignoredPaths = ignored.map((p) => path.join(p));
     expect(ignoredPaths.sort()).toEqual(expected);
   });
 
