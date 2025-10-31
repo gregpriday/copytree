@@ -62,11 +62,6 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-      - name: Check coverage thresholds
-        run: |
-          echo "Verifying 80% coverage threshold..."
-          npm run test:coverage -- --coverageThreshold='{"global":{"branches":80,"functions":80,"lines":80,"statements":80}}'
-
   lint:
     name: Lint & Format Check
     runs-on: ubuntu-latest

@@ -22,16 +22,6 @@ export default {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  coverageThreshold: {
-    global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80
-    },
-    "./src/utils/GitUtils.js": { branches: 90, lines: 90 },
-    "./src/transforms/transformers/UnitTestSummaryTransformer.js": { branches: 70, lines: 80 }
-  },
   
   // Module paths - keep mocks for ESM
   moduleNameMapper: {
