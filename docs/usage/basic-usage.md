@@ -118,12 +118,12 @@ copytree --clipboard
 ### 2. File Output
 
 ```bash
-# Save to specific file (default markdown)
-copytree --output project-snapshot.md
+# Save to specific file (defaults to xml)
+copytree --output project-snapshot.xml
 
 # Different formats
 copytree --output snapshot.json --format json
-copytree --output snapshot.xml --format xml
+copytree --output snapshot.md --format markdown
 ```
 
 ### 3. Console Display
