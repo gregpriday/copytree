@@ -34,13 +34,13 @@ class MarkdownTransformer extends BaseTransformer {
     let transformedContent;
 
     switch (this.mode) {
-      case 'html':
-        transformedContent = this.convertToHtml(content);
-        break;
-      case 'strip':
-      default:
-        transformedContent = this.stripMarkdown(content);
-        break;
+    case 'html':
+      transformedContent = this.convertToHtml(content);
+      break;
+    case 'strip':
+    default:
+      transformedContent = this.stripMarkdown(content);
+      break;
     }
 
     return {

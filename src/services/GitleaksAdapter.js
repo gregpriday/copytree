@@ -119,9 +119,9 @@ class GitleaksAdapter {
           const findings = JSON.parse(error.stdout);
           return Array.isArray(findings)
             ? findings.map((f) => ({
-                ...f,
-                File: logicalPath,
-              }))
+              ...f,
+              File: logicalPath,
+            }))
             : [];
         } catch (parseError) {
           // If we can't parse the output, treat it as no findings

@@ -38,30 +38,30 @@ class SortFilesStage extends Stage {
       let compareValue = 0;
 
       switch (this.sortBy) {
-        case 'size':
-          compareValue = this.compareBySize(a, b);
-          break;
+      case 'size':
+        compareValue = this.compareBySize(a, b);
+        break;
 
-        case 'modified':
-          compareValue = this.compareByModified(a, b);
-          break;
+      case 'modified':
+        compareValue = this.compareByModified(a, b);
+        break;
 
-        case 'name':
-          compareValue = this.compareByName(a, b);
-          break;
+      case 'name':
+        compareValue = this.compareByName(a, b);
+        break;
 
-        case 'extension':
-          compareValue = this.compareByExtension(a, b);
-          break;
+      case 'extension':
+        compareValue = this.compareByExtension(a, b);
+        break;
 
-        case 'depth':
-          compareValue = this.compareByDepth(a, b);
-          break;
+      case 'depth':
+        compareValue = this.compareByDepth(a, b);
+        break;
 
-        case 'path':
-        default:
-          compareValue = this.compareByPath(a, b);
-          break;
+      case 'path':
+      default:
+        compareValue = this.compareByPath(a, b);
+        break;
       }
 
       // Apply sort order

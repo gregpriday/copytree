@@ -172,9 +172,9 @@ class MarkdownFormatter {
               typeof content === 'string'
                 ? content
                 : this.stage.config.get(
-                    'copytree.binaryPlaceholderText',
-                    '[Binary file not included]',
-                  ) || '',
+                  'copytree.binaryPlaceholderText',
+                  '[Binary file not included]',
+                ) || '',
             );
           } else {
             // skip mode: emit empty block

@@ -221,18 +221,18 @@ const ConfigInspectView = () => {
     // Show configurations by section or all if specific section requested
     specificSection
       ? React.createElement(ConfigSection, {
-          sectionName: specificSection,
-          configs: effectiveConfig,
-          showSectionHeader: false,
-        })
+        sectionName: specificSection,
+        configs: effectiveConfig,
+        showSectionHeader: false,
+      })
       : sections.map((sectionName) =>
-          React.createElement(ConfigSection, {
-            key: sectionName,
-            sectionName,
-            configs: effectiveConfig,
-            showSectionHeader: true,
-          }),
-        ),
+        React.createElement(ConfigSection, {
+          key: sectionName,
+          sectionName,
+          configs: effectiveConfig,
+          showSectionHeader: true,
+        }),
+      ),
 
     // Show legend
     React.createElement(Box, { marginTop: 1 }),
