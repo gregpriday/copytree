@@ -4,10 +4,29 @@
  * Utilities for creating, managing, and cleaning up test fixtures.
  */
 
-import fs from 'fs-extra';
 import path from 'path';
 import { execSync } from 'child_process';
 import { createTestTempDir } from './tempfs.js';
+
+// For E2E tests and golden files, we need the REAL fs-extra, not the mocked version
+// We'll get the actual implementation directly from the module
+let fsExtra;
+try {
+  // In Jest context, use requireActual to bypass mocks
+  fsExtra = typeof jest !== 'undefined' ? jest.requireActual('fs-extra') : null;
+} catch (e) {
+  fsExtra = null;
+}
+
+// Create our fs object with the functions we need
+const fs = {
+  ensureDirSync: fsExtra?.ensureDirSync || fsExtra?.default?.ensureDirSync,
+  writeFileSync: fsExtra?.writeFileSync || fsExtra?.default?.writeFileSync,
+  readFileSync: fsExtra?.readFileSync || fsExtra?.default?.readFileSync,
+  existsSync: fsExtra?.existsSync || fsExtra?.default?.existsSync,
+  removeSync: fsExtra?.removeSync || fsExtra?.default?.removeSync,
+  copySync: fsExtra?.copySync || fsExtra?.default?.copySync,
+};
 
 // Jest-compatible directory resolution
 const FIXTURES_DIR = path.join(process.cwd(), 'tests', 'fixtures');
@@ -327,21 +346,55 @@ export function createRobustnessFixtures(name = 'robustness') {
  * Jest custom matcher for golden files
  */
 export function toMatchGolden(received, goldenName, options = {}) {
-  const pass = matchGolden(received, goldenName, options);
+  const update = process.env.UPDATE_GOLDEN === 'true' || options.update;
 
-  if (pass) {
+  if (update) {
+    // Update mode: write golden and pass
+    writeGolden(goldenName, received);
     return {
       pass: true,
-      message: () => `Expected content not to match golden file ${goldenName}`,
+      message: () => `Golden file ${goldenName} updated`,
     };
-  } else {
+  }
+
+  // Comparison mode: read and compare
+  try {
     const golden = readGolden(goldenName);
+    const pass = received === golden;
+
+    if (pass) {
+      return {
+        pass: true,
+        message: () => `Expected content not to match golden file ${goldenName}`,
+      };
+    } else {
+      // Get jest-diff - handle both CommonJS and ESM
+      let jestDiff;
+      try {
+        jestDiff = typeof jest !== 'undefined' ? jest.requireActual('jest-diff') : null;
+        // Handle ESM default export
+        if (jestDiff && jestDiff.default) {
+          jestDiff = jestDiff.default;
+        }
+      } catch {
+        // Fallback: just show a simple message without diff
+        jestDiff = null;
+      }
+
+      const diffOutput = jestDiff
+        ? jestDiff(golden, received)
+        : `Expected:\n${golden}\n\nReceived:\n${received}`;
+
+      return {
+        pass: false,
+        message: () => `Expected content to match golden file ${goldenName}\n\n${diffOutput}`,
+      };
+    }
+  } catch (error) {
     return {
       pass: false,
-      message: () => {
-        const diff = require('jest-diff').default(golden, received);
-        return `Expected content to match golden file ${goldenName}\n\n${diff}`;
-      },
+      message: () =>
+        `Golden file ${goldenName} not found. Run with UPDATE_GOLDEN=true to create it.\nError: ${error.message}`,
     };
   }
 }

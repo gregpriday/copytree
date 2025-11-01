@@ -1,6 +1,8 @@
 // Global test setup
 // This file runs before all tests
 
+import { toMatchGolden } from './helpers/fixtures.js';
+
 // Set test environment variables
 process.env.NODE_ENV = 'test';
 process.env.COPYTREE_CACHE_ENABLED = 'false'; // Disable caching in tests
@@ -36,6 +38,9 @@ expect.extend({
           : `expected files to contain ${filepath}`,
     };
   },
+
+  // Register golden file matcher
+  toMatchGolden,
 });
 
 // Global test utilities
