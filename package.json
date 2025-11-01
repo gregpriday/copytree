@@ -70,15 +70,18 @@
     "@babel/preset-react": "^7.27.1",
     "@babel/register": "^7.27.1",
     "@types/node": "^24.9.2",
-    "babel-jest": "^30.0.4",
+    "babel-jest": "^30.2.0",
     "eslint": "^9.18.0",
     "fast-xml-parser": "^5.3.0",
     "ink-testing-library": "^4.0.0",
     "jest": "^30.0.4",
-    "jest-mock-fs": "^1.0.2",
     "prettier": "^3.5.0",
     "sharp": "^0.34.3",
     "strip-ansi": "^7.1.0",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "test-exclude": "^7.0.1",
+    "glob": "^10.4.5"
   }
 }

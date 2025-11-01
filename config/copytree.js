@@ -19,9 +19,10 @@ export default {
   // Global excluded files (excluded by name pattern)
   globalExcludedFiles: [
     // Lock files
-    'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
-    'composer.lock', 'Gemfile.lock', 'Pipfile.lock',
-    'poetry.lock', 'Cargo.lock', 'pubspec.lock',
+    'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'shrinkwrap.yaml',
+    'composer.lock', 'Gemfile.lock', 'Pipfile.lock', 'poetry.lock', 'uv.lock', 'pdm.lock', 'requirements.lock',
+    'Cargo.lock', 'go.sum', 'mix.lock', 'flake.lock',
+    'pubspec.lock', 'Podfile.lock', 'Cartfile.resolved', 'Package.resolved', 'deno.lock',
 
     // Environment files
     '.env', '.env.local', '.env.*.local', '.env.example',
