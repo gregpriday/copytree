@@ -83,7 +83,22 @@ program
   )
   .option('--fail-on-secrets', 'Exit with error if secrets are found (CI mode)')
   .option('--secrets-report <file>', 'Output secrets report to file (use - for stdout)')
-  .action(async (path, options) => {
+  .action(async (targetPath, options) => {
+    // Auto-detect format from output file extension
+    if (!options.format && options.output) {
+      const formatByExt = {
+        '.json': 'json',
+        '.md': 'markdown',
+        '.markdown': 'markdown',
+        '.ndjson': 'ndjson',
+        '.sarif': 'sarif',
+      };
+      const inferred = formatByExt[path.extname(options.output).toLowerCase()];
+      if (inferred) {
+        options.format = inferred;
+      }
+    }
+
     if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
@@ -93,7 +108,7 @@ program
     render(
       React.createElement(App, {
         command: 'copy',
-        path: path || '.',
+        path: targetPath || '.',
         options,
       }),
     );

@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 /**
  * SARIF (Static Analysis Results Interchange Format) Formatter
  *
@@ -171,13 +174,21 @@ class SARIFFormatter {
    * @returns {string} file:// URI
    * @private
    */
-  _toFileUri(path) {
-    // Simple conversion - SARIF viewers can handle relative paths too
-    // If path is already absolute, prefix with file://
-    if (path.startsWith('/')) {
-      return `file://${path}`;
+  _toFileUri(fileSystemPath) {
+    if (!fileSystemPath) {
+      return undefined;
     }
-    return path;
+
+    if (fileSystemPath.startsWith('file://')) {
+      return fileSystemPath;
+    }
+
+    if (path.isAbsolute(fileSystemPath)) {
+      return pathToFileURL(fileSystemPath).href;
+    }
+
+    // Normalize relative Windows-style paths for SARIF consumers
+    return fileSystemPath.replace(/\\/g, '/');
   }
 }
 

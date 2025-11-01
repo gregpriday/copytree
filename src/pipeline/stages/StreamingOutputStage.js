@@ -2,6 +2,7 @@ import Stage from '../Stage.js';
 import { Transform } from 'stream';
 // const { create } = require('xmlbuilder2'); // Currently unused
 import path from 'path';
+import { pathToFileURL } from 'url';
 import {
   detectFenceLanguage,
   chooseFence,
@@ -608,6 +609,12 @@ class StreamingOutputStage extends Stage {
           return result;
         });
 
+        const fileCount = files.length;
+        const totalSize = this.calculateTotalSize(files);
+        const basePath = input.basePath || '';
+        const workingDirectoryUri =
+          basePath && path.isAbsolute(basePath) ? pathToFileURL(basePath).href : basePath;
+
         const sarif = {
           $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
           version: '2.1.0',
@@ -646,16 +653,15 @@ class StreamingOutputStage extends Stage {
                   executionSuccessful: true,
                   endTimeUtc: new Date().toISOString(),
                   workingDirectory: {
-                    uri: input.basePath.startsWith('/')
-                      ? `file://${input.basePath}`
-                      : input.basePath,
+                    uri: workingDirectoryUri,
                   },
                 },
               ],
               properties: {
                 profile: input.profile?.name || 'default',
-                fileCount: files.length,
-                totalSize: this.calculateTotalSize(files),
+                fileCount,
+                skippedFiles,
+                totalSize,
                 git: input.gitMetadata
                   ? {
                       branch: input.gitMetadata.branch || null,
@@ -684,14 +690,18 @@ class StreamingOutputStage extends Stage {
 
   async streamFiles(input, transformStream) {
     // Process files one at a time to manage memory
+    let processed = 0;
+
     for (const file of input.files) {
       if (file !== null) {
         transformStream.write(file);
 
         // Small delay to prevent overwhelming the stream
-        if (input.files.indexOf(file) % 100 === 0) {
+        if (processed % 100 === 0) {
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
+
+        processed++;
       }
     }
 
