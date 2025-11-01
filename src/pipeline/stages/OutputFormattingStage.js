@@ -2,6 +2,8 @@ import Stage from '../Stage.js';
 import path from 'path';
 import XMLFormatter from '../formatters/XMLFormatter.js';
 import MarkdownFormatter from '../formatters/MarkdownFormatter.js';
+import NDJSONFormatter from '../formatters/NDJSONFormatter.js';
+import SARIFFormatter from '../formatters/SARIFFormatter.js';
 
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
@@ -54,6 +56,24 @@ class OutputFormattingStage extends Stage {
         break;
       case 'markdown': {
         const formatter = new MarkdownFormatter({
+          stage: this,
+          addLineNumbers: this.addLineNumbers,
+          onlyTree: this.onlyTree,
+        });
+        output = await formatter.format(input);
+        break;
+      }
+      case 'ndjson': {
+        const formatter = new NDJSONFormatter({
+          stage: this,
+          addLineNumbers: this.addLineNumbers,
+          onlyTree: this.onlyTree,
+        });
+        output = await formatter.format(input);
+        break;
+      }
+      case 'sarif': {
+        const formatter = new SARIFFormatter({
           stage: this,
           addLineNumbers: this.addLineNumbers,
           onlyTree: this.onlyTree,
