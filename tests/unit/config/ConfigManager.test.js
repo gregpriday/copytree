@@ -6,8 +6,9 @@ jest.mock('../../../src/config.js', () => import('../../mocks/config.js'));
 
 // Static imports for Node.js modules
 import fs from 'fs-extra';
-import path from 'path';
-import os from 'os';
+
+// Import temp file management helpers
+import { withTempDir, settleFs } from '../../helpers/tempfs.js';
 
 // Use dynamic import for module under test
 let config, env;
@@ -19,16 +20,14 @@ beforeAll(async () => {
 });
 
 describe('ConfigManager', () => {
-  let tempDir;
   let originalEnv;
 
   beforeEach(() => {
     jest.clearAllMocks();
     originalEnv = { ...process.env };
-    tempDir = path.join(os.tmpdir(), `copytree-test-${Date.now()}`);
 
     // Mock file system operations
-    fs.mkdtempSync.mockReturnValue(tempDir);
+    fs.mkdtempSync.mockReturnValue('/mocked-temp');
     fs.existsSync.mockReturnValue(false);
     fs.ensureDirSync.mockImplementation(() => {});
     fs.readdirSync.mockReturnValue([]);

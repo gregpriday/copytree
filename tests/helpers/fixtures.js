@@ -6,12 +6,11 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import os from 'os';
 import { execSync } from 'child_process';
+import { createTestTempDir } from './tempfs.js';
 
 // Jest-compatible directory resolution
 const FIXTURES_DIR = path.join(process.cwd(), 'tests', 'fixtures');
-const TMP_DIR = path.join(os.tmpdir(), 'copytree-test');
 
 /**
  * Get path to a fixture
@@ -29,32 +28,40 @@ export function goldenPath(name) {
 
 /**
  * Get path in temp directory
+ * @deprecated Use withTempDir from tempfs.js instead for deterministic cleanup
  */
 export function tmpPath(name = '') {
-  return path.join(TMP_DIR, name);
+  // Legacy function - delegates to tempfs for proper cleanup
+  console.warn('tmpPath is deprecated - use withTempDir from tempfs.js instead');
+  const tempDir = createTestTempDir(name || 'legacy');
+  return tempDir.path;
 }
 
 /**
  * Create temp directory
+ * @deprecated Use createTestTempDir or withTempDir from tempfs.js instead
  */
-export function createTmpDir() {
-  fs.ensureDirSync(TMP_DIR);
-  return TMP_DIR;
+export async function createTmpDir() {
+  console.warn('createTmpDir is deprecated - use createTestTempDir from tempfs.js instead');
+  const tempDir = await createTestTempDir('fixtures');
+  return tempDir.path;
 }
 
 /**
  * Clean temp directory
+ * @deprecated Cleanup is automatic with withTempDir from tempfs.js
  */
 export function cleanTmpDir() {
-  if (fs.existsSync(TMP_DIR)) {
-    fs.removeSync(TMP_DIR);
-  }
+  console.warn('cleanTmpDir is deprecated - cleanup is automatic with withTempDir from tempfs.js');
+  // No-op: cleanup should be handled by withTempDir or explicit cleanup() calls
 }
 
 /**
  * Copy fixture to temp directory
+ * @deprecated Use withTempDir and copy files manually for better control
  */
 export function copyFixture(name, tmpName = name) {
+  console.warn('copyFixture is deprecated - use withTempDir and copy manually instead');
   const src = fixturePath(name);
   const dest = tmpPath(tmpName);
   fs.copySync(src, dest);
@@ -98,9 +105,16 @@ export function matchGolden(content, name, options = {}) {
 
 /**
  * Create a local git repository fixture
+ *
+ * NOTE: This function still uses legacy tmpPath. Consider using withTempDir instead:
+ * await withTempDir('repo-name', async (tempDir) => {
+ *   const repo = await createLocalGitRepoInDir(tempDir, files);
+ *   // use repo
+ * });
  */
 export function createLocalGitRepo(name, files = {}) {
-  const repoPath = tmpPath(name);
+  const tempDir = createTestTempDir(name);
+  const repoPath = tempDir.path;
   fs.ensureDirSync(repoPath);
 
   // Initialize git repo
@@ -149,6 +163,12 @@ export function createLocalGitRepo(name, files = {}) {
 
 /**
  * Create a simple project fixture programmatically
+ *
+ * NOTE: This function uses temp directory creation. Consider using withTempDir instead:
+ * await withTempDir('test-project', async (tempDir) => {
+ *   await createSimpleProjectInDir(tempDir, options);
+ *   // use project
+ * });
  */
 export function createSimpleProject(name = 'test-project', options = {}) {
   const {
@@ -170,7 +190,8 @@ export function createSimpleProject(name = 'test-project', options = {}) {
     },
   } = options;
 
-  const projectPath = tmpPath(name);
+  const tempDir = createTestTempDir(name);
+  const projectPath = tempDir.path;
   fs.ensureDirSync(projectPath);
 
   // Create files
@@ -194,11 +215,14 @@ export function createSimpleProject(name = 'test-project', options = {}) {
 
 /**
  * Create a large project for performance testing
+ *
+ * NOTE: This function uses temp directory creation. Consider using withTempDir instead.
  */
 export function createLargeProject(name, fileCount = 100, options = {}) {
   const { avgFileSize = 1024, withVariety = true } = options;
 
-  const projectPath = tmpPath(name);
+  const tempDir = createTestTempDir(name);
+  const projectPath = tempDir.path;
   fs.ensureDirSync(projectPath);
 
   const extensions = withVariety
@@ -229,9 +253,12 @@ export function createLargeProject(name, fileCount = 100, options = {}) {
 
 /**
  * Create malformed/edge-case files for robustness testing
+ *
+ * NOTE: This function uses temp directory creation. Consider using withTempDir instead.
  */
 export function createRobustnessFixtures(name = 'robustness') {
-  const projectPath = tmpPath(name);
+  const tempDir = createTestTempDir(name);
+  const projectPath = tempDir.path;
   fs.ensureDirSync(projectPath);
 
   const fixtures = {

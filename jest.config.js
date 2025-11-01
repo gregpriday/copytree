@@ -1,6 +1,6 @@
 export default {
   testEnvironment: 'node',
-  
+
   // Test file patterns
   testMatch: [
     '**/tests/**/*.test.js',
@@ -8,7 +8,7 @@ export default {
     '**/tests/**/*.test.jsx',
     '**/tests/**/*.spec.jsx'
   ],
-  
+
   // Coverage configuration
   collectCoverage: false, // Set to true when running coverage
   collectCoverageFrom: [
@@ -22,7 +22,15 @@ export default {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+  },
+
   // Module paths - keep mocks for ESM
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
@@ -34,13 +42,13 @@ export default {
     '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
     '^ink$': '<rootDir>/tests/mocks/ink.js'
   },
-  
+
   // Module directories
   moduleDirectories: ['node_modules', 'src'],
-  
+
   // Setup files
   setupFiles: ['<rootDir>/tests/setup-mocks.js'],
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js', '<rootDir>/tests/jest.setup.js'],
   
   // Transform files for ESM
   transform: {
