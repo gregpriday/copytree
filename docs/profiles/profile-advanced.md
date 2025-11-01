@@ -232,12 +232,11 @@ Apply transformers based on patterns:
 
 ```yaml
 rules:
-  # Large files get summarized
+  # Large files get previewed
   - include: "src/**/*.js"
-    transform: file-size-check
+    transform: first-lines
     transform_options:
-      threshold: 50000  # 50KB
-      fallback: ai-summary
+      lineCount: 30
   
   # Documentation gets stripped
   - include: "**/*.md"
@@ -258,14 +257,14 @@ Some transformers can work in sequence:
 
 ```yaml
 transformers:
-  # PDF extraction then summarization
+  # PDF extraction then preview
   pdf-processor:
     chain:
       - pdf-to-text
-      - ai-summary
+      - first-lines
     options:
       max_pages: 10
-      summary_length: 500
+      line_count: 50
   
   # CSV preview
   csv-preview:

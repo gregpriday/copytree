@@ -266,13 +266,12 @@ coverageThreshold: {
 - `src/pipeline/Stage.js`
 - `src/config/ConfigManager.js`
 - `src/transforms/TransformerRegistry.js`
-- `src/services/AIService.js`
 - `src/utils/GitUtils.js`
 
 #### High-Priority (90% coverage)
 
 - All pipeline stages (`src/pipeline/stages/*.js`)
-- Core transformers (FileLoader, PDF, Image, AISummary)
+- Core transformers (FileLoader, PDF, Image, CSV, Markdown)
 - Service layer (`src/services/*.js`)
 
 #### Standard (80% coverage)
@@ -356,28 +355,6 @@ All CLI commands should have comprehensive tests covering:
 - Environment variables map to config keys
 - Provenance tracks which source set each value
 - Missing values fall through to defaults
-
-### ✅ AIService Retry & Fallback Tests
-
-**Location:** `tests/unit/services/AIService.retry.test.js`
-
-**Coverage:**
-- Retryable error identification (RATE_LIMIT, TIMEOUT, etc.)
-- Non-retryable error immediate failure (INVALID_API_KEY, SAFETY_FILTER)
-- Exponential backoff implementation
-- Retry-after header respect
-- Provider fallback on failure
-- Max retry limits
-- Attempt tracking and logging
-
-**Test Count:** 23 tests
-
-**Key Validations:**
-- Retries up to 3 times on retryable errors
-- Fails immediately on non-retryable errors
-- Exponential backoff delays are correct
-- Falls back to secondary providers
-- All providers exhausted before final failure
 
 ---
 
@@ -626,7 +603,6 @@ jobs:
 - ✅ Pipeline event contract tests
 - ✅ Transformer trait enforcement tests
 - ✅ Config hierarchy tests
-- ✅ AIService retry/fallback tests
 
 **Status:** All core test infrastructure is in place and validated.
 

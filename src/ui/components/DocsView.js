@@ -550,10 +550,6 @@ git:
 ## Environment Variables
 
 \`\`\`bash
-# API Keys
-export GEMINI_API_KEY=your-key-here
-export OPENAI_API_KEY=your-key-here
-
 # Paths
 export COPYTREE_CONFIG=~/custom-config.yml
 export COPYTREE_CACHE_DIR=~/custom-cache

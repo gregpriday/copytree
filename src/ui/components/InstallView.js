@@ -192,7 +192,6 @@ async function createDirectories() {
     path.join(homeDir, '.copytree'),
     path.join(homeDir, '.copytree', 'profiles'),
     path.join(homeDir, '.copytree', 'cache'),
-    path.join(homeDir, '.copytree', 'cache', 'ai'),
     path.join(homeDir, '.copytree', 'cache', 'transforms'),
     path.join(homeDir, '.copytree', 'external-sources'),
     path.join(homeDir, '.copytree', 'logs'),

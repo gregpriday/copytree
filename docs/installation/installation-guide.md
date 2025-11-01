@@ -93,9 +93,8 @@ copytree install:copytree
 
 This will:
 - Create `~/.copytree/` configuration directory
-- Set up AI provider credentials
 - Configure default settings
-- Test API connections
+- Validate configuration
 
 ### 3. Manual Configuration
 

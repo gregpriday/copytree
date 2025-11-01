@@ -41,9 +41,9 @@ rules:
       maxPages: 20
       
   - include: "assets/**/*.{png,jpg}"
-    transform: image-description         # Apply image description
+    transform: image                     # Apply OCR
     transform_options:
-      model: gemini-1.5-flash
+      extractText: true
 
 # External source configuration
 external:
@@ -105,22 +105,6 @@ transformers:
       maxRows: 20
       delimiter: ","
   
-  # AI-powered summarization
-  ai-summary:
-    enabled: true
-    options:
-      extensions: [".js", ".ts", ".py", ".java"]
-      maxFileSize: 102400   # 100KB
-      includeOriginal: false
-  
-  # Image description
-  image-description:
-    enabled: true
-    options:
-      maxImageSize: 10485760  # 10MB
-      model: gemini-1.5-flash
-      prompt: "Describe this image focusing on UI/UX elements"
-  
   # First lines extraction
   first-lines:
     enabled: true
@@ -156,20 +140,20 @@ environments:
       maxFileSize: 10485760   # 10MB in dev
       maxTotalSize: 104857600 # 100MB in dev
     transformers:
-      ai-summary:
+      pdf:
         enabled: true
         options:
-          includeOriginal: true
-          
+          maxPages: 100
+
   production:
     options:
       maxFileSize: 1048576    # 1MB in prod
       maxTotalSize: 20971520  # 20MB in prod
     transformers:
-      ai-summary:
-        enabled: false        # Disable AI in prod
-      image-description:
-        enabled: false
+      pdf:
+        enabled: true
+        options:
+          maxPages: 20        # Limit pages in prod
 
 # Advanced patterns examples
 patterns:

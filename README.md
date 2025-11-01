@@ -197,7 +197,7 @@ For detailed guides, see the `docs/` directory:
 - **[Getting Started](docs/index.md)** - Introduction and quick start
 - **[CLI Reference](docs/cli/copytree-reference.md)** - Complete command options
 - **[Profile Overview](docs/profiles/profile-overview.md)** - Creating and using profiles
-- **[Transformer Reference](docs/profiles/transformer-reference.md)** - All 15+ transformers explained
+- **[Transformer Reference](docs/profiles/transformer-reference.md)** - All 13 transformers explained
 - **[Architecture](docs/technical/architecture.md)** - Pipeline and system design
 - **[Troubleshooting](docs/usage/troubleshooting.md)** - Common issues and solutions
 

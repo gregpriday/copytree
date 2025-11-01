@@ -115,12 +115,11 @@ rules:
   - exclude: ".tmp/**"
 
 transformers:
-  # Summarize large files
-  ai-summary:
+  # Preview large files
+  first-lines:
     enabled: true
     options:
-      maxLength: 1000
-      filesOver: 50000  # 50KB
+      lineCount: 50
 ```
 
 ## Documentation Website

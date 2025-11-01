@@ -280,7 +280,6 @@ copytree -v
 - `1` - Profile validation or loading errors
 - `2` - Invalid option combination
 - `3` - File system or Git errors
-- `4` - AI service errors
 
 ## Examples
 

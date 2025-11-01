@@ -217,7 +217,6 @@ program
   .command('cache:clear')
   .description('Clear all caches')
   .option('--transformations', 'Clear only transformation cache')
-  .option('--ai', 'Clear only AI cache')
   .option('--git', 'Clear only git cache')
   .option('--profiles', 'Clear only profile detection cache')
   .option('--gc', 'Run garbage collection on expired entries')
