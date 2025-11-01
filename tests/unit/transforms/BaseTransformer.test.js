@@ -47,7 +47,7 @@ describe('BaseTransformer', () => {
   describe('constructor', () => {
     test('should initialize with default options', () => {
       expect(transformer.options).toEqual({});
-      expect(transformer.cacheEnabled).toBe(false); // Default for non-AI transformers
+      expect(transformer.cacheEnabled).toBe(true); // Default is now true per config
       expect(transformer.cacheTTL).toBe(86400);
     });
 

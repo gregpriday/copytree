@@ -1,6 +1,10 @@
 // Global mocks setup
 // This file sets up mocks that need to be available before any modules are loaded
 
+// Mock import.meta for ESM support in Jest
+// This allows import.meta.url to work in transformed code
+global.importMeta = { url: 'file://' + __dirname + '/test.js' };
+
 // Mock ConfigManager
 jest.mock('../src/config/ConfigManager.js', () => {
   const mockConfigData = {

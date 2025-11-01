@@ -34,6 +34,8 @@ export default {
   // Module paths - keep mocks for ESM
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
+    '^chalk$': '<rootDir>/tests/mocks/chalk.js',
+    '^ora$': '<rootDir>/tests/mocks/ora.js',
     '^.*/config/ConfigManager\\.js$': '<rootDir>/tests/mocks/ConfigManager.js',
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
@@ -57,7 +59,7 @@ export default {
   
   // Transform ignore patterns to handle ES modules
   transformIgnorePatterns: [
-    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy|marked|strip-ansi|ansi-regex)/)'
+    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy|marked|strip-ansi|ansi-regex|chalk|ora)/)'
   ],
   
   // Ignore patterns
