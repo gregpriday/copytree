@@ -89,6 +89,29 @@ Before finishing any code changes, verify:
 5. ✅ **Git Flow followed** - Correct branch type, no direct commits to main/develop
 6. ✅ **Docs updated** - If public API changed, update relevant `@docs/` files
 
+## Issue Prioritization
+
+When creating or triaging issues, assign priority labels using `gh issue edit <number> --add-label "priority-X"`:
+
+**Priority Labels:**
+- `priority-0 🔥` - Production outage, security incident, data loss. **Immediate response required.**
+- `priority-1 ⏱️` - High impact or blocks quality work. Flaky tests, critical test gaps, user-facing bugs with no workaround.
+- `priority-2 ⚙️` - Planned work. Quality improvements, feature additions, security enhancements, code cleanup.
+- `priority-3 🌿` - Low impact polish. Documentation improvements, UX enhancements, nice-to-have features.
+- `untriaged ❓` - Needs review and prioritization.
+
+**CopyTree-Specific Guidelines:**
+- **Priority-1**: Test flakiness, missing E2E tests, user docs showing removed features, CI/CD reliability issues
+- **Priority-2**: Performance infrastructure, transformer additions, profile system improvements, secrets detection
+- **Priority-3**: CLI help parity, release workflow polish, UI formatting improvements
+- **Always Priority-1**: Issues that block expanding test coverage or undermine existing tests
+
+**Before Assigning:**
+1. Consider impact on users vs developers
+2. Check if it blocks other work (test infrastructure blocks quality improvements)
+3. Identify relationships/dependencies between issues
+4. Prioritize fixing broken things over adding new things
+
 ## Prompting Patterns (For Users)
 
 Increase adherence by starting sessions with:
