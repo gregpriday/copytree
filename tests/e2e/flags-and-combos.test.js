@@ -15,11 +15,7 @@ const PROJECT = path.resolve(process.cwd(), 'tests/fixtures/simple-project');
 
 describe('Flags and combinations', () => {
   test('--with-line-numbers (XML)', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--with-line-numbers',
-      '--display',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--with-line-numbers', '--display']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');
@@ -29,11 +25,7 @@ describe('Flags and combinations', () => {
   }, 30000);
 
   test('--only-tree (tree structure only)', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--only-tree',
-      '--display',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--only-tree', '--display']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');
@@ -158,11 +150,7 @@ describe('Flags and combinations', () => {
   }, 30000);
 
   test('--show-size flag', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--show-size',
-      '--display',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--show-size', '--display']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');

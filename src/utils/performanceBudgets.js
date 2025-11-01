@@ -562,7 +562,8 @@ export class PerformanceTelemetry {
         type: 'transformation_performance',
         severity: 'medium',
         description: 'File transformations are frequently slow',
-        recommendation: 'Enable transformation result caching and consider reducing transformation complexity',
+        recommendation:
+          'Enable transformation result caching and consider reducing transformation complexity',
       });
     }
 

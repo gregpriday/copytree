@@ -59,11 +59,7 @@ describe('Negative cases', () => {
   }, 30000);
 
   test('conflicting flags --clipboard and --display', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--clipboard',
-      '--display',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--clipboard', '--display']);
 
     // This might succeed or fail depending on implementation
     // If it fails, capture the error message
@@ -78,11 +74,7 @@ describe('Negative cases', () => {
   }, 30000);
 
   test('invalid filter pattern', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--filter',
-      '[invalid-regex-[',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--filter', '[invalid-regex-[']);
 
     // May fail with pattern error or succeed by treating it literally
     if (code !== 0) {

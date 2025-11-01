@@ -22,12 +22,7 @@ describe('Output formats', () => {
   }, 30000);
 
   test('JSON format', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--format',
-      'json',
-      '--display',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--format', 'json', '--display']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');
@@ -37,12 +32,7 @@ describe('Output formats', () => {
   }, 30000);
 
   test('Markdown format', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--format',
-      'markdown',
-      '--display',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--format', 'markdown', '--display']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');
@@ -52,12 +42,7 @@ describe('Output formats', () => {
   }, 30000);
 
   test('Tree format', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--format',
-      'tree',
-      '--display',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--format', 'tree', '--display']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');

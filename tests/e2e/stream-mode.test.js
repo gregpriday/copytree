@@ -11,12 +11,7 @@ const PROJECT = path.resolve(process.cwd(), 'tests/fixtures/simple-project');
 
 describe('Stream mode', () => {
   test('--stream with tree format', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--stream',
-      '--format',
-      'tree',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'tree']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');
@@ -39,12 +34,7 @@ describe('Stream mode', () => {
   }, 30000);
 
   test('--stream with JSON format', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--stream',
-      '--format',
-      'json',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'json']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');
@@ -54,12 +44,7 @@ describe('Stream mode', () => {
   }, 30000);
 
   test('--stream with markdown format', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--stream',
-      '--format',
-      'markdown',
-    ]);
+    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'markdown']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');
