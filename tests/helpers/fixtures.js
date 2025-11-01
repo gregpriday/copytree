@@ -371,10 +371,12 @@ export function toMatchGolden(received, goldenName, options = {}) {
       // Get jest-diff - handle both CommonJS and ESM
       let jestDiff;
       try {
-        jestDiff = typeof jest !== 'undefined' ? jest.requireActual('jest-diff') : null;
-        // Handle ESM default export
-        if (jestDiff && jestDiff.default) {
-          jestDiff = jestDiff.default;
+        const jestDiffModule = typeof jest !== 'undefined' ? jest.requireActual('jest-diff') : null;
+        // Handle different export shapes: { diff }, { default }, or direct callable
+        jestDiff = jestDiffModule?.diff || jestDiffModule?.default || jestDiffModule;
+        // Ensure it's actually a function
+        if (typeof jestDiff !== 'function') {
+          jestDiff = null;
         }
       } catch {
         // Fallback: just show a simple message without diff

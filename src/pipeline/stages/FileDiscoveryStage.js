@@ -41,11 +41,17 @@ class FileDiscoveryStage extends Stage {
     // 1. Add global exclusions from config (highest priority, always excluded)
     const globalExcluded = config().get('copytree.globalExcludedDirectories', []);
     const basePathExcluded = config().get('copytree.basePathExcludedDirectories', []);
+    const globalExcludedFiles = config().get('copytree.globalExcludedFiles', []);
 
-    if (globalExcluded.length > 0 || basePathExcluded.length > 0) {
+    if (
+      globalExcluded.length > 0 ||
+      basePathExcluded.length > 0 ||
+      globalExcludedFiles.length > 0
+    ) {
       const globalRules = [
         ...globalExcluded.map((dir) => `${dir}/**`), // Exclude directory and all contents
         ...globalExcluded.map((dir) => dir), // Also exclude the directory itself
+        ...globalExcludedFiles, // Add file patterns (lock files, OS files, etc.)
       ];
 
       // Base path exclusions only apply at project root
@@ -55,7 +61,7 @@ class FileDiscoveryStage extends Stage {
       initialLayers.push({ base: this.basePath, ig: globalLayer });
 
       this.log(
-        `Applied ${globalExcluded.length} global + ${basePathExcluded.length} base exclusions`,
+        `Applied ${globalExcluded.length} global + ${basePathExcluded.length} base + ${globalExcludedFiles.length} file exclusions`,
         'debug',
       );
     }

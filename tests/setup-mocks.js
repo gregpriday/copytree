@@ -37,7 +37,7 @@ jest.mock('../src/config/ConfigManager.js', () => {
       prefix: 'copytree_',
       defaultTtl: 3600,
       transformations: {
-        enabled: true,
+        enabled: false, // Default for non-AI transformers
         ttl: 86400,
       },
     },

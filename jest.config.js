@@ -56,11 +56,9 @@ export default {
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest'
   },
-  
-  // Transform ignore patterns to handle ES modules
-  transformIgnorePatterns: [
-    'node_modules/(?!(globby|slash|fast-glob|@fastify|p-limit|p-timeout|p-queue|eventemitter3|clipboardy|marked|strip-ansi|ansi-regex|chalk|ora)/)'
-  ],
+
+  // Transform all node_modules ESM packages for Jest compatibility
+  transformIgnorePatterns: [],
   
   // Ignore patterns
   testPathIgnorePatterns: [
