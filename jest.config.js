@@ -34,6 +34,8 @@ export default {
   // Module paths - keep mocks for ESM
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
+    '^chalk$': '<rootDir>/tests/mocks/chalk.js',
+    '^ora$': '<rootDir>/tests/mocks/ora.js',
     '^.*/config/ConfigManager\\.js$': '<rootDir>/tests/mocks/ConfigManager.js',
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
@@ -54,8 +56,7 @@ export default {
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest'
   },
-  
-  // Transform ignore patterns to handle ES modules
+
   // Transform all node_modules ESM packages for Jest compatibility
   transformIgnorePatterns: [],
   

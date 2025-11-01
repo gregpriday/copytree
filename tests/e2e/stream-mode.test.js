@@ -52,4 +52,24 @@ describe('Stream mode', () => {
     const normalized = normalize(stdout, { projectRoot: PROJECT });
     expect(normalized).toMatchGolden('stream/stream.md.golden');
   }, 30000);
+
+  test('--stream with NDJSON format', async () => {
+    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'ndjson']);
+
+    expect(code).toBe(0);
+    expect(stderr).toBe('');
+
+    const normalized = normalize(stdout, { projectRoot: PROJECT });
+    expect(normalized).toMatchGolden('stream/stream.ndjson.golden');
+  }, 30000);
+
+  test('--stream with SARIF format', async () => {
+    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'sarif']);
+
+    expect(code).toBe(0);
+    expect(stderr).toBe('');
+
+    const normalized = normalize(stdout, { projectRoot: PROJECT });
+    expect(normalized).toMatchGolden('stream/stream.sarif.golden');
+  }, 30000);
 });

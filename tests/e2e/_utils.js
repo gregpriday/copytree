@@ -100,6 +100,14 @@ export function normalize(text, options = {}) {
     if (line === lastLine && line.includes('%')) {
       continue;
     }
+    // Skip progress indicator lines (⏳, ✓, etc.) and status messages
+    if (line.match(/^[⏳✓✗⚠️🔍📁📝🖥️]\s/)) {
+      continue;
+    }
+    // Skip ANSI escape sequences that weren't removed
+    if (line.match(/^\[[\dK;A-Z]+/)) {
+      continue;
+    }
     uniqueLines.push(line);
     lastLine = line;
   }

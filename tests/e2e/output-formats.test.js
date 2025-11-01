@@ -1,7 +1,7 @@
 /**
  * E2E Tests: Output Formats
  *
- * Tests all four output formats (XML, JSON, Markdown, tree) for stability
+ * Tests all output formats (XML, JSON, Markdown, NDJSON, SARIF, tree) for stability
  * and regression protection using golden files.
  */
 
@@ -52,5 +52,25 @@ describe('Output formats', () => {
       sortTreeLines: true,
     });
     expect(normalized).toMatchGolden('default/simple.tree.golden');
+  }, 30000);
+
+  test('NDJSON format', async () => {
+    const { code, stdout, stderr } = await runCli([PROJECT, '--format', 'ndjson', '--display']);
+
+    expect(code).toBe(0);
+    expect(stderr).toBe('');
+
+    const normalized = normalize(stdout, { projectRoot: PROJECT });
+    expect(normalized).toMatchGolden('default/simple.ndjson.golden');
+  }, 30000);
+
+  test('SARIF format', async () => {
+    const { code, stdout, stderr } = await runCli([PROJECT, '--format', 'sarif', '--display']);
+
+    expect(code).toBe(0);
+    expect(stderr).toBe('');
+
+    const normalized = normalize(stdout, { projectRoot: PROJECT });
+    expect(normalized).toMatchGolden('default/simple.sarif.golden');
   }, 30000);
 });

@@ -8,6 +8,12 @@ import Clipboard from '../utils/clipboard.js';
 import fs from 'fs-extra';
 import path from 'path';
 import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const pkg = JSON.parse(readFileSync(path.join(__dirname, '../../package.json'), 'utf8'));
 
 /**
  * Main copy command implementation
@@ -59,6 +65,7 @@ async function copyCommand(targetPath = '.', options = {}) {
       profile,
       options,
       startTime,
+      version: pkg.version,
     });
 
     // 6. Write secrets report if requested
@@ -392,7 +399,17 @@ async function displayOutput(outputResult, options) {
     const f = (options.format || 'xml').toString().toLowerCase();
     const format = f === 'md' ? 'markdown' : f;
     const extension =
-      format === 'json' ? 'json' : format === 'markdown' ? 'md' : format === 'tree' ? 'txt' : 'xml';
+      format === 'json'
+        ? 'json'
+        : format === 'markdown'
+          ? 'md'
+          : format === 'tree'
+            ? 'txt'
+            : format === 'ndjson'
+              ? 'ndjson'
+              : format === 'sarif'
+                ? 'sarif'
+                : 'xml';
     const os = await import('os');
     const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
     await fs.writeFile(tempFile, output, 'utf8');
@@ -445,7 +462,11 @@ async function displayOutput(outputResult, options) {
             ? 'md'
             : format === 'tree'
               ? 'txt'
-              : 'xml';
+              : format === 'ndjson'
+                ? 'ndjson'
+                : format === 'sarif'
+                  ? 'sarif'
+                  : 'xml';
       const os = await import('os');
       const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, output, 'utf8');
