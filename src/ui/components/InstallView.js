@@ -87,7 +87,6 @@ const InstallView = () => {
         const installSteps = [
           { name: 'Create directories', details: '' },
           { name: 'Copy default configuration', details: '' },
-          { name: 'Set up environment', details: '' },
           { name: 'Check dependencies', details: '' },
           { name: 'Create example profiles', details: '' },
         ];
@@ -114,30 +113,20 @@ const InstallView = () => {
         };
         setSteps([...installSteps]);
 
-        // Step 3: Set up environment
+        // Step 3: Check dependencies
         setCurrentStep(2);
-        const envSetup = await setupEnvironment();
-        installSteps[2] = {
-          name: 'Set up environment',
-          status: envSetup.created ? 'success' : 'skipped',
-          details: envSetup.message,
-        };
-        setSteps([...installSteps]);
-
-        // Step 4: Check dependencies
-        setCurrentStep(3);
         const deps = await checkDependencies();
-        installSteps[3] = {
+        installSteps[2] = {
           name: 'Check dependencies',
           status: deps.allGood ? 'success' : 'warning',
           details: deps.message,
         };
         setSteps([...installSteps]);
 
-        // Step 5: Create example profiles
-        setCurrentStep(4);
+        // Step 4: Create example profiles
+        setCurrentStep(3);
         const profiles = await createExampleProfiles();
-        installSteps[4] = {
+        installSteps[3] = {
           name: 'Create example profiles',
           status: profiles.created > 0 ? 'success' : 'skipped',
           details: `Created ${profiles.created} example profiles`,
@@ -248,13 +237,13 @@ app:
 cache:
   enabled: true
   ttl: 86400  # 24 hours
-  
+
 # Output defaults
 output:
   format: xml
   prettyPrint: true
   includeMetadata: true
-  
+
 # Git integration
 git:
   respectGitignore: true
@@ -266,39 +255,6 @@ git:
   return {
     copied: true,
     message: `Created ${userConfigPath}`,
-  };
-}
-
-/**
- * Set up environment file (same as original implementation)
- */
-async function setupEnvironment() {
-  const homeDir = os.homedir();
-  const envPath = path.join(homeDir, '.copytree', '.env');
-
-  if (await fs.pathExists(envPath)) {
-    return {
-      created: false,
-      message: 'Environment file already exists',
-    };
-  }
-
-  const envContent = `# CopyTree Environment Variables
-
-# API Keys (if needed for external integrations)
-
-# Optional Configuration
-# COPYTREE_MAX_FILE_SIZE=10485760
-# COPYTREE_MAX_TOTAL_SIZE=104857600
-# COPYTREE_CACHE_TTL=86400
-# COPYTREE_DEBUG=false
-`;
-
-  await fs.writeFile(envPath, envContent, 'utf8');
-
-  return {
-    created: true,
-    message: `Created ${envPath}`,
   };
 }
 

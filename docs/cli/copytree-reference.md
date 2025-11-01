@@ -153,7 +153,7 @@ copytree --with-git-status
 Always include these patterns (force-include), even if excluded by profile.
 
 ```bash
-copytree --always "*.config.js" --always ".env.example"
+copytree --always "*.config.js" --always "config.example.js"
 ```
 
 ### Content Options

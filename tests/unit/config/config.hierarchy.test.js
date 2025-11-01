@@ -226,83 +226,6 @@ describe('Configuration Hierarchy', () => {
     });
   });
 
-  describe('Environment Variable Mapping', () => {
-    it('maps GEMINI_API_KEY to ai.gemini.apiKey', () => {
-      configManager.loadDefault({
-        ai: { gemini: { apiKey: '' } },
-      });
-
-      // Set a test env var
-      process.env.TEST_GEMINI_API_KEY = 'env-key';
-
-      // Simulate env var mapping
-      const envConfig = {
-        ai: { gemini: { apiKey: process.env.TEST_GEMINI_API_KEY } },
-      };
-      configManager.loadEnv(envConfig);
-
-      expect(configManager.get('ai.gemini.apiKey')).toBe('env-key');
-
-      delete process.env.TEST_GEMINI_API_KEY;
-    });
-
-    it('maps GEMINI_MODEL to ai.gemini.model', () => {
-      configManager.loadDefault({
-        ai: { gemini: { model: 'default-model' } },
-      });
-
-      process.env.GEMINI_MODEL = 'env-model';
-      const envConfig = {
-        ai: { gemini: { model: process.env.GEMINI_MODEL } },
-      };
-      configManager.loadEnv(envConfig);
-
-      expect(configManager.get('ai.gemini.model')).toBe('env-model');
-    });
-
-    it('maps COPYTREE_MAX_FILE_SIZE to copytree.maxFileSize', () => {
-      configManager.loadDefault({
-        copytree: { maxFileSize: 10485760 },
-      });
-
-      process.env.COPYTREE_MAX_FILE_SIZE = '20971520';
-      const envConfig = {
-        copytree: { maxFileSize: parseInt(process.env.COPYTREE_MAX_FILE_SIZE) },
-      };
-      configManager.loadEnv(envConfig);
-
-      expect(configManager.get('copytree.maxFileSize')).toBe(20971520);
-    });
-
-    it('maps AI_CACHE_ENABLED to ai.cache.enabled', () => {
-      configManager.loadDefault({
-        ai: { cache: { enabled: false } },
-      });
-
-      process.env.AI_CACHE_ENABLED = 'true';
-      const envConfig = {
-        ai: { cache: { enabled: process.env.AI_CACHE_ENABLED === 'true' } },
-      };
-      configManager.loadEnv(envConfig);
-
-      expect(configManager.get('ai.cache.enabled')).toBe(true);
-    });
-
-    it('CLI options override environment variables', () => {
-      process.env.GEMINI_MODEL = 'env-model';
-      const envConfig = {
-        ai: { gemini: { model: process.env.GEMINI_MODEL } },
-      };
-      configManager.loadEnv(envConfig);
-
-      configManager.loadCLI({
-        ai: { gemini: { model: 'cli-model' } },
-      });
-
-      expect(configManager.get('ai.gemini.model')).toBe('cli-model');
-    });
-  });
-
   describe('Provenance Tracking', () => {
     it('tracks which source set each value', () => {
       configManager.loadDefault({ key1: 'default' });
@@ -390,49 +313,6 @@ describe('Configuration Hierarchy', () => {
 
       // Both should merge
       expect(configManager.get('value')).toBe(2); // json wins
-    });
-  });
-
-  describe('env() Function Behavior', () => {
-    it('reads environment variables with defaults', () => {
-      process.env.TEST_VAR = 'test-value';
-
-      const envFunc = (key, defaultValue = null) => {
-        return process.env[key] || defaultValue;
-      };
-
-      expect(envFunc('TEST_VAR', 'default')).toBe('test-value');
-      expect(envFunc('MISSING_VAR', 'default')).toBe('default');
-    });
-
-    it('handles empty string vs undefined', () => {
-      process.env.EMPTY_VAR = '';
-
-      const envFunc = (key, defaultValue = null) => {
-        const value = process.env[key];
-        return value !== undefined ? value : defaultValue;
-      };
-
-      expect(envFunc('EMPTY_VAR', 'default')).toBe('');
-      expect(envFunc('MISSING_VAR', 'default')).toBe('default');
-    });
-
-    it('supports type coercion for env values', () => {
-      process.env.NUMBER_VAR = '42';
-      process.env.BOOL_VAR = 'true';
-
-      const envInt = (key, defaultValue = 0) => {
-        const value = process.env[key];
-        return value !== undefined ? parseInt(value, 10) : defaultValue;
-      };
-
-      const envBool = (key, defaultValue = false) => {
-        const value = process.env[key];
-        return value !== undefined ? value === 'true' : defaultValue;
-      };
-
-      expect(envInt('NUMBER_VAR', 0)).toBe(42);
-      expect(envBool('BOOL_VAR', false)).toBe(true);
     });
   });
 

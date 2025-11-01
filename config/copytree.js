@@ -1,5 +1,3 @@
-import { env } from '../src/config/ConfigManager.js';
-
 export default {
   // Global excluded directories (always excluded regardless of location)
   // Only includes version control directories that can't be in .gitignore
@@ -12,66 +10,64 @@ export default {
     'CVS',       // CVS
     '_darcs',    // Darcs
   ],
-  
+
   // Base path excluded directories (only excluded at project root)
   // These are typically in .gitignore, but we exclude them as a safety net
   // Can be overridden by .copytreeinclude if needed
   basePathExcludedDirectories: [],
-  
+
   // Global excluded files (excluded by name pattern)
   globalExcludedFiles: [
     // Lock files
     'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
     'composer.lock', 'Gemfile.lock', 'Pipfile.lock',
     'poetry.lock', 'Cargo.lock', 'pubspec.lock',
-    
+
     // Environment files
     '.env', '.env.local', '.env.*.local', '.env.example',
-    
+
     // OS files
     '.DS_Store', 'Thumbs.db', 'desktop.ini',
     '$RECYCLE.BIN', 'ehthumbs.db', 'ehthumbs_vista.db',
-    
+
     // Logs
     '*.log', 'npm-debug.log*', 'yarn-debug.log*', 'yarn-error.log*',
     'lerna-debug.log*', 'pnpm-debug.log*',
-    
+
     // Editor files
     '*.swp', '*.swo', '*~', '*.sublime-workspace', '*.sublime-project',
-    
+
     // Compiled files
     '*.pyc', '*.pyo', '*.pyd', '__pycache__',
     '*.class', '*.jar', '*.war', '*.ear',
     '*.o', '*.obj', '*.exe', '*.dll', '*.so', '*.dylib',
     '*.ncb', '*.sdf', '*.suo', '*.pdb', '*.idb',
-    
+
     // Archives
     '*.7z', '*.dmg', '*.gz', '*.iso', '*.jar', '*.rar', '*.tar', '*.zip',
-    
-    // Media files (configurable)
-    ...(env('COPYTREE_EXCLUDE_MEDIA', true) ? [
-      '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.svg', '*.ico',
-      '*.mp3', '*.mp4', '*.avi', '*.mov', '*.wmv', '*.flv', '*.webm',
-      '*.wav', '*.flac', '*.aac', '*.ogg', '*.wma',
-    ] : []),
+
+    // Media files - always excluded
+    '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.svg', '*.ico',
+    '*.mp3', '*.mp4', '*.avi', '*.mov', '*.wmv', '*.flv', '*.webm',
+    '*.wav', '*.flac', '*.aac', '*.ogg', '*.wma',
   ],
-  
+
   // File size limits
-  maxFileSize: env('COPYTREE_MAX_FILE_SIZE', 10 * 1024 * 1024), // 10MB
-  maxTotalSize: env('COPYTREE_MAX_TOTAL_SIZE', 100 * 1024 * 1024), // 100MB
-  maxFileCount: env('COPYTREE_MAX_FILE_COUNT', 10000),
-  
+  maxFileSize: 10 * 1024 * 1024, // 10MB
+  maxTotalSize: 100 * 1024 * 1024, // 100MB
+  maxFileCount: 10000,
+
   // Output limits
-  maxOutputSize: env('COPYTREE_MAX_OUTPUT_SIZE', 50 * 1024 * 1024), // 50MB
-  maxCharacterLimit: env('COPYTREE_MAX_CHARS', 2000000), // 2M chars
-  
+  maxOutputSize: 50 * 1024 * 1024, // 50MB
+  maxCharacterLimit: 2000000, // 2M chars
+
   // Processing options
-  followSymlinks: env('COPYTREE_FOLLOW_SYMLINKS', false),
-  includeHidden: env('COPYTREE_INCLUDE_HIDDEN', false),
-  preserveEmptyDirs: env('COPYTREE_PRESERVE_EMPTY_DIRS', false),
-  
+  followSymlinks: false,
+  includeHidden: false,
+  preserveEmptyDirs: false,
+
   // Binary file handling
-  binaryFileAction: env('COPYTREE_BINARY_ACTION', 'placeholder'), // placeholder, skip, base64, comment (legacy)
+  binaryFileAction: 'placeholder', // placeholder, skip, base64, comment (legacy)
   binaryPlaceholderText: '[Binary file not included]',
 
   // Binary detection configuration
@@ -100,13 +96,13 @@ export default {
     xml: '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
     markdown: '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
   },
-  
+
   // Line number options
-  addLineNumbers: env('COPYTREE_LINE_NUMBERS', false),
-  lineNumberFormat: env('COPYTREE_LINE_NUMBER_FORMAT', '%4d: '), // printf-style format
-  
+  addLineNumbers: false,
+  lineNumberFormat: '%4d: ', // printf-style format
+
   // Tree view options
-  treeIndent: env('COPYTREE_TREE_INDENT', '  '),
+  treeIndent: '  ',
   treeConnectors: {
     middle: '├── ',
     last: '└── ',
