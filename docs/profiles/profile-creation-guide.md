@@ -215,12 +215,11 @@ transformers:
     options:
       mode: strip    # or 'html'
   
-  # AI summarization
-  ai-summary:
+  # File preview
+  first-lines:
     enabled: true
     options:
-      maxLength: 500
-      model: gemini-1.5-flash
+      lineCount: 50
 ```
 
 ### Available Transformers

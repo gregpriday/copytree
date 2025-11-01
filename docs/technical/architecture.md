@@ -341,7 +341,6 @@ class TransformStage extends Stage {
 
   _isRecoverableError(error) {
     const recoverableTypes = [
-      'AIProviderError',     // AI service failures
       'TransformError',      // Transformation failures
       'ENOTFOUND',           // Network connectivity issues
       'ETIMEDOUT',           // Request timeouts

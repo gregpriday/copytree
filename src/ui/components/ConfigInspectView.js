@@ -200,7 +200,7 @@ const ConfigInspectView = () => {
   }
 
   // Default table format
-  const sections = ['ai', 'app', 'cache', 'copytree', 'state'];
+  const sections = ['app', 'cache', 'copytree', 'state'];
   const specificSection = options.section;
 
   return React.createElement(

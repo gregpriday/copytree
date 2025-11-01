@@ -524,11 +524,7 @@ class TransformerRegistry {
       }
 
       // Check specific requirements
-      if (
-        traits.requirements.apiKey &&
-        !process.env.GEMINI_API_KEY &&
-        !process.env.OPENAI_API_KEY
-      ) {
+      if (traits.requirements.apiKey) {
         issues.push({
           type: 'missing_resource',
           severity: 'error',
@@ -737,7 +733,7 @@ class TransformerRegistry {
         heavy: true,
         stateful: false,
         dependencies: ['tesseract'],
-        conflictsWith: ['image-description'],
+        conflictsWith: [],
         requirements: {
           memory: '100MB',
         },

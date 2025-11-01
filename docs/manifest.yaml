@@ -34,7 +34,7 @@ sections:
   # Transformer documentation
   - id: transformers/reference
     title: "Transformer Reference"
-    summary: "Complete guide to all 15+ transformers and their options"
+    summary: "Complete guide to all 13 transformers and their options"
     files:
       - "profiles/transformer-reference.md"
     tags: [transformers, reference]

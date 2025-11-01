@@ -68,21 +68,20 @@ import TransformerRegistry from './TransformerRegistry.js';
 const registry = new TransformerRegistry();
 
 // Register transformer with traits
-registry.register('ai-summary', new AISummaryTransformer(), {
-  extensions: ['.js', '.py'],
+registry.register('pdf', new PDFTransformer(), {
+  extensions: ['.pdf'],
   priority: 20
 }, {
   // Traits object
-  inputTypes: ['text'],
+  inputTypes: ['binary'],
   outputTypes: ['text'],
   idempotent: true,
   orderSensitive: false,
   heavy: true,
   requirements: {
-    apiKey: true,
-    network: true
+    memory: '100MB'
   },
-  tags: ['ai', 'summary', 'expensive']
+  tags: ['pdf', 'text-extraction', 'heavy']
 });
 ```
 
@@ -131,7 +130,7 @@ The system includes predefined traits for built-in transformers:
 ### Basic Validation
 
 ```javascript
-const plan = ['pdf', 'ai-summary', 'markdown'];
+const plan = ['pdf', 'first-lines', 'markdown'];
 const result = registry.validatePlan(plan);
 
 console.log(result.valid);    // true/false
@@ -226,9 +225,9 @@ registry.setValidationEnabled(true);
 
 ```javascript
 // Get traits for specific transformer
-const traits = registry.getTraits('ai-summary');
+const traits = registry.getTraits('pdf');
 console.log(traits.heavy);        // true
-console.log(traits.requirements); // { apiKey: true, network: true }
+console.log(traits.requirements); // { memory: '100MB' }
 
 // List all transformers with traits
 const transformers = registry.list();
@@ -368,7 +367,7 @@ try {
 
 ```javascript
 // Check for missing resources before execution
-const validation = registry.validatePlan(['ai-summary']);
+const validation = registry.validatePlan(['pdf']);
 const resourceIssues = validation.issues.filter(issue => 
   issue.type === 'missing_resource'
 );
