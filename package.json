@@ -78,6 +78,7 @@
     "jest-mock-fs": "^1.0.2",
     "prettier": "^3.5.0",
     "sharp": "^0.34.3",
+    "strip-ansi": "^7.1.0",
     "typescript": "^5.8.3"
   }
 }
