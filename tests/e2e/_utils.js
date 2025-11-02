@@ -86,7 +86,20 @@ export function normalize(text, options = {}) {
   // 2. Remove TTY overwrites (carriage returns from progress updates)
   output = output.replace(/\r[^\n]/g, '\n');
 
-  // 3. Remove duplicate progress lines (caused by \r overwrites)
+  // 3. Remove UI status/spinner lines (⏳, ✅, etc.)
+  const uiPatterns = [
+    /^[⏳✅❌⚠️✓✗🔍📁📝🖥️]\s+.*$/gm, // Status messages with emoji
+    /^Loading profile.*$/gm,
+    /^Validating path.*$/gm,
+    /^Starting pipeline.*$/gm,
+    /^\d+ files? \[.*\] (copied to clipboard|displayed to terminal|written to).*$/gm,
+  ];
+
+  for (const pattern of uiPatterns) {
+    output = output.replace(pattern, '');
+  }
+
+  // 4. Remove duplicate progress lines (caused by \r overwrites)
   const lines = output.split('\n');
   const uniqueLines = [];
   let lastLine = null;
@@ -100,10 +113,6 @@ export function normalize(text, options = {}) {
     if (line === lastLine && line.includes('%')) {
       continue;
     }
-    // Skip progress indicator lines (⏳, ✓, etc.) and status messages
-    if (line.match(/^[⏳✓✗⚠️🔍📁📝🖥️]\s/)) {
-      continue;
-    }
     // Skip ANSI escape sequences that weren't removed
     if (line.match(/^\[[\dK;A-Z]+/)) {
       continue;
@@ -113,24 +122,24 @@ export function normalize(text, options = {}) {
   }
   output = uniqueLines.join('\n');
 
-  // 4. Apply comprehensive normalization (paths, timestamps, IDs, metrics)
+  // 5. Apply comprehensive normalization (paths, timestamps, IDs, metrics)
   output = normalizeForGolden(output, {
     basePath: options.projectRoot || process.cwd(),
     normalizeAll: true,
   });
 
-  // 5. Normalize Git-specific data
+  // 6. Normalize Git-specific data
   output = normalizeGitData(output);
 
-  // 6. Normalize Windows drive letters
+  // 7. Normalize Windows drive letters
   output = output.replace(/[A-Z]:\\/g, '/');
 
-  // 7. Sort tree lines if requested (for cross-OS determinism)
+  // 8. Sort tree lines if requested (for cross-OS determinism)
   if (options.sortTreeLines) {
     output = sortTreeOutput(output);
   }
 
-  // 8. Final cleanup: trim trailing whitespace, normalize final newline
+  // 9. Final cleanup: trim trailing whitespace, normalize final newline
   output = output
     .split('\n')
     .map((line) => line.trimEnd())
