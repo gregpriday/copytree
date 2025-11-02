@@ -610,6 +610,7 @@ class StreamingOutputStage extends Stage {
         });
 
         const fileCount = files.length;
+        const skippedFiles = input.stats?.skippedFiles || 0;
         const totalSize = this.calculateTotalSize(files);
         const basePath = input.basePath || '';
         const workingDirectoryUri =
