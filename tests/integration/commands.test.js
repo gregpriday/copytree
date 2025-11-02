@@ -279,6 +279,15 @@ output:
       expect(stderr).toMatch(/does not exist|unknown command/i);
     });
 
+    test('should reject removed install:copytree command', async () => {
+      // Regression test: install:copytree was removed in issue #26
+      const { exitCode, stderr } = await runCommand(`node "${cliPath}" install:copytree`);
+
+      expect(exitCode).not.toBe(0);
+      // Commander treats unknown commands as paths, so it will fail with "does not exist"
+      expect(stderr).toContain('does not exist');
+    });
+
     test('should handle invalid options', async () => {
       const { exitCode, stderr } = await runCommand(`node "${cliPath}" copy --invalid-option`);
 

@@ -256,24 +256,7 @@ program
     );
   });
 
-// 12. Install copytree command
-program
-  .command('install:copytree')
-  .description('Set up CopyTree environment and configuration')
-  .action(async () => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'install:copytree',
-        path: null,
-        options: {},
-      }),
-    );
-  });
+// 12. Install copytree command - REMOVED
+// This command has been removed as all directories are auto-created on first use.
 
 program.parse(process.argv);

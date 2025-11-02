@@ -83,20 +83,17 @@ copytree --version
 copytree --display --dry-run
 ```
 
-### 2. Interactive Configuration
+### 2. Automatic Setup
 
-Run the interactive setup wizard:
+CopyTree automatically creates required directories on first use:
 
-```bash
-copytree install:copytree
-```
+- `~/.copytree/cache/` - Cache directory (created when caching is used)
+- `~/.copytree/profiles/` - User profiles directory (created when custom profiles are accessed)
+- `~/.copytree/repos/` - GitHub repository cache (created when cloning repos)
 
-This will:
-- Create `~/.copytree/` configuration directory
-- Configure default settings
-- Validate configuration
+**No manual setup required!** Just start using CopyTree.
 
-### 3. Manual Configuration
+### 3. Manual Configuration (Optional)
 
 Alternatively, create configuration manually:
 
@@ -263,8 +260,8 @@ copytree config:validate
 # Inspect configuration
 copytree config:inspect
 
-# Re-run setup
-copytree install:copytree
+# Validate configuration
+copytree config:validate
 
 # Check environment variables
 echo $COPYTREE_MAX_FILE_SIZE

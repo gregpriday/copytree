@@ -20,7 +20,6 @@ import ProfileListView from './components/ProfileListView.js';
 import ValidationView from './components/ValidationView.js';
 import ConfigInspectView from './components/ConfigInspectView.js';
 import DocsView from './components/DocsView.js';
-import InstallView from './components/InstallView.js';
 
 const AppContent = () => {
   const { command, updateState } = useAppContext();
@@ -51,8 +50,6 @@ const AppContent = () => {
         });
       case 'copy:docs':
         return React.createElement(DocsView);
-      case 'install:copytree':
-        return React.createElement(InstallView);
       default: {
         // Ensure Text is available
         if (!Text) {
