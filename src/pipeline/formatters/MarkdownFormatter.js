@@ -7,6 +7,7 @@ import {
   escapeYamlScalar,
 } from '../../utils/markdown.js';
 import { hashFile, hashContent } from '../../utils/fileHash.js';
+import { sanitizeForComment } from '../../utils/helpers.js';
 
 class MarkdownFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
@@ -91,6 +92,26 @@ class MarkdownFormatter {
 
       for (const file of files) {
         const relPath = `@${file.path}`;
+        const binaryAction = this.stage.config.get('copytree.binaryFileAction', 'placeholder');
+        const policy =
+          this.stage.config.get('copytree.binaryPolicy', {})[file.binaryCategory] || binaryAction;
+
+        // Check if file should be rendered as a comment
+        if (file.excluded || (file.isBinary && policy === 'comment')) {
+          const tpl = this.stage.config.get(
+            'copytree.binaryCommentTemplates.markdown',
+            '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
+          );
+          const categoryName = (file.binaryCategory || 'Binary').toUpperCase();
+          const msg = tpl
+            .replace('{TYPE}', sanitizeForComment(categoryName))
+            .replace('{PATH}', sanitizeForComment(relPath))
+            .replace('{SIZE}', this.stage.formatBytes(file.size || 0));
+          lines.push(msg);
+          lines.push('');
+          continue;
+        }
+
         const modifiedISO = file.modified
           ? file.modified instanceof Date
             ? file.modified.toISOString()
@@ -105,14 +126,14 @@ class MarkdownFormatter {
             sha = hashContent(file.content, 'sha256');
           }
         } catch (_e) {
-          // Silently ignore hash errors
+          // Ignore hash computation errors
         }
-        const binaryAction = this.stage.config.get('copytree.binaryFileAction', 'placeholder');
         let binaryMode = undefined;
         if (file.isBinary) {
           if (binaryAction === 'base64' || file.encoding === 'base64') binaryMode = 'base64';
           else if (binaryAction === 'placeholder') binaryMode = 'placeholder';
           else if (binaryAction === 'skip') binaryMode = 'skip';
+          else if (binaryAction === 'comment' || policy === 'comment') binaryMode = 'comment';
         }
         const attrs = {
           path: relPath,
@@ -123,6 +144,7 @@ class MarkdownFormatter {
           binary: file.isBinary ? true : false,
           encoding: file.encoding || undefined,
           binaryMode,
+          binaryCategory: file.binaryCategory || undefined,
           truncated: file.truncated ? true : false,
           truncatedAt: file.truncated ? (file.content?.length ?? 0) : undefined,
         };
@@ -150,9 +172,9 @@ class MarkdownFormatter {
               typeof content === 'string'
                 ? content
                 : this.stage.config.get(
-                  'copytree.binaryPlaceholderText',
-                  '[Binary file not included]',
-                ) || '',
+                    'copytree.binaryPlaceholderText',
+                    '[Binary file not included]',
+                  ) || '',
             );
           } else {
             // skip mode: emit empty block

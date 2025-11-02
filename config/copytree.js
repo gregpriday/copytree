@@ -1,120 +1,120 @@
-import { env } from '../src/config/ConfigManager.js';
-
 export default {
   // Global excluded directories (always excluded regardless of location)
+  // Only includes version control directories that can't be in .gitignore
+  // Everything else (node_modules, .idea, etc.) should be in .gitignore
   globalExcludedDirectories: [
-    // Version control
-    '.git', '.svn', '.hg', '.bzr', 'CVS', '_darcs',
-    
-    // IDEs and editors
-    '.idea', '.vscode', '.vs', '.settings', 'nbproject', '.project',
-    '.buildpath', '.Rproj.user', '.spyderproject', '.spyproject',
-    '.ropeproject', '.venv', '.mypy_cache', '.dmypy.json',
-    
-    // Dependencies
-    'node_modules', 'bower_components', 'jspm_packages',
-    'venv', 'env', 'ENV', 'virtualenv', '.virtualenv',
-    'pipenv', '.pipenv', 'poetry', '.poetry',
-    'conda-meta', '.conda',
-    
-    // Build and cache
-    '__pycache__', '.pytest_cache', '.tox', '.nox',
-    '.coverage', 'htmlcov', '.nyc_output', 'coverage',
-    '.sass-cache', '.cache', '.parcel-cache', '.next',
-    '.nuxt', '.vuepress', '.docusaurus', '.serverless',
-    '.fusebox', '.dynamodb', '.temp', '.tmp', 'tmp', 'temp',
-    
-    // Mobile
-    '.gradle', '.idea/gradle.xml', '.idea/libraries',
-    'Pods', 'DerivedData', 'xcuserdata',
-    
-    // Other
-    '.vagrant', '.terraform', '.pulumi',
-    '.ipynb_checkpoints', '.jupyter',
-    'thumbs.db', '.DS_Store', 'desktop.ini',
+    '.git',      // Git repository metadata
+    '.svn',      // Subversion
+    '.hg',       // Mercurial
+    '.bzr',      // Bazaar
+    'CVS',       // CVS
+    '_darcs',    // Darcs
   ],
-  
+
   // Base path excluded directories (only excluded at project root)
-  basePathExcludedDirectories: [
-    'vendor',      // PHP Composer
-    'Pods',        // iOS CocoaPods  
-    '.github',     // GitHub config
-    '.gitlab',     // GitLab config
-    '.circleci',   // CircleCI config
-    '.travis',     // Travis CI
-    'dist',        // Distribution/build output
-    'build',       // Build output
-    'out',         // Output directory
-    'target',      // Maven/Gradle output
-    '.webpack',    // Webpack
-  ],
-  
+  // These are typically in .gitignore, but we exclude them as a safety net
+  // Can be overridden by .copytreeinclude if needed
+  basePathExcludedDirectories: [],
+
   // Global excluded files (excluded by name pattern)
   globalExcludedFiles: [
     // Lock files
-    'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
-    'composer.lock', 'Gemfile.lock', 'Pipfile.lock',
-    'poetry.lock', 'Cargo.lock', 'pubspec.lock',
-    
+    'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'shrinkwrap.yaml',
+    'composer.lock', 'Gemfile.lock', 'Pipfile.lock', 'poetry.lock', 'uv.lock', 'pdm.lock', 'requirements.lock',
+    'Cargo.lock', 'go.sum', 'mix.lock', 'flake.lock',
+    'pubspec.lock', 'Podfile.lock', 'Cartfile.resolved', 'Package.resolved', 'deno.lock',
+
     // Environment files
     '.env', '.env.local', '.env.*.local', '.env.example',
-    
+
     // OS files
     '.DS_Store', 'Thumbs.db', 'desktop.ini',
     '$RECYCLE.BIN', 'ehthumbs.db', 'ehthumbs_vista.db',
-    
+
     // Logs
     '*.log', 'npm-debug.log*', 'yarn-debug.log*', 'yarn-error.log*',
     'lerna-debug.log*', 'pnpm-debug.log*',
-    
+
     // Editor files
     '*.swp', '*.swo', '*~', '*.sublime-workspace', '*.sublime-project',
-    
+
     // Compiled files
     '*.pyc', '*.pyo', '*.pyd', '__pycache__',
     '*.class', '*.jar', '*.war', '*.ear',
     '*.o', '*.obj', '*.exe', '*.dll', '*.so', '*.dylib',
     '*.ncb', '*.sdf', '*.suo', '*.pdb', '*.idb',
-    
+
     // Archives
     '*.7z', '*.dmg', '*.gz', '*.iso', '*.jar', '*.rar', '*.tar', '*.zip',
-    
-    // Media files (configurable)
-    ...(env('COPYTREE_EXCLUDE_MEDIA', true) ? [
-      '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.svg', '*.ico',
-      '*.mp3', '*.mp4', '*.avi', '*.mov', '*.wmv', '*.flv', '*.webm',
-      '*.wav', '*.flac', '*.aac', '*.ogg', '*.wma',
-    ] : []),
+
+    // Media files - always excluded
+    '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.svg', '*.ico',
+    '*.mp3', '*.mp4', '*.avi', '*.mov', '*.wmv', '*.flv', '*.webm',
+    '*.wav', '*.flac', '*.aac', '*.ogg', '*.wma',
   ],
-  
+
   // File size limits
-  maxFileSize: env('COPYTREE_MAX_FILE_SIZE', 10 * 1024 * 1024), // 10MB
-  maxTotalSize: env('COPYTREE_MAX_TOTAL_SIZE', 100 * 1024 * 1024), // 100MB
-  maxFileCount: env('COPYTREE_MAX_FILE_COUNT', 10000),
-  
+  maxFileSize: 10 * 1024 * 1024, // 10MB
+  maxTotalSize: 100 * 1024 * 1024, // 100MB
+  maxFileCount: 10000,
+
   // Output limits
-  maxOutputSize: env('COPYTREE_MAX_OUTPUT_SIZE', 50 * 1024 * 1024), // 50MB
-  maxCharacterLimit: env('COPYTREE_MAX_CHARS', 2000000), // 2M chars
-  
+  maxOutputSize: 50 * 1024 * 1024, // 50MB
+  maxCharacterLimit: 2000000, // 2M chars
+
   // Processing options
-  followSymlinks: env('COPYTREE_FOLLOW_SYMLINKS', false),
-  includeHidden: env('COPYTREE_INCLUDE_HIDDEN', false),
-  preserveEmptyDirs: env('COPYTREE_PRESERVE_EMPTY_DIRS', false),
-  
+  followSymlinks: false,
+  includeHidden: false,
+  preserveEmptyDirs: false,
+
   // Binary file handling
-  binaryFileAction: env('COPYTREE_BINARY_ACTION', 'placeholder'), // placeholder, skip, base64
+  binaryFileAction: 'placeholder', // placeholder, skip, base64, comment (legacy)
   binaryPlaceholderText: '[Binary file not included]',
-  
+
+  // Binary detection configuration
+  binaryDetect: {
+    sampleBytes: 8192,
+    nonPrintableThreshold: 0.3,
+  },
+
+  // Binary policy per category (overrides binaryFileAction)
+  // Options: comment | skip | placeholder | base64 | convert
+  binaryPolicy: {
+    image: 'comment', // Images: show comment placeholder
+    media: 'comment', // Audio/video: show comment placeholder
+    archive: 'comment', // ZIP/TAR/etc: show comment placeholder
+    exec: 'comment', // Executables: show comment placeholder
+    font: 'comment', // Font files: show comment placeholder
+    database: 'comment', // Database files: show comment placeholder
+    cert: 'comment', // Certificates: show comment placeholder
+    document: 'convert', // PDF/DOC/etc: convert to text if possible
+    other: 'comment', // Unknown binaries: show comment placeholder
+    text: 'load', // Text files: load normally
+  },
+
+  // Template strings for binary file comments
+  binaryCommentTemplates: {
+    xml: '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
+    markdown: '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
+  },
+
   // Line number options
-  addLineNumbers: env('COPYTREE_LINE_NUMBERS', false),
-  lineNumberFormat: env('COPYTREE_LINE_NUMBER_FORMAT', '%4d: '), // printf-style format
-  
+  addLineNumbers: false,
+  lineNumberFormat: '%4d: ', // printf-style format
+
   // Tree view options
-  treeIndent: env('COPYTREE_TREE_INDENT', '  '),
+  treeIndent: '  ',
   treeConnectors: {
     middle: '├── ',
     last: '└── ',
     vertical: '│   ',
     empty: '    ',
+  },
+
+  // Filesystem retry configuration
+  fs: {
+    retryAttempts: 3, // Maximum number of retry attempts for transient errors
+    retryDelay: 100, // Initial delay in milliseconds
+    maxDelay: 2000, // Maximum delay cap in milliseconds
   },
 };

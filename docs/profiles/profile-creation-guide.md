@@ -176,13 +176,15 @@ CopyTree uses glob patterns:
 Build on existing profiles:
 
 ```yaml
-extends: react
+extends: default
 
-rules:
-  # Inherits all react rules
-  # Add your customizations
-  - include: "src/custom/**"
-  - exclude: "src/legacy/**"
+# Inherits all default rules
+# Add your customizations
+include:
+  - "src/custom/**"
+
+exclude:
+  - "src/legacy/**"
 ```
 
 ### Multiple Inheritance
@@ -213,12 +215,11 @@ transformers:
     options:
       mode: strip    # or 'html'
   
-  # AI summarization
-  ai-summary:
+  # File preview
+  first-lines:
     enabled: true
     options:
-      maxLength: 500
-      model: gemini-1.5-flash
+      lineCount: 50
 ```
 
 ### Available Transformers

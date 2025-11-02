@@ -8,6 +8,22 @@ import Clipboard from '../utils/clipboard.js';
 import fs from 'fs-extra';
 import path from 'path';
 import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { summarize as getFsErrorSummary, reset as resetFsErrors } from '../utils/fsErrorReport.js';
+
+// Lazy initialization for Jest compatibility
+let __filename, __dirname, pkg;
+try {
+  __filename = fileURLToPath(import.meta.url);
+  __dirname = path.dirname(__filename);
+  pkg = JSON.parse(readFileSync(path.join(__dirname, '../../package.json'), 'utf8'));
+} catch (error) {
+  // In test environment, these may not be available
+  __filename = '';
+  __dirname = '';
+  pkg = { version: '0.0.0-test' };
+}
 
 /**
  * Main copy command implementation
@@ -17,6 +33,9 @@ async function copyCommand(targetPath = '.', options = {}) {
   const startTime = Date.now();
 
   try {
+    // Reset filesystem error tracking at start
+    resetFsErrors();
+
     // Start with initializing message
     logger.startSpinner('Initializing');
 
@@ -59,30 +78,78 @@ async function copyCommand(targetPath = '.', options = {}) {
       profile,
       options,
       startTime,
+      version: pkg.version,
     });
 
-    // 6. Prepare output
+    // 6. Write secrets report if requested
+    if (options.secretsReport && result.stats?.secretsGuard?.report) {
+      const reportPath = options.secretsReport === '-' ? null : path.resolve(options.secretsReport);
+
+      if (reportPath) {
+        await fs.ensureDir(path.dirname(reportPath));
+        await fs.writeJson(reportPath, result.stats.secretsGuard.report, { spaces: 2 });
+        logger.info(`Secrets report written to ${reportPath}`);
+      } else {
+        // Write to stdout
+        console.log(JSON.stringify(result.stats.secretsGuard.report, null, 2));
+      }
+    }
+
+    // 7. Prepare output
     let outputResult;
     if (!options.dryRun) {
       outputResult = await prepareOutput(result, options);
     }
 
-    // 7. Stop spinner before showing final result
+    // 8. Stop spinner before showing final result
     logger.stopSpinner();
 
-    // 8. Display final output
+    // 9. Display final output
     if (!options.dryRun && outputResult) {
       await displayOutput(outputResult, options);
     } else if (options.dryRun) {
       logger.info('🔍 Dry run mode - no files were processed.');
-      const fileCount = result.files.length;
-      const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
+      const fileCount = result.files.filter((f) => f !== null).length;
+      const totalSize = result.files
+        .filter((f) => f !== null)
+        .reduce((sum, file) => sum + (file.size || 0), 0);
       logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}] would be processed`);
     }
 
-    // 9. Show summary if requested
+    // 10. Show summary if requested
     if (options.info) {
       showSummary(result, startTime);
+    }
+
+    // 11. Show filesystem error summary
+    const fsSummary = getFsErrorSummary();
+    if (
+      fsSummary.totalRetries > 0 ||
+      fsSummary.succeededAfterRetry > 0 ||
+      fsSummary.failed > 0 ||
+      fsSummary.permanent > 0
+    ) {
+      logger.info('\nFilesystem Operations Summary:');
+      if (fsSummary.totalRetries > 0) {
+        logger.info(`  Total retries: ${fsSummary.totalRetries}`);
+      }
+      if (fsSummary.succeededAfterRetry > 0) {
+        logger.success(`  Succeeded after retry: ${fsSummary.succeededAfterRetry}`);
+      }
+      if (fsSummary.failed > 0) {
+        logger.warn(`  Failed after retries: ${fsSummary.failed}`);
+      }
+      if (fsSummary.permanent > 0) {
+        logger.error(`  Permanent errors: ${fsSummary.permanent}`);
+      }
+    }
+
+    // 12. Exit with error if --fail-on-fs-errors and there are failures
+    if (options.failOnFsErrors && (fsSummary.failed > 0 || fsSummary.permanent > 0)) {
+      logger.error(
+        `\nExiting with error due to filesystem failures (use --fail-on-fs-errors to control this behavior)`,
+      );
+      process.exitCode = 1;
     }
   } catch (error) {
     logger.stopSpinner();
@@ -123,10 +190,16 @@ async function loadProfile(profileLoader, profileName, options) {
   let profile;
   try {
     profile = await profileLoader.load(profileName, overrides);
-  } catch (_error) {
-    // Fallback to default profile
-    logger.warn(`Failed to load profile '${profileName}', using default`);
-    profile = ProfileLoader.createDefault();
+  } catch (error) {
+    // Only fallback to default if the profile name was explicitly 'default'
+    // Otherwise, throw error to prevent silent failures
+    if (profileName === 'default') {
+      logger.warn(`Failed to load default profile, creating basic profile: ${error.message}`);
+      profile = ProfileLoader.createDefault();
+    } else {
+      // Re-throw error for non-existent profiles
+      throw error;
+    }
   }
 
   return profile;
@@ -137,6 +210,13 @@ async function loadProfile(profileLoader, profileName, options) {
  */
 async function setupPipelineStages(basePath, profile, options) {
   const stages = [];
+
+  // Merge force-include patterns from all sources (CLI, profile, .copytreeinclude)
+  const mergedAlways = [
+    ...(Array.isArray(options.always) ? options.always : options.always ? [options.always] : []),
+    ...(Array.isArray(profile.always) ? profile.always : []),
+    // .copytreeinclude is loaded by the stage itself
+  ];
 
   // 1. File Discovery Stage
   const { default: FileDiscoveryStage } = await import('../pipeline/stages/FileDiscoveryStage.js');
@@ -150,10 +230,19 @@ async function setupPipelineStages(basePath, profile, options) {
       maxFileSize: profile.options?.maxFileSize,
       maxTotalSize: profile.options?.maxTotalSize,
       maxFileCount: profile.options?.maxFileCount,
+      forceInclude: mergedAlways,
     }),
   );
 
-  // 2. Git Filter Stage (if --modified or --changed is used)
+  // 2. Always Include Stage (mark files before any filtering)
+  if (mergedAlways.length > 0) {
+    const { default: AlwaysIncludeStage } = await import(
+      '../pipeline/stages/AlwaysIncludeStage.js'
+    );
+    stages.push(new AlwaysIncludeStage(mergedAlways));
+  }
+
+  // 3. Git Filter Stage (if --modified or --changed is used)
   if (options.modified || options.changed) {
     const { default: GitFilterStage } = await import('../pipeline/stages/GitFilterStage.js');
     stages.push(
@@ -166,7 +255,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 3. Profile Filter Stage (applies exclude patterns)
+  // 4. Profile Filter Stage (applies exclude patterns)
   const { default: ProfileFilterStage } = await import('../pipeline/stages/ProfileFilterStage.js');
   stages.push(
     new ProfileFilterStage({
@@ -174,18 +263,6 @@ async function setupPipelineStages(basePath, profile, options) {
       filter: profile.filter || [],
     }),
   );
-
-  // 4. Always Include Stage (if --always option is used)
-  if (options.always) {
-    const { default: AlwaysIncludeStage } = await import(
-      '../pipeline/stages/AlwaysIncludeStage.js'
-    );
-    stages.push(
-      new AlwaysIncludeStage({
-        patterns: Array.isArray(options.always) ? options.always : [options.always],
-      }),
-    );
-  }
 
   // 5. External Source Stage (if external sources are configured)
   if (profile.external && profile.external.length > 0) {
@@ -214,7 +291,27 @@ async function setupPipelineStages(basePath, profile, options) {
       }),
     );
 
-    // 8. Transformer Stage
+    // 8. Secrets Guard Stage (automatic secret detection and redaction)
+    // Only add if explicitly enabled or not explicitly disabled
+    const secretsGuardEnabled =
+      options.secretsGuard !== false &&
+      (options.secretsGuard === true || config().get('secretsGuard.enabled', true));
+
+    if (secretsGuardEnabled) {
+      const { default: SecretsGuardStage } = await import(
+        '../pipeline/stages/SecretsGuardStage.js'
+      );
+      stages.push(
+        new SecretsGuardStage({
+          enabled: true,
+          redactionMode:
+            options.secretsRedactMode || config().get('secretsGuard.redactionMode', 'typed'),
+          failOnSecrets: options.failOnSecrets || config().get('secretsGuard.failOnSecrets', false),
+        }),
+      );
+    }
+
+    // 9. Transformer Stage
     const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
     const registry = await TransformerRegistry.createDefault();
     stages.push(
@@ -226,7 +323,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 9. Character Limit Stage (if --char-limit option is used)
+  // 10. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(
@@ -236,18 +333,17 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 10. Instructions Stage (load instructions unless disabled)
+  // 11. Instructions Stage (load instructions unless disabled)
   const { default: InstructionsStage } = await import('../pipeline/stages/InstructionsStage.js');
   stages.push(new InstructionsStage());
 
-  // 11. Output Formatting Stage
+  // 12. Output Formatting Stage
   // Determine output format (default to tree if --only-tree is used)
-  const rawFormat =
-    options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'markdown');
+  const rawFormat = options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'xml');
   const outputFormat =
-    (rawFormat || 'markdown').toString().toLowerCase() === 'md'
+    (rawFormat || 'xml').toString().toLowerCase() === 'md'
       ? 'markdown'
-      : (rawFormat || 'markdown').toString().toLowerCase();
+      : (rawFormat || 'xml').toString().toLowerCase();
 
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
@@ -294,8 +390,10 @@ async function setupPipelineStages(basePath, profile, options) {
 async function prepareOutput(result, options) {
   // If streaming was used, output has already been handled
   if (result.streamed) {
-    const fileCount = result.files.length;
-    const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
+    const fileCount = result.files.filter((f) => f !== null).length;
+    const totalSize = result.files
+      .filter((f) => f !== null)
+      .reduce((sum, file) => sum + (file.size || 0), 0);
 
     return {
       type: 'streamed',
@@ -313,7 +411,7 @@ async function prepareOutput(result, options) {
 
   // Calculate output size
   const outputSize = Buffer.byteLength(output, 'utf8');
-  const fileCount = result.files.length;
+  const fileCount = result.files.filter((f) => f !== null).length;
 
   return {
     type: 'normal',
@@ -342,10 +440,20 @@ async function displayOutput(outputResult, options) {
 
   // Handle --as-reference option
   if (options.asReference) {
-    const f = (options.format || 'markdown').toString().toLowerCase();
+    const f = (options.format || 'xml').toString().toLowerCase();
     const format = f === 'md' ? 'markdown' : f;
     const extension =
-      format === 'json' ? 'json' : format === 'markdown' ? 'md' : format === 'tree' ? 'txt' : 'xml';
+      format === 'json'
+        ? 'json'
+        : format === 'markdown'
+          ? 'md'
+          : format === 'tree'
+            ? 'txt'
+            : format === 'ndjson'
+              ? 'ndjson'
+              : format === 'sarif'
+                ? 'sarif'
+                : 'xml';
     const os = await import('os');
     const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
     await fs.writeFile(tempFile, output, 'utf8');
@@ -389,7 +497,7 @@ async function displayOutput(outputResult, options) {
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
     } catch (_error) {
       // If clipboard fails, save to temporary file
-      const f = (options.format || 'markdown').toString().toLowerCase();
+      const f = (options.format || 'xml').toString().toLowerCase();
       const format = f === 'md' ? 'markdown' : f;
       const extension =
         format === 'json'
@@ -398,7 +506,11 @@ async function displayOutput(outputResult, options) {
             ? 'md'
             : format === 'tree'
               ? 'txt'
-              : 'xml';
+              : format === 'ndjson'
+                ? 'ndjson'
+                : format === 'sarif'
+                  ? 'sarif'
+                  : 'xml';
       const os = await import('os');
       const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, output, 'utf8');
@@ -429,6 +541,14 @@ function showSummary(result, startTime) {
 
   if (stats.excludedFiles > 0) {
     console.log(`  Excluded files: ${stats.excludedFiles}`);
+  }
+
+  // Show secrets guard stats if present
+  if (stats.secretsGuard) {
+    const sg = stats.secretsGuard;
+    console.log(
+      `  🔒 Secrets Guard: ${sg.filesExcluded || 0} files excluded, ${sg.secretsRedacted || 0} redactions, ${sg.secretsFound || 0} findings`,
+    );
   }
 
   if (result.errors && result.errors.length > 0) {

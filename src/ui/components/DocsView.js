@@ -103,6 +103,10 @@ const DocsView = () => {
           if (options.output) {
             await fs.writeFile(options.output, docContent, 'utf8');
             action = `Documentation written to ${options.output}`;
+          } else if (options.display) {
+            // Display to console
+            console.log(docContent);
+            action = 'Documentation displayed';
           } else if (options.clipboard !== false) {
             // Dynamically import ESM-only clipboardy inside async function
             const { default: clipboardy } = await import('clipboardy');
@@ -211,6 +215,8 @@ async function getAvailableTopics(docsDir) {
       { name: 'transformers', description: 'File transformer documentation' },
       { name: 'pipeline', description: 'Pipeline architecture documentation' },
       { name: 'configuration', description: 'Configuration guide' },
+      { name: 'ignore-files', description: '.copytreeignore and .copytreeinclude usage' },
+      { name: 'all', description: 'All documentation combined (recommended for AI agents)' },
     ],
   });
 
@@ -544,10 +550,6 @@ git:
 ## Environment Variables
 
 \`\`\`bash
-# API Keys
-export GEMINI_API_KEY=your-key-here
-export OPENAI_API_KEY=your-key-here
-
 # Paths
 export COPYTREE_CONFIG=~/custom-config.yml
 export COPYTREE_CACHE_DIR=~/custom-cache
@@ -603,7 +605,165 @@ transformers:
       lineCount: 100
 \`\`\`
 `,
+
+    'ignore-files': `# .copytreeignore and .copytreeinclude Files
+
+## Overview
+
+CopyTree provides two powerful files for controlling which files are included in your output:
+
+- **.copytreeignore** - Exclude files and directories (similar to .gitignore)
+- **.copytreeinclude** - Force-include files that would otherwise be excluded (highest precedence)
+
+## .copytreeignore
+
+Place a \`.copytreeignore\` file in your project root to exclude files:
+
+\`\`\`bash
+# .copytreeignore
+node_modules/
+dist/
+*.log
+.env
+coverage/
+\`\`\`
+
+Uses the same syntax as \`.gitignore\`: wildcards (\`*\`), recursive patterns (\`**\`), negation (\`!\`).
+
+## .copytreeinclude
+
+Force-include files that would otherwise be excluded. **Highest precedence** - overrides all other exclusion rules:
+
+\`\`\`bash
+# .copytreeinclude
+.example/**
+.env.example
+config/**
+docs/**/*.md
+\`\`\`
+
+### Common Use Cases
+
+1. **Hidden files**: Include hidden directories like \`.example/\`
+2. **Environment files**: Include \`.env.example\` for documentation
+3. **Override exclusions**: Include specific files from excluded directories
+4. **Git context**: Force-include README/config when using \`--git-modified\`
+
+### Precedence (highest to lowest)
+
+1. \`.copytreeinclude\` + CLI \`--always\` + profile \`always\` (highest)
+2. Git filters (\`--git-modified\`, \`--git-branch\`)
+3. Profile \`filter\` patterns
+4. Profile \`exclude\` patterns
+5. \`.copytreeignore\`
+6. \`.gitignore\` (when \`respectGitignore: true\`)
+
+## Quick Examples
+
+\`\`\`bash
+# Use ignore/include files
+copytree  # Respects .copytreeignore and .copytreeinclude
+
+# Force-include via CLI
+copytree --always ".example/**" --always ".env"
+
+# Combine with git filters
+copytree --git-modified --always "README.md"
+
+# Preview before running
+copytree --dry-run
+\`\`\`
+`,
   };
+
+  // Build the 'all' documentation by combining all topics
+  docs.all = `# CopyTree Complete Documentation
+
+This document contains all essential CopyTree documentation for quick reference.
+
+${docs.profiles}
+
+---
+
+${docs.transformers}
+
+---
+
+${docs.pipeline}
+
+---
+
+${docs.configuration}
+
+---
+
+# .copytreeignore and .copytreeinclude Files
+
+## Overview
+
+CopyTree provides two powerful files for controlling which files are included:
+
+- **.copytreeignore** - Exclude files (similar to .gitignore)
+- **.copytreeinclude** - Force-include files (highest precedence)
+
+## .copytreeignore
+
+\`\`\`bash
+# .copytreeignore
+node_modules/
+dist/
+*.log
+.env
+coverage/
+\`\`\`
+
+## .copytreeinclude
+
+\`\`\`bash
+# .copytreeinclude
+.example/**
+.env.example
+config/**
+\`\`\`
+
+### Precedence (highest to lowest)
+
+1. \`.copytreeinclude\` + \`--always\` + profile \`always\` (highest)
+2. Git filters (\`--git-modified\`, \`--git-branch\`)
+3. Profile \`filter\` and \`exclude\` patterns
+4. \`.copytreeignore\`
+5. \`.gitignore\`
+
+---
+
+## Common Commands Reference
+
+\`\`\`bash
+# Copy to clipboard (default XML format)
+copytree
+
+# Copy as file reference (useful for LLMs)
+copytree -r
+
+# Display tree structure only
+copytree -t
+
+# Save to file
+copytree -o output.xml
+
+# Git-modified files only
+copytree -m
+
+# Compare with branch
+copytree -c main
+
+# Use custom profile
+copytree -p my-profile
+
+# View this documentation
+copytree copy:docs --topic all --display
+\`\`\`
+`;
 
   return docs[topic] || null;
 }

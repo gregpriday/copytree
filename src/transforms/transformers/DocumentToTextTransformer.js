@@ -97,6 +97,8 @@ class DocumentToTextTransformer extends BaseTransformer {
       return {
         ...file,
         content: this.formatOutput(file, textContent, size),
+        isBinary: false, // Mark as text after successful conversion
+        encoding: 'utf8',
         transformed: true,
         transformedBy: this.constructor.name,
         metadata: {

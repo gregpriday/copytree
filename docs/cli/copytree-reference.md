@@ -14,7 +14,7 @@ copytree [path] [options]
 ### Profile Options
 
 #### `--profile=<name>`, `-p <name>`
-Apply a custom profile for file selection (required).
+Use a specific profile for file selection. If omitted, CopyTree uses the **default profile**.
 
 **Examples:**
 ```bash
@@ -22,8 +22,7 @@ copytree --profile mycustom
 copytree -p mycustom
 ```
 
-#### Note: Profile Required
-A custom profile is now required for all operations. Create profiles in `~/.copytree/profiles/` or `.copytree/`.
+**Note:** The default profile is automatically used when no profile is specified. Create custom profiles in `~/.copytree/profiles/` or `.copytree/` for project-specific needs.
 
 ### Filter Options
 
@@ -43,12 +42,13 @@ copytree --modified
 copytree -m
 ```
 
-#### `--changes=<range>`, `-c <range>`
-Include files changed between Git commits or branches.
+#### `--changed=<ref>`, `-c <ref>`
+Include files changed since a specific Git reference (commit, branch, or tag).
 
 ```bash
-copytree --changes main..feature-branch
-copytree -c HEAD~5..HEAD
+copytree --changed HEAD~5
+copytree -c main
+copytree --changed v1.0.0
 ```
 
 ### Output Options
@@ -94,45 +94,33 @@ copytree --no-clipboard --display
 ### Format Options
 
 #### `--format=<type>`
-Output format: `markdown|md` (default), `xml`, `json`, or `tree`.
+Output format: `markdown|md`, `xml`, `json`, or `tree`.
+
+**Default:** `xml`
 
 ```bash
 copytree --format json
 copytree --format tree
+copytree --format xml  # default
 copytree --format markdown
-copytree --format xml
 ```
 
 ### Display Control Options
 
-#### `--depth=<number>`, `-d <number>`
-Maximum directory traversal depth.
-
-**Default:** 10
+#### `--head=<number>`, `-l <number>`
+Limit to first N files processed.
 
 ```bash
-copytree --depth 3
-copytree -d 5
+copytree --head 50
+copytree -l 100
 ```
 
-#### `--max-lines=<number>`, `-l <number>`
-Maximum lines per file (0 = unlimited).
-
-**Default:** 0
+#### `--char-limit=<number>`, `-C <number>`
+Character limit for total output.
 
 ```bash
-copytree --max-lines 100
-copytree -l 50
-```
-
-#### `--max-characters=<number>`, `-C <number>`
-Maximum characters per file.
-
-**Default:** 0 (unlimited)
-
-```bash
-copytree --max-characters 5000
-copytree -C 10000
+copytree --char-limit 100000
+copytree -C 50000
 ```
 
 #### `--only-tree`, `-t`
@@ -143,67 +131,86 @@ copytree --only-tree
 copytree -t
 ```
 
-### Git Integration Options
+### Sorting & Git Status Options
 
-#### `--order-by=<field>`
-Order files by: `default` or `modified`.
-
-**Default:** `default`
+#### `--sort=<by>`, `-s <by>`
+Sort files by: `path`, `size`, `modified`, `name`, or `extension`.
 
 ```bash
-copytree --order-by modified
+copytree --sort modified
+copytree --sort size
+copytree -s name
 ```
 
-#### `--git-status`, `-g`
+#### `--with-git-status`
 Include Git status indicators for each file.
 
 ```bash
-copytree --git-status
-copytree -g
+copytree --with-git-status
+```
+
+#### `--always=<patterns...>`
+Always include these patterns (force-include), even if excluded by profile.
+
+```bash
+copytree --always "*.config.js" --always "config.example.js"
 ```
 
 ### Content Options
 
-#### `--line-numbers`, `-n`
+#### `--with-line-numbers`
 Include line numbers in output.
 
 ```bash
-copytree --line-numbers
-copytree -n
+copytree --with-line-numbers
 ```
 
-#### `--file-size`, `-z`
+#### `--show-size`
 Show file sizes in output.
 
 ```bash
-copytree --file-size
-copytree -z
+copytree --show-size
 ```
 
-#### `--size-report`, `-s`
-Generate a report of files sorted by size.
+#### `--info`
+Show information table with project statistics.
 
 ```bash
-copytree --size-report
-copytree -s
+copytree --info
+```
+
+#### `--include-binary`
+Include binary files in output (normally excluded).
+
+```bash
+copytree --include-binary
+```
+
+#### `--dedupe`
+Remove duplicate files from output.
+
+```bash
+copytree --dedupe
+```
+
+#### `--as-reference`, `-r`
+Generate reference documentation format.
+
+```bash
+copytree --as-reference
+copytree -r
+```
+
+#### `--external=<source...>`
+Include external sources (GitHub URLs or local paths).
+
+```bash
+copytree --external https://github.com/user/repo
 ```
 
 ### Transformation Options
 
-#### `--transform`, `-T`
-Apply file transformers (PDF to text, image OCR, etc.).
-
-```bash
-copytree --transform
-copytree -T
-```
-
-#### `--no-transform`
-Skip all file transformations.
-
-```bash
-copytree --no-transform
-```
+**Note:** Transformers are configured in profiles, not via CLI flags. See the [Transformer Reference](../profiles/transformer-reference.md) for details on enabling and configuring transformers in your profile.
 
 ### Debug & Optimization Options
 
@@ -229,10 +236,17 @@ copytree --debug
 ```
 
 #### `--no-cache`
-Skip caching for external sources (GitHub repos).
+Disable caching for AI operations and external sources.
 
 ```bash
-copytree https://github.com/user/repo --no-cache
+copytree --no-cache
+```
+
+#### `--no-validate`
+Disable configuration validation (for testing/debugging).
+
+```bash
+copytree --no-validate
 ```
 
 ### Instructions Options
@@ -266,7 +280,6 @@ copytree -v
 - `1` - Profile validation or loading errors
 - `2` - Invalid option combination
 - `3` - File system or Git errors
-- `4` - AI service errors
 
 ## Examples
 
@@ -284,10 +297,13 @@ copytree https://github.com/facebook/react
 
 ### Using Profiles
 ```bash
-# Use custom profile (required)
+# Uses default profile automatically
+copytree
+
+# Use custom profile
 copytree --profile mycustom
 
-# List available custom profiles
+# List available profiles
 copytree profile:list
 ```
 
@@ -298,16 +314,16 @@ copytree --filter "src/**/*.js" --filter "*.json"
 
 # Git integration
 copytree --modified
-copytree --changes main..develop
+copytree --changed HEAD~5
 ```
 
 ### Output Options
 ```bash
-# Save to file with AI-generated name
-copytree --output
+# Save to file (Markdown by default)
+copytree --output project-snapshot.md
 
-# Save to specific file
-copytree --output project-snapshot.xml
+# Save as XML
+copytree --output project-snapshot.xml --format xml
 
 # Display in console
 copytree --display
@@ -320,16 +336,16 @@ copytree --format tree
 ### Advanced Usage
 ```bash
 # Combine multiple options
-copytree --profile react --modified --transform --output
+copytree --profile myproject --modified --output snapshot.md
 
 # Debug mode with dry run
 copytree --debug --dry-run
 
-# Size analysis
-copytree --size-report --max-lines 50
+# Limit output
+copytree --head 50 --char-limit 100000
 
 # Stream large projects
-copytree --stream --no-transform | gzip > project.xml.gz
+copytree --stream | gzip > project.md.gz
 ```
 
 ## Notes

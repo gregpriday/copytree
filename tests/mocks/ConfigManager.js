@@ -7,6 +7,10 @@ class ConfigManager {
         driver: 'file',
         prefix: 'copytree_',
         defaultTtl: 3600,
+        transformations: {
+          enabled: false, // Default for non-AI transformers
+          ttl: 86400,
+        },
         file: {
           path: null,
           extension: '.cache',

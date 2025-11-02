@@ -13,6 +13,15 @@ class DeduplicateFilesStage extends Stage {
   }
 
   /**
+   * Handle errors during deduplication - return files unchanged
+   */
+  async handleError(error, input) {
+    this.log(`Deduplication failed: ${error.message}, returning files unchanged`, 'warn');
+    // Return input unchanged if deduplication fails
+    return input;
+  }
+
+  /**
    * Process files and remove duplicates
    */
   async process(files, context) {

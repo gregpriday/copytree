@@ -1,0 +1,25 @@
+# CopyTree Ignore File
+# Exclude files and directories that aren't needed for code work
+
+# Documentation - exclude detailed guides but keep overview docs
+docs/**
+
+# Tests - exclude test fixtures (especially large images) but keep test code
+tests/fixtures/**
+
+# Configuration and tooling files that are rarely modified
+babel.config.json
+jest.config.js
+jest.integration.config.js
+eslint.config.js
+
+# Debug and temporary files
+debug-hang.js
+
+# Changelog and license (less relevant for code work)
+CHANGELOG.md
+LICENSE
+
+# Example/template files - keep the default profile, exclude examples
+# (commented out to keep profiles for reference)
+# profiles/**

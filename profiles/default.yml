@@ -48,10 +48,24 @@ exclude:
   - package-lock.json
   - yarn.lock
   - pnpm-lock.yaml
+  - bun.lockb
+  - shrinkwrap.yaml
   - composer.lock
   - Gemfile.lock
   - Pipfile.lock
   - poetry.lock
+  - uv.lock
+  - pdm.lock
+  - requirements.lock
+  - Cargo.lock
+  - go.sum
+  - mix.lock
+  - flake.lock
+  - pubspec.lock
+  - Podfile.lock
+  - Cartfile.resolved
+  - Package.resolved
+  - deno.lock
   
   # Compiled files
   - "*.pyc"
@@ -101,7 +115,7 @@ transformers:
     enabled: true
 
 output:
-  format: markdown
+  format: xml
   includeMetadata: true
   addLineNumbers: false
   prettyPrint: true

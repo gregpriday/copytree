@@ -72,37 +72,26 @@ nvm use 18
 
 ## Configuration Problems
 
-### API Key Not Working
+### Configuration Validation
 
-**Problem**: AI features fail with authentication errors
+**Problem**: Configuration errors or validation failures
 
 **Solutions**:
 
-1. **Verify API key configuration**:
+1. **Validate configuration**:
    ```bash
-   copytree config:validate ai
+   copytree config:validate
    ```
 
-2. **Re-run setup**:
+2. **Check environment variables**:
    ```bash
-   copytree install:copytree
+   echo $COPYTREE_MAX_FILE_SIZE
+   echo $COPYTREE_MAX_TOTAL_SIZE
    ```
 
-3. **Check environment variables**:
+3. **Inspect effective configuration**:
    ```bash
-   echo $GEMINI_API_KEY
-   ```
-
-4. **Manual configuration**:
-   ```bash
-   # Edit ~/.copytree/config.json
-   {
-     "ai": {
-       "gemini": {
-         "apiKey": "your-actual-api-key"
-       }
-     }
-   }
+   copytree config:inspect
    ```
 
 ### Configuration File Not Found
@@ -111,19 +100,18 @@ nvm use 18
 
 **Solutions**:
 
-1. **Create config directory**:
-   ```bash
-   mkdir -p ~/.copytree
-   ```
+> **Note:** CopyTree automatically creates required directories on first use. Configuration files are optional - the tool works with built-in defaults.
 
-2. **Run interactive setup**:
-   ```bash
-   copytree install:copytree
-   ```
-
-3. **Check config location**:
+1. **Check config location**:
    ```bash
    ls -la ~/.copytree/
+   ```
+
+2. **Verify auto-created directories**:
+   ```bash
+   # Directories are created automatically when needed
+   # Run any command to trigger auto-creation:
+   copytree --version
    ```
 
 ## Output Issues
@@ -265,34 +253,6 @@ copytree --format tree
    ```bash
    git diff --name-only
    git diff --name-only main..HEAD
-   ```
-
-## AI-Related Errors
-
-### AI Response Timeout
-
-**Problem**: AI operations timing out
-
-**Solutions**:
-
-1. **Increase timeout**:
-   ```bash
-   # Set in config
-   {
-     "ai": {
-       "timeout": 60000
-     }
-   }
-   ```
-
-2. **Use smaller scope**:
-   ```bash
-   copytree src/ --profile minimal
-   ```
-
-3. **Skip AI features**:
-   ```bash
-   copytree --filter "*.js"  # Use patterns instead
    ```
 
 ## Performance Issues
@@ -437,11 +397,6 @@ ls -la ~/.copytree/cache/
 - Current directory might be empty
 - Profile rules might be too restrictive
 - Check .gitignore and .copytreeignore
-
-### "API rate limit exceeded"
-- Wait before retrying
-- Use non-AI features temporarily
-- Check API quota on provider dashboard
 
 ### "Invalid configuration"
 - Run `copytree config:validate`

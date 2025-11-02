@@ -56,7 +56,16 @@ class GitHubUrlHandler {
    */
   setupCacheDirectory() {
     this.cacheDir = path.join(os.homedir(), '.copytree', 'repos');
-    fs.ensureDirSync(this.cacheDir);
+    try {
+      fs.ensureDirSync(this.cacheDir);
+    } catch (error) {
+      throw new CommandError(
+        `Failed to create repository cache directory at ${this.cacheDir}: ${error.message}. ` +
+          'Ensure HOME is writable or set a custom cache path via configuration.',
+        'GitHubUrlHandler',
+        { originalError: error },
+      );
+    }
     this.repoDir = path.join(this.cacheDir, this.cacheKey);
   }
 

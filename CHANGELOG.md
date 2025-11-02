@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.13.1] - 2025-10-29
+
+### Fixed
+- **Critical**: Remove remaining AIProviderError import in TransformStage.js that caused runtime error
+- Remove AIProviderError from recoverable error types list
+
+## [0.13.0] - 2025-10-29
+
+### Major Changes
+- **Removed AI Provider Integration** - Simplified codebase by removing AI provider infrastructure and dependencies
+- **Enhanced Binary File Handling** - Implemented magic number detection for accurate binary file identification
+- **Comprehensive Force-Include System** - Added `.copytreeinclude` file support for forcing inclusion of specific files
+- **Improved Testing Infrastructure** - Established comprehensive test suites with helpers and utilities
+
+### Added
+- **Structured Documentation System** - New task-based documentation with groups and sections for better organization
+- **Binary File Detection** - Magic number-based detection for accurate binary file identification
+- **Force-Include Mechanism** - `.copytreeinclude` file support with highest precedence in file selection
+- **Testing Infrastructure** - Comprehensive test helpers including determinism utilities, fixtures management, and pipeline testing utilities
+- **Golden File Testing** - Regression testing infrastructure with normalized output comparison
+
+### Removed
+- **AI Provider System** - Removed BaseProvider.js and all AI provider infrastructure
+- **AI Configuration** - Removed AI-specific configuration sections and validation
+- **AI Error Handling** - Removed AIProviderError and ProviderError classes from error system
+
+### Enhanced
+- **Documentation Structure** - Refactored documentation for improved clarity and accuracy across all guides
+- **README Simplification** - Streamlined README by removing AI-specific sections and focusing on core features
+- **Installation Guide** - Simplified setup process by removing AI provider configuration steps
+- **Troubleshooting Guide** - Removed AI-related error sections and focused on core functionality issues
+- **Pipeline Event Tests** - Improved pipeline event contract validation and testing infrastructure
+
+### Fixed
+- **File Count Accuracy** - Corrected file count calculation by excluding null placeholders
+- **Code Quality Issues** - Resolved linting and formatting issues across the codebase
+- **Pipeline Event Contracts** - Fixed event emission validation in pipeline tests
+- **Binary File Exclusion** - Improved binary file detection and exclusion logic
+
+### Technical Improvements
+- **Dependency Updates** - Upgraded project dependencies to latest stable versions
+- **Test Coverage** - Added comprehensive unit, integration, and e2e test suites
+- **Documentation Organization** - Restructured documentation with better grouping and navigation
+- **Code Consistency** - Applied consistent formatting and linting across entire codebase
+
 ## [0.12.0] - 2025-08-29
 
 ### Major Changes

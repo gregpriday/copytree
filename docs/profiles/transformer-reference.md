@@ -60,51 +60,7 @@ transformers:
 - Preserving original content
 - Binary file handling
 
-### 2. AI Summary
-
-Generates intelligent summaries of code files using AI.
-
-**Name**: `ai-summary`
-
-**Options**:
-```yaml
-transformers:
-  ai-summary:
-    enabled: true
-    options:
-      extensions:      # File extensions to process
-        - .js
-        - .py
-        - .java
-      maxFileSize: 102400  # Max size in bytes (default: 100KB)
-      includeOriginal: false  # Include original with summary
-```
-
-**Supported Languages**:
-- JavaScript (.js, .jsx, .ts, .tsx)
-- Python (.py)
-- Java (.java)
-- Go (.go)
-- Rust (.rs)
-- C/C++ (.c, .cpp, .h)
-- PHP (.php)
-- Ruby (.rb)
-- Swift (.swift)
-- Kotlin (.kt)
-- And more...
-
-**Example Output**:
-```
-AI Summary:
-This file implements a REST API controller for user management. It includes endpoints for:
-- GET /users - List all users with pagination
-- POST /users - Create new user with validation
-- PUT /users/:id - Update existing user
-- DELETE /users/:id - Soft delete user
-The controller uses JWT authentication and includes error handling.
-```
-
-### 3. PDF to Text
+### 2. PDF to Text
 
 Extracts text content from PDF files.
 
@@ -139,42 +95,7 @@ Page 1:
 Introduction to Software Architecture...
 ```
 
-### 4. Image Description
-
-Generates AI descriptions of images using vision models.
-
-**Name**: `image-description`
-
-**Options**:
-```yaml
-transformers:
-  image-description:
-    enabled: true
-    options:
-      maxImageSize: 10485760  # Max size in bytes (10MB)
-      apiKey: ${GEMINI_API_KEY}  # Or specify directly
-      model: gemini-1.5-flash    # Vision model to use
-      prompt: "Describe this image in detail"  # Custom prompt
-```
-
-**Supported Formats**:
-- JPEG (.jpg, .jpeg)
-- PNG (.png)
-- GIF (.gif)
-- WebP (.webp)
-- BMP (.bmp)
-
-**Example Output**:
-```
-[Image Description: screenshot.png]
-This appears to be a screenshot of a web application dashboard. The interface shows:
-- A navigation bar with logo and menu items
-- A data visualization chart showing monthly revenue
-- A table with user statistics
-- Dark theme with blue accent colors
-```
-
-### 5. Image OCR
+### 3. Image OCR
 
 Extracts text from images using optical character recognition.
 
@@ -196,7 +117,7 @@ transformers:
 - Diagrams with labels
 - Error message screenshots
 
-### 6. CSV Formatter
+### 4. CSV Formatter
 
 Formats CSV/TSV files as readable tables.
 
@@ -229,7 +150,7 @@ transformers:
 [Showing 2 of 150 total rows]
 ```
 
-### 7. Markdown Processor
+### 5. Markdown Processor
 
 Transforms markdown files by stripping or converting formatting.
 
@@ -253,7 +174,7 @@ transformers:
 - Documentation processing
 - README files
 
-### 8. First Lines
+### 6. First Lines
 
 Extracts the first N lines from text files.
 
@@ -275,7 +196,7 @@ transformers:
 - Preview of long documents
 - Quick file inspection
 
-### 9. Document to Text
+### 7. Document to Text
 
 Converts various document formats to plain text.
 
@@ -296,7 +217,7 @@ transformers:
 - Rich Text (.rtf)
 - And more (requires Pandoc)
 
-### 10. HTML Stripper
+### 8. HTML Stripper
 
 Removes HTML tags from content.
 
@@ -316,7 +237,7 @@ transformers:
 - Email template processing
 - HTML documentation
 
-### 11. Markdown Link Stripper
+### 9. Markdown Link Stripper
 
 Removes links from markdown files.
 
@@ -331,7 +252,7 @@ transformers:
       preserveText: true  # Keep link text
 ```
 
-### 12. File Summary
+### 10. File Summary
 
 Creates basic summaries of files without AI.
 
@@ -346,7 +267,7 @@ transformers:
       includeStats: true  # File statistics
 ```
 
-### 13. SVG Description
+### 11. SVG Description
 
 Generates descriptions of SVG graphics.
 
@@ -361,7 +282,7 @@ transformers:
       extractText: true  # Extract text elements
 ```
 
-### 14. Unit Test Summary
+### 12. Unit Test Summary
 
 Analyzes and summarizes unit test files.
 
@@ -383,7 +304,7 @@ transformers:
 - Identifies test frameworks
 - Summarizes coverage
 
-### 15. Binary Handler
+### 13. Binary Handler
 
 Handles binary files with configurable behavior.
 
@@ -412,24 +333,18 @@ transformers:
     enabled: true
     options:
       maxPages: 100
-      
+
   # Process markdown
   markdown:
     enabled: true
     options:
       mode: strip
-      
-  # Describe images
-  image-description:
+
+  # Format CSV files
+  csv:
     enabled: true
     options:
-      model: gemini-1.5-pro
-      
-  # Summarize large code files
-  ai-summary:
-    enabled: true
-    options:
-      maxFileSize: 204800  # 200KB
+      maxRows: 20
 ```
 
 ### Selective Transformation
@@ -440,14 +355,16 @@ Apply transformers to specific patterns:
 rules:
   - include: "docs/**/*.pdf"
     transform: pdf
-    
+
   - include: "screenshots/**/*.png"
-    transform: image-description
-    
-  - include: "src/**/*.js"
-    transform: ai-summary
+    transform: image
     transform_options:
-      includeOriginal: true
+      extractText: true
+
+  - include: "src/**/*.md"
+    transform: markdown
+    transform_options:
+      mode: strip
 ```
 
 ### Performance Optimization
@@ -455,18 +372,20 @@ rules:
 ```yaml
 transformers:
   # Limit expensive operations
-  ai-summary:
-    enabled: true
-    options:
-      maxFileSize: 51200  # 50KB limit
-      
   pdf:
     enabled: true
     options:
       maxPages: 10  # First 10 pages only
-      
-  image-description:
-    enabled: false  # Disable for speed
+
+  image:
+    enabled: true
+    options:
+      extractText: true
+
+  first-lines:
+    enabled: true
+    options:
+      lineCount: 20  # Limit preview length
 ```
 
 ## Best Practices
@@ -474,21 +393,23 @@ transformers:
 ### 1. Choose Appropriate Transformers
 
 ```yaml
-# For code analysis
+# For code documentation
 transformers:
-  ai-summary:
+  markdown:
     enabled: true
-    
+  first-lines:
+    enabled: true
+
 # For documentation
 transformers:
   pdf:
     enabled: true
-  markdown:
+  document-to-text:
     enabled: true
-    
+
 # For visual assets
 transformers:
-  image-description:
+  image:
     enabled: true
 ```
 
@@ -496,37 +417,16 @@ transformers:
 
 ```yaml
 transformers:
-  ai-summary:
-    options:
-      maxFileSize: 102400  # 100KB
-      
   pdf:
     options:
       maxPages: 50  # Avoid huge documents
+
+  first-lines:
+    options:
+      lineCount: 50  # Limit preview
 ```
 
-### 3. Consider API Costs
-
-AI-powered transformers use API calls:
-
-```yaml
-# Development - more liberal
-transformers:
-  ai-summary:
-    enabled: true
-    options:
-      includeOriginal: true
-      
-# Production - conservative
-transformers:
-  ai-summary:
-    enabled: true
-    options:
-      maxFileSize: 51200  # Smaller limit
-      includeOriginal: false
-```
-
-### 4. Test Transformer Output
+### 3. Test Transformer Output
 
 ```bash
 # Test specific transformer
@@ -549,19 +449,8 @@ transformers:
 
 **Verify dependencies**:
 - PDF: Requires `pdf-parse` package
-- Images: Requires `tesseract.js` or Gemini API
+- Images: Requires `tesseract.js` for OCR
 - Documents: Requires Pandoc installed
-
-### API Errors
-
-**For AI transformers**:
-```bash
-# Check API key
-echo $GEMINI_API_KEY
-
-# Test with simple file
-copytree single-file.js --transform
-```
 
 ### Performance Issues
 
@@ -569,10 +458,10 @@ copytree single-file.js --transform
 ```yaml
 # Only transform specific files
 rules:
-  - include: "important/**/*.js"
-    transform: ai-summary
-    
-  - include: "**/*.js"
+  - include: "docs/**/*.pdf"
+    transform: pdf
+
+  - include: "**/*.pdf"
     transform: false  # Skip others
 ```
 
@@ -616,14 +505,14 @@ The system can optimize transformer execution order by:
 ```javascript
 // Validation happens automatically in the pipeline
 const registry = await TransformerRegistry.createDefault();
-const validation = registry.validatePlan(['ai-summary', 'pdf', 'image']);
+const validation = registry.validatePlan(['pdf', 'markdown', 'image']);
 
 if (!validation.valid) {
   console.log('Issues found:', validation.issues);
 }
 
 // Optimization suggestions
-const optimization = registry.optimizePlan(['heavy-ai', 'light-text', 'order-sensitive']);
+const optimization = registry.optimizePlan(['pdf', 'first-lines', 'markdown']);
 console.log('Optimized order:', optimization.optimized);
 ```
 

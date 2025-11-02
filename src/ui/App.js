@@ -20,7 +20,6 @@ import ProfileListView from './components/ProfileListView.js';
 import ValidationView from './components/ValidationView.js';
 import ConfigInspectView from './components/ConfigInspectView.js';
 import DocsView from './components/DocsView.js';
-import InstallView from './components/InstallView.js';
 
 const AppContent = () => {
   const { command, updateState } = useAppContext();
@@ -35,31 +34,29 @@ const AppContent = () => {
     }
 
     switch (command) {
-    case 'copy':
-      return React.createElement(CopyView);
-    case 'profile:list':
-      return React.createElement(ProfileListView);
-    case 'profile:validate':
-    case 'config:validate':
-      return React.createElement(ValidationView);
-    case 'config:inspect':
-      return React.createElement(ConfigInspectView);
-    case 'cache:clear':
-      return React.createElement(ValidationView, {
-        successMessage: 'Cache cleared successfully',
-        type: 'cache',
-      });
-    case 'copy:docs':
-      return React.createElement(DocsView);
-    case 'install:copytree':
-      return React.createElement(InstallView);
-    default: {
-      // Ensure Text is available
-      if (!Text) {
-        return null; // Don't render anything if Text component isn't loaded yet
+      case 'copy':
+        return React.createElement(CopyView);
+      case 'profile:list':
+        return React.createElement(ProfileListView);
+      case 'profile:validate':
+      case 'config:validate':
+        return React.createElement(ValidationView);
+      case 'config:inspect':
+        return React.createElement(ConfigInspectView);
+      case 'cache:clear':
+        return React.createElement(ValidationView, {
+          successMessage: 'Cache cleared successfully',
+          type: 'cache',
+        });
+      case 'copy:docs':
+        return React.createElement(DocsView);
+      default: {
+        // Ensure Text is available
+        if (!Text) {
+          return null; // Don't render anything if Text component isn't loaded yet
+        }
+        return React.createElement(Text, { color: 'red' }, `Unknown command: ${command}`);
       }
-      return React.createElement(Text, { color: 'red' }, `Unknown command: ${command}`);
-    }
     }
   };
 

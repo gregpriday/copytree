@@ -1,6 +1,7 @@
 import Stage from '../Stage.js';
 import fs from 'fs-extra';
 import path from 'path';
+import { detect, isConvertibleDocument } from '../../utils/BinaryDetector.js';
 
 class FileLoadingStage extends Stage {
   constructor(options = {}) {
@@ -27,12 +28,35 @@ class FileLoadingStage extends Stage {
 
   async loadFileContent(file) {
     try {
-      const isBinary = await this.isBinaryFile(file.absolutePath);
+      // Use centralized binary detector
+      const det = await detect(file.absolutePath, {
+        sampleBytes: this.config.get('copytree.binaryDetect.sampleBytes', 8192),
+        nonPrintableThreshold: this.config.get('copytree.binaryDetect.nonPrintableThreshold', 0.3),
+      });
 
-      if (isBinary) {
-        return this.handleBinaryFile(file);
+      // Get policy for this file's category
+      const policy =
+        this.config.get('copytree.binaryPolicy', {})[det.category] || this.binaryAction;
+
+      // Handle convertible documents - load raw bytes so transformers can convert
+      if (det.isBinary && isConvertibleDocument(det.category, det.ext) && policy === 'convert') {
+        const content = await fs.readFile(file.absolutePath); // Buffer
+        return {
+          ...file,
+          content,
+          isBinary: true,
+          encoding: undefined,
+          binaryCategory: det.category,
+          binaryName: det.name,
+        };
       }
 
+      // Handle non-convertible binaries
+      if (det.isBinary) {
+        return this.handleBinaryFile(file, det, policy);
+      }
+
+      // Regular text file
       const content = await fs.readFile(file.absolutePath, this.encoding);
 
       return {
@@ -53,74 +77,39 @@ class FileLoadingStage extends Stage {
     }
   }
 
-  async isBinaryFile(filePath) {
-    try {
-      // First check by extension
-      const ext = path.extname(filePath).toLowerCase();
-      const binaryExtensions = [
-        '.exe',
-        '.dll',
-        '.so',
-        '.dylib',
-        '.bin',
-        '.jpg',
-        '.jpeg',
-        '.png',
-        '.gif',
-        '.bmp',
-        '.ico',
-        '.mp3',
-        '.mp4',
-        '.avi',
-        '.mov',
-        '.pdf',
-        '.zip',
-        '.tar',
-        '.gz',
-        '.rar',
-        '.7z',
-      ];
+  handleBinaryFile(file, det, policy) {
+    switch (policy) {
+      case 'skip':
+        return null;
 
-      if (binaryExtensions.includes(ext)) {
-        return true;
-      }
+      case 'comment':
+        // Return stub for formatters to emit comments
+        return {
+          ...file,
+          content: '',
+          isBinary: true,
+          excluded: true,
+          excludedReason: det.category || 'binary',
+          binaryCategory: det.category,
+          binaryName: det.name,
+        };
 
-      // Then check content for null bytes
-      const buffer = await fs.readFile(filePath);
-      const sampleSize = Math.min(512, buffer.length);
+      case 'base64':
+        return this.loadBinaryAsBase64(file, det);
 
-      // Check for null bytes (common in binary files)
-      for (let i = 0; i < sampleSize; i++) {
-        if (buffer[i] === 0) {
-          return true;
-        }
-      }
-
-      return false;
-    } catch (_error) {
-      return false;
+      case 'placeholder':
+      default:
+        return {
+          ...file,
+          content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
+          isBinary: true,
+          binaryCategory: det.category,
+          binaryName: det.name,
+        };
     }
   }
 
-  handleBinaryFile(file) {
-    switch (this.binaryAction) {
-    case 'skip':
-      return null;
-
-    case 'base64':
-      return this.loadBinaryAsBase64(file);
-
-    case 'placeholder':
-    default:
-      return {
-        ...file,
-        content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
-        isBinary: true,
-      };
-    }
-  }
-
-  async loadBinaryAsBase64(file) {
+  async loadBinaryAsBase64(file, det) {
     try {
       const buffer = await fs.readFile(file.absolutePath);
       const base64 = buffer.toString('base64');
@@ -130,6 +119,8 @@ class FileLoadingStage extends Stage {
         content: base64,
         isBinary: true,
         encoding: 'base64',
+        binaryCategory: det?.category,
+        binaryName: det?.name,
       };
     } catch (error) {
       return {
@@ -137,6 +128,8 @@ class FileLoadingStage extends Stage {
         content: `[Error loading binary file: ${error.message}]`,
         error: error.message,
         isBinary: true,
+        binaryCategory: det?.category,
+        binaryName: det?.name,
       };
     }
   }

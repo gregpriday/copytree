@@ -83,17 +83,6 @@ class PipelineError extends CopyTreeError {
 }
 
 /**
- * AI Provider error
- */
-class AIProviderError extends CopyTreeError {
-  constructor(message, provider, details = {}) {
-    super(message, 'AI_PROVIDER_ERROR', { provider, ...details });
-    this.name = 'AIProviderError';
-    this.provider = provider;
-  }
-}
-
-/**
  * Transform error
  */
 class TransformError extends CopyTreeError {
@@ -139,6 +128,20 @@ class InstructionsError extends CopyTreeError {
 }
 
 /**
+ * Secrets detected error
+ * Thrown when secrets are found and failOnSecrets is enabled
+ */
+class SecretsDetectedError extends CopyTreeError {
+  constructor(secretsCount, findings = [], details = {}) {
+    const message = `Secrets detected: ${secretsCount} secret(s) found`;
+    super(message, 'SECRETS_DETECTED', { secretsCount, findings, ...details });
+    this.name = 'SecretsDetectedError';
+    this.secretsCount = secretsCount;
+    this.findings = findings;
+  }
+}
+
+/**
  * Handle errors consistently
  */
 function handleError(error, options = {}) {
@@ -170,13 +173,11 @@ function handleError(error, options = {}) {
   return error;
 }
 
-// Alias for consistency with BaseProvider
-const ProviderError = AIProviderError;
-
 /**
  * Error codes that should be retried (transient errors)
  */
 export const RETRYABLE_ERROR_CODES = [
+  // Network errors (existing)
   'RATE_LIMIT',
   'TIMEOUT',
   'SERVICE_UNAVAILABLE',
@@ -187,19 +188,22 @@ export const RETRYABLE_ERROR_CODES = [
   'ECONNRESET',
   'ECONNABORTED',
   'SOCKET_TIMEOUT',
+  // Filesystem errors (new)
+  'EBUSY', // Resource busy (file locked)
+  'EPERM', // Permission denied (transient on Windows with antivirus)
+  'EACCES', // Access denied (Windows file lock/antivirus)
+  'EMFILE', // Too many open files
+  'ENFILE', // File table overflow
+  'EAGAIN', // Resource temporarily unavailable
+  'EIO', // I/O error (network drives)
 ];
 
 /**
  * Error codes that should NOT be retried (permanent errors)
  */
 export const NON_RETRYABLE_ERROR_CODES = [
-  'INVALID_API_KEY',
-  'SAFETY_FILTER',
   'INVALID_REQUEST',
-  'CONTENT_BLOCKED',
-  'QUOTA_EXCEEDED',
   'PERMISSION_DENIED',
-  'AUTHENTICATION_FAILED',
   'VALIDATION_ERROR',
   'CONFIG_ERROR',
 ];
@@ -210,15 +214,21 @@ export const NON_RETRYABLE_ERROR_CODES = [
  * @returns {boolean} True if the error should be retried
  */
 export function isRetryableError(error) {
-  if (error instanceof ProviderError) {
-    // For ProviderError, the specific error code is in details.code
-    const specificCode = error.details?.code;
-    return specificCode && RETRYABLE_ERROR_CODES.includes(specificCode);
-  }
-
   // Check for common network error codes on the error object
   const errorCode = error.code || error.name || '';
   return RETRYABLE_ERROR_CODES.includes(errorCode);
+}
+
+/**
+ * Check if an error is a retryable filesystem error
+ * @param {Error|string} error - The error to check (Error object or error code string)
+ * @returns {boolean} True if the error is a retryable filesystem error
+ */
+export function isRetryableFsError(error) {
+  const code = error?.code || error;
+  // Filesystem-specific retryable codes
+  const fsRetryableCodes = ['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'ENFILE', 'EAGAIN', 'EIO'];
+  return fsRetryableCodes.includes(code);
 }
 
 /**
@@ -229,14 +239,6 @@ export function isRetryableError(error) {
 export function categorizeError(error) {
   if (isRetryableError(error)) {
     return 'retryable';
-  }
-
-  if (error instanceof ProviderError) {
-    // For ProviderError, the specific error code is in details.code
-    const specificCode = error.details?.code;
-    if (specificCode && NON_RETRYABLE_ERROR_CODES.includes(specificCode)) {
-      return 'non-retryable';
-    }
   }
 
   const errorCode = error.code || error.name || '';
@@ -254,11 +256,10 @@ export {
   ConfigurationError,
   ValidationError,
   PipelineError,
-  AIProviderError,
-  ProviderError,
   TransformError,
   GitError,
   ProfileError,
   InstructionsError,
+  SecretsDetectedError,
   handleError,
 };

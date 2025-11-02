@@ -45,7 +45,7 @@ rules:
   - always: "package-lock.json"
   - always: "tsconfig.json"
   - always: "README.md"
-  - always: ".env.example"
+  - always: "config.example.js"
   
   # Build artifacts
   - exclude: "build/**"
@@ -105,7 +105,7 @@ rules:
   - always: "package.json"
   - always: "tsconfig.json"
   - always: "ecosystem.config.js"
-  - always: ".env.example"
+  - always: "config.example.js"
   - always: "docker-compose.yml"
   
   # Exclude
@@ -115,12 +115,11 @@ rules:
   - exclude: ".tmp/**"
 
 transformers:
-  # Summarize large files
-  ai-summary:
+  # Preview large files
+  first-lines:
     enabled: true
     options:
-      maxLength: 1000
-      filesOver: 50000  # 50KB
+      lineCount: 50
 ```
 
 ## Documentation Website
@@ -215,7 +214,7 @@ rules:
   - always: "app.js"
   - always: "server.js"
   - always: "package.json"
-  - always: ".env.example"
+  - always: "config.example.js"
   - always: "nodemon.json"
   
   # Exclude
@@ -357,7 +356,7 @@ rules:
   - include: "services/*/src/**/*.{js,ts}"
   - include: "services/*/package.json"
   - include: "services/*/Dockerfile"
-  - include: "services/*/.env.example"
+  - include: "services/*/config.example.js"
   
   # API Gateway
   - include: "gateway/**/*.{js,ts}"
@@ -381,7 +380,7 @@ rules:
   
   # Root files
   - always: "Makefile"
-  - always: ".env.example"
+  - always: "config.example.js"
   - always: "README.md"
   
   # Exclude

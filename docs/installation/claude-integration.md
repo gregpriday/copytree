@@ -19,11 +19,11 @@ CopyTree works seamlessly with Claude Code by providing structured, AI-friendly 
 The simplest way to share your project with Claude Code:
 
 ```bash
-# Copy current directory
+# Copy current directory (uses default profile)
 copytree
 
-# Copy with a specific profile
-copytree --profile laravel
+# Copy with a custom profile
+copytree --profile myproject
 
 # Copy only modified files
 copytree --modified
@@ -48,16 +48,17 @@ Then you can reference this file in Claude Code conversations.
 
 ### 1. Use Appropriate Profiles
 
-Select profiles that match your project type:
+Create and use custom profiles for your project needs:
 
 ```bash
 # List available profiles
 copytree profile:list
 
-# Use framework-specific profiles
-copytree --profile laravel
-copytree --profile sveltekit
-copytree --profile react
+# Use default profile (automatic)
+copytree
+
+# Use custom profile
+copytree --profile myproject
 ```
 
 ### 2. Filter for Relevance
@@ -77,18 +78,15 @@ copytree --filter "src/**/*.js"
 
 ### 3. Enable Transformations
 
-Get better context with AI-powered transformations:
+Configure transformers in your profile for better context:
 
-```bash
-# Enable all transformations
-copytree --transform
+**Note:** Transformers are configured in profiles, not via CLI flags. See the [Transformer Reference](../profiles/transformer-reference.md) for details.
 
-# This includes:
-# - PDF to text conversion
-# - Image OCR and descriptions
-# - Code summaries for large files
-# - Test file summaries
-```
+Transformers include:
+- PDF to text conversion
+- Image OCR and descriptions
+- Code summaries for large files
+- Test file summaries
 
 ### 4. Manage Output Size
 
@@ -111,21 +109,21 @@ copytree --only-tree
 
 ```bash
 # Copy only files related to the error
-copytree --modified --transform -o debug-context.xml
+copytree --modified -o debug-context.md
 ```
 
 ### Code Review
 
 ```bash
-# Copy files changed in feature branch
-copytree --changed main --transform
+# Copy files changed since main branch
+copytree --changed main
 ```
 
 ### Documentation Generation
 
 ```bash
-# Copy with summaries and descriptions
-copytree --profile docs --transform --always "README.md" --always "docs/**/*"
+# Copy documentation with force-include
+copytree --always "README.md" --always "docs/**/*"
 ```
 
 ### Understanding New Codebase
@@ -135,14 +133,14 @@ copytree --profile docs --transform --always "README.md" --always "docs/**/*"
 copytree --only-tree
 
 # Then dive into specific areas
-copytree --filter "src/components/**" --transform
+copytree --filter "src/components/**"
 ```
 
 ## Tips for Effective Use
 
 1. **Start Small**: Begin with filtered views before sharing entire codebases
-2. **Use Profiles**: Leverage built-in profiles for better file selection
-3. **Enable Caching**: Keep caching enabled for faster AI transformations
+2. **Use Profiles**: Create custom profiles for better file selection
+3. **Enable Caching**: Keep caching enabled (default) for faster AI transformations
 4. **Iterate**: Use git filters to focus on current work
 5. **Reference Files**: For ongoing work, use file output instead of clipboard
 
@@ -165,11 +163,11 @@ copytree --char-limit 50000
 For better performance:
 
 ```bash
-# Enable caching (default)
-copytree --transform
+# Caching is enabled by default for AI operations
+copytree
 
-# Or disable specific transformations
-copytree --no-transform
+# Disable caching if needed
+copytree --no-cache
 ```
 
 ### Missing Context
@@ -178,7 +176,7 @@ If important files are missing:
 
 ```bash
 # Force include specific files
-copytree --always "config/*" --always ".env.example"
+copytree --always "config/*" --always "config.example.js"
 
 # Check what profile is being used
 copytree --dry-run

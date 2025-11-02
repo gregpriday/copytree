@@ -151,15 +151,16 @@ external:
 
 ### 3. Profile Inheritance
 
-Extend existing profiles:
+Extend existing profiles (like default or your own custom profiles):
 
 ```yaml
-extends: react  # Inherit from react profile
+extends: default  # Inherit from default profile
 
-rules:
-  # Add your custom rules
-  - include: "src/custom/**"
-  - exclude: "src/legacy/**"
+include:
+  - "src/custom/**"
+
+exclude:
+  - "src/legacy/**"
 ```
 
 ## Default Profile
@@ -175,13 +176,17 @@ Focus on source code:
 name: development
 description: Active development files
 
-rules:
-  - include: "src/**/*.{js,jsx,ts,tsx}"
-  - include: "*.{json,yaml}"
-  - exclude: "**/*.test.js"
-  - exclude: "**/*.spec.js"
-  - always: "package.json"
-  - always: "README.md"
+include:
+  - "src/**/*.{js,jsx,ts,tsx}"
+  - "*.{json,yaml}"
+
+exclude:
+  - "**/*.test.js"
+  - "**/*.spec.js"
+
+always:
+  - "package.json"
+  - "README.md"
 ```
 
 ### 2. Documentation Profile
@@ -191,10 +196,12 @@ Only documentation files:
 name: docs
 description: Documentation files only
 
-rules:
-  - include: "**/*.md"
-  - include: "docs/**"
-  - exclude: "node_modules/**"
+include:
+  - "**/*.md"
+  - "docs/**"
+
+exclude:
+  - "node_modules/**"
 ```
 
 ### 3. API Profile
@@ -204,13 +211,15 @@ API-related files:
 name: api
 description: API endpoints and schemas
 
-rules:
-  - include: "**/routes/**"
-  - include: "**/controllers/**"
-  - include: "**/models/**"
-  - include: "**/middleware/**"
-  - include: "**/*.swagger.yaml"
-  - exclude: "**/*.test.js"
+include:
+  - "**/routes/**"
+  - "**/controllers/**"
+  - "**/models/**"
+  - "**/middleware/**"
+  - "**/*.swagger.yaml"
+
+exclude:
+  - "**/*.test.js"
 ```
 
 ## Profile Locations
@@ -271,11 +280,11 @@ description: Authentication feature files including components, API, and tests
 Build on existing profiles:
 
 ```yaml
-extends: react
+extends: default
 
-rules:
-  # Only add what's different
-  - include: "src/features/auth/**"
+include:
+  # Only add what's different from parent
+  - "src/features/auth/**"
 ```
 
 ### 5. Test Your Profiles
@@ -306,6 +315,5 @@ copytree profile:validate my-profile
 ## Next Steps
 
 - [Profile Creation Guide](./profile-creation-guide.md) - Create custom profiles
-- [Creating Profiles](./profile-creation-guide.md) - Build custom profiles
 - [Advanced Features](./profile-advanced.md) - External sources and more
 - [Examples](./profile-examples.md) - Real-world configurations

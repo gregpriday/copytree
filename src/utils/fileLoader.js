@@ -1,6 +1,15 @@
 import fs from 'fs-extra';
 import path from 'path';
+import fastGlob from 'fast-glob';
 import { logger } from './logger.js';
+import { withFsRetry } from './retryableFs.js';
+import { isRetryableFsError } from './errors.js';
+import {
+  recordRetry,
+  recordGiveUp,
+  recordPermanent,
+  recordSuccessAfterRetry,
+} from './fsErrorReport.js';
 
 /**
  * File loader utility for loading files from a directory
@@ -11,6 +20,14 @@ class FileLoader {
     this.includeHidden = options.includeHidden || false;
     this.followSymlinks = options.followSymlinks || false;
     this.maxFileSize = options.maxFileSize || 10 * 1024 * 1024; // 10MB default
+    this.config = options.config || {};
+
+    // Extract retry configuration with defaults
+    this.retryConfig = {
+      maxAttempts: this.config?.copytree?.fs?.retryAttempts ?? 3,
+      initialDelay: this.config?.copytree?.fs?.retryDelay ?? 100,
+      maxDelay: this.config?.copytree?.fs?.maxDelay ?? 2000,
+    };
   }
 
   /**
@@ -20,11 +37,8 @@ class FileLoader {
     const { include = ['**/*'], exclude = [] } = patterns;
 
     try {
-      // Dynamic import for ESM-only globby
-      const { globby } = await import('globby');
-
-      // Get file paths using globby
-      const filePaths = await globby(include, {
+      // Get file paths using fast-glob
+      const filePaths = await fastGlob(include, {
         cwd: this.basePath,
         ignore: exclude,
         dot: this.includeHidden,
@@ -58,10 +72,16 @@ class FileLoader {
     const fullPath = path.join(this.basePath, relativePath);
 
     try {
-      const stats = await fs.stat(fullPath);
+      // Stat file with retry logic
+      const stats = await withFsRetry(() => fs.stat(fullPath), {
+        ...this.retryConfig,
+        onRetry: ({ code }) => recordRetry(fullPath, code),
+      });
 
       // Skip files that are too large
       if (stats.size > this.maxFileSize) {
+        // Record success for stat operation even though we're skipping the file
+        recordSuccessAfterRetry(fullPath);
         logger.warn('Skipping large file', {
           path: relativePath,
           size: stats.size,
@@ -70,8 +90,14 @@ class FileLoader {
         return null;
       }
 
-      // Read file content
-      const content = await fs.readFile(fullPath, 'utf8');
+      // Read file content with retry logic
+      const content = await withFsRetry(() => fs.readFile(fullPath, 'utf8'), {
+        ...this.retryConfig,
+        onRetry: ({ code }) => recordRetry(fullPath, code),
+      });
+
+      // Record successful operation after retries
+      recordSuccessAfterRetry(fullPath);
 
       return {
         name: path.basename(relativePath),
@@ -87,13 +113,25 @@ class FileLoader {
         type: this.detectFileType(relativePath, content),
       };
     } catch (error) {
-      // Try reading as binary if UTF-8 fails
+      // Handle different error types
       if (error.code === 'EISDIR') {
+        recordPermanent(fullPath, error.code);
         return null; // Skip directories
-      } else if (error.toString().includes('Invalid')) {
+      }
+
+      // Try reading as binary if UTF-8 fails (only for non-retryable errors)
+      if (error.toString().includes('Invalid') && !isRetryableFsError(error)) {
         try {
-          const content = await fs.readFile(fullPath);
-          const stats = await fs.stat(fullPath);
+          const content = await withFsRetry(() => fs.readFile(fullPath), {
+            ...this.retryConfig,
+            onRetry: ({ code }) => recordRetry(fullPath, code),
+          });
+          const stats = await withFsRetry(() => fs.stat(fullPath), {
+            ...this.retryConfig,
+            onRetry: ({ code }) => recordRetry(fullPath, code),
+          });
+
+          recordSuccessAfterRetry(fullPath);
 
           return {
             name: path.basename(relativePath),
@@ -110,6 +148,12 @@ class FileLoader {
             isBinary: true,
           };
         } catch (binaryError) {
+          // Record binary read failure
+          if (isRetryableFsError(binaryError)) {
+            recordGiveUp(fullPath, binaryError.code);
+          } else {
+            recordPermanent(fullPath, binaryError.code);
+          }
           logger.error('Failed to load file as binary', {
             path: relativePath,
             error: binaryError.message,
@@ -117,10 +161,20 @@ class FileLoader {
           return null;
         }
       } else {
-        logger.error('Failed to load file', {
-          path: relativePath,
-          error: error.message,
-        });
+        // Record the failure based on error type
+        if (isRetryableFsError(error)) {
+          recordGiveUp(fullPath, error.code);
+          logger.warn('File failed after retries', {
+            path: relativePath,
+            code: error.code,
+          });
+        } else {
+          recordPermanent(fullPath, error.code);
+          logger.error('Failed to load file', {
+            path: relativePath,
+            error: error.message,
+          });
+        }
         return null;
       }
     }

@@ -423,12 +423,87 @@
         },
         "binaryFileAction": {
           "type": "string",
-          "enum": ["placeholder", "skip", "base64"],
-          "description": "Binary file handling action"
+          "enum": ["placeholder", "skip", "base64", "comment"],
+          "description": "Binary file handling action (legacy, use binaryPolicy)"
         },
         "binaryPlaceholderText": {
           "type": "string",
           "description": "Placeholder text for binary files"
+        },
+        "binaryDetect": {
+          "type": "object",
+          "description": "Binary detection configuration",
+          "properties": {
+            "sampleBytes": {
+              "type": "number",
+              "description": "Number of bytes to sample for detection"
+            },
+            "nonPrintableThreshold": {
+              "type": "number",
+              "description": "Threshold ratio for non-printable characters"
+            }
+          },
+          "additionalProperties": false
+        },
+        "binaryPolicy": {
+          "type": "object",
+          "description": "Binary handling policy per category",
+          "properties": {
+            "image": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "media": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "archive": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "exec": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "font": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "database": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "cert": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "document": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "other": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert"]
+            },
+            "text": {
+              "type": "string",
+              "enum": ["comment", "skip", "placeholder", "base64", "convert", "load"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "binaryCommentTemplates": {
+          "type": "object",
+          "description": "Template strings for binary file comments",
+          "properties": {
+            "xml": {
+              "type": "string"
+            },
+            "markdown": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         },
         "addLineNumbers": {
           "type": "boolean",
@@ -457,6 +532,31 @@
             },
             "empty": {
               "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "fs": {
+          "type": "object",
+          "description": "Filesystem retry configuration",
+          "properties": {
+            "retryAttempts": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 10,
+              "description": "Maximum number of retry attempts for transient filesystem errors"
+            },
+            "retryDelay": {
+              "type": "number",
+              "minimum": 10,
+              "maximum": 5000,
+              "description": "Initial delay in milliseconds before first retry"
+            },
+            "maxDelay": {
+              "type": "number",
+              "minimum": 100,
+              "maximum": 30000,
+              "description": "Maximum delay in milliseconds for exponential backoff"
             }
           },
           "additionalProperties": false
@@ -585,6 +685,83 @@
             "compress": {
               "type": "boolean",
               "description": "Compress serialized data"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "secretsGuard": {
+      "type": "object",
+      "description": "Secrets detection and redaction configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable automatic secret detection and redaction"
+        },
+        "exclude": {
+          "type": "array",
+          "description": "File patterns to exclude entirely (high-risk files)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowlist": {
+          "type": "array",
+          "description": "File patterns to always allow (e.g., test fixtures)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "redactInline": {
+          "type": "boolean",
+          "description": "Redact secrets inline vs exclude entire file"
+        },
+        "redactionMode": {
+          "type": "string",
+          "enum": ["typed", "generic", "hash"],
+          "description": "Redaction marker style: typed (***REDACTED:TYPE***), generic (***REDACTED***), hash (***REDACTED:TYPE:HASH***)"
+        },
+        "maxFileBytes": {
+          "type": "number",
+          "minimum": 1024,
+          "maximum": 10485760,
+          "description": "Maximum file size to scan (bytes)"
+        },
+        "parallelism": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Number of concurrent file scans"
+        },
+        "failOnSecrets": {
+          "type": "boolean",
+          "description": "Exit with error if secrets are found (CI mode)"
+        },
+        "gitleaks": {
+          "type": "object",
+          "description": "Gitleaks-specific configuration",
+          "properties": {
+            "binaryPath": {
+              "type": "string",
+              "description": "Path to gitleaks binary"
+            },
+            "configPath": {
+              "type": "string",
+              "description": "Path to .gitleaks.toml config file"
+            },
+            "extraArgs": {
+              "type": "array",
+              "description": "Additional CLI arguments for gitleaks",
+              "items": {
+                "type": "string"
+              }
+            },
+            "logLevel": {
+              "type": "string",
+              "enum": ["fatal", "error", "warn", "info", "debug"],
+              "description": "Gitleaks log level"
             }
           },
           "additionalProperties": false

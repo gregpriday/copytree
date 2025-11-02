@@ -242,7 +242,7 @@ export function generateRecommendations(stats, duration, fileCount) {
     const allSlowStages = [...slowStages.warning, ...slowStages.critical];
 
     if (allSlowStages.includes('FileTransformation')) {
-      recommendations.push('Enable caching for AI operations to improve repeated runs');
+      recommendations.push('Enable caching for transformations to improve repeated runs');
       recommendations.push('Consider reducing transformation complexity or file count');
     }
 
@@ -258,9 +258,9 @@ export function generateRecommendations(stats, duration, fileCount) {
     }
   }
 
-  // AI-specific recommendations
+  // Transformation caching recommendations
   if (stats.filesTransformed && stats.filesTransformed > 20) {
-    recommendations.push('Consider AI result caching with COPYTREE_CACHE_ENABLED=true');
+    recommendations.push('Consider transformation result caching with COPYTREE_CACHE_ENABLED=true');
   }
 
   // Throughput recommendations
@@ -562,7 +562,8 @@ export class PerformanceTelemetry {
         type: 'transformation_performance',
         severity: 'medium',
         description: 'File transformations are frequently slow',
-        recommendation: 'Enable AI result caching and consider reducing transformation complexity',
+        recommendation:
+          'Enable transformation result caching and consider reducing transformation complexity',
       });
     }
 

@@ -78,10 +78,21 @@ class SortFilesStage extends Stage {
   }
 
   /**
+   * Handle errors during sorting - return unsorted files
+   */
+  async handleError(error, input) {
+    this.log(`Sorting failed: ${error.message}, returning files unsorted`, 'warn');
+    // Return input unchanged if sorting fails
+    return input;
+  }
+
+  /**
    * Compare by file path (alphabetical)
    */
   compareByPath(a, b) {
-    return a.relativePath.localeCompare(b.relativePath, undefined, {
+    const pathA = a.relativePath || a.path || '';
+    const pathB = b.relativePath || b.path || '';
+    return pathA.localeCompare(pathB, undefined, {
       numeric: true,
       sensitivity: 'base',
     });

@@ -4,19 +4,11 @@
 
 // Note: Removed @babel/register for better performance
 
-// Suppress dotenv console output
-const originalLog = console.log;
-console.log = () => {};
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Load .env from the project directory (copytree root)
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
-console.log = originalLog;
 
 import React from 'react';
 // Use dynamic import for ESM-only ink
@@ -42,7 +34,7 @@ const program = new Command();
 program
   .name('copytree')
   .description(
-    'Copy directory structures and file contents into Markdown (default), XML, JSON, or tree formats',
+    'Copy directory structures and file contents into XML (default), Markdown, JSON, NDJSON, SARIF, or tree formats',
   )
   .version(pkg.version);
 
@@ -50,14 +42,17 @@ program
 program
   .command('copy [path]', { isDefault: true })
   .description(
-    'Copy directory structure to markdown (default) or XML/JSON/tree with customizable profiles and filters',
+    'Copy directory structure to XML (default) or Markdown/JSON/NDJSON/SARIF/tree with customizable profiles and filters',
   )
   .option('-p, --profile <name>', 'Use a predefined profile (default: default)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
   .option('-o, --output <file>', 'Save output to file')
-  .option('--format <format>', 'Output format: markdown|md, xml, json, tree (default: markdown)')
+  .option(
+    '--format <format>',
+    'Output format: xml, markdown|md, json, ndjson, sarif, tree (default: xml)',
+  )
   .option('-i, --display', 'Display output to console')
   .option('-S, --stream', 'Stream output')
   .option('--dry-run', 'Show what would be copied without doing it')
@@ -80,7 +75,31 @@ program
   .option('--no-instructions', 'Disable including instructions in output')
   .option('--instructions <name>', 'Use custom instructions set (default: default)')
   .option('--no-validate', 'Disable configuration validation')
-  .action(async (path, options) => {
+  .option('--secrets-guard', 'Enable automatic secret detection and redaction (default: enabled)')
+  .option('--no-secrets-guard', 'Disable secret detection and redaction')
+  .option(
+    '--secrets-redact-mode <mode>',
+    'Redaction marker style: typed, generic, hash (default: typed)',
+  )
+  .option('--fail-on-secrets', 'Exit with error if secrets are found (CI mode)')
+  .option('--secrets-report <file>', 'Output secrets report to file (use - for stdout)')
+  .option('--fail-on-fs-errors', 'Exit with error if filesystem operations fail after retries')
+  .action(async (targetPath, options) => {
+    // Auto-detect format from output file extension
+    if (!options.format && options.output) {
+      const formatByExt = {
+        '.json': 'json',
+        '.md': 'markdown',
+        '.markdown': 'markdown',
+        '.ndjson': 'ndjson',
+        '.sarif': 'sarif',
+      };
+      const inferred = formatByExt[path.extname(options.output).toLowerCase()];
+      if (inferred) {
+        options.format = inferred;
+      }
+    }
+
     if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
@@ -90,7 +109,7 @@ program
     render(
       React.createElement(App, {
         command: 'copy',
-        path: path || '.',
+        path: targetPath || '.',
         options,
       }),
     );
@@ -141,9 +160,15 @@ program
 // 8. Copy docs command
 program
   .command('copy:docs')
-  .description('Copy framework/library documentation')
-  .option('--topic <name>', 'Documentation topic to copy')
+  .description('Copy CopyTree documentation (use --display to read all docs)')
+  .option('--topic <name>', 'Legacy: documentation topic to copy')
+  .option('--section <id...>', 'Copy specific section(s) by ID')
+  .option('--group <id...>', 'Copy documentation group(s) by ID')
+  .option('--task <id>', 'Copy task bundle with intro and checklist')
+  .option('--list [kind]', 'List available items: all|sections|groups|tasks (default: all)')
+  .option('--meta <format>', 'Output metadata in json or yaml format')
   .option('-o, --output <file>', 'Output file instead of clipboard')
+  .option('-i, --display', 'Display to console (recommended for AI agents)')
   .option('--no-clipboard', 'Display to console instead of clipboard')
   .action(async (options) => {
     if (!render || !App) {
@@ -211,7 +236,6 @@ program
   .command('cache:clear')
   .description('Clear all caches')
   .option('--transformations', 'Clear only transformation cache')
-  .option('--ai', 'Clear only AI cache')
   .option('--git', 'Clear only git cache')
   .option('--profiles', 'Clear only profile detection cache')
   .option('--gc', 'Run garbage collection on expired entries')
@@ -233,24 +257,7 @@ program
     );
   });
 
-// 12. Install copytree command
-program
-  .command('install:copytree')
-  .description('Set up CopyTree environment and configuration')
-  .action(async () => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'install:copytree',
-        path: null,
-        options: {},
-      }),
-    );
-  });
+// 12. Install copytree command - REMOVED
+// This command has been removed as all directories are auto-created on first use.
 
 program.parse(process.argv);

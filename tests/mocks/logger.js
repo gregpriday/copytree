@@ -31,10 +31,11 @@ const createMockLogger = () => {
 // Create the main logger instance
 const logger = createMockLogger();
 
-// Export both the class and a default instance (matching the original export)
-const MockLogger = jest.fn(() => createMockLogger());
+// Mock Logger class (matching the original export)
+const Logger = jest.fn(() => createMockLogger());
 
-export { MockLogger as Logger, logger };
+// Export both the class and a default instance (matching the original export)
+export { Logger, logger };
 
 // Export convenience method exports (matching the original)
 export const info = logger.info;

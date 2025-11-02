@@ -1,5 +1,6 @@
 // Unmock fs-extra for integration tests
 jest.unmock('fs-extra');
+jest.unmock('fast-glob');
 
 // Static imports for Node.js modules
 import fs from 'fs-extra';
@@ -55,6 +56,10 @@ describe('Pipeline Integration Tests', () => {
 
     // Create test files
     await fs.writeFile(path.join(tempDir, 'index.js'), 'console.log("Hello");');
+    console.log(
+      'index.js content after creation:',
+      await fs.readFile(path.join(tempDir, 'index.js'), 'utf8'),
+    );
     await fs.writeFile(path.join(tempDir, 'utils.js'), 'export const util = () => {};');
     await fs.writeFile(path.join(tempDir, 'test.spec.js'), 'describe("test", () => {});');
     await fs.writeFile(path.join(tempDir, 'README.md'), '# Test Project');
@@ -146,6 +151,11 @@ describe('Pipeline Integration Tests', () => {
         options: {},
       });
 
+      console.log(
+        'index.js content from pipeline:',
+        result.files.find((f) => f.path === 'index.js').content,
+      );
+
       expect(result.output).toContain('<ct:directory');
       expect(result.output).toContain('<ct:file path="@index.js"');
       expect(result.output).toContain('console.log("Hello");');
@@ -206,6 +216,31 @@ describe('Pipeline Integration Tests', () => {
       expect(filePaths).not.toContain('debug.log');
       expect(filePaths).not.toContain('node_modules/package.js');
       expect(filePaths).toContain('index.js'); // Should include non-ignored files
+    });
+
+    it('should respect .copytreeignore in subdirectories', async () => {
+      // Create nested directory with its own .copytreeignore
+      await fs.ensureDir(path.join(tempDir, 'src/internal'));
+      await fs.writeFile(path.join(tempDir, 'src/internal/secret.js'), 'top secret');
+      await fs.writeFile(path.join(tempDir, 'src/.copytreeignore'), 'internal/');
+
+      pipeline.through([
+        new FileDiscoveryStage({
+          basePath: tempDir,
+          patterns: ['**/*.js'],
+          respectGitignore: true,
+        }),
+      ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: {},
+      });
+
+      const paths = result.files.map((f) => f.path);
+      expect(paths).toContain('src/app.js');
+      expect(paths).not.toContain('src/internal/secret.js');
     });
   });
 

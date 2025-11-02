@@ -3,13 +3,12 @@ import fs from 'fs-extra';
 import ora from 'ora';
 
 // Use dynamic imports for modules under test
-let copy, Pipeline, ProfileLoader, ProfileGuesser, AIService, Clipboard;
+let copy, Pipeline, ProfileLoader, ProfileGuesser, Clipboard;
 
 // Mock all dependencies
 jest.mock('../../../src/pipeline/Pipeline.js');
 jest.mock('../../../src/profiles/ProfileLoader.js');
 jest.mock('../../../src/profiles/ProfileGuesser.js');
-jest.mock('../../../src/services/AIService.js');
 jest.mock('fs-extra');
 jest.mock('../../../src/utils/clipboard.js');
 jest.mock('ora');
@@ -44,6 +43,7 @@ jest.mock('../../../src/utils/errors.js', () => ({
 
 // Mock stage classes
 jest.mock('../../../src/pipeline/stages/FileDiscoveryStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/AlwaysIncludeStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/ProfileFilterStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/FileLoadingStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/OutputFormattingStage.js', () => jest.fn());
@@ -53,6 +53,8 @@ jest.mock('../../../src/pipeline/stages/ExternalSourceStage.js', () => jest.fn()
 jest.mock('../../../src/pipeline/stages/LimitStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/CharLimitStage.js', () => jest.fn());
 jest.mock('../../../src/pipeline/stages/StreamingOutputStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/SecretsGuardStage.js', () => jest.fn());
+jest.mock('../../../src/pipeline/stages/InstructionsStage.js', () => jest.fn());
 
 // Mock TransformerRegistry
 jest.mock('../../../src/transforms/TransformerRegistry.js', () => ({
@@ -80,7 +82,6 @@ describe('copy command', () => {
     const pipelineModule = await import('../../../src/pipeline/Pipeline.js');
     const profileLoaderModule = await import('../../../src/profiles/ProfileLoader.js');
     const profileGuesserModule = await import('../../../src/profiles/ProfileGuesser.js');
-    const aiServiceModule = await import('../../../src/services/AIService.js');
     const clipboardModule = await import('../../../src/utils/clipboard.js');
     const loggerModule = await import('../../../src/utils/logger.js');
     const errorsModule = await import('../../../src/utils/errors.js');
@@ -89,7 +90,6 @@ describe('copy command', () => {
     Pipeline = pipelineModule.default;
     ProfileLoader = profileLoaderModule.default;
     ProfileGuesser = profileGuesserModule.default;
-    AIService = aiServiceModule.default;
     Clipboard = clipboardModule.default;
     logger = loggerModule.logger;
     handleError = errorsModule.handleError;
@@ -169,8 +169,8 @@ describe('copy command', () => {
   });
 
   afterEach(() => {
-    consoleLogSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
+    consoleLogSpy?.mockRestore();
+    consoleErrorSpy?.mockRestore();
   });
 
   describe('basic functionality', () => {
@@ -320,8 +320,11 @@ describe('copy command', () => {
 
       await copy('.', { profile: 'invalid' });
 
-      // The error is caught and a default profile is used
-      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('using default'));
+      // Verify that handleError was called with the profile error (not silently falling back)
+      expect(handleError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Profile not found' }),
+        expect.any(Object),
+      );
     });
 
     it('should handle file write errors', async () => {
