@@ -83,18 +83,13 @@ nvm use 18
    copytree config:validate
    ```
 
-2. **Re-run setup**:
-   ```bash
-   copytree install:copytree
-   ```
-
-3. **Check environment variables**:
+2. **Check environment variables**:
    ```bash
    echo $COPYTREE_MAX_FILE_SIZE
    echo $COPYTREE_MAX_TOTAL_SIZE
    ```
 
-4. **Inspect effective configuration**:
+3. **Inspect effective configuration**:
    ```bash
    copytree config:inspect
    ```
@@ -105,19 +100,18 @@ nvm use 18
 
 **Solutions**:
 
-1. **Create config directory**:
-   ```bash
-   mkdir -p ~/.copytree
-   ```
+> **Note:** CopyTree automatically creates required directories on first use. Configuration files are optional - the tool works with built-in defaults.
 
-2. **Run interactive setup**:
-   ```bash
-   copytree install:copytree
-   ```
-
-3. **Check config location**:
+1. **Check config location**:
    ```bash
    ls -la ~/.copytree/
+   ```
+
+2. **Verify auto-created directories**:
+   ```bash
+   # Directories are created automatically when needed
+   # Run any command to trigger auto-creation:
+   copytree --version
    ```
 
 ## Output Issues

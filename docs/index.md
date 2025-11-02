@@ -51,7 +51,7 @@ In-depth technical documentation for developers and contributors:
 - **Clipboard**: Default output for easy pasting
 - **File Output**: Save to file
 - **Streaming**: Real-time output for large projects
-- **Multiple Formats**: Markdown (default), XML, JSON, or tree view
+- **Multiple Formats**: XML (default), Markdown, JSON, or tree view
 
 ### 4. **Developer-Friendly**
 - **External Sources**: Include files from GitHub or other directories
@@ -70,11 +70,11 @@ copytree --profile myproject
 
 ### Document Generation
 ```bash
-# Generate project overview (Markdown by default)
+# Generate project overview as Markdown
 copytree --output project-overview.md
 
-# Generate as XML
-copytree --output project-overview.xml --format xml
+# Generate as XML (default format)
+copytree --output project-overview.xml
 ```
 
 ### Code Review
@@ -98,15 +98,17 @@ CopyTree uses a hierarchical configuration system:
 
 ### Quick Configuration
 ```bash
-# Run interactive setup
-copytree install:copytree
-
 # Validate configuration
 copytree config:validate
+
+# Inspect configuration with provenance
+copytree config:inspect
 
 # Clear cache
 copytree cache:clear
 ```
+
+> **Note:** CopyTree automatically creates required directories (cache, profiles, repos) on first use. No manual setup is required.
 
 ## 📖 Learn More
 

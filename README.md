@@ -213,7 +213,8 @@ For detailed guides, see the `docs/` directory:
 - `copytree config:validate` - Validate configuration
 - `copytree config:inspect` - Inspect effective configuration with source provenance (redacts secrets by default)
 - `copytree copy:docs` - Copy built-in documentation
-- `copytree install:copytree` - Set up CopyTree environment and configuration
+
+> **Note:** CopyTree automatically creates required directories (e.g., `~/.copytree/cache/`, `~/.copytree/profiles/`) on first use. No manual setup is required.
 
 ## 🐛 Troubleshooting
 
