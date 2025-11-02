@@ -122,27 +122,28 @@ export function normalize(text, options = {}) {
   }
   output = uniqueLines.join('\n');
 
-  // 5. Apply comprehensive normalization (paths, timestamps, IDs, metrics)
+  // 5. Normalize Windows paths in basePath only (not in output content)
+  // This prevents breaking JSON escape sequences like \n
+  let basePath = options.projectRoot || process.cwd();
+  basePath = basePath.replace(/\\/g, '/'); // Backslashes to forward slashes
+  basePath = basePath.replace(/\/+/g, '/'); // Multiple slashes to single
+  basePath = basePath.replace(/^[A-Z]:\/+/g, '/'); // D:/a -> /a
+
+  // 6. Apply comprehensive normalization (paths, timestamps, IDs, metrics)
   output = normalizeForGolden(output, {
-    basePath: options.projectRoot || process.cwd(),
+    basePath,
     normalizeAll: true,
   });
 
-  // 6. Normalize Git-specific data
+  // 7. Normalize Git-specific data
   output = normalizeGitData(output);
 
-  // 7. Normalize Windows paths - convert double slashes to single slashes
-  output = output.replace(/\/\//g, '/');
-
-  // 8. Normalize Windows drive letters (e.g., D:/ -> /)
-  output = output.replace(/[A-Z]:\/+/g, '/');
-
-  // 9. Sort tree lines if requested (for cross-OS determinism)
+  // 8. Sort tree lines if requested (for cross-OS determinism)
   if (options.sortTreeLines) {
     output = sortTreeOutput(output);
   }
 
-  // 10. Final cleanup: trim trailing whitespace, normalize final newline
+  // 9. Final cleanup: trim trailing whitespace, normalize final newline
   output = output
     .split('\n')
     .map((line) => line.trimEnd())

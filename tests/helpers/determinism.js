@@ -16,15 +16,15 @@ export function normalizePaths(content, options = {}) {
 
   let normalized = content;
 
+  // Normalize basePath to use forward slashes for consistent matching
+  const normalizedBasePath = basePath.replace(/\\/g, '/');
+
   // Replace absolute paths with placeholder
-  const absolutePattern = new RegExp(basePath.replace(/[/\\]/g, '[/\\\\]'), 'g');
+  const absolutePattern = new RegExp(normalizedBasePath.replace(/[/\\]/g, '[/\\\\]'), 'g');
   normalized = normalized.replace(absolutePattern, placeholder);
 
-  // Normalize Windows paths to Unix style
-  normalized = normalized.replace(/\\/g, '/');
-
   // Normalize home directory
-  const homeDir = os.homedir();
+  const homeDir = os.homedir().replace(/\\/g, '/');
   normalized = normalized.replace(new RegExp(homeDir.replace(/[/\\]/g, '[/\\\\]'), 'g'), '<HOME>');
 
   return normalized;

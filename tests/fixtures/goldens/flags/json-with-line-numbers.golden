@@ -5,8 +5,8 @@
     "fileCount": 3,
     "totalSize": 77,
     "profile": "default",
-    "directoryStructure": "├── src/n│   └── test.js/n├── index.js/n└── README.md",
-    "instructions": "This XML document represents the directory structure and contents of a project, which you will analyze to answer user questions. Reference files using @ followed by the relative path from the project root (e.g., @README.md, @src/app.js). The @ notation must not be enclosed in backticks. For example, always write /"...in the file @app/page.tsx.../" and never /"...in the file `@app/page.tsx`.../". You can also reference directories with @directory/path to instruct the agent to examine multiple files."
+    "directoryStructure": "├── src/\n│   └── test.js\n├── index.js\n└── README.md",
+    "instructions": "This XML document represents the directory structure and contents of a project, which you will analyze to answer user questions. Reference files using @ followed by the relative path from the project root (e.g., @README.md, @src/app.js). The @ notation must not be enclosed in backticks. For example, always write \"...in the file @app/page.tsx...\" and never \"...in the file `@app/page.tsx`...\". You can also reference directories with @directory/path to instruct the agent to examine multiple files."
   },
   "files": [
     {
@@ -15,7 +15,7 @@
       "modified": "<TIMESTAMP>",
       "isBinary": false,
       "encoding": "utf8",
-      "content": "   1: console.log('Hello');/n   2: "
+      "content": "   1: console.log('Hello');\n   2: "
     },
     {
       "path": "README.md",
@@ -23,7 +23,7 @@
       "modified": "<TIMESTAMP>",
       "isBinary": false,
       "encoding": "utf8",
-      "content": "   1: # Test Project/n   2: "
+      "content": "   1: # Test Project\n   2: "
     },
     {
       "path": "src/test.js",
@@ -31,7 +31,7 @@
       "modified": "<TIMESTAMP>",
       "isBinary": false,
       "encoding": "utf8",
-      "content": "   1: export function test() {/n   2:   return 42;/n   3: }/n   4: "
+      "content": "   1: export function test() {\n   2:   return 42;\n   3: }\n   4: "
     }
   ]
 }🖥️ 3 files [<MEMORY>] displayed to terminal

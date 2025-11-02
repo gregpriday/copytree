@@ -1,5 +1,5 @@
 {
-  "$schema": "https:/json.schemastore.org/sarif-2.1.0.json",
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
   "version": "2.1.0",
   "runs": [
     {
@@ -7,7 +7,7 @@
         "driver": {
           "name": "CopyTree",
           "version": "0.0.0",
-          "informationUri": "https:/copytree.dev",
+          "informationUri": "https://copytree.dev",
           "rules": [
             {
               "id": "file-discovered",
@@ -18,7 +18,7 @@
               "fullDescription": {
                 "text": "CopyTree enumerated this file in the selected scope based on the configured profile and filters."
               },
-              "helpUri": "https:/copytree.dev",
+              "helpUri": "https://copytree.dev",
               "defaultConfiguration": {
                 "level": "note"
               },
@@ -121,7 +121,7 @@
           "executionSuccessful": true,
           "endTimeUtc": "<TIMESTAMP>",
           "workingDirectory": {
-            "uri": "file:/<PROJECT_ROOT>"
+            "uri": "file://<PROJECT_ROOT>"
           }
         }
       ],
