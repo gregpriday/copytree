@@ -131,15 +131,18 @@ export function normalize(text, options = {}) {
   // 6. Normalize Git-specific data
   output = normalizeGitData(output);
 
-  // 7. Normalize Windows drive letters
-  output = output.replace(/[A-Z]:\\/g, '/');
+  // 7. Normalize Windows paths - convert double slashes to single slashes
+  output = output.replace(/\/\//g, '/');
 
-  // 8. Sort tree lines if requested (for cross-OS determinism)
+  // 8. Normalize Windows drive letters (e.g., D:/ -> /)
+  output = output.replace(/[A-Z]:\/+/g, '/');
+
+  // 9. Sort tree lines if requested (for cross-OS determinism)
   if (options.sortTreeLines) {
     output = sortTreeOutput(output);
   }
 
-  // 9. Final cleanup: trim trailing whitespace, normalize final newline
+  // 10. Final cleanup: trim trailing whitespace, normalize final newline
   output = output
     .split('\n')
     .map((line) => line.trimEnd())
