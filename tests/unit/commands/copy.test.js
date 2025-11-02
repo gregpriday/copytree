@@ -169,8 +169,8 @@ describe('copy command', () => {
   });
 
   afterEach(() => {
-    consoleLogSpy.mockRestore();
-    consoleErrorSpy.mockRestore();
+    consoleLogSpy?.mockRestore();
+    consoleErrorSpy?.mockRestore();
   });
 
   describe('basic functionality', () => {

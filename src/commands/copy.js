@@ -11,9 +11,18 @@ import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const pkg = JSON.parse(readFileSync(path.join(__dirname, '../../package.json'), 'utf8'));
+// Lazy initialization for Jest compatibility
+let __filename, __dirname, pkg;
+try {
+  __filename = fileURLToPath(import.meta.url);
+  __dirname = path.dirname(__filename);
+  pkg = JSON.parse(readFileSync(path.join(__dirname, '../../package.json'), 'utf8'));
+} catch (error) {
+  // In test environment, these may not be available
+  __filename = '';
+  __dirname = '';
+  pkg = { version: '0.0.0-test' };
+}
 
 /**
  * Main copy command implementation
