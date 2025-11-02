@@ -1,35 +1,5 @@
 // Mock dependencies before importing
 jest.mock('fs-extra');
-jest.mock('marked', () => {
-  const mockParse = jest.fn((content) => {
-    // Simple mock implementation for testing
-    let html = content
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2" />')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-
-    // Wrap non-heading lines in p tags
-    html = html
-      .split('\n')
-      .map((line) => {
-        if (!line.startsWith('<h1') && line.trim()) {
-          return `<p>${line}</p>`;
-        }
-        return line;
-      })
-      .join('\n');
-
-    return html;
-  });
-
-  return {
-    __esModule: true,
-    default: { parse: mockParse },
-    parse: mockParse,
-  };
-});
-
 import MarkdownTransformer from '../../../src/transforms/transformers/MarkdownTransformer.js';
 import fs from 'fs-extra';
 
@@ -274,7 +244,7 @@ describe('MarkdownTransformer', () => {
     });
 
     // Skip HTML mode tests for now - marked mock is complex
-    it.skip('should convert markdown to HTML', async () => {
+    it('should convert markdown to HTML', async () => {
       const file = {
         path: 'test.md',
         content: '# Heading\n\nParagraph with **bold** text.',
@@ -291,7 +261,7 @@ describe('MarkdownTransformer', () => {
       expect(result.content).toContain('bold');
     });
 
-    it.skip('should convert images to HTML img tags', async () => {
+    it('should convert images to HTML img tags', async () => {
       const file = {
         path: 'test.md',
         content: '![Alt text](image.png)',
@@ -304,7 +274,7 @@ describe('MarkdownTransformer', () => {
       expect(result.content).toContain('src="image.png"');
     });
 
-    it.skip('should convert links to HTML anchors', async () => {
+    it('should convert links to HTML anchors', async () => {
       const file = {
         path: 'test.md',
         content: '[Link text](https://example.com)',

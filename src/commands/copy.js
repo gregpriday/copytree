@@ -10,6 +10,7 @@ import path from 'path';
 import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
+import { summarize as getFsErrorSummary, reset as resetFsErrors } from '../utils/fsErrorReport.js';
 
 // Lazy initialization for Jest compatibility
 let __filename, __dirname, pkg;
@@ -32,6 +33,9 @@ async function copyCommand(targetPath = '.', options = {}) {
   const startTime = Date.now();
 
   try {
+    // Reset filesystem error tracking at start
+    resetFsErrors();
+
     // Start with initializing message
     logger.startSpinner('Initializing');
 
@@ -115,6 +119,37 @@ async function copyCommand(targetPath = '.', options = {}) {
     // 10. Show summary if requested
     if (options.info) {
       showSummary(result, startTime);
+    }
+
+    // 11. Show filesystem error summary
+    const fsSummary = getFsErrorSummary();
+    if (
+      fsSummary.totalRetries > 0 ||
+      fsSummary.succeededAfterRetry > 0 ||
+      fsSummary.failed > 0 ||
+      fsSummary.permanent > 0
+    ) {
+      logger.info('\nFilesystem Operations Summary:');
+      if (fsSummary.totalRetries > 0) {
+        logger.info(`  Total retries: ${fsSummary.totalRetries}`);
+      }
+      if (fsSummary.succeededAfterRetry > 0) {
+        logger.success(`  Succeeded after retry: ${fsSummary.succeededAfterRetry}`);
+      }
+      if (fsSummary.failed > 0) {
+        logger.warn(`  Failed after retries: ${fsSummary.failed}`);
+      }
+      if (fsSummary.permanent > 0) {
+        logger.error(`  Permanent errors: ${fsSummary.permanent}`);
+      }
+    }
+
+    // 12. Exit with error if --fail-on-fs-errors and there are failures
+    if (options.failOnFsErrors && (fsSummary.failed > 0 || fsSummary.permanent > 0)) {
+      logger.error(
+        `\nExiting with error due to filesystem failures (use --fail-on-fs-errors to control this behavior)`,
+      );
+      process.exitCode = 1;
     }
   } catch (error) {
     logger.stopSpinner();
