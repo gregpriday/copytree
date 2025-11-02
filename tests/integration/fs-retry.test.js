@@ -1,18 +1,26 @@
-// Jest is globally available
-import { promises as fs } from 'node:fs';
-import { withFsRetry } from '../../src/utils/retryableFs.js';
-import {
-  recordRetry,
-  recordGiveUp,
-  recordPermanent,
-  recordSuccessAfterRetry,
-  summarize,
-  reset,
-} from '../../src/utils/fsErrorReport.js';
-import { walkWithIgnore } from '../../src/utils/ignoreWalker.js';
-import FileLoader from '../../src/utils/fileLoader.js';
-import path from 'path';
-import os from 'os';
+import path from 'node:path';
+import os from 'node:os';
+
+let fs;
+let withFsRetry;
+let recordRetry;
+let recordGiveUp;
+let recordPermanent;
+let recordSuccessAfterRetry;
+let summarize;
+let reset;
+let walkWithIgnore;
+let FileLoader;
+
+beforeAll(async () => {
+  jest.unmock('fs-extra');
+  ({ promises: fs } = await import('node:fs'));
+  ({ withFsRetry } = await import('../../src/utils/retryableFs.js'));
+  ({ recordRetry, recordGiveUp, recordPermanent, recordSuccessAfterRetry, summarize, reset } =
+    await import('../../src/utils/fsErrorReport.js'));
+  ({ walkWithIgnore } = await import('../../src/utils/ignoreWalker.js'));
+  ({ default: FileLoader } = await import('../../src/utils/fileLoader.js'));
+});
 
 describe('Filesystem Retry Integration Tests', () => {
   beforeEach(() => {
@@ -116,7 +124,7 @@ describe('Filesystem Retry Integration Tests', () => {
   });
 
   describe('FileLoader with retry and error reporting', () => {
-    it.skip('should load files successfully', async () => {
+    it('should load files successfully', async () => {
       const testDir = path.join(os.tmpdir(), `test-loader-${Date.now()}`);
       await fs.mkdir(testDir, { recursive: true });
       const testFile = path.join(testDir, 'test.txt');
@@ -181,7 +189,7 @@ describe('Filesystem Retry Integration Tests', () => {
     });
   });
 
-  describe.skip('error aggregation across operations', () => {
+  describe('error aggregation across operations', () => {
     it('should aggregate errors from multiple operations', async () => {
       // Simulate various error scenarios
       const onRetry = ({ code }) => recordRetry('/simulated/path1', code);
@@ -263,7 +271,7 @@ describe('Filesystem Retry Integration Tests', () => {
     });
   });
 
-  describe.skip('real-world scenarios', () => {
+  describe('real-world scenarios', () => {
     it('should handle rapid file operations', async () => {
       const testDir = path.join(os.tmpdir(), `test-rapid-${Date.now()}`);
       await fs.mkdir(testDir, { recursive: true });

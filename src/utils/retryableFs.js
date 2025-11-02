@@ -41,7 +41,14 @@ export async function withFsRetry(operation, options = {}) {
       }
 
       // Execute the operation
-      return await operation();
+      const result = await operation();
+
+      // If the operation completed but the signal was aborted, treat as aborted
+      if (signal?.aborted) {
+        throw createAbortError();
+      }
+
+      return result;
     } catch (error) {
       const retryable = isRetryableFsError(error);
 

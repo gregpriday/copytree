@@ -224,7 +224,7 @@ describe('withFsRetry', () => {
   });
 
   describe('abort signal', () => {
-    it.skip('should throw abort error when signal is aborted', async () => {
+    it('should throw abort error when signal is aborted', async () => {
       const controller = new AbortController();
       const operation = jest.fn().mockImplementation(async () => {
         controller.abort();
@@ -233,12 +233,13 @@ describe('withFsRetry', () => {
       });
 
       const promise = withFsRetry(operation, { signal: controller.signal });
+      promise.catch(() => {});
 
       await jest.runAllTimersAsync();
       await expect(promise).rejects.toThrow('Operation aborted');
     });
 
-    it.skip('should check abort signal before each attempt', async () => {
+    it('should check abort signal before each attempt', async () => {
       const controller = new AbortController();
       const operation = jest
         .fn()
@@ -255,6 +256,7 @@ describe('withFsRetry', () => {
         initialDelay: 100,
         signal: controller.signal,
       });
+      promise.catch(() => {});
 
       await jest.runAllTimersAsync();
       await expect(promise).rejects.toThrow();
