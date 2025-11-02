@@ -113,6 +113,10 @@ export function normalizeMetrics(content, options = {}) {
   // File sizes
   normalized = normalized.replace(/"(size|fileSize)":\s*\d+(\.\d+)?/g, `"$1": ${sizePlaceholder}`);
 
+  // Byte counts in square brackets (e.g., "[160 B]" in tree output)
+  // These vary by platform due to line ending differences
+  normalized = normalized.replace(/\[\d+\s*B\]/g, '[<BYTES>]');
+
   return normalized;
 }
 
