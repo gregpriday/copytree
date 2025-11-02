@@ -41,7 +41,7 @@ npm run test:unit       # Unit tests only
 # Code Quality (REQUIRED before commits)
 npm run lint            # ESLint check
 npm run format:check    # Prettier check
-npm run format          # Auto-format
+npm run format          # Auto-format code (use when formatting is requested)
 
 # Debugging
 DEBUG=copytree:* copytree        # Verbose logging
