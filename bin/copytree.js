@@ -83,6 +83,7 @@ program
   )
   .option('--fail-on-secrets', 'Exit with error if secrets are found (CI mode)')
   .option('--secrets-report <file>', 'Output secrets report to file (use - for stdout)')
+  .option('--fail-on-fs-errors', 'Exit with error if filesystem operations fail after retries')
   .action(async (targetPath, options) => {
     // Auto-detect format from output file extension
     if (!options.format && options.output) {

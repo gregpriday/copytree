@@ -1,0 +1,90 @@
+--- a/src/utils/retryableFs.js
++++ b/src/utils/retryableFs.js
+@@ -18,6 +18,11 @@ export async function withFsRetry(operation, options = {}) {
+     signal,
+   } = options;
+
++  const createAbortError = () => {
++    const abortError = new Error('Operation aborted');
++    abortError.code = 'ABORT_ERR';
++    return abortError;
++  };
++
+   let attempt = 0;
+
+   while (true) {
+@@ -25,10 +30,7 @@ export async function withFsRetry(operation, options = {}) {
+
+     try {
+       // Check for abort signal
+-      if (signal?.aborted) {
+-        const abortError = new Error('Operation aborted');
+-        abortError.code = 'ABORT_ERR';
+-        throw abortError;
++      if (signal?.aborted) {
++        throw createAbortError();
+       }
+
+       // Execute the operation
+@@ -43,14 +45,38 @@ export async function withFsRetry(operation, options = {}) {
+
+       // Calculate delay with exponential backoff
+       const baseDelay = Math.min(initialDelay * Math.pow(2, attempt - 1), maxDelay);
+-      const delay = jitter ? Math.floor(baseDelay * (0.5 + Math.random())) : baseDelay;
++      const jitterDelay = jitter ? Math.floor(baseDelay * (0.5 + Math.random())) : baseDelay;
++      const delay = Math.min(jitterDelay, maxDelay);
++
++      if (signal?.aborted) {
++        throw createAbortError();
++      }
+
+       // Call retry callback
+       await onRetry({ attempt, delay, code: error.code });
+
+       // Wait before retrying
+-      await new Promise((resolve) => setTimeout(resolve, delay));
++      await new Promise((resolve, reject) => {
++        let timeoutId;
++        const onAbort = () => {
++          if (timeoutId !== undefined) {
++            clearTimeout(timeoutId);
++          }
++          signal?.removeEventListener('abort', onAbort);
++          reject(createAbortError());
++        };
++
++        timeoutId = setTimeout(() => {
++          signal?.removeEventListener('abort', onAbort);
++          resolve();
++        }, delay);
++
++        if (signal) {
++          if (signal.aborted) {
++            onAbort();
++            return;
++          }
++          signal.addEventListener('abort', onAbort, { once: true });
++        }
++      });
+     }
+   }
+ }
+--- a/src/utils/errors.js
++++ b/src/utils/errors.js
+@@ -191,6 +191,7 @@ export const RETRYABLE_ERROR_CODES = [
+   // Filesystem errors (new)
+   'EBUSY', // Resource busy (file locked)
+   'EPERM', // Permission denied (transient on Windows with antivirus)
++  'EACCES', // Access denied (Windows file lock/antivirus)
+   'EMFILE', // Too many open files
+   'ENFILE', // File table overflow
+   'EAGAIN', // Resource temporarily unavailable
+@@ -226,7 +227,7 @@ export function isRetryableError(error) {
+ export function isRetryableFsError(error) {
+   const code = error?.code || error;
+   // Filesystem-specific retryable codes
+-  const fsRetryableCodes = ['EBUSY', 'EPERM', 'EMFILE', 'ENFILE', 'EAGAIN', 'EIO'];
++  const fsRetryableCodes = ['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'ENFILE', 'EAGAIN', 'EIO'];
+   return fsRetryableCodes.includes(code);
+ }
+

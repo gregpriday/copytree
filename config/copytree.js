@@ -110,4 +110,11 @@ export default {
     vertical: '│   ',
     empty: '    ',
   },
+
+  // Filesystem retry configuration
+  fs: {
+    retryAttempts: 3, // Maximum number of retry attempts for transient errors
+    retryDelay: 100, // Initial delay in milliseconds
+    maxDelay: 2000, // Maximum delay cap in milliseconds
+  },
 };

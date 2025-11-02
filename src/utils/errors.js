@@ -177,6 +177,7 @@ function handleError(error, options = {}) {
  * Error codes that should be retried (transient errors)
  */
 export const RETRYABLE_ERROR_CODES = [
+  // Network errors (existing)
   'RATE_LIMIT',
   'TIMEOUT',
   'SERVICE_UNAVAILABLE',
@@ -187,6 +188,14 @@ export const RETRYABLE_ERROR_CODES = [
   'ECONNRESET',
   'ECONNABORTED',
   'SOCKET_TIMEOUT',
+  // Filesystem errors (new)
+  'EBUSY', // Resource busy (file locked)
+  'EPERM', // Permission denied (transient on Windows with antivirus)
+  'EACCES', // Access denied (Windows file lock/antivirus)
+  'EMFILE', // Too many open files
+  'ENFILE', // File table overflow
+  'EAGAIN', // Resource temporarily unavailable
+  'EIO', // I/O error (network drives)
 ];
 
 /**
@@ -208,6 +217,18 @@ export function isRetryableError(error) {
   // Check for common network error codes on the error object
   const errorCode = error.code || error.name || '';
   return RETRYABLE_ERROR_CODES.includes(errorCode);
+}
+
+/**
+ * Check if an error is a retryable filesystem error
+ * @param {Error|string} error - The error to check (Error object or error code string)
+ * @returns {boolean} True if the error is a retryable filesystem error
+ */
+export function isRetryableFsError(error) {
+  const code = error?.code || error;
+  // Filesystem-specific retryable codes
+  const fsRetryableCodes = ['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'ENFILE', 'EAGAIN', 'EIO'];
+  return fsRetryableCodes.includes(code);
 }
 
 /**

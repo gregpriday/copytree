@@ -11,6 +11,14 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import ignore from 'ignore';
+import { withFsRetry } from './retryableFs.js';
+import { isRetryableFsError } from './errors.js';
+import {
+  recordRetry,
+  recordGiveUp,
+  recordPermanent,
+  recordSuccessAfterRetry,
+} from './fsErrorReport.js';
 
 /**
  * Normalize path to POSIX style (forward slashes)
@@ -100,6 +108,7 @@ function isIgnored(absPath, root, layers, isDirectory = false) {
  * @param {boolean} [options.followSymlinks=false] - Whether to follow symbolic links
  * @param {boolean} [options.explain=false] - Include explanation for each decision
  * @param {Array} [options.initialLayers=[]] - Pre-existing ignore layers (e.g., from .gitignore)
+ * @param {Object} [options.config] - Configuration object for retry settings
  * @yields {{path: string, stats: fs.Stats, explanation?: Object}} File information
  */
 export async function* walkWithIgnore(root, options = {}) {
@@ -109,7 +118,15 @@ export async function* walkWithIgnore(root, options = {}) {
     followSymlinks = false,
     explain = false,
     initialLayers = [],
+    config = {},
   } = options;
+
+  // Extract retry configuration with defaults
+  const retryConfig = {
+    maxAttempts: config?.copytree?.fs?.retryAttempts ?? 3,
+    initialDelay: config?.copytree?.fs?.retryDelay ?? 100,
+    maxDelay: config?.copytree?.fs?.maxDelay ?? 2000,
+  };
 
   const stats = {};
   stats.filesScanned = 0;
@@ -128,8 +145,19 @@ export async function* walkWithIgnore(root, options = {}) {
 
     let entries;
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
+      entries = await withFsRetry(() => fs.readdir(dir, { withFileTypes: true }), {
+        ...retryConfig,
+        onRetry: ({ code }) => recordRetry(dir, code),
+      });
+      // Record success if there were retries
+      recordSuccessAfterRetry(dir);
     } catch (error) {
+      // Record failure type based on error category
+      if (isRetryableFsError(error)) {
+        recordGiveUp(dir, error.code);
+      } else {
+        recordPermanent(dir, error.code);
+      }
       // Can't read directory - skip it
       return;
     }
@@ -146,10 +174,20 @@ export async function* walkWithIgnore(root, options = {}) {
           continue; // Skip symlinks by default
         }
         try {
-          stat = await fs.stat(absPath); // Follow symlink
+          stat = await withFsRetry(() => fs.stat(absPath), {
+            ...retryConfig,
+            onRetry: ({ code }) => recordRetry(absPath, code),
+          });
+          recordSuccessAfterRetry(absPath);
           isDir = stat.isDirectory();
-        } catch {
-          continue; // Broken symlink
+        } catch (error) {
+          // Record failure and skip broken symlink
+          if (isRetryableFsError(error)) {
+            recordGiveUp(absPath, error.code);
+          } else {
+            recordPermanent(absPath, error.code);
+          }
+          continue;
         }
       }
 
@@ -165,7 +203,20 @@ export async function* walkWithIgnore(root, options = {}) {
         // Yield directory if requested
         if (includeDirectories) {
           if (!stat) {
-            stat = await fs.stat(absPath);
+            try {
+              stat = await withFsRetry(() => fs.stat(absPath), {
+                ...retryConfig,
+                onRetry: ({ code }) => recordRetry(absPath, code),
+              });
+              recordSuccessAfterRetry(absPath);
+            } catch (error) {
+              if (isRetryableFsError(error)) {
+                recordGiveUp(absPath, error.code);
+              } else {
+                recordPermanent(absPath, error.code);
+              }
+              continue; // Skip directory if we can't stat it
+            }
           }
           const result = { path: absPath, stats: stat };
           if (explain) {
@@ -186,7 +237,20 @@ export async function* walkWithIgnore(root, options = {}) {
 
         // Yield file
         if (!stat) {
-          stat = await fs.stat(absPath);
+          try {
+            stat = await withFsRetry(() => fs.stat(absPath), {
+              ...retryConfig,
+              onRetry: ({ code }) => recordRetry(absPath, code),
+            });
+            recordSuccessAfterRetry(absPath);
+          } catch (error) {
+            if (isRetryableFsError(error)) {
+              recordGiveUp(absPath, error.code);
+            } else {
+              recordPermanent(absPath, error.code);
+            }
+            continue; // Skip file if we can't stat it
+          }
         }
         const result = { path: absPath, stats: stat };
         if (explain) {
@@ -222,7 +286,7 @@ export async function getAllFiles(root, options = {}) {
  * @returns {Promise<{ignored: boolean, rule: string, layer: string}>} Decision with explanation
  */
 export async function testPath(testPath, root, options = {}) {
-  const { ignoreFileName = '.copytreeignore' } = options;
+  const { ignoreFileName = '.copytreeignore', config = {} } = options;
 
   // Build layers by walking up from root to the file's directory
   const absPath = path.resolve(root, testPath);
@@ -250,10 +314,25 @@ export async function testPath(testPath, root, options = {}) {
   // Determine if it's a directory
   let isDirectory = false;
   try {
-    const stat = await fs.stat(absPath);
+    // Use retry for stat in testPath with config
+    const retryConfig = {
+      maxAttempts: config?.copytree?.fs?.retryAttempts ?? 3,
+      initialDelay: config?.copytree?.fs?.retryDelay ?? 100,
+      maxDelay: config?.copytree?.fs?.maxDelay ?? 2000,
+    };
+    const stat = await withFsRetry(() => fs.stat(absPath), {
+      ...retryConfig,
+      onRetry: ({ code }) => recordRetry(absPath, code),
+    });
+    recordSuccessAfterRetry(absPath);
     isDirectory = stat.isDirectory();
-  } catch {
-    // Assume file if stat fails
+  } catch (error) {
+    // Record failure and assume file if stat fails
+    if (isRetryableFsError(error)) {
+      recordGiveUp(absPath, error.code);
+    } else {
+      recordPermanent(absPath, error.code);
+    }
   }
 
   return isIgnored(absPath, root, layers, isDirectory);
