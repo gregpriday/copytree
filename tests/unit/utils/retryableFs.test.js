@@ -46,9 +46,7 @@ describe('withFsRetry', () => {
     it('should succeed after retries for EPERM errors', async () => {
       const operation = jest
         .fn()
-        .mockRejectedValueOnce(
-          Object.assign(new Error('Permission denied'), { code: 'EPERM' }),
-        )
+        .mockRejectedValueOnce(Object.assign(new Error('Permission denied'), { code: 'EPERM' }))
         .mockResolvedValue('success');
 
       const promise = withFsRetry(operation, { maxAttempts: 3, initialDelay: 100 });
@@ -63,9 +61,7 @@ describe('withFsRetry', () => {
     it('should succeed after retries for EMFILE errors', async () => {
       const operation = jest
         .fn()
-        .mockRejectedValueOnce(
-          Object.assign(new Error('Too many open files'), { code: 'EMFILE' }),
-        )
+        .mockRejectedValueOnce(Object.assign(new Error('Too many open files'), { code: 'EMFILE' }))
         .mockResolvedValue('success');
 
       const promise = withFsRetry(operation, { maxAttempts: 3, initialDelay: 100 });

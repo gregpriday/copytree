@@ -289,9 +289,7 @@ describe('Filesystem Retry Integration Tests', () => {
         });
 
         // Load all files
-        const loadPromises = Array.from({ length: 10 }, (_, i) =>
-          loader.loadFile(`file${i}.txt`),
-        );
+        const loadPromises = Array.from({ length: 10 }, (_, i) => loader.loadFile(`file${i}.txt`));
         const results = await Promise.all(loadPromises);
 
         expect(results.filter((r) => r !== null)).toHaveLength(10);
