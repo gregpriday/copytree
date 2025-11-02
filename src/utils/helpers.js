@@ -348,7 +348,7 @@ function escapeXml(str) {
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
-    '\'': '&apos;',
+    "'": '&apos;',
   };
 
   return str.replace(/[&<>"']/g, (char) => xmlEscapes[char]);

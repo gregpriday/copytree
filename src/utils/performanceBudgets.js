@@ -130,18 +130,18 @@ export function calculatePerformanceGrade(stats, duration, fileCount) {
  */
 export function getGradeColor(grade) {
   switch (grade) {
-  case 'A':
-    return 'green';
-  case 'B':
-    return 'cyan';
-  case 'C':
-    return 'yellow';
-  case 'D':
-    return 'magenta';
-  case 'F':
-    return 'red';
-  default:
-    return 'white';
+    case 'A':
+      return 'green';
+    case 'B':
+      return 'cyan';
+    case 'C':
+      return 'yellow';
+    case 'D':
+      return 'magenta';
+    case 'F':
+      return 'red';
+    default:
+      return 'white';
   }
 }
 
@@ -592,9 +592,9 @@ export class PerformanceTelemetry {
       },
       trends: trends
         ? {
-          duration: `${trends.durationTrend} (${trends.durationChange > 0 ? '+' : ''}${trends.durationChange}%)`,
-          memory: `${trends.memoryTrend} (${trends.memoryChange > 0 ? '+' : ''}${trends.memoryChange}%)`,
-        }
+            duration: `${trends.durationTrend} (${trends.durationChange > 0 ? '+' : ''}${trends.durationChange}%)`,
+            memory: `${trends.memoryTrend} (${trends.memoryChange > 0 ? '+' : ''}${trends.memoryChange}%)`,
+          }
         : null,
       topBottlenecks: stats.commonBottlenecks.slice(0, 3),
       keyOpportunities: stats.optimizationOpportunities.slice(0, 3),

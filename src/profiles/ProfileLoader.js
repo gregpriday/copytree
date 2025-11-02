@@ -152,28 +152,28 @@ class ProfileLoader {
 
     let data;
     switch (ext) {
-    case '.yml':
-    case '.yaml':
-      data = yaml.load(content);
-      break;
-    case '.json':
-      data = JSON.parse(content);
-      break;
-    default:
-      // For files without recognized extensions, try YAML first, then JSON
-      try {
+      case '.yml':
+      case '.yaml':
         data = yaml.load(content);
-      } catch (yamlError) {
+        break;
+      case '.json':
+        data = JSON.parse(content);
+        break;
+      default:
+        // For files without recognized extensions, try YAML first, then JSON
         try {
-          data = JSON.parse(content);
-        } catch (jsonError) {
-          throw new ProfileError(
-            `Unable to parse profile file as YAML or JSON: ${filePath}`,
-            filePath,
-            { yamlError: yamlError.message, jsonError: jsonError.message },
-          );
+          data = yaml.load(content);
+        } catch (yamlError) {
+          try {
+            data = JSON.parse(content);
+          } catch (jsonError) {
+            throw new ProfileError(
+              `Unable to parse profile file as YAML or JSON: ${filePath}`,
+              filePath,
+              { yamlError: yamlError.message, jsonError: jsonError.message },
+            );
+          }
         }
-      }
     }
 
     // Add metadata
