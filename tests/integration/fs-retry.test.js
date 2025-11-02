@@ -115,8 +115,8 @@ describe('Filesystem Retry Integration Tests', () => {
     });
   });
 
-  describe.skip('FileLoader with retry and error reporting', () => {
-    it('should load files successfully', async () => {
+  describe('FileLoader with retry and error reporting', () => {
+    it.skip('should load files successfully', async () => {
       const testDir = path.join(os.tmpdir(), `test-loader-${Date.now()}`);
       await fs.mkdir(testDir, { recursive: true });
       const testFile = path.join(testDir, 'test.txt');
@@ -186,13 +186,13 @@ describe('Filesystem Retry Integration Tests', () => {
       // Simulate various error scenarios
       const onRetry = ({ code }) => recordRetry('/simulated/path1', code);
 
-      // Simulate retryable error that succeeds
+      // Simulate retryable error that fails after retries
       try {
         await withFsRetry(
           async () => {
             throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' });
           },
-          { maxAttempts: 1, initialDelay: 1, onRetry },
+          { maxAttempts: 3, initialDelay: 1, onRetry },
         );
       } catch (error) {
         recordGiveUp('/simulated/path1', error.code);
