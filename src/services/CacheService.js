@@ -47,9 +47,7 @@ class CacheService {
       try {
         fs.ensureDirSync(this.cachePath);
       } catch (error) {
-        this.logger.warn(
-          `Failed to create cache directory at ${this.cachePath}: ${error.message}`,
-        );
+        this.logger.warn(`Failed to create cache directory at ${this.cachePath}: ${error.message}`);
         this.logger.warn(
           'Cache will be disabled. To fix: ensure HOME is writable or set COPYTREE_CACHE_PATH to a writable location.',
         );
