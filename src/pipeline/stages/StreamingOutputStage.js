@@ -615,7 +615,6 @@ class StreamingOutputStage extends Stage {
         const basePath = input.basePath || '';
         const workingDirectoryUri =
           basePath && path.isAbsolute(basePath) ? pathToFileURL(basePath).href : basePath;
-        const skippedFiles = input.stats?.skippedFiles || 0;
 
         const sarif = {
           $schema: 'https://json.schemastore.org/sarif-2.1.0.json',

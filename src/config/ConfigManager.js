@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import _ from 'lodash';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { createRequire } from 'module';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -86,7 +86,9 @@ class ConfigManager {
     for (const file of configFiles) {
       const configName = path.basename(file, '.js');
       try {
-        const configModule = await import(path.join(this.configPath, file));
+        const filePath = path.join(this.configPath, file);
+        const moduleUrl = pathToFileURL(filePath).href;
+        const configModule = await import(moduleUrl);
         const configData = configModule.default || configModule;
         this.config[configName] = configData;
         this.defaultConfig[configName] = _.cloneDeep(configData);
@@ -115,7 +117,7 @@ class ConfigManager {
           userConfigData = fs.readJsonSync(filePath);
         } else {
           // Use dynamic import for ES modules
-          const moduleUrl = `file://${filePath}?t=${Date.now()}`; // Add timestamp to bypass cache
+          const moduleUrl = pathToFileURL(filePath).href + `?t=${Date.now()}`; // Add timestamp to bypass cache
           const configModule = await import(moduleUrl);
           userConfigData = configModule.default || configModule;
         }
