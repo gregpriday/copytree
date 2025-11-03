@@ -162,6 +162,10 @@ export async function* walkWithIgnore(root, options = {}) {
       return;
     }
 
+    // Sort entries for deterministic order across platforms
+    // fs.readdir order is not guaranteed and differs between Windows/Unix
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+
     for (const entry of entries) {
       const absPath = path.join(dir, entry.name);
 

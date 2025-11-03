@@ -1,0 +1,35 @@
+{
+  "directory": "<PROJECT_ROOT>",
+  "metadata": {
+    "generated": "<TIMESTAMP>",
+    "fileCount": 3,
+    "totalSize": 77,
+    "profile": "default"
+  },
+  "files": [
+    {
+      "path": "index.js",
+      "size": <SIZE>,
+      "modified": "<TIMESTAMP>",
+      "isBinary": false,
+      "encoding": "utf8",
+      "content": "console.log('Hello');\n"
+    },
+    {
+      "path": "README.md",
+      "size": <SIZE>,
+      "modified": "<TIMESTAMP>",
+      "isBinary": false,
+      "encoding": "utf8",
+      "content": "# Test Project\n"
+    },
+    {
+      "path": "src/test.js",
+      "size": <SIZE>,
+      "modified": "<TIMESTAMP>",
+      "isBinary": false,
+      "encoding": "utf8",
+      "content": "export function test() {\n  return 42;\n}\n"
+    }
+  ]
+}

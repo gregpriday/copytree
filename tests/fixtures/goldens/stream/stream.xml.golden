@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ct:directory xmlns:ct="urn:copytree" path="<PROJECT_ROOT>">
+  <ct:metadata>
+    <ct:generated><TIMESTAMP></ct:generated>
+    <ct:fileCount>3</ct:fileCount>
+    <ct:totalSize>77</ct:totalSize>
+    <ct:profile>default</ct:profile>
+  </ct:metadata>
+  <ct:files>
+    <ct:file path="@index.js" size="22" modified="<TIMESTAMP>"><![CDATA[console.log('Hello');
+]]></ct:file>
+    <ct:file path="@README.md" size="15" modified="<TIMESTAMP>"><![CDATA[# Test Project
+]]></ct:file>
+    <ct:file path="@src/test.js" size="40" modified="<TIMESTAMP>"><![CDATA[export function test() {
+  return 42;
+}
+]]></ct:file>
+  </ct:files>
+</ct:directory>
