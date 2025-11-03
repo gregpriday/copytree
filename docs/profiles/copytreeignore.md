@@ -93,11 +93,13 @@ build/             # Directory (with trailing slash)
 *.log
 temp/
 
-# Profile rules
-rules:
-  - include: "**/*"
-  - exclude: "*.tmp"
-  - always: "debug.log"  # This will still be included
+# Profile
+include:
+  - "**/*"
+exclude:
+  - "*.tmp"
+always:
+  - "debug.log"  # This will still be included
 ```
 
 ## Common Use Cases
@@ -190,9 +192,9 @@ logs/
 
 ```yaml
 # Profile
-rules:
-  - exclude: "**/*.test.js"
-  
+exclude:
+  - "**/*.test.js"
+
 # .copytreeignore
 **/*.spec.js
 
@@ -210,8 +212,8 @@ config/*
 
 ```yaml
 # Profile
-rules:
-  - always: "config/important.js"  # Will be included
+always:
+  - "config/important.js"  # Will be included
 ```
 
 ## Best Practices
@@ -451,8 +453,8 @@ api-docs/dist/
 
 3. Check profile `always` rules:
    ```yaml
-   rules:
-     - always: "node_modules/keep-this.js"  # Overrides ignore
+   always:
+     - "node_modules/keep-this.js"  # Overrides ignore
    ```
 
 ### Pattern Not Working
@@ -494,12 +496,12 @@ Use profiles for conditional exclusions:
 
 ```yaml
 # Development profile
-rules:
-  - exclude: "docs/**"    # Exclude docs in dev
+exclude:
+  - "docs/**"    # Exclude docs in dev
 
-# Production profile  
-rules:
-  - include: "docs/**"    # Include docs in prod
+# Production profile
+include:
+  - "docs/**"    # Include docs in prod
 ```
 
 ### Project-Specific Patterns

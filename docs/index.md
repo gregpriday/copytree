@@ -39,7 +39,6 @@ Authoritative technical references:
 - **[Configuration Reference](./reference/configuration.md)** - Complete config system with precedence rules
 - **[CLI Reference](./cli/copytree-reference.md)** - All commands and options
 - **[Transformer Reference](./profiles/transformer-reference.md)** - PDF, OCR, and file transformers
-- **[DDR-0001: Profiles & Transformers](./reference/decisions/ddr-0001-profiles-and-transformers.md)** - Canonical behavior rules
 
 ### Advanced Topics
 
@@ -55,7 +54,6 @@ For contributors and extenders:
 
 - **[Architecture Guide](./technical/architecture.md)** - Pipeline, stages, and event system
 - **[Testing Strategy](./technical/testing-strategy.md)** - Test infrastructure and patterns
-- **[ESM/CommonJS Compatibility](./technical/esm-commonjs-compatibility.md)** - Module system details
 
 
 ## ✨ Key Features
@@ -68,14 +66,13 @@ For contributors and extenders:
 ### 2. **Advanced Transformations**
 - **PDF to Text**: Extract text from PDF documents
 - **Image OCR**: Extract text from images using Tesseract
-- **Code Summarization**: AI-powered summaries for large files
 - **Format Conversion**: Markdown processing, CSV formatting, and more
 
 ### 3. **Multiple Output Options**
 - **Clipboard**: Default output for easy pasting
 - **File Output**: Save to file
 - **Streaming**: Real-time output for large projects
-- **Multiple Formats**: XML (default), Markdown, JSON, or tree view
+- **Multiple Formats**: XML (default), Markdown, JSON, NDJSON, SARIF, or tree view
 
 ### 4. **Developer-Friendly**
 - **External Sources**: Include files from GitHub or other directories
@@ -113,12 +110,10 @@ copytree --changed HEAD~5
 
 ## 🔧 Configuration
 
-CopyTree uses a hierarchical configuration system:
+CopyTree uses a two-level configuration system:
 
 1. **Default Configuration**: Built-in defaults
-2. **User Configuration**: `~/.copytree/` directory
-3. **Project Configuration**: `.copytree.yaml` in your project
-4. **Environment Variables**: Override any setting
+2. **User Configuration**: `~/.copytree/config/` directory (`.js` or `.json` files)
 
 ### Quick Configuration
 ```bash
@@ -131,8 +126,6 @@ copytree config:inspect
 # Clear cache
 copytree cache:clear
 ```
-
-> **Note:** CopyTree automatically creates required directories (cache, profiles, repos) on first use. No manual setup is required.
 
 ## 📖 Learn More
 
@@ -158,7 +151,7 @@ Having issues? Check our comprehensive [Troubleshooting Guide](./usage/troublesh
 
 ```bash
 # Check system requirements
-copytree config:validate --verbose
+copytree config:validate
 
 # View debug information
 DEBUG=copytree:* copytree

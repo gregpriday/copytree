@@ -127,28 +127,6 @@ module.exports = {
 };
 ```
 
-### Project Config
-
-Add to `.copytree.yaml`:
-
-```yaml
-secretsGuard:
-  enabled: true
-  redactionMode: typed
-  exclude:
-    - 'config/production.json'
-  allowlist:
-    - 'test/fixtures/*.env'
-```
-
-### Environment Variables
-
-```bash
-# Override config via environment
-export COPYTREE_SECRETS_GUARD_ENABLED=true
-export COPYTREE_SECRETS_GUARD_FAIL_ON_SECRETS=true
-```
-
 ## Excluded File Patterns
 
 These files are **always excluded** (never scanned or included):

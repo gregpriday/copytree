@@ -18,7 +18,6 @@ This guide covers the complete installation process for CopyTree on your system.
 These tools enhance CopyTree's capabilities but are not required for basic operation:
 
 - **Pandoc**: For advanced document conversion (DOCX, ODT, etc.)
-- **Poppler**: For PDF text extraction utilities
 - **Tesseract**: For OCR capabilities on images
 
 ### Checking Prerequisites
@@ -35,7 +34,6 @@ git --version   # Any recent version
 
 # Check optional tools
 pandoc --version    # Optional
-pdftotext -v       # Optional (part of Poppler)
 tesseract --version # Optional
 ```
 
@@ -67,7 +65,7 @@ npx copytree
 To contribute or modify CopyTree:
 
 ```bash
-git clone https://github.com/yourusername/copytree.git
+git clone https://github.com/gregpriday/copytree.git
 cd copytree
 npm install
 npm link  # Makes 'copytree' command available globally
@@ -90,7 +88,6 @@ copytree --display --dry-run
 CopyTree automatically creates required directories on first use:
 
 - `~/.copytree/cache/` - Cache directory (created when caching is used)
-- `~/.copytree/profiles/` - User profiles directory (created when custom profiles are accessed)
 - `~/.copytree/repos/` - GitHub repository cache (created when cloning repos)
 
 **No manual setup required!** Just start using CopyTree.
@@ -127,8 +124,6 @@ You can also use environment variables:
 ```bash
 # Add to ~/.bashrc, ~/.zshrc, or equivalent
 export COPYTREE_CACHE_ENABLED="true"
-export COPYTREE_MAX_FILE_SIZE="10485760"    # 10MB
-export COPYTREE_MAX_TOTAL_SIZE="104857600"  # 100MB
 ```
 
 ## Installing Optional Dependencies
@@ -137,11 +132,10 @@ export COPYTREE_MAX_TOTAL_SIZE="104857600"  # 100MB
 
 ```bash
 # Install all optional dependencies
-brew install pandoc poppler tesseract
+brew install pandoc tesseract
 
 # Or install individually
 brew install pandoc      # Document conversion
-brew install poppler     # PDF utilities
 brew install tesseract   # OCR support
 ```
 
@@ -152,7 +146,7 @@ brew install tesseract   # OCR support
 sudo apt update
 
 # Install dependencies
-sudo apt install pandoc poppler-utils tesseract-ocr
+sudo apt install pandoc tesseract-ocr
 ```
 
 ### Windows (WSL)
@@ -248,7 +242,7 @@ npx copytree
 
 ```bash
 # Check which optional dependencies are missing
-copytree config:validate --verbose
+copytree config:validate
 
 # Install missing dependencies based on your OS (see above)
 ```
@@ -264,9 +258,6 @@ copytree config:inspect
 
 # Validate configuration
 copytree config:validate
-
-# Check environment variables
-echo $COPYTREE_MAX_FILE_SIZE
 ```
 
 ### Node.js Version Issues
@@ -275,9 +266,9 @@ echo $COPYTREE_MAX_FILE_SIZE
 # Install Node Version Manager (nvm)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
-# Install and use Node.js 18
-nvm install 18
-nvm use 18
+# Install and use Node.js 20
+nvm install 20
+nvm use 20
 ```
 
 ## Platform-Specific Notes
@@ -317,4 +308,4 @@ copytree copy:docs
 
 If you encounter issues not covered here, please:
 1. Check our comprehensive [Troubleshooting Guide](../usage/troubleshooting.md)
-2. Visit our [GitHub repository](https://github.com/yourusername/copytree) for updates and to report bugs
+2. Visit our [GitHub repository](https://github.com/gregpriday/copytree) for updates and to report bugs

@@ -371,7 +371,7 @@ Always validate and dry-run:
 copytree profile:validate myprofile
 
 # Preview selection
-copytree --profile myprofile --dry-run --verbose
+copytree --profile myprofile --dry-run
 
 # View in terminal first
 copytree --profile myprofile --display
@@ -410,8 +410,8 @@ ls ~/.copytree/profiles/         # User profiles
 Rules might be too restrictive:
 
 ```bash
-# Use verbose mode to debug
-copytree --profile myprofile --dry-run --verbose
+# Use dry-run mode to debug
+copytree --profile myprofile --dry-run
 
 # This shows:
 # - Which rules matched

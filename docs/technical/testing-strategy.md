@@ -368,7 +368,7 @@ All CLI commands should have comprehensive tests covering:
 - All output formats (XML, JSON, Markdown, Tree)
 - Profile application
 - Include/exclude patterns
-- Git filters (--git-modified, --git-branch)
+- Git filters (--modified, --changed <ref>)
 - Transformer pipeline
 - Streaming output
 - Character limits

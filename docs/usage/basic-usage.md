@@ -108,10 +108,10 @@ Select files based on Git status:
 copytree --modified
 
 # Files changed between commits
-copytree --changes main..feature-branch
+copytree --changed main..feature-branch
 
 # Files changed in last 5 commits
-copytree --changes HEAD~5..HEAD
+copytree --changed HEAD~5..HEAD
 ```
 
 ## Output Options
@@ -253,8 +253,8 @@ Produces XML metadata and files; useful when integrating with XML-based tooling.
 # Copy project for AI analysis
 copytree --profile my-react
 
-# Copy with transformations
-copytree --profile my-react --transform
+# Copy with transformations (configured in profile)
+copytree --profile my-react
 ```
 
 ### 2. Code Review Preparation
@@ -264,10 +264,10 @@ copytree --profile my-react --transform
 copytree --modified
 
 # Copy feature branch changes
-copytree --changes main..feature/new-feature
+copytree --changed main..feature/new-feature
 
 # Include git status
-copytree --git-status
+copytree --with-git-status
 ```
 
 ### 3. Documentation Generation
@@ -277,7 +277,7 @@ copytree --git-status
 copytree --profile docs-only
 
 # Copy with file info
-copytree --profile mycustom --file-size --line-numbers
+copytree --profile mycustom --show-size --with-line-numbers
 
 # Tree structure only
 copytree --profile mycustom --only-tree
@@ -287,7 +287,7 @@ copytree --profile mycustom --only-tree
 
 ```bash
 # Copy with line numbers
-copytree --line-numbers
+copytree --with-line-numbers
 
 # Dry run to see what would be copied
 copytree --dry-run
@@ -298,30 +298,27 @@ copytree --dry-run
 ### Content Limiting
 
 ```bash
-# Limit directory depth
-copytree --depth 3
-
-# Limit lines per file
-copytree --max-lines 100
-
 # Limit characters per file
-copytree --max-characters 5000
+copytree --char-limit 5000
+
+# Limit to first N files
+copytree --head 50
 ```
 
 ### File Information
 
 ```bash
 # Include line numbers
-copytree --line-numbers
+copytree --with-line-numbers
 
 # Include file sizes
-copytree --file-size
+copytree --show-size
 
 # Include git status
-copytree --git-status
+copytree --with-git-status
 
-# Size report
-copytree --size-report
+# Show file info table
+copytree --info
 ```
 
 ### Transformations
@@ -375,7 +372,8 @@ external:
   - source: https://github.com/org/docs
     destination: docs/external
     rules:
-      - include: "*.md"
+      - "*.md"
+      - "**/*.md"
 ```
 
 ## Performance Tips
@@ -396,16 +394,13 @@ copytree --profile full
 # Focus on specific directories
 copytree src/ --profile react
 
-# Use depth limits
-copytree --depth 3
+# Limit number of files
+copytree --head 100
 ```
 
 ### 3. Skip Unnecessary Processing
 
 ```bash
-# Skip transformations for speed
-copytree --no-transform
-
 # Skip cache for fresh results
 copytree --no-cache
 ```
@@ -425,14 +420,11 @@ copytree --validate --profile myprofile
 ### Debug Issues
 
 ```bash
-# Enable debug output
-copytree --debug
-
-# Verbose output
-copytree --verbose
-
 # Check configuration
 copytree config:validate
+
+# Inspect configuration with provenance
+copytree config:inspect
 ```
 
 ### Common Issues
@@ -440,7 +432,7 @@ copytree config:validate
 1. **Nothing copied**: Check if files match profile rules
 2. **Too many files**: Use more specific profile or filters
 3. **Missing files**: Check .copytreeignore and gitignore
-4. **Slow performance**: Limit scope or skip transformations
+4. **Slow performance**: Limit scope with `--head` or disable cache with `--no-cache`
 
 ## Next Steps
 

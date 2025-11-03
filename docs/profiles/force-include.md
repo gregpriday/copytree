@@ -10,7 +10,7 @@ Force-include has the **highest precedence** in CopyTree's filtering system. Fil
 - Bypass `.gitignore` and `.copytreeignore` exclusions
 - Override profile `exclude` patterns
 - Override profile `filter` (include-only) patterns
-- Be preserved when using `--git-modified` or `--git-branch` filters
+- Be preserved when using `--modified` (or `-m`) or `--changed <ref>` (or `-c <ref>`) filters
 
 ## Three Ways to Force-Include Files
 
@@ -149,7 +149,7 @@ copytree --profile minimal --always "docs/**"
 
 ```bash
 # Show only modified files, but always include README and config
-copytree --git-modified --always "README.md" --always "config/**"
+copytree --modified --always "README.md" --always "config/**"
 ```
 
 ## Precedence Rules
@@ -159,7 +159,7 @@ copytree --git-modified --always "README.md" --always "config/**"
 The precedence hierarchy is:
 
 1. **Force-include** (highest) - `always` patterns from CLI/profile/.copytreeinclude
-2. Git filters - `--git-modified`, `--git-branch`
+2. Git filters - `--modified` (or `-m`), `--changed <ref>` (or `-c <ref>`)
 3. Profile `filter` (include-only patterns)
 4. Profile `exclude` patterns
 5. `.copytreeignore` patterns
@@ -238,7 +238,7 @@ Force-include context files when reviewing changes:
 
 ```bash
 # Show modified files + always include package.json
-copytree --git-modified --always "package.json" --always "README.md"
+copytree --modified --always "package.json" --always "README.md"
 ```
 
 ## Troubleshooting
@@ -315,7 +315,7 @@ copytree --profile complete
 ```bash
 # Show modified files plus always include config and docs
 copytree \
-  --git-modified \
+  --modified \
   --always "config/**" \
   --always "README.md" \
   --always "docs/api.md"

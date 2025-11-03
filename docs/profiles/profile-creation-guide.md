@@ -14,10 +14,12 @@ cat > .copytree/my-profile.yml << 'EOF'
 name: my-profile
 description: Custom profile for my project
 
-rules:
-  - include: "src/**/*.js"
-  - include: "*.json"
-  - exclude: "**/*.test.js"
+include:
+  - "src/**/*.js"
+  - "*.json"
+
+exclude:
+  - "**/*.test.js"
 EOF
 ```
 
@@ -29,10 +31,15 @@ EOF
 name: profile-name         # Required: Unique identifier
 description: Profile desc  # Required: What this profile does
 
-rules:                    # File selection rules
-  - include: "pattern"
-  - exclude: "pattern"
-  - always: "file"
+# File selection rules
+include:
+  - "pattern"
+
+exclude:
+  - "pattern"
+
+always:
+  - "file"
 ```
 
 ### Complete Structure
@@ -44,20 +51,24 @@ version: 1.0.0
 extends: default          # Inherit from another profile
 
 # File selection rules
-rules:
-  - include: "src/**/*.{js,jsx}"
-  - include: "lib/**/*.js"
-  - exclude: "**/*.test.js"
-  - exclude: "**/fixtures/**"
-  - always: "README.md"
-  - always: "package.json"
+include:
+  - "src/**/*.{js,jsx}"
+  - "lib/**/*.js"
+
+exclude:
+  - "**/*.test.js"
+  - "**/fixtures/**"
+
+always:
+  - "README.md"
+  - "package.json"
 
 # External sources
 external:
   - source: https://github.com/user/shared-lib
     destination: external/shared
     rules:
-      - include: "src/**/*.js"
+      - "src/**/*.js"
     optional: true
 
 # Processing options
@@ -87,19 +98,19 @@ transformers:
 Include patterns define what files to keep:
 
 ```yaml
-rules:
+include:
   # Basic patterns
-  - include: "*.js"              # All .js files in root
-  - include: "src/**/*.js"       # All .js files in src
-  - include: "**/*.{js,ts}"      # JS and TS files anywhere
-  
+  - "*.js"              # All .js files in root
+  - "src/**/*.js"       # All .js files in src
+  - "**/*.{js,ts}"      # JS and TS files anywhere
+
   # Directory patterns
-  - include: "src/**"            # Everything in src
-  - include: "**/components/**"  # All components dirs
-  
+  - "src/**"            # Everything in src
+  - "**/components/**"  # All components dirs
+
   # Specific files
-  - include: "config/*.json"     # JSON configs
-  - include: "**/index.js"       # All index.js files
+  - "config/*.json"     # JSON configs
+  - "**/index.js"       # All index.js files
 ```
 
 ### Exclude Rules
@@ -107,16 +118,16 @@ rules:
 Exclude patterns remove files from selection:
 
 ```yaml
-rules:
+exclude:
   # Common exclusions
-  - exclude: "node_modules/**"   # Dependencies
-  - exclude: "**/*.test.js"      # Test files
-  - exclude: "dist/**"           # Build output
-  - exclude: "**/*.log"          # Log files
-  
+  - "node_modules/**"   # Dependencies
+  - "**/*.test.js"      # Test files
+  - "dist/**"           # Build output
+  - "**/*.log"          # Log files
+
   # Pattern exclusions
-  - exclude: "**/*-lock.json"    # Lock files
-  - exclude: ".*/**"             # Hidden directories
+  - "**/*-lock.json"    # Lock files
+  - ".*/**"             # Hidden directories
 ```
 
 ### Always Rules
@@ -124,11 +135,11 @@ rules:
 Force include specific files:
 
 ```yaml
-rules:
-  - always: "README.md"
-  - always: "package.json"
-  - always: ".env.example"
-  - always: "src/config/app.js"
+always:
+  - "README.md"
+  - "package.json"
+  - ".env.example"
+  - "src/config/app.js"
 ```
 
 ### Rule Order
@@ -237,8 +248,7 @@ external:
   - source: https://github.com/user/repo
     destination: external/repo
     rules:
-      - include: "src/**/*.js"
-      - exclude: "**/*.test.js"
+      - "src/**/*.js"
 ```
 
 ### Local Directories
@@ -250,7 +260,7 @@ external:
   - source: ../shared-components
     destination: shared
     rules:
-      - include: "**/*.jsx"
+      - "**/*.jsx"
     optional: true  # Don't fail if missing
 ```
 
@@ -297,15 +307,19 @@ copytree --profile my-profile --dry-run | tail -n 5
 name: react-app
 description: React application with TypeScript
 
-rules:
-  - include: "src/**/*.{js,jsx,ts,tsx}"
-  - include: "public/**/*"
-  - include: "*.{json,md}"
-  - exclude: "**/*.test.{js,ts}"
-  - exclude: "**/*.spec.{js,ts}"
-  - exclude: "src/**/__tests__/**"
-  - always: "package.json"
-  - always: "tsconfig.json"
+include:
+  - "src/**/*.{js,jsx,ts,tsx}"
+  - "public/**/*"
+  - "*.{json,md}"
+
+exclude:
+  - "**/*.test.{js,ts}"
+  - "**/*.spec.{js,ts}"
+  - "src/**/__tests__/**"
+
+always:
+  - "package.json"
+  - "tsconfig.json"
 ```
 
 ### API Documentation
@@ -314,12 +328,14 @@ rules:
 name: api-docs
 description: API endpoints and documentation
 
-rules:
-  - include: "**/routes/**/*.js"
-  - include: "**/controllers/**/*.js"
-  - include: "**/*.swagger.{json,yaml}"
-  - include: "docs/**/*.md"
-  - exclude: "**/*.test.js"
+include:
+  - "**/routes/**/*.js"
+  - "**/controllers/**/*.js"
+  - "**/*.swagger.{json,yaml}"
+  - "docs/**/*.md"
+
+exclude:
+  - "**/*.test.js"
 ```
 
 ### Monorepo Package
@@ -328,11 +344,15 @@ rules:
 name: monorepo-pkg
 description: Specific package in monorepo
 
-rules:
-  - include: "packages/my-package/**/*"
-  - exclude: "**/node_modules/**"
-  - exclude: "**/dist/**"
-  - always: "packages/my-package/package.json"
+include:
+  - "packages/my-package/**/*"
+
+exclude:
+  - "**/node_modules/**"
+  - "**/dist/**"
+
+always:
+  - "packages/my-package/package.json"
 ```
 
 ## Best Practices
@@ -342,9 +362,11 @@ rules:
 Begin with basic patterns:
 
 ```yaml
-rules:
-  - include: "src/**/*.js"
-  - exclude: "**/*.test.js"
+include:
+  - "src/**/*.js"
+
+exclude:
+  - "**/*.test.js"
 ```
 
 ### 2. Use Dry Run
@@ -381,18 +403,19 @@ description: |
 Group related patterns:
 
 ```yaml
-rules:
-  # Source code
-  - include: "src/**/*.js"
-  - include: "src/**/*.jsx"
-  
-  # Tests
-  - include: "tests/**/*.js"
-  - exclude: "tests/fixtures/**"
-  
-  # Configuration
-  - always: "package.json"
-  - always: "babel.config.js"
+# Source code
+include:
+  - "src/**/*.js"
+  - "src/**/*.jsx"
+  - "tests/**/*.js"
+
+exclude:
+  - "tests/fixtures/**"
+
+# Configuration
+always:
+  - "package.json"
+  - "babel.config.js"
 ```
 
 ## Troubleshooting
@@ -403,11 +426,8 @@ rules:
 
 **Debug**:
 ```bash
-# Check without profile
-copytree --no-profile --dry-run
-
-# Check exclude rules
-copytree --profile my-profile --debug
+# See what files would be included
+copytree --profile my-profile --dry-run --verbose
 ```
 
 **Solutions**:
@@ -454,11 +474,13 @@ copytree --filter "src/**/*.js" --dry-run
 Use comments for clarity:
 
 ```yaml
-rules:
-  # Production code only
-  - include: "src/**/*.js"
-  - exclude: "src/**/*.dev.js"  # Development files
-  - exclude: "src/**/*.mock.js" # Mock files
+# Production code only
+include:
+  - "src/**/*.js"
+
+exclude:
+  - "src/**/*.dev.js"  # Development files
+  - "src/**/*.mock.js" # Mock files
 ```
 
 ### Performance Optimization
@@ -471,9 +493,9 @@ options:
   maxTotalSize: 10485760   # 10MB total
   maxFileCount: 1000       # Limit file count
 
-rules:
-  # Be specific to reduce scanning
-  - include: "src/core/**/*.js"  # Not "**/*.js"
+# Be specific to reduce scanning
+include:
+  - "src/core/**/*.js"  # Not "**/*.js"
 ```
 
 ### Multi-Environment Profiles
@@ -483,15 +505,17 @@ Create variants:
 ```yaml
 # .copytree/dev.yml
 extends: default
-rules:
-  - include: "tests/**"
-  - include: "docs/**"
+
+include:
+  - "tests/**"
+  - "docs/**"
 
 # .copytree/prod.yml
 extends: default
-rules:
-  - exclude: "**/*.test.js"
-  - exclude: "docs/**"
+
+exclude:
+  - "**/*.test.js"
+  - "docs/**"
 ```
 
 ## Next Steps

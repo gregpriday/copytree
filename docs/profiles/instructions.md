@@ -135,15 +135,6 @@ CopyTree includes a default instructions file that provides general guidance for
 }
 ```
 
-## Environment Configuration
-
-Set default instructions via environment variable:
-
-```bash
-export COPYTREE_DEFAULT_INSTRUCTIONS=react-review
-copytree  # Uses react-review instructions by default
-```
-
 ## Common Use Cases
 
 ### Code Review Instructions

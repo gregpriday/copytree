@@ -254,10 +254,10 @@ The default profile might be too restrictive for your project. Try:
 
 ```bash
 # See what would be selected
-copytree --dry-run --verbose
+copytree --dry-run
 
-# Or create a custom profile
-copytree profile:create myprofile
+# Or create a custom profile (see the Profile Creation Guide)
+# https://github.com/gregpriday/copytree/blob/main/docs/profiles/first-profile.md
 ```
 
 **Output too large**
@@ -265,11 +265,11 @@ copytree profile:create myprofile
 Limit the output size:
 
 ```bash
-# Limit file count
-copytree --limit 100
+# Limit to first N files
+copytree --head 100
 
-# Limit file size (10MB = 10485760 bytes)
-copytree --max-file-size 10485760
+# Use character limit per file
+copytree --char-limit 1000
 
 # Use streaming for large projects
 copytree --stream --output large-project.xml

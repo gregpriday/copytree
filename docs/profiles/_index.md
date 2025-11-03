@@ -75,10 +75,10 @@ Profiles are YAML files with:
 
 ### Profile Locations
 
-CopyTree looks for profiles in:
-1. Built-in profiles (includes default profile)
-2. Project profiles (`.copytree/` in your project)
-3. User profiles (`~/.copytree/profiles/`)
+CopyTree looks for profiles in this order (highest priority first):
+1. Project profiles (`.copytree/` in your project)
+2. User profiles (`~/.copytree/profiles/`)
+3. Built-in profiles (includes default profile)
 
 ### Profile Selection
 
@@ -161,4 +161,4 @@ cp ~/.copytree/profiles/template.yaml .copytree/new-profile.yaml
 
 Start with the [Profile Overview](./profile-overview.md) for a comprehensive introduction, then explore specific topics based on your needs.
 
-For quick reference, check the [Built-in Profiles](./builtin-profiles.md) list or jump straight to [Creating Custom Profiles](./profile-creation-guide.md).
+For quick reference, jump straight to [Creating Custom Profiles](./profile-creation-guide.md).

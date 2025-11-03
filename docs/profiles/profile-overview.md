@@ -2,8 +2,6 @@
 
 Profiles are YAML configuration files that tell CopyTree which files to include in your output. They provide a powerful and flexible way to select exactly the files you need for different purposes.
 
-> **📘 Canonical Rules**: For authoritative profile behavior and transformer configuration rules, see [DDR-0001: Profiles and Transformers](../reference/decisions/ddr-0001-profiles-and-transformers.md).
-
 ## What are Profiles?
 
 A profile is a reusable configuration that defines:
@@ -20,11 +18,13 @@ Here's a simple profile example:
 name: my-project
 description: Profile for my Node.js project
 
-rules:
-  - include: "src/**/*.js"
-  - include: "*.json"
-  - exclude: "node_modules/**"
-  - exclude: "**/*.test.js"
+include:
+  - "src/**/*.js"
+  - "*.json"
+
+exclude:
+  - "node_modules/**"
+  - "**/*.test.js"
 ```
 
 This profile:
@@ -64,26 +64,26 @@ CopyTree processes rules in order:
 
 #### Include Rules
 ```yaml
-rules:
-  - include: "src/**/*.js"      # All JS files in src
-  - include: "*.{json,yaml}"    # JSON and YAML in root
-  - include: "docs/**"          # Everything in docs
+include:
+  - "src/**/*.js"      # All JS files in src
+  - "*.{json,yaml}"    # JSON and YAML in root
+  - "docs/**"          # Everything in docs
 ```
 
 #### Exclude Rules
 ```yaml
-rules:
-  - exclude: "node_modules/**"  # Skip dependencies
-  - exclude: "**/*.log"         # Skip log files
-  - exclude: ".git/**"          # Skip git directory
+exclude:
+  - "node_modules/**"  # Skip dependencies
+  - "**/*.log"         # Skip log files
+  - ".git/**"          # Skip git directory
 ```
 
 #### Always Rules
 Force inclusion regardless of other rules:
 ```yaml
-rules:
-  - always: "README.md"         # Always include README
-  - always: "package.json"      # Always include package.json
+always:
+  - "README.md"         # Always include README
+  - "package.json"      # Always include package.json
 ```
 
 ## Pattern Syntax
@@ -125,18 +125,19 @@ Profiles use glob patterns with these features:
 Apply transformations to specific file types:
 
 ```yaml
-rules:
-  - include: "**/*.pdf"
-    transform: pdf-to-text    # Convert PDFs to text
-  
-  - include: "**/*.png"
-    transform: ocr            # Extract text from images
-  
-  - include: "src/**/*.js"
-    transform: summarize      # AI summarization
-    transform_options:
-      max_length: 500
+transformers:
+  pdf:
+    enabled: true
+    options:
+      maxPages: 20
+
+  image:
+    enabled: true
+    options:
+      extractText: true
 ```
+
+See [Transformer Reference](./transformer-reference.md) for complete documentation on configuring transformers in profiles.
 
 ### 2. External Sources
 
@@ -146,9 +147,10 @@ Include files from other locations:
 external:
   - source: https://github.com/user/docs
     destination: external/docs
-    rules:
-      - include: "*.md"
-      - exclude: "drafts/**"
+    include:
+      - "*.md"
+    exclude:
+      - "drafts/**"
 ```
 
 ### 3. Profile Inheritance
@@ -226,19 +228,22 @@ exclude:
 
 ## Profile Locations
 
-CopyTree searches for profiles in:
+CopyTree searches for profiles in this order (highest to lowest priority):
 
-1. **Built-in profiles**: Shipped with CopyTree
-   - Default profile works for all project types
-   - Located in the package installation
-
-2. **Project profiles**: `.copytree/` directory
+1. **Project profiles**: `.copytree/` directory
    - Custom profiles for your project
    - Version controlled with your code
+   - Highest priority - overrides user and built-in profiles
 
-3. **User profiles**: `~/.copytree/profiles/`
+2. **User profiles**: `~/.copytree/profiles/`
    - Personal profiles available globally
    - Reusable across projects
+   - Medium priority - overrides built-in profiles
+
+3. **Built-in profiles**: Shipped with CopyTree
+   - Default profile works for all project types
+   - Located in the package installation
+   - Lowest priority - used when no custom profile exists
 
 ## Best Practices
 
@@ -247,13 +252,13 @@ Begin with restrictive rules and expand as needed:
 
 ```yaml
 # Good - specific and focused
-rules:
-  - include: "src/**/*.js"
-  - include: "src/**/*.jsx"
+include:
+  - "src/**/*.js"
+  - "src/**/*.jsx"
 
 # Avoid - too broad
-rules:
-  - include: "**/*"
+include:
+  - "**/*"
 ```
 
 ### 2. Use Meaningful Names
@@ -290,21 +295,25 @@ include:
 ```
 
 ### 5. Test Your Profiles
-Use dry-run to verify:
+Use validation to verify:
 
 ```bash
-copytree --profile my-profile --dry-run --verbose
+# Validate profile syntax and configuration
+copytree profile:validate my-profile
+
+# List all available profiles
+copytree profile:list
 ```
 
 ## Debugging Profiles
 
 ### View Active Rules
 ```bash
-# See what profile is being used
-copytree --debug
-
 # Validate profile syntax
 copytree profile:validate my-profile
+
+# List all profiles with their locations
+copytree profile:list
 ```
 
 ### Common Issues

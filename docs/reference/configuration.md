@@ -4,31 +4,28 @@ Complete reference for CopyTree configuration system, including precedence rules
 
 ## Configuration Precedence
 
-CopyTree uses a hierarchical configuration system where settings are merged in this order (highest precedence first):
+CopyTree uses a simple two-level configuration system:
 
 ```
-CLI flags > Environment variables > Project config > User config > Default config
+User config > Default config
 ```
+
+Settings are loaded from:
+1. **Built-in defaults** from `config/*.js` files
+2. **User overrides** from `~/.copytree/*.js` or `~/.copytree/*.json` files
+
+The two levels are deeply merged, with user configuration overriding defaults.
 
 ### Precedence Example
 
 ```bash
-# Default config
+# Default config (config/app.js)
 maxFileSize: 10MB
 
-# User config (~/.copytree/config.yml)
+# User config (~/.copytree/app.js)
 maxFileSize: 20MB
 
-# Project config (.copytree/config.yml)
-maxFileSize: 50MB
-
-# Environment variable
-export COPYTREE_MAX_FILE_SIZE=100MB
-
-# CLI flag
-copytree --max-file-size 200MB
-
-# Effective value: 200MB (CLI wins)
+# Effective value: 20MB (user config wins)
 ```
 
 ## Configuration Locations
@@ -55,101 +52,71 @@ Built-in defaults (lowest precedence):
 
 Global settings for all projects:
 
-**Location**: `~/.copytree/config.yml`
+**Location**: `~/.copytree/*.js` or `~/.copytree/*.json`
 
-```yaml
-# User-wide configuration
-maxFileSize: 20971520       # 20MB
-maxTotalSize: 209715200     # 200MB
-respectGitignore: true
-includeHidden: false
+**JavaScript Format**:
+```javascript
+// ~/.copytree/app.js
+export default {
+  maxFileSize: 20971520,       // 20MB
+  maxTotalSize: 209715200,     // 200MB
+  respectGitignore: true,
+  includeHidden: false,
 
-# Default profile for all projects
-defaultProfile: default
+  // Default profile for all projects
+  defaultProfile: 'default',
 
-# Cache settings
-cache:
-  enabled: true
-  ttl: 3600000              # 1 hour
-  directory: ~/.copytree/cache
+  // Cache settings
+  cache: {
+    enabled: true,
+    ttl: 3600000,              // 1 hour
+    directory: '~/.copytree/cache'
+  }
+};
 ```
 
-### 3. Project Configuration
-
-Project-specific settings (higher precedence):
-
-**Location**: `.copytree/config.yml` (in project root)
-
-```yaml
-# Project-specific configuration
-maxFileSize: 52428800       # 50MB
-maxTotalSize: 524288000     # 500MB
-
-# Project default profile
-defaultProfile: myproject
-
-# Project-specific exclusions
-additionalExclusions:
-  - "vendor/**"
-  - "storage/**"
-  - "*.log"
+**JSON Format**:
+```json
+{
+  "maxFileSize": 20971520,
+  "maxTotalSize": 209715200,
+  "respectGitignore": true,
+  "includeHidden": false,
+  "defaultProfile": "default",
+  "cache": {
+    "enabled": true,
+    "ttl": 3600000,
+    "directory": "~/.copytree/cache"
+  }
+}
 ```
 
-### 4. Environment Variables
+**Note**: Configuration file names must match the config section name (e.g., `app.js`, `ai.js`).
 
-Override configuration via environment:
+## Configuration Keys
 
-```bash
-# Set environment variables
-export COPYTREE_MAX_FILE_SIZE=104857600        # 100MB
-export COPYTREE_MAX_TOTAL_SIZE=1073741824      # 1GB
-export COPYTREE_PROFILE=myprofile
-export COPYTREE_RESPECT_GITIGNORE=false
-export COPYTREE_CACHE_ENABLED=false
-
-# Run with env vars
-copytree
-```
-
-### 5. CLI Flags
-
-Highest precedence - override everything:
-
-```bash
-copytree \
-  --max-file-size 209715200 \
-  --max-total-size 2147483648 \
-  --profile custom \
-  --no-gitignore \
-  --include-hidden
-```
-
-## Environment Variable Mapping
-
-| Environment Variable | Config Key | CLI Flag | Type | Default |
-|---------------------|------------|----------|------|---------|
-| `COPYTREE_MAX_FILE_SIZE` | `maxFileSize` | `--max-file-size` | bytes | 10485760 |
-| `COPYTREE_MAX_TOTAL_SIZE` | `maxTotalSize` | `--max-total-size` | bytes | 104857600 |
-| `COPYTREE_MAX_FILE_COUNT` | `maxFileCount` | `--limit` | number | 10000 |
-| `COPYTREE_PROFILE` | `defaultProfile` | `--profile` | string | `default` |
-| `COPYTREE_RESPECT_GITIGNORE` | `respectGitignore` | `--no-gitignore` | boolean | `true` |
-| `COPYTREE_INCLUDE_HIDDEN` | `includeHidden` | `--include-hidden` | boolean | `false` |
-| `COPYTREE_FOLLOW_SYMLINKS` | `followSymlinks` | `--follow-symlinks` | boolean | `false` |
-| `COPYTREE_CACHE_ENABLED` | `cache.enabled` | N/A | boolean | `true` |
-| `COPYTREE_CACHE_TTL` | `cache.ttl` | N/A | milliseconds | 3600000 |
+| Config Key | CLI Flag | Type | Default | Description |
+|-----------|----------|------|---------|-------------|
+| `maxFileSize` | N/A | bytes | 10485760 | Maximum single file size |
+| `maxTotalSize` | N/A | bytes | 104857600 | Maximum total size of all files |
+| `maxFileCount` | `--limit` | number | 10000 | Maximum number of files |
+| `defaultProfile` | `--profile` | string | `default` | Default profile to use |
+| `respectGitignore` | N/A | boolean | `true` | Respect .gitignore rules |
+| `includeHidden` | N/A | boolean | `false` | Include hidden files |
+| `followSymlinks` | `--follow-symlinks` | boolean | `false` | Follow symbolic links |
+| `cache.enabled` | N/A | boolean | `true` | Enable caching |
+| `cache.ttl` | N/A | milliseconds | 3600000 | Cache time-to-live |
 
 ## Profile Configuration
 
-Profiles control file selection and transformation. See [DDR-0001](./decisions/ddr-0001-profiles-and-transformers.md) for canonical rules.
+Profiles control file selection and transformation. See [Profile Overview](../profiles/profile-overview.md) for details.
 
 ### Profile Selection Precedence
 
 ```
 1. CLI --profile flag
-2. Environment variable COPYTREE_PROFILE
-3. Project config defaultProfile
-4. User config defaultProfile
-5. Built-in default profile (automatic)
+2. User config defaultProfile
+3. Built-in default profile (automatic)
 ```
 
 **Example**:
@@ -158,19 +125,13 @@ Profiles control file selection and transformation. See [DDR-0001](./decisions/d
 # 1. CLI flag (highest precedence)
 copytree --profile api-docs
 
-# 2. Environment variable
-export COPYTREE_PROFILE=api-docs
-copytree
+# 2. User config
+# ~/.copytree/app.js
+export default {
+  defaultProfile: 'api-docs'
+};
 
-# 3. Project config
-# .copytree/config.yml
-defaultProfile: api-docs
-
-# 4. User config
-# ~/.copytree/config.yml
-defaultProfile: api-docs
-
-# 5. Built-in default (automatic)
+# 3. Built-in default (automatic)
 copytree  # Uses built-in default profile
 ```
 
@@ -230,19 +191,19 @@ Configuration Validation: ✓ Valid
 
 Effective Configuration:
   maxFileSize: 20971520 (20MB)
-    Source: User config (~/.copytree/config.yml)
+    Source: User config (~/.copytree/app.js)
 
-  maxTotalSize: 524288000 (500MB)
-    Source: Project config (.copytree/config.yml)
+  maxTotalSize: 104857600 (100MB)
+    Source: Default config
 
   defaultProfile: "myproject"
-    Source: Project config (.copytree/config.yml)
+    Source: User config (~/.copytree/app.js)
 
   respectGitignore: true
     Source: Default config
 
-  cacheEnabled: false
-    Source: Environment variable (COPYTREE_CACHE_ENABLED)
+  cache.enabled: true
+    Source: Default config
 ```
 
 ### Configuration Schema
@@ -309,68 +270,66 @@ cache:
 
 ### Scenario 2: Team Configuration
 
-Standardize settings for team:
+Standardize settings via shared profile:
 
 ```yaml
-# .copytree/config.yml (committed to repo)
-defaultProfile: "team-standard"
-respectGitignore: true
+# .copytree/team-standard.yml (committed to repo)
+name: team-standard
+description: Team standard profile
 
-additionalExclusions:
+include:
+  - "src/**"
+  - "docs/**"
+
+exclude:
   - "vendor/**"
   - "storage/**"
   - "coverage/**"
   - "*.log"
 
-maxFileSize: 20971520           # 20MB limit for all team members
+transformers:
+  file-loader:
+    enabled: true
 ```
+
+**Note**: Configuration files (not profiles) cannot be shared at the project level. Use profiles for team standardization.
 
 ### Scenario 3: CI/CD Pipeline
 
-Optimize for automated environments:
+Use CLI flags for CI environments:
 
 ```bash
-# .env or CI configuration
-export COPYTREE_CACHE_ENABLED=false
-export COPYTREE_MAX_FILE_SIZE=52428800
-export COPYTREE_PROFILE=ci-minimal
-export COPYTREE_STREAMING_ENABLED=true
+# CI script
+copytree --profile ci-minimal --display
 ```
 
 ### Scenario 4: Personal Defaults
 
 Set personal preferences globally:
 
-```yaml
-# ~/.copytree/config.yml
-defaultProfile: "mydefault"
-defaultFormat: "markdown"
+```javascript
+// ~/.copytree/app.js
+export default {
+  defaultProfile: 'mydefault',
+  defaultFormat: 'markdown',
 
-maxFileSize: 52428800           # 50MB
+  maxFileSize: 52428800,           // 50MB
 
-cache:
-  enabled: true
-  ttl: 14400000                 # 4 hours
+  cache: {
+    enabled: true,
+    ttl: 14400000                  // 4 hours
+  },
 
-# Prefer hidden files for my workflow
-includeHidden: true
+  // Prefer hidden files for my workflow
+  includeHidden: true
+};
 ```
 
 ## Configuration Files Format
 
-### YAML Format (Recommended)
-
-```yaml
-# .copytree/config.yml
-maxFileSize: 20971520
-defaultProfile: myproject
-
-cache:
-  enabled: true
-  ttl: 3600000
-```
-
 ### JSON Format
+
+**Location**: `~/.copytree/*.json`
 
 ```json
 {
@@ -383,10 +342,12 @@ cache:
 }
 ```
 
-### JavaScript Format (Advanced)
+### JavaScript Format (Recommended)
+
+**Location**: `~/.copytree/*.js`
 
 ```javascript
-// .copytree/config.js
+// ~/.copytree/app.js
 export default {
   maxFileSize: 20 * 1024 * 1024,  // 20MB
   defaultProfile: 'myproject',
@@ -403,6 +364,8 @@ export default {
 };
 ```
 
+**Note**: Configuration files must use ES module syntax (`export default`) and match the config section name.
+
 ## Troubleshooting Configuration
 
 ### Check Effective Configuration
@@ -418,7 +381,7 @@ copytree config:inspect
 Ensure configuration is valid:
 
 ```bash
-copytree config:validate --verbose
+copytree config:validate
 ```
 
 ### Debug Configuration Loading
@@ -445,95 +408,102 @@ copytree config:validate
 # - Invalid values (e.g., strings for numbers)
 ```
 
-**"Environment variable not working"**
+**"User config not loading"**
 
-Ensure correct prefix and format:
-
-```bash
-# Correct
-export COPYTREE_MAX_FILE_SIZE=20971520
-
-# Incorrect (no COPYTREE_ prefix)
-export MAX_FILE_SIZE=20971520
-
-# Verify it's set
-echo $COPYTREE_MAX_FILE_SIZE
-```
-
-**"Project config not loaded"**
-
-Check file location:
+Check file location and format:
 
 ```bash
-# Must be in project root
-ls .copytree/config.yml
+# Must be in ~/.copytree/ directory
+ls ~/.copytree/app.js
+ls ~/.copytree/app.json
 
-# Not in subdirectory
-ls src/.copytree/config.yml  # Won't work
+# Check file has proper ES module export (for .js files)
+# Must use: export default { ... }
+# Not: module.exports = { ... }
+
+# File name must match config section
+# app.js for app config
+# ai.js for AI config
 ```
 
 ## Best Practices
 
-### 1. Use Project Config for Team Settings
+### 1. Use Profiles for Team Settings
 
-Commit `.copytree/config.yml` to share team standards:
+Commit profiles to share team standards:
 
 ```yaml
-# .copytree/config.yml (committed)
-defaultProfile: team-standard
-maxFileSize: 20971520
-respectGitignore: true
+# .copytree/team-standard.yml (committed)
+name: team-standard
+description: Team standard profile
+
+include:
+  - "src/**"
+  - "docs/**"
+
+exclude:
+  - "vendor/**"     # PHP dependencies
+  - "storage/**"    # Laravel storage
+  - "coverage/**"   # Test coverage
+  - "*.log"
 ```
 
 ### 2. Use User Config for Personal Preferences
 
-Keep personal settings in `~/.copytree/config.yml`:
+Keep personal settings in `~/.copytree/`:
 
-```yaml
-# ~/.copytree/config.yml (not committed)
-defaultFormat: markdown
-cache:
-  ttl: 7200000  # I prefer longer cache
+```javascript
+// ~/.copytree/app.js (not committed)
+export default {
+  defaultFormat: 'markdown',
+  cache: {
+    ttl: 7200000  // I prefer longer cache
+  }
+};
 ```
 
-### 3. Use Environment Variables for Temporary Overrides
-
-```bash
-# One-time override without changing files
-COPYTREE_MAX_FILE_SIZE=104857600 copytree
-```
-
-### 4. Use CLI Flags for Experimenting
+### 3. Use CLI Flags for Experimenting
 
 ```bash
 # Try different settings without modifying config
-copytree --max-file-size 52428800 --no-cache
+copytree --profile test-profile --display
 ```
 
-### 5. Document Project Configuration
+### 4. Document Configuration Files
 
-Add comments to project config:
+Add comments to user config:
 
-```yaml
-# .copytree/config.yml
+```javascript
+// ~/.copytree/app.js
 
-# Team standard: 20MB limit to keep AI context manageable
-maxFileSize: 20971520
+export default {
+  // Prefer larger file size for my projects
+  maxFileSize: 20 * 1024 * 1024,  // 20MB
 
-# Always use team-standard profile
-defaultProfile: team-standard
+  // Always use my custom profile by default
+  defaultProfile: 'mydefault',
 
-# Exclude generated directories
-additionalExclusions:
-  - "vendor/**"     # PHP dependencies
-  - "storage/**"    # Laravel storage
-  - "coverage/**"   # Test coverage
+  // Longer cache TTL for slower network
+  cache: {
+    enabled: true,
+    ttl: 4 * 60 * 60 * 1000  // 4 hours
+  }
+};
+```
+
+### 5. Validate Configuration Regularly
+
+```bash
+# Check configuration is valid
+copytree config:validate
+
+# Inspect effective configuration
+copytree config:inspect
 ```
 
 ## Related Documentation
 
-- **[DDR-0001: Profiles and Transformers](./decisions/ddr-0001-profiles-and-transformers.md)** - Canonical rules for profiles and transformers
 - **[Profile Overview](../profiles/profile-overview.md)** - Complete guide to profiles
 - **[Transformer Reference](../profiles/transformer-reference.md)** - All available transformers
-- **[CLI Reference](./cli.md)** - Command-line options
+- **[CLI Reference](../cli/copytree-reference.md)** - Command-line options
 - **[Troubleshooting Guide](../usage/troubleshooting.md)** - Common issues and solutions
