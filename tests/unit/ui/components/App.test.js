@@ -21,7 +21,9 @@ describe('App Component', () => {
         '../../../../src/ui/components/PipelineStatus.js'
       );
       const { default: Results } = await import('../../../../src/ui/components/Results.js');
-      const { default: SummaryTable } = await import('../../../../src/ui/components/SummaryTable.js');
+      const { default: SummaryTable } = await import(
+        '../../../../src/ui/components/SummaryTable.js'
+      );
       const { default: StaticLog } = await import('../../../../src/ui/components/StaticLog.js');
 
       expect(typeof PipelineStatus).toBe('function');
@@ -40,16 +42,10 @@ describe('App Component', () => {
     test('App renders with copy command', async () => {
       const { default: App } = await import('../../../../src/ui/App.js');
 
-      const instance = render(
-        <App
-          command="copy"
-          path="."
-          options={{}}
-        />
-      );
+      const instance = render(<App command="copy" path="." options={{}} />);
 
       // Give async components time to load
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = instance.lastFrame();
       expect(output).toBeDefined();
@@ -64,15 +60,10 @@ describe('App Component', () => {
     test('App renders profile:list command', async () => {
       const { default: App } = await import('../../../../src/ui/App.js');
 
-      const instance = render(
-        <App
-          command="profile:list"
-          options={{}}
-        />
-      );
+      const instance = render(<App command="profile:list" options={{}} />);
 
       // Give async components time to load
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = instance.lastFrame();
       expect(output).toBeDefined();
@@ -86,15 +77,10 @@ describe('App Component', () => {
     test('App renders config:validate command', async () => {
       const { default: App } = await import('../../../../src/ui/App.js');
 
-      const instance = render(
-        <App
-          command="config:validate"
-          options={{}}
-        />
-      );
+      const instance = render(<App command="config:validate" options={{}} />);
 
       // Give async components time to load
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = instance.lastFrame();
       expect(output).toBeDefined();
@@ -108,15 +94,10 @@ describe('App Component', () => {
     test('App renders copy:docs command', async () => {
       const { default: App } = await import('../../../../src/ui/App.js');
 
-      const instance = render(
-        <App
-          command="copy:docs"
-          options={{}}
-        />
-      );
+      const instance = render(<App command="copy:docs" options={{}} />);
 
       // Give async components time to load
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = instance.lastFrame();
       expect(output).toBeDefined();

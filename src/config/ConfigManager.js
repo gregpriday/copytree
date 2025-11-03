@@ -21,14 +21,8 @@ const resolveEnv = () => {
     };
   } catch {
     // Fallback to CJS globals (Jest/Node CommonJS environment)
-    const fallbackDir =
-      typeof __dirname !== 'undefined'
-        ? __dirname
-        : path.dirname(__filename);
-    const fallbackReq =
-      typeof require !== 'undefined'
-        ? require
-        : createRequire(__filename);
+    const fallbackDir = typeof __dirname !== 'undefined' ? __dirname : path.dirname(__filename);
+    const fallbackReq = typeof require !== 'undefined' ? require : createRequire(__filename);
     return { dir: fallbackDir, req: fallbackReq };
   }
 };

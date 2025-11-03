@@ -20,7 +20,7 @@ const resolveEnv = () => {
   }
 };
 
-const { filename: moduleFilename, dirname: moduleDir} = resolveEnv();
+const { filename: moduleFilename, dirname: moduleDir } = resolveEnv();
 
 /**
  * Instructions loader and manager

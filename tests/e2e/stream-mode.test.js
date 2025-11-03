@@ -21,14 +21,14 @@ function runCliWithStreamCapture(args) {
     const startTime = Date.now();
 
     const proc = spawn('node', [CLI_PATH, ...args], {
-      env: { ...process.env, FORCE_COLOR: '0' }
+      env: { ...process.env, FORCE_COLOR: '0' },
     });
 
     proc.stdout.on('data', (data) => {
       chunks.push({
         data: data.toString(),
         timestamp: Date.now() - startTime,
-        size: data.length
+        size: data.length,
       });
     });
 
@@ -52,7 +52,7 @@ describe('Stream mode', () => {
         PROJECT,
         '--stream',
         '--format',
-        'xml'
+        'xml',
       ]);
 
       expect(exitCode).toBe(0);
@@ -61,7 +61,7 @@ describe('Stream mode', () => {
       expect(chunks.length).toBeGreaterThan(1);
 
       // Verify chunks are emitted over time (not all at once)
-      const timestamps = chunks.map(c => c.timestamp);
+      const timestamps = chunks.map((c) => c.timestamp);
       const timeSpread = timestamps[timestamps.length - 1] - timestamps[0];
       expect(timeSpread).toBeGreaterThan(0); // Should take some time
 
@@ -74,7 +74,7 @@ describe('Stream mode', () => {
         PROJECT,
         '--stream',
         '--format',
-        'markdown'
+        'markdown',
       ]);
 
       expect(exitCode).toBe(0);
@@ -96,67 +96,67 @@ describe('Stream mode', () => {
   });
 
   describe('Stream output format correctness', () => {
-  test('--stream with tree format', async () => {
-    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'tree']);
+    test('--stream with tree format', async () => {
+      const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'tree']);
 
-    expect(code).toBe(0);
-    expect(stderr).toBe('');
+      expect(code).toBe(0);
+      expect(stderr).toBe('');
 
-    const normalized = normalize(stdout, {
-      projectRoot: PROJECT,
-      sortTreeLines: true,
-    });
-    expect(normalized).toMatchGolden('stream/stream.tree.golden');
-  }, 30000);
+      const normalized = normalize(stdout, {
+        projectRoot: PROJECT,
+        sortTreeLines: true,
+      });
+      expect(normalized).toMatchGolden('stream/stream.tree.golden');
+    }, 30000);
 
-  test('--stream with XML format', async () => {
-    const { code, stdout, stderr } = await runCli([PROJECT, '--stream']);
+    test('--stream with XML format', async () => {
+      const { code, stdout, stderr } = await runCli([PROJECT, '--stream']);
 
-    expect(code).toBe(0);
-    expect(stderr).toBe('');
+      expect(code).toBe(0);
+      expect(stderr).toBe('');
 
-    const normalized = normalize(stdout, { projectRoot: PROJECT });
-    expect(normalized).toMatchGolden('stream/stream.xml.golden');
-  }, 30000);
+      const normalized = normalize(stdout, { projectRoot: PROJECT });
+      expect(normalized).toMatchGolden('stream/stream.xml.golden');
+    }, 30000);
 
-  test('--stream with JSON format', async () => {
-    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'json']);
+    test('--stream with JSON format', async () => {
+      const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'json']);
 
-    expect(code).toBe(0);
-    expect(stderr).toBe('');
+      expect(code).toBe(0);
+      expect(stderr).toBe('');
 
-    const normalized = normalize(stdout, { projectRoot: PROJECT });
-    expect(normalized).toMatchGolden('stream/stream.json.golden');
-  }, 30000);
+      const normalized = normalize(stdout, { projectRoot: PROJECT });
+      expect(normalized).toMatchGolden('stream/stream.json.golden');
+    }, 30000);
 
-  test('--stream with markdown format', async () => {
-    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'markdown']);
+    test('--stream with markdown format', async () => {
+      const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'markdown']);
 
-    expect(code).toBe(0);
-    expect(stderr).toBe('');
+      expect(code).toBe(0);
+      expect(stderr).toBe('');
 
-    const normalized = normalize(stdout, { projectRoot: PROJECT });
-    expect(normalized).toMatchGolden('stream/stream.md.golden');
-  }, 30000);
+      const normalized = normalize(stdout, { projectRoot: PROJECT });
+      expect(normalized).toMatchGolden('stream/stream.md.golden');
+    }, 30000);
 
-  test('--stream with NDJSON format', async () => {
-    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'ndjson']);
+    test('--stream with NDJSON format', async () => {
+      const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'ndjson']);
 
-    expect(code).toBe(0);
-    expect(stderr).toBe('');
+      expect(code).toBe(0);
+      expect(stderr).toBe('');
 
-    const normalized = normalize(stdout, { projectRoot: PROJECT });
-    expect(normalized).toMatchGolden('stream/stream.ndjson.golden');
-  }, 30000);
+      const normalized = normalize(stdout, { projectRoot: PROJECT });
+      expect(normalized).toMatchGolden('stream/stream.ndjson.golden');
+    }, 30000);
 
-  test('--stream with SARIF format', async () => {
-    const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'sarif']);
+    test('--stream with SARIF format', async () => {
+      const { code, stdout, stderr } = await runCli([PROJECT, '--stream', '--format', 'sarif']);
 
-    expect(code).toBe(0);
-    expect(stderr).toBe('');
+      expect(code).toBe(0);
+      expect(stderr).toBe('');
 
-    const normalized = normalize(stdout, { projectRoot: PROJECT });
-    expect(normalized).toMatchGolden('stream/stream.sarif.golden');
-  }, 30000);
+      const normalized = normalize(stdout, { projectRoot: PROJECT });
+      expect(normalized).toMatchGolden('stream/stream.sarif.golden');
+    }, 30000);
   }); // End of 'Stream output format correctness'
 }); // End of 'Stream mode'

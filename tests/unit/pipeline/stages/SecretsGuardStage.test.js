@@ -233,7 +233,7 @@ describe('SecretsGuardStage', () => {
     it('should throw SecretsDetectedError when failOnSecrets is true', async () => {
       stage.failOnSecrets = true;
 
-      const secretContent = 'AKIAIOSFODNN7EXAMPLE';  // Fake AWS key
+      const secretContent = 'AKIAIOSFODNN7EXAMPLE'; // Fake AWS key
       mockGitleaks.scanString.mockResolvedValue([
         {
           RuleID: 'aws-access-key',

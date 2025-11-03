@@ -178,7 +178,7 @@ describe('File count calculation with null placeholders (using real OutputFormat
         .map((_, i) => ({ path: `file${i}.txt`, size: 1000, content: 'test' }));
 
       // Replace some with null (simulating skipped binary files)
-      [5, 10, 15, 20, 25, 30, 35, 40].forEach(i => {
+      [5, 10, 15, 20, 25, 30, 35, 40].forEach((i) => {
         filesWithNulls[i] = null;
       });
 

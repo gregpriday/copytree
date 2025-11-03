@@ -350,7 +350,7 @@ describe('OutputFormattingStage - NDJSON', () => {
       expect(lines.length).toBeGreaterThan(0);
 
       // Each line should be valid JSON
-      lines.forEach(line => {
+      lines.forEach((line) => {
         expect(() => JSON.parse(line)).not.toThrow();
       });
     });

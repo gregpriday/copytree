@@ -91,7 +91,7 @@ describe('Configuration Hierarchy (Real ConfigManager)', () => {
       // Create user config file with override directly in ~/.copytree/
       await fs.writeFile(
         path.join(tempUserConfigPath, 'copytree.js'),
-        `export default { maxFileSize: 999999, customSetting: 'user-value' };`
+        `export default { maxFileSize: 999999, customSetting: 'user-value' };`,
       );
 
       configManager = await ConfigManager.create({ noValidate: true });

@@ -228,7 +228,7 @@ describe('CacheService', () => {
         await settleFs(50);
 
         // Wait for expiration
-        await new Promise(resolve => setTimeout(resolve, 2100));
+        await new Promise((resolve) => setTimeout(resolve, 2100));
 
         // Second instance: try to read expired data
         const cache2 = new CacheService({

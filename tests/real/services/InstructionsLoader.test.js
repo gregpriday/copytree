@@ -160,7 +160,7 @@ describe('InstructionsLoader (Real Implementation)', () => {
       // Mock user directory with some files
       fs.pathExists.mockResolvedValue(true);
       fs.readdir
-        .mockResolvedValueOnce(['default.md', 'custom.md'])  // user dir
+        .mockResolvedValueOnce(['default.md', 'custom.md']) // user dir
         .mockResolvedValueOnce(['default.md', 'another.md']); // app dir
 
       const result = await loader.list();
@@ -170,7 +170,7 @@ describe('InstructionsLoader (Real Implementation)', () => {
       expect(result).toContain('custom');
       expect(result).toContain('another');
       // Should dedupe 'default' which appears in both
-      expect(result.filter(name => name === 'default').length).toBe(1);
+      expect(result.filter((name) => name === 'default').length).toBe(1);
     });
 
     it('should handle missing directories gracefully', async () => {

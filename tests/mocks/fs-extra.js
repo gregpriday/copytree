@@ -5,7 +5,7 @@ export const stat = jest.fn().mockResolvedValue({ isDirectory: () => true });
 export const writeFile = jest.fn().mockResolvedValue();
 export const createWriteStream = jest.fn(() => ({
   write: jest.fn(),
-  end: jest.fn(cb => cb?.())
+  end: jest.fn((cb) => cb?.()),
 }));
 export const ensureDir = jest.fn().mockResolvedValue();
 export const ensureDirSync = jest.fn();
@@ -72,7 +72,7 @@ const mock = {
 mock.default = mock;
 
 export const resetFsExtraMock = () => {
-  Object.values(mock).forEach(fn => {
+  Object.values(mock).forEach((fn) => {
     if (jest.isMockFunction(fn)) {
       fn.mockClear();
     }
