@@ -113,6 +113,7 @@ jobs:
           LC_ALL: 'C'
 
       - name: Check for uncommitted golden file changes
+        shell: bash
         run: |
           if git diff --exit-code -- tests/fixtures/goldens; then
             echo "✅ No uncommitted golden file changes"
