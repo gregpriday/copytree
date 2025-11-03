@@ -140,6 +140,12 @@ export function normalize(text, options = {}) {
   output = output.replace(/(path=["']@[^"']*?)\\+([^"']*?["'])/g, '$1/$2');
   // Also handle Windows paths in JSON "path": "src\test.js" and "directory": "D:\a\b"
   output = output.replace(/("(?:path|directory)"\s*:\s*"[^"]*?)\\+([^"]*?")/g, '$1/$2');
+  // Markdown headers like ### @src\test.js → ### @src/test.js
+  output = output.replace(/(###\s+@[^\n]*?)\\+([^\n]*)/g, '$1/$2');
+  // Markdown file comments like <!-- copytree:file-begin path="@src\test.js" -->
+  output = output.replace(/(<!--[^>]*?path=["']@[^"']*?)\\+([^"']*?["'][^>]*?-->)/g, '$1/$2');
+  // SARIF format "uri": "file:///src\test.js" → "file:///src/test.js"
+  output = output.replace(/("uri"\s*:\s*"[^"]*?)\\+([^"]*?")/g, '$1/$2');
 
   // 8. Normalize Git-specific data
   output = normalizeGitData(output);
