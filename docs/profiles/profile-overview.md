@@ -2,6 +2,8 @@
 
 Profiles are YAML configuration files that tell CopyTree which files to include in your output. They provide a powerful and flexible way to select exactly the files you need for different purposes.
 
+> **📘 Canonical Rules**: For authoritative profile behavior and transformer configuration rules, see [DDR-0001: Profiles and Transformers](../reference/decisions/ddr-0001-profiles-and-transformers.md).
+
 ## What are Profiles?
 
 A profile is a reusable configuration that defines:

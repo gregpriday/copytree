@@ -65,9 +65,9 @@ node --version
 # Install Node Version Manager (nvm)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
-# Install Node.js 18+
-nvm install 18
-nvm use 18
+# Install Node.js 20+
+nvm install 20
+nvm use 20
 ```
 
 ## Configuration Problems

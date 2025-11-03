@@ -6,10 +6,12 @@ This guide covers the complete installation process for CopyTree on your system.
 
 ### System Requirements
 
-- **Node.js**: Version 18.0 or higher (LTS recommended)
-- **npm**: Version 8.0 or higher (comes with Node.js)
+- **Node.js**: Version 20.0 or higher (LTS recommended)
+- **npm**: Version 10.0 or higher (comes with Node.js)
 - **Git**: For repository operations and Git integration features
 - **Operating System**: macOS, Linux, or Windows with WSL
+
+> **Important**: CopyTree requires Node.js 20+ and uses ES Modules (ESM) only. CommonJS is not supported.
 
 ### Optional Dependencies
 
@@ -23,10 +25,10 @@ These tools enhance CopyTree's capabilities but are not required for basic opera
 
 ```bash
 # Check Node.js version
-node --version  # Should show v18.0.0 or higher
+node --version  # Should show v20.0.0 or higher
 
 # Check npm version
-npm --version   # Should show 8.0.0 or higher
+npm --version   # Should show 10.0.0 or higher
 
 # Check Git installation
 git --version   # Any recent version

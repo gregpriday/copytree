@@ -33,20 +33,35 @@ copytree --display
 
 ## Understanding Profiles
 
-Profiles are the heart of CopyTree's intelligent file selection. All profiles must be custom-created.
+Profiles are the heart of CopyTree's intelligent file selection. CopyTree includes a default profile that works for most projects, or you can create custom profiles for specific needs.
 
-### Custom Profile Required
+### Profile Selection
 
-CopyTree requires a custom profile to be specified:
+CopyTree uses the following profile selection order:
+
+1. If `--profile` flag is provided → use the specified profile
+2. Else → use the built-in default profile automatically
 
 ```bash
-# Custom profile required
+# Use default profile (automatic)
+copytree
+
+# Explicitly specify default profile
+copytree --profile default
+
+# Use a custom profile
 copytree --profile mycustom
 ```
 
-### Using Custom Profiles
+The default profile provides sensible exclusions for common build artifacts, dependencies, and IDE files while including all source code and documentation.
 
-Specify your custom profile:
+### When to Use Custom Profiles
+
+Create custom profiles when you need to:
+- Focus on specific file types or directories
+- Apply transformers to certain files
+- Include files from external sources
+- Override default exclusion rules
 
 ```bash
 # Use custom React profile
@@ -55,21 +70,17 @@ copytree --profile my-react
 # Use custom API profile
 copytree --profile api-docs
 
-# See all available custom profiles
+# See all available profiles
 copytree profile:list
 ```
 
-### Example Custom Profiles
+### Example Custom Profile Use Cases
 
-Create custom profiles such as:
-- `my-laravel` - Laravel PHP framework setup
-- `react-app` - React applications
-- `vue-project` - Vue.js applications
-- `django-api` - Django Python framework
-- `nodejs-api` - Generic Node.js projects
-- `api-docs` - API-focused files
+- `react-components` - Only React component files
+- `api-docs` - API endpoints and schemas
 - `docs-only` - Documentation files only
-- `minimal-js` - Essential code files
+- `minimal-js` - Essential JavaScript files
+- `full-stack` - Both frontend and backend code
 
 ## File Selection Methods
 
@@ -315,13 +326,29 @@ copytree --size-report
 
 ### Transformations
 
-```bash
-# Apply transformers (PDF to text, etc.)
-copytree --transform
+Transformers are configured in profiles, not via CLI flags. To enable transformations like PDF-to-text or image OCR, configure them in your profile:
 
-# Skip transformations
-copytree --no-transform
+```yaml
+# In your profile (e.g., .copytree/myprofile.yml)
+transformers:
+  pdf:
+    enabled: true
+    options:
+      maxPages: 50
+
+  image:
+    enabled: true
+    options:
+      extractText: true
 ```
+
+Then use the profile:
+
+```bash
+copytree --profile myprofile
+```
+
+See the [Transformer Reference](../profiles/transformer-reference.md) for all available transformers and options.
 
 ## Working with External Sources
 

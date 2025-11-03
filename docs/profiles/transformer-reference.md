@@ -2,6 +2,8 @@
 
 Transformers process files to extract, convert, or enhance their content. This reference covers all available transformers and their configuration options.
 
+> **📘 Canonical Rules**: Transformers are configured **in profiles only**. See [DDR-0001: Profiles and Transformers](../reference/decisions/ddr-0001-profiles-and-transformers.md) for authoritative configuration rules.
+
 ## Overview
 
 Transformers are applied to files during the copy process to:

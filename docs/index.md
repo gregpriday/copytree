@@ -2,42 +2,66 @@
 
 CopyTree is a powerful Node.js CLI tool that intelligently copies directory structures and file contents into AI-friendly formats. Perfect for sharing codebases with AI assistants, documentation generation, and code analysis.
 
-## 🚀 Quick Start
+> **Requirements**: Node.js 20+ | ESM only | [View on GitHub](https://github.com/gregpriday/copytree)
 
-```bash
-# Install globally
-npm install -g copytree
+## 🚀 Start Here
 
-# Copy current directory to clipboard (uses default profile)
-copytree
+**New to CopyTree?** Follow this path to get productive in 10 minutes:
 
-# Copy with a custom profile
-copytree --profile myproject
-```
+1. **[Quickstart Guide](./getting-started/quickstart.md)** - Install and run your first copy
+2. **[Create Your First Profile](./getting-started/first-profile.md)** - Customize file selection for your needs
+3. **[Basic Usage](./usage/basic-usage.md)** - Master common workflows and patterns
 
-## 📚 Documentation Sections
+## 📚 Documentation by Section
 
-### [Installation Guide](./installation/installation-guide.md)
-Complete installation instructions including prerequisites, npm setup, and configuration.
+### Getting Started
 
-### [CLI Reference](./cli/copytree-reference.md)
-Comprehensive command-line reference for all CopyTree commands and options.
+Perfect for newcomers and quick reference:
 
-### [Profile System](./profiles/profile-overview.md)
-Learn about CopyTree's powerful profile system for project-specific file selection.
+- **[Quickstart Guide](./getting-started/quickstart.md)** - Get up and running in 10 minutes
+- **[Your First Custom Profile](./getting-started/first-profile.md)** - Learn to create profiles step-by-step
+- **[Installation Guide](./installation/installation-guide.md)** - Complete installation instructions
+- **[Claude Code Integration](./installation/claude-integration.md)** - Use with Claude Code
 
-### [AI Integration](./installation/claude-integration.md)
-Set up CopyTree with Claude Code and other AI assistants for enhanced productivity.
+### User Guides
 
-### [Technical Documentation](./technical/)
-In-depth technical documentation for developers and contributors:
-- [Architecture Guide](./technical/architecture.md) - Pipeline system, stages, and core contracts
+For day-to-day usage:
+
+- **[Basic Usage](./usage/basic-usage.md)** - Common commands and workflows
+- **[Profile Overview](./profiles/profile-overview.md)** - Understanding the profile system
+- **[Profile Examples](./profiles/profile-examples.md)** - Real-world profile configurations
+- **[Troubleshooting](./usage/troubleshooting.md)** - Solve common problems
+
+### Reference
+
+Authoritative technical references:
+
+- **[Configuration Reference](./reference/configuration.md)** - Complete config system with precedence rules
+- **[CLI Reference](./cli/copytree-reference.md)** - All commands and options
+- **[Transformer Reference](./profiles/transformer-reference.md)** - PDF, OCR, and file transformers
+- **[DDR-0001: Profiles & Transformers](./reference/decisions/ddr-0001-profiles-and-transformers.md)** - Canonical behavior rules
+
+### Advanced Topics
+
+For power users:
+
+- **[Advanced Profile Features](./profiles/profile-advanced.md)** - External sources, inheritance, optimization
+- **[Profile Creation Guide](./profiles/profile-creation-guide.md)** - Comprehensive profile authoring
+- **[Secrets Guard](./usage/secrets-guard.md)** - Prevent accidental secret exposure
+
+### Developer Documentation
+
+For contributors and extenders:
+
+- **[Architecture Guide](./technical/architecture.md)** - Pipeline, stages, and event system
+- **[Testing Strategy](./technical/testing-strategy.md)** - Test infrastructure and patterns
+- **[ESM/CommonJS Compatibility](./technical/esm-commonjs-compatibility.md)** - Module system details
 
 
 ## ✨ Key Features
 
 ### 1. **Intelligent File Selection**
-- **Profile System**: Default profile included; create custom profiles for project-specific needs
+- **Profile System**: Default profile automatically used; create custom profiles for project-specific needs
 - **Git Integration**: Copy only modified or changed files
 - **Pattern Matching**: Flexible include/exclude rules
 

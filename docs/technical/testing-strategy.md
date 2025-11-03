@@ -479,7 +479,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node: [18, 20, 22]
+        node: [20, 22]  # Node.js 20+ required
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
