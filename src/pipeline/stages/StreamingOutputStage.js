@@ -222,12 +222,8 @@ class StreamingOutputStage extends Stage {
       callback(null, chunk);
     };
 
-    // End handler
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        stream.end();
-      });
-    });
+    // No closing content needed for Markdown format
+    // Files are self-contained with begin/end markers
 
     return stream;
   }
@@ -319,14 +315,12 @@ class StreamingOutputStage extends Stage {
       callback(null, xml);
     };
 
-    // Add end handler to close XML
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        stream.write('  </ct:files>\n');
-        stream.write('</ct:directory>\n');
-        stream.end();
-      });
-    });
+    // Add end handler to close XML when stream ends
+    stream._final = (callback) => {
+      stream.push('  </ct:files>\n');
+      stream.push('</ct:directory>\n');
+      callback();
+    };
 
     return stream;
   }
@@ -392,14 +386,12 @@ class StreamingOutputStage extends Stage {
       callback(null, json);
     };
 
-    // Add end handler to close JSON
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        stream.write('\n  ]\n');
-        stream.write('}\n');
-        stream.end();
-      });
-    });
+    // Add _final handler to close JSON structure
+    stream._final = (callback) => {
+      stream.push('\n  ]\n');
+      stream.push('}\n');
+      callback();
+    };
 
     return stream;
   }
@@ -423,74 +415,76 @@ class StreamingOutputStage extends Stage {
       callback();
     };
 
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        // Build and render tree
-        const lines = [];
-        lines.push(input.basePath);
-        lines.push('');
+    // Add _final handler to output the tree
+    stream._final = (callback) => {
+      // Build and render tree
+      const lines = [];
+      lines.push(input.basePath);
+      lines.push('');
 
-        const tree = this.buildTreeStructure(files);
-        this.renderTree(tree, lines, '', true);
+      const tree = this.buildTreeStructure(files);
+      this.renderTree(tree, lines, '', true);
 
-        lines.push('');
-        lines.push(`${files.length} files, ${this.formatBytes(this.calculateTotalSize(files))}`);
+      lines.push('');
+      lines.push(`${files.length} files, ${this.formatBytes(this.calculateTotalSize(files))}`);
 
-        stream.write(lines.join('\n') + '\n');
-        stream.end();
-      });
-    });
+      stream.push(lines.join('\n') + '\n');
+      callback();
+    };
 
     return stream;
   }
 
   createNDJSONStream(input) {
+    const files = input.files || [];
+    const totalSize = this.calculateTotalSize(files);
+    const profileName = input.profile?.name || 'default';
+
+    let metadataWritten = false;
+
     const stream = new Transform({
       writableObjectMode: true,
       transform: (chunk, _encoding, callback) => callback(null, chunk),
     });
 
-    let isFirst = true;
-    const files = input.files || [];
-    const totalSize = this.calculateTotalSize(files);
-    const profileName = input.profile?.name || 'default';
-
-    // Output metadata as first line
-    stream.on('pipe', () => {
-      const metadata = {
-        type: 'metadata',
-        directory: input.basePath,
-        generated: new Date().toISOString(),
-        fileCount: files.length,
-        totalSize,
-        profile: profileName,
-      };
-
-      if (input.gitMetadata) {
-        metadata.git = {
-          branch: input.gitMetadata.branch || null,
-          lastCommit: input.gitMetadata.lastCommit
-            ? {
-                hash: input.gitMetadata.lastCommit.hash,
-                message: input.gitMetadata.lastCommit.message,
-              }
-            : null,
-          filterType: input.gitMetadata.filterType || null,
-          hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
-        };
-      }
-
-      if (input.instructions) {
-        metadata.instructions = {
-          name: input.instructionsName || 'default',
-          content: input.instructions,
-        };
-      }
-
-      stream.write(JSON.stringify(metadata) + '\n');
-    });
-
     stream._transform = (file, _encoding, callback) => {
+      // Write metadata as first line if not yet written
+      if (!metadataWritten) {
+        metadataWritten = true;
+        const metadata = {
+          type: 'metadata',
+          directory: input.basePath,
+          generated: new Date().toISOString(),
+          fileCount: files.length,
+          totalSize,
+          profile: profileName,
+        };
+
+        if (input.gitMetadata) {
+          metadata.git = {
+            branch: input.gitMetadata.branch || null,
+            lastCommit: input.gitMetadata.lastCommit
+              ? {
+                  hash: input.gitMetadata.lastCommit.hash,
+                  message: input.gitMetadata.lastCommit.message,
+                }
+              : null,
+            filterType: input.gitMetadata.filterType || null,
+            hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
+          };
+        }
+
+        if (input.instructions) {
+          metadata.instructions = {
+            name: input.instructionsName || 'default',
+            content: input.instructions,
+          };
+        }
+
+        stream.push(JSON.stringify(metadata) + '\n');
+      }
+
+      // Write file record
       if (file && file !== null) {
         const record = {
           type: 'file',
@@ -518,24 +512,58 @@ class StreamingOutputStage extends Stage {
           record.content = content;
         }
 
-        stream.write(JSON.stringify(record) + '\n');
+        stream.push(JSON.stringify(record) + '\n');
       }
       callback();
     };
 
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        // Output summary as last line
-        const summary = {
-          type: 'summary',
+    // Add _final handler to output summary line
+    stream._final = (callback) => {
+      // If no files were processed, still write metadata
+      if (!metadataWritten) {
+        metadataWritten = true;
+        const metadata = {
+          type: 'metadata',
+          directory: input.basePath,
+          generated: new Date().toISOString(),
           fileCount: files.length,
           totalSize,
-          processedAt: new Date().toISOString(),
+          profile: profileName,
         };
-        stream.write(JSON.stringify(summary) + '\n');
-        stream.end();
-      });
-    });
+
+        if (input.gitMetadata) {
+          metadata.git = {
+            branch: input.gitMetadata.branch || null,
+            lastCommit: input.gitMetadata.lastCommit
+              ? {
+                  hash: input.gitMetadata.lastCommit.hash,
+                  message: input.gitMetadata.lastCommit.message,
+                }
+              : null,
+            filterType: input.gitMetadata.filterType || null,
+            hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
+          };
+        }
+
+        if (input.instructions) {
+          metadata.instructions = {
+            name: input.instructionsName || 'default',
+            content: input.instructions,
+          };
+        }
+
+        stream.push(JSON.stringify(metadata) + '\n');
+      }
+
+      const summary = {
+        type: 'summary',
+        fileCount: files.length,
+        totalSize,
+        processedAt: new Date().toISOString(),
+      };
+      stream.push(JSON.stringify(summary) + '\n');
+      callback();
+    };
 
     return stream;
   }
@@ -556,135 +584,132 @@ class StreamingOutputStage extends Stage {
       callback();
     };
 
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        const toolName = 'CopyTree';
-        const toolVersion = input.version || '0.0.0';
-        const informationUri = 'https://copytree.dev';
+    // Add _final handler to output complete SARIF document
+    stream._final = (callback) => {
+      const toolName = 'CopyTree';
+      const toolVersion = input.version || '0.0.0';
+      const informationUri = 'https://copytree.dev';
 
-        const results = files.map((file) => {
-          const totalLines =
-            typeof file.content === 'string' && !file.isBinary
-              ? file.content.split('\n').length
-              : 0;
+      const results = files.map((file) => {
+        const totalLines =
+          typeof file.content === 'string' && !file.isBinary ? file.content.split('\n').length : 0;
 
-          const result = {
-            ruleId: 'file-discovered',
-            level: 'note',
-            message: { text: `File discovered: ${file.path}` },
-            locations: [
-              {
-                physicalLocation: {
-                  artifactLocation: {
-                    uri: file.path,
-                    uriBaseId: '%SRCROOT%',
+        const result = {
+          ruleId: 'file-discovered',
+          level: 'note',
+          message: { text: `File discovered: ${file.path}` },
+          locations: [
+            {
+              physicalLocation: {
+                artifactLocation: {
+                  uri: file.path,
+                  uriBaseId: '%SRCROOT%',
+                },
+              },
+            },
+          ],
+          properties: {
+            size: file.size || 0,
+            modified: file.modified || null,
+            isBinary: !!file.isBinary,
+          },
+        };
+
+        if (totalLines > 0) {
+          result.locations[0].physicalLocation.region = {
+            startLine: 1,
+            endLine: Math.max(1, totalLines),
+          };
+        }
+
+        if (file.encoding) result.properties.encoding = file.encoding;
+        if (file.binaryCategory) result.properties.binaryCategory = file.binaryCategory;
+        if (file.gitStatus) result.properties.gitStatus = file.gitStatus;
+        if (file.truncated) {
+          result.properties.truncated = true;
+          if (file.originalLength !== undefined) {
+            result.properties.originalLength = file.originalLength;
+          }
+        }
+
+        return result;
+      });
+
+      const fileCount = files.length;
+      const skippedFiles = input.stats?.skippedFiles || 0;
+      const totalSize = this.calculateTotalSize(files);
+      const basePath = input.basePath || '';
+      const workingDirectoryUri =
+        basePath && path.isAbsolute(basePath) ? pathToFileURL(basePath).href : basePath;
+
+      const sarif = {
+        $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+        version: '2.1.0',
+        runs: [
+          {
+            tool: {
+              driver: {
+                name: toolName,
+                version: toolVersion,
+                informationUri,
+                rules: [
+                  {
+                    id: 'file-discovered',
+                    name: 'FileDiscovered',
+                    shortDescription: {
+                      text: 'A file was discovered by CopyTree.',
+                    },
+                    fullDescription: {
+                      text: 'CopyTree enumerated this file in the selected scope based on the configured profile and filters.',
+                    },
+                    helpUri: informationUri,
+                    defaultConfiguration: {
+                      level: 'note',
+                    },
+                    properties: {
+                      category: 'file-discovery',
+                      tags: ['discovery', 'enumeration'],
+                    },
                   },
+                ],
+              },
+            },
+            results,
+            invocations: [
+              {
+                executionSuccessful: true,
+                endTimeUtc: new Date().toISOString(),
+                workingDirectory: {
+                  uri: workingDirectoryUri,
                 },
               },
             ],
             properties: {
-              size: file.size || 0,
-              modified: file.modified || null,
-              isBinary: !!file.isBinary,
+              profile: input.profile?.name || 'default',
+              fileCount,
+              skippedFiles,
+              totalSize,
+              git: input.gitMetadata
+                ? {
+                    branch: input.gitMetadata.branch || null,
+                    lastCommit: input.gitMetadata.lastCommit
+                      ? {
+                          hash: input.gitMetadata.lastCommit.hash,
+                          message: input.gitMetadata.lastCommit.message,
+                        }
+                      : null,
+                    hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
+                  }
+                : null,
             },
-          };
+          },
+        ],
+      };
 
-          if (totalLines > 0) {
-            result.locations[0].physicalLocation.region = {
-              startLine: 1,
-              endLine: Math.max(1, totalLines),
-            };
-          }
-
-          if (file.encoding) result.properties.encoding = file.encoding;
-          if (file.binaryCategory) result.properties.binaryCategory = file.binaryCategory;
-          if (file.gitStatus) result.properties.gitStatus = file.gitStatus;
-          if (file.truncated) {
-            result.properties.truncated = true;
-            if (file.originalLength !== undefined) {
-              result.properties.originalLength = file.originalLength;
-            }
-          }
-
-          return result;
-        });
-
-        const fileCount = files.length;
-        const skippedFiles = input.stats?.skippedFiles || 0;
-        const totalSize = this.calculateTotalSize(files);
-        const basePath = input.basePath || '';
-        const workingDirectoryUri =
-          basePath && path.isAbsolute(basePath) ? pathToFileURL(basePath).href : basePath;
-
-        const sarif = {
-          $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-          version: '2.1.0',
-          runs: [
-            {
-              tool: {
-                driver: {
-                  name: toolName,
-                  version: toolVersion,
-                  informationUri,
-                  rules: [
-                    {
-                      id: 'file-discovered',
-                      name: 'FileDiscovered',
-                      shortDescription: {
-                        text: 'A file was discovered by CopyTree.',
-                      },
-                      fullDescription: {
-                        text: 'CopyTree enumerated this file in the selected scope based on the configured profile and filters.',
-                      },
-                      helpUri: informationUri,
-                      defaultConfiguration: {
-                        level: 'note',
-                      },
-                      properties: {
-                        category: 'file-discovery',
-                        tags: ['discovery', 'enumeration'],
-                      },
-                    },
-                  ],
-                },
-              },
-              results,
-              invocations: [
-                {
-                  executionSuccessful: true,
-                  endTimeUtc: new Date().toISOString(),
-                  workingDirectory: {
-                    uri: workingDirectoryUri,
-                  },
-                },
-              ],
-              properties: {
-                profile: input.profile?.name || 'default',
-                fileCount,
-                skippedFiles,
-                totalSize,
-                git: input.gitMetadata
-                  ? {
-                      branch: input.gitMetadata.branch || null,
-                      lastCommit: input.gitMetadata.lastCommit
-                        ? {
-                            hash: input.gitMetadata.lastCommit.hash,
-                            message: input.gitMetadata.lastCommit.message,
-                          }
-                        : null,
-                      hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
-                    }
-                  : null,
-              },
-            },
-          ],
-        };
-
-        const output = this.prettyPrint ? JSON.stringify(sarif, null, 2) : JSON.stringify(sarif);
-        stream.write(output);
-        stream.end();
-      });
-    });
+      const output = this.prettyPrint ? JSON.stringify(sarif, null, 2) : JSON.stringify(sarif);
+      stream.push(output);
+      callback();
+    };
 
     return stream;
   }

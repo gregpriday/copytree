@@ -36,6 +36,11 @@ async function copyCommand(targetPath = '.', options = {}) {
     // Reset filesystem error tracking at start
     resetFsErrors();
 
+    // When streaming, silence the logger to avoid polluting stdout
+    if (options.stream) {
+      logger.options.silent = true;
+    }
+
     // Start with initializing message
     logger.startSpinner('Initializing');
 

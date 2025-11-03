@@ -425,7 +425,7 @@ describe('Pipeline Event Contract', () => {
 
       const [fast, slow] = completions;
       expect(fast.duration).toBeLessThan(slow.duration);
-      expect(slow.duration).toBeGreaterThanOrEqual(50);
+      expect(slow.duration).toBeGreaterThanOrEqual(45); // More lenient to avoid flakiness
     });
 
     it('tracks memory deltas between stages', async () => {

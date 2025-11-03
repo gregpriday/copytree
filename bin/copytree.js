@@ -100,6 +100,19 @@ program
       }
     }
 
+    // When streaming, skip UI and run command directly
+    if (options.stream) {
+      const copyCommand = (await import('../src/commands/copy.js')).default;
+      try {
+        await copyCommand(targetPath || '.', options);
+        process.exit(0);
+      } catch (error) {
+        console.error(error.message);
+        process.exit(1);
+      }
+      return;
+    }
+
     if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
