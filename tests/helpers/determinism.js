@@ -19,13 +19,24 @@ export function normalizePaths(content, options = {}) {
   // Normalize basePath to use forward slashes for consistent matching
   const normalizedBasePath = basePath.replace(/\\/g, '/');
 
+  // Create pattern that matches both with and without Windows drive letter
+  // This handles cases where basePath might be "/a/path" but content has "D:/a/path"
+  const pathWithoutDrive = normalizedBasePath.replace(/^[A-Z]:/, '');
+  const pathPattern = normalizedBasePath.startsWith('/')
+    ? `(?:[A-Z]:)?${pathWithoutDrive.replace(/[/\\]/g, '[/\\\\]')}`
+    : normalizedBasePath.replace(/[/\\]/g, '[/\\\\]');
+
   // Replace absolute paths with placeholder
-  const absolutePattern = new RegExp(normalizedBasePath.replace(/[/\\]/g, '[/\\\\]'), 'g');
+  const absolutePattern = new RegExp(pathPattern, 'g');
   normalized = normalized.replace(absolutePattern, placeholder);
 
   // Normalize home directory
   const homeDir = os.homedir().replace(/\\/g, '/');
-  normalized = normalized.replace(new RegExp(homeDir.replace(/[/\\]/g, '[/\\\\]'), 'g'), '<HOME>');
+  const homeDirWithoutDrive = homeDir.replace(/^[A-Z]:/, '');
+  const homePattern = homeDir.startsWith('/')
+    ? `(?:[A-Z]:)?${homeDirWithoutDrive.replace(/[/\\]/g, '[/\\\\]')}`
+    : homeDir.replace(/[/\\]/g, '[/\\\\]');
+  normalized = normalized.replace(new RegExp(homePattern, 'g'), '<HOME>');
 
   return normalized;
 }
