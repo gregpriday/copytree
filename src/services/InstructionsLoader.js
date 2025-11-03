@@ -4,8 +4,23 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { logger } from '../utils/logger.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Get module directory path - works in both ESM and CommonJS (Jest) contexts
+const resolveEnv = () => {
+  try {
+    const metaUrl = import.meta.url;
+    return {
+      filename: fileURLToPath(metaUrl),
+      dirname: path.dirname(fileURLToPath(metaUrl)),
+    };
+  } catch {
+    return {
+      filename: typeof __filename !== 'undefined' ? __filename : '',
+      dirname: typeof __dirname !== 'undefined' ? __dirname : '',
+    };
+  }
+};
+
+const { filename: moduleFilename, dirname: moduleDir} = resolveEnv();
 
 /**
  * Instructions loader and manager
@@ -18,7 +33,7 @@ class InstructionsLoader {
 
     // Instructions directories (in order of priority)
     this.userDir = path.join(os.homedir(), '.copytree/instructions');
-    this.appDir = path.join(__dirname, '..', 'templates', 'instructions');
+    this.appDir = path.join(moduleDir, '..', 'templates', 'instructions');
 
     // Cache for loaded instructions
     this.instructionsCache = new Map();

@@ -52,14 +52,22 @@ describe('Filesystem Retry Integration Tests', () => {
     it('should fail permanently on ENOENT without retries', async () => {
       const nonExistentPath = path.join(os.tmpdir(), 'does-not-exist.txt');
 
+      // Track retry attempts
+      let retryCount = 0;
+      const onRetry = () => {
+        retryCount++;
+      };
+
       await expect(
         withFsRetry(() => fs.readFile(nonExistentPath, 'utf8'), {
           maxAttempts: 3,
           initialDelay: 10,
+          onRetry,
         }),
       ).rejects.toThrow();
 
-      // Should only try once for non-retryable errors
+      // ENOENT is not retryable - should fail immediately without any retries
+      expect(retryCount).toBe(0);
     });
   });
 

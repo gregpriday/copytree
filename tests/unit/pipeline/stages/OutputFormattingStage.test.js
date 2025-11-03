@@ -225,3 +225,167 @@ describe('OutputFormattingStage - Markdown', () => {
     });
   });
 });
+
+describe('OutputFormattingStage - XML', () => {
+  it('renders valid XML with files', async () => {
+    await withTempDir('xml-basic', async (tempDir) => {
+      const filePath = path.join(tempDir, 'index.js');
+      await fs.writeFile(filePath, 'console.log("test");');
+
+      const stage = new OutputFormattingStage({ format: 'xml' });
+      const result = await stage.process({
+        basePath: tempDir,
+        profile: { name: 'default' },
+        options: {},
+        files: [
+          {
+            path: 'index.js',
+            absolutePath: filePath,
+            size: 20,
+            modified: new Date(),
+            isBinary: false,
+            content: 'console.log("test");',
+          },
+        ],
+      });
+
+      const out = result.output;
+      expect(out).toContain('<?xml version="1.0" encoding="UTF-8"?>');
+      expect(out).toContain('<ct:directory');
+      expect(out).toContain('xmlns:ct="urn:copytree"');
+      expect(out).toContain('console.log("test");');
+    });
+  });
+});
+
+describe('OutputFormattingStage - JSON', () => {
+  it('renders valid JSON with files', async () => {
+    await withTempDir('json-basic', async (tempDir) => {
+      const filePath = path.join(tempDir, 'data.txt');
+      await fs.writeFile(filePath, 'sample data');
+
+      const stage = new OutputFormattingStage({ format: 'json' });
+      const result = await stage.process({
+        basePath: tempDir,
+        profile: { name: 'default' },
+        options: {},
+        files: [
+          {
+            path: 'data.txt',
+            absolutePath: filePath,
+            size: 11,
+            modified: new Date('2024-01-01'),
+            isBinary: false,
+            content: 'sample data',
+          },
+        ],
+      });
+
+      const out = result.output;
+      const parsed = JSON.parse(out);
+      expect(parsed.files).toHaveLength(1);
+      expect(parsed.files[0].path).toBe('data.txt');
+      expect(parsed.files[0].content).toBe('sample data');
+      expect(parsed.directory).toBeDefined();
+    });
+  });
+});
+
+describe('OutputFormattingStage - Tree', () => {
+  it('renders tree structure', async () => {
+    await withTempDir('tree-basic', async (tempDir) => {
+      const filePath = path.join(tempDir, 'index.js');
+      await fs.writeFile(filePath, 'code');
+
+      const stage = new OutputFormattingStage({ format: 'tree' });
+      const result = await stage.process({
+        basePath: tempDir,
+        profile: { name: 'default' },
+        options: {},
+        files: [
+          {
+            path: 'index.js',
+            absolutePath: filePath,
+            size: 4,
+            modified: new Date(),
+            isBinary: false,
+            content: 'code',
+          },
+        ],
+      });
+
+      const out = result.output;
+      expect(out).toContain('index.js');
+      // Tree format should not include file contents
+      expect(out).not.toContain('code');
+    });
+  });
+});
+
+describe('OutputFormattingStage - NDJSON', () => {
+  it('renders newline-delimited JSON', async () => {
+    await withTempDir('ndjson-basic', async (tempDir) => {
+      const filePath = path.join(tempDir, 'test.txt');
+      await fs.writeFile(filePath, 'content');
+
+      const stage = new OutputFormattingStage({ format: 'ndjson' });
+      const result = await stage.process({
+        basePath: tempDir,
+        profile: { name: 'default' },
+        options: {},
+        files: [
+          {
+            path: 'test.txt',
+            absolutePath: filePath,
+            size: 7,
+            modified: new Date(),
+            isBinary: false,
+            content: 'content',
+          },
+        ],
+      });
+
+      const out = result.output;
+      const lines = out.trim().split('\n');
+      expect(lines.length).toBeGreaterThan(0);
+
+      // Each line should be valid JSON
+      lines.forEach(line => {
+        expect(() => JSON.parse(line)).not.toThrow();
+      });
+    });
+  });
+});
+
+describe('OutputFormattingStage - SARIF', () => {
+  it('renders valid SARIF format', async () => {
+    await withTempDir('sarif-basic', async (tempDir) => {
+      const filePath = path.join(tempDir, 'app.js');
+      await fs.writeFile(filePath, 'function test() {}');
+
+      const stage = new OutputFormattingStage({ format: 'sarif' });
+      const result = await stage.process({
+        basePath: tempDir,
+        profile: { name: 'default' },
+        options: {},
+        files: [
+          {
+            path: 'app.js',
+            absolutePath: filePath,
+            size: 18,
+            modified: new Date(),
+            isBinary: false,
+            content: 'function test() {}',
+          },
+        ],
+      });
+
+      const out = result.output;
+      const parsed = JSON.parse(out);
+      expect(parsed.version).toBe('2.1.0');
+      expect(parsed.$schema).toContain('sarif-2.1.0');
+      expect(parsed.runs).toBeDefined();
+      expect(Array.isArray(parsed.runs)).toBe(true);
+    });
+  });
+});

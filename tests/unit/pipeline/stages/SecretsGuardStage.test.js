@@ -233,21 +233,46 @@ describe('SecretsGuardStage', () => {
     it('should throw SecretsDetectedError when failOnSecrets is true', async () => {
       stage.failOnSecrets = true;
 
+      const secretContent = 'AKIAIOSFODNN7EXAMPLE';  // Fake AWS key
       mockGitleaks.scanString.mockResolvedValue([
         {
           RuleID: 'aws-access-key',
           StartLine: 1,
           EndLine: 1,
           StartColumn: 1,
-          EndColumn: 10,
+          EndColumn: 20,
+          Match: secretContent,
         },
       ]);
 
       const input = {
-        files: [{ path: 'config.js', content: 'secret123', size: 100 }],
+        files: [{ path: 'config.js', content: secretContent, size: 100 }],
       };
 
-      await expect(stage.process(input)).rejects.toThrow(SecretsDetectedError);
+      try {
+        await stage.process(input);
+        fail('Expected SecretsDetectedError to be thrown');
+      } catch (error) {
+        // Verify it's the right error type
+        expect(error).toBeInstanceOf(SecretsDetectedError);
+
+        // CRITICAL: Verify the error payload doesn't contain the raw secret
+        const errorString = JSON.stringify(error);
+        const errorMessage = error.message || '';
+        const errorFindings = error.findings || [];
+
+        // Check that raw secret text is NOT in error message
+        expect(errorMessage).not.toContain(secretContent);
+
+        // Check that raw secret text is NOT in serialized error
+        expect(errorString).not.toContain(secretContent);
+
+        // If findings are included, verify they're sanitized
+        for (const finding of errorFindings) {
+          const findingString = JSON.stringify(finding);
+          expect(findingString).not.toContain(secretContent);
+        }
+      }
     });
 
     it('should respect allowlist patterns', async () => {

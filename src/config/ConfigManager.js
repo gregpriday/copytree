@@ -8,13 +8,37 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { ConfigurationError } from '../utils/errors.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
+// Get module directory path - works in both ESM and CommonJS (Jest) contexts
+// Use function to avoid top-level await and handle both ESM and CJS
+const resolveEnv = () => {
+  // Try ESM first - will fail in CJS/Jest environment
+  try {
+    // Access import.meta directly - Babel will transform this for us
+    const metaUrl = import.meta.url;
+    return {
+      dir: path.dirname(fileURLToPath(metaUrl)),
+      req: createRequire(metaUrl),
+    };
+  } catch {
+    // Fallback to CJS globals (Jest/Node CommonJS environment)
+    const fallbackDir =
+      typeof __dirname !== 'undefined'
+        ? __dirname
+        : path.dirname(__filename);
+    const fallbackReq =
+      typeof require !== 'undefined'
+        ? require
+        : createRequire(__filename);
+    return { dir: fallbackDir, req: fallbackReq };
+  }
+};
+
+const { dir: moduleDir, req: moduleRequire } = resolveEnv();
 
 class ConfigManager {
   constructor(options = {}) {
     this.config = {};
-    this.configPath = path.join(__dirname, '../../config');
+    this.configPath = path.join(moduleDir, '../../config');
     this.userConfigPath = path.join(os.homedir(), '.copytree');
 
     // Check if validation should be disabled via options or environment
@@ -142,7 +166,7 @@ class ConfigManager {
    * @param {*} defaultValue - Default value if config not found
    * @returns {*} Configuration value
    */
-  get(path, defaultValue = null) {
+  get(path, defaultValue) {
     return _.get(this.config, path, defaultValue);
   }
 
@@ -166,10 +190,10 @@ class ConfigManager {
 
   /**
    * Get all configuration
-   * @returns {Object} All configuration
+   * @returns {Object} All configuration (deep copy)
    */
   all() {
-    return this.config;
+    return _.cloneDeep(this.config);
   }
 
   /**
