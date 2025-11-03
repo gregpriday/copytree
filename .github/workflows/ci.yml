@@ -114,7 +114,12 @@ jobs:
 
       - name: Check for uncommitted golden file changes
         run: |
-          git diff --exit-code -- tests/fixtures/goldens || (echo "::error::Uncommitted golden file changes detected! Run UPDATE_GOLDEN=true npm run test:e2e and commit the changes."; exit 1)
+          if git diff --exit-code -- tests/fixtures/goldens; then
+            echo "✅ No uncommitted golden file changes"
+          else
+            echo "::error::Uncommitted golden file changes detected! Run UPDATE_GOLDEN=true npm run test:e2e and commit the changes."
+            exit 1
+          fi
 
   lint:
     name: Lint & Format Check
