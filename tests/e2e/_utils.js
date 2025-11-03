@@ -146,6 +146,10 @@ export function normalize(text, options = {}) {
   output = output.replace(/(<!--[^>]*?path=["']@[^"']*?)\\+([^"']*?["'][^>]*?-->)/g, '$1/$2');
   // SARIF format "uri": "file:///src\test.js" → "file:///src/test.js"
   output = output.replace(/("uri"\s*:\s*"[^"]*?)\\+([^"]*?")/g, '$1/$2');
+  // SARIF message text: "File discovered: src\test.js" → "File discovered: src/test.js"
+  output = output.replace(/("text"\s*:\s*"[^"]*?)\\+([^"]*?")/g, '$1/$2');
+  // SARIF workingDirectory: "file:///<PROJECT_ROOT>" → "file://<PROJECT_ROOT>"
+  output = output.replace(/"uri":\s*"file:\/\/\/(<PROJECT_ROOT>)"/g, '"uri": "file://$1"');
 
   // 8. Normalize Git-specific data
   output = normalizeGitData(output);
