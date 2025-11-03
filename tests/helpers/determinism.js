@@ -20,11 +20,12 @@ export function normalizePaths(content, options = {}) {
   const normalizedBasePath = basePath.replace(/\\/g, '/');
 
   // Create pattern that matches both with and without Windows drive letter
-  // This handles cases where basePath might be "/a/path" but content has "D:/a/path"
+  // This handles cases where basePath might be "/a/path" but content has "D:/a/path" or "D:\\a\\path" (JSON escaped)
   const pathWithoutDrive = normalizedBasePath.replace(/^[A-Z]:/, '');
+  // Match both single backslashes (XML/text) and double backslashes (JSON escaped)
   const pathPattern = normalizedBasePath.startsWith('/')
-    ? `(?:[A-Z]:)?${pathWithoutDrive.replace(/[/\\]/g, '[/\\\\]')}`
-    : normalizedBasePath.replace(/[/\\]/g, '[/\\\\]');
+    ? `(?:[A-Z]:)?${pathWithoutDrive.replace(/\//g, '(?:/|\\\\\\\\)')}`
+    : normalizedBasePath.replace(/\//g, '(?:/|\\\\\\\\)');
 
   // Replace absolute paths with placeholder
   const absolutePattern = new RegExp(pathPattern, 'g');
@@ -34,8 +35,8 @@ export function normalizePaths(content, options = {}) {
   const homeDir = os.homedir().replace(/\\/g, '/');
   const homeDirWithoutDrive = homeDir.replace(/^[A-Z]:/, '');
   const homePattern = homeDir.startsWith('/')
-    ? `(?:[A-Z]:)?${homeDirWithoutDrive.replace(/[/\\]/g, '[/\\\\]')}`
-    : homeDir.replace(/[/\\]/g, '[/\\\\]');
+    ? `(?:[A-Z]:)?${homeDirWithoutDrive.replace(/\//g, '(?:/|\\\\\\\\)')}`
+    : homeDir.replace(/\//g, '(?:/|\\\\\\\\)');
   normalized = normalized.replace(new RegExp(homePattern, 'g'), '<HOME>');
 
   return normalized;
