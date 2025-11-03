@@ -1,20 +1,12 @@
 // Use automatic mocking for logger
 jest.mock('../../../src/utils/logger.js');
 
-// Mock fs-extra methods that CacheService uses
-jest.mock('fs-extra', () => ({
-  ensureDirSync: jest.fn(),
-  pathExists: jest.fn().mockResolvedValue(false),
-  readJson: jest.fn().mockRejectedValue(new Error('File not found')),
-  remove: jest.fn().mockResolvedValue(undefined),
-  ensureDir: jest.fn().mockResolvedValue(undefined),
-  writeJson: jest.fn().mockResolvedValue(undefined),
-  readdir: jest.fn().mockResolvedValue([]),
-  stat: jest.fn().mockResolvedValue({ size: 1024, mtimeMs: Date.now() }),
-}));
+// Unmock fs-extra to test real file operations
+jest.unmock('fs-extra');
 
 import { CacheService } from '../../../src/services/CacheService.js';
 import fs from 'fs-extra';
+import path from 'path';
 import { withTempDir, settleFs } from '../../helpers/tempfs.js';
 
 describe('CacheService', () => {
@@ -186,6 +178,69 @@ describe('CacheService', () => {
 
       await memCache.set('key', 'value');
       expect(await memCache.get('key')).toBe('value');
+    });
+  });
+
+  describe('persistence (file driver)', () => {
+    test('should persist and load data across instances', async () => {
+      await withTempDir('cache-persistence', async (tempDir) => {
+        // First instance: write data
+        const cache1 = new CacheService({
+          cachePath: tempDir,
+          defaultTtl: 3600,
+          enabled: true,
+          driver: 'file',
+        });
+
+        await cache1.set('persistent-key', 'persistent-value');
+        await cache1.set('another-key', { foo: 'bar' });
+        await settleFs(50);
+
+        // Verify files were written
+        const files = await fs.readdir(tempDir);
+        expect(files.length).toBeGreaterThan(0);
+
+        // Second instance: read data (simulates restart)
+        const cache2 = new CacheService({
+          cachePath: tempDir,
+          defaultTtl: 3600,
+          enabled: true,
+          driver: 'file',
+        });
+
+        // Should read persisted data from disk
+        expect(await cache2.get('persistent-key')).toBe('persistent-value');
+        expect(await cache2.get('another-key')).toEqual({ foo: 'bar' });
+      });
+    });
+
+    test('should respect TTL after restart', async () => {
+      await withTempDir('cache-ttl-persistence', async (tempDir) => {
+        // First instance: write with short TTL
+        const cache1 = new CacheService({
+          cachePath: tempDir,
+          defaultTtl: 2, // 2 seconds
+          enabled: true,
+          driver: 'file',
+        });
+
+        await cache1.set('short-lived', 'value');
+        await settleFs(50);
+
+        // Wait for expiration
+        await new Promise(resolve => setTimeout(resolve, 2100));
+
+        // Second instance: try to read expired data
+        const cache2 = new CacheService({
+          cachePath: tempDir,
+          defaultTtl: 3600,
+          enabled: true,
+          driver: 'file',
+        });
+
+        // Should be null due to expiration
+        expect(await cache2.get('short-lived')).toBeNull();
+      });
     });
   });
 });

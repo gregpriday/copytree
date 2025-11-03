@@ -1,9 +1,7 @@
-// Global mocks setup
-// This file sets up mocks that need to be available before any modules are loaded
-
-// Mock import.meta for ESM support in Jest
-// This allows import.meta.url to work in transformed code
-global.importMeta = { url: 'file://' + __dirname + '/test.js' };
+/**
+ * Global mocks setup for the "mocked" Jest project
+ * This file contains jest.mock() calls that replace real modules with mocks
+ */
 
 // Mock ConfigManager
 jest.mock('../src/config/ConfigManager.js', () => {
@@ -171,8 +169,7 @@ jest.mock('clipboardy', () => ({
   readSync: jest.fn().mockReturnValue(''),
 }));
 
-// Mock fs-extra (comprehensive mock with all functions from centralized mock)
-// Note: Can't import external modules in jest.mock() factory, so we inline it
+// Mock fs-extra (comprehensive mock with all functions)
 jest.mock('fs-extra', () => {
   const pathExists = jest.fn().mockResolvedValue(true);
   const stat = jest.fn().mockResolvedValue({ isDirectory: () => true });

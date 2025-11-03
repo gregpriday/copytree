@@ -162,8 +162,21 @@ describe('Pipeline Event Contract', () => {
       });
 
       const stageEvents = collector.getEvents('stage:complete');
-      // Context should be accessible to stages
       expect(stageEvents.length).toBeGreaterThan(0);
+
+      // Verify context is actually included in the stage output
+      for (const event of stageEvents) {
+        expect(event).toHaveProperty('data');
+        expect(event.data).toHaveProperty('output');
+        // Context should be propagated through the pipeline
+        expect(event.data.output).toHaveProperty('context');
+        expect(event.data.output.context).toBeDefined();
+        // Verify it contains the expected config and profile
+        expect(event.data.output.context).toHaveProperty('config');
+        expect(event.data.output.context).toHaveProperty('profile');
+        expect(event.data.output.context.config).toEqual({ test: true });
+        expect(event.data.output.context.profile).toEqual({ name: 'test' });
+      }
     });
   });
 
