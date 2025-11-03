@@ -109,19 +109,17 @@ The system includes predefined traits for built-in transformers:
   tags: ['text-extraction', 'document', 'pdf']
 }
 
-// AI Summary
+// Image Transformer (OCR)
 {
-  inputTypes: ['text'],
+  inputTypes: ['binary'],
   outputTypes: ['text'],
   idempotent: true,
   heavy: true,
-  conflictsWith: ['file-summary'],
+  dependencies: ['tesseract'],
   requirements: {
-    apiKey: true,
-    network: true,
-    memory: '200MB'
+    memory: '150MB'
   },
-  tags: ['ai', 'summary', 'expensive']
+  tags: ['ocr', 'image', 'text-extraction']
 }
 ```
 
@@ -433,8 +431,8 @@ The traits system is designed for extensibility:
 - **Runtime performance monitoring** integration
 - **Custom validation rules** for specific use cases
 
-## See Also
+## Related Documentation
 
-- [TransformerRegistry API Reference](./transformer-registry-api.md)
-- [Pipeline Architecture](./pipeline-architecture.md)
-- [Custom Transformer Development](./custom-transformers.md)
+- [Transformer Reference](../profiles/transformer-reference.md) - Complete list of built-in transformers
+- [Architecture Guide](../technical/architecture.md) - Pipeline and system design
+- [Profile System](../profiles/profile-overview.md) - Configuring transformers in profiles

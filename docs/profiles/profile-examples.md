@@ -25,52 +25,50 @@ description: React application with TypeScript, tests, and modern tooling
 
 extends: default
 
-rules:
-  # Source code
-  - include: "src/**/*.{js,jsx,ts,tsx}"
-  - include: "src/**/*.css"
-  - include: "src/**/*.module.css"
-  
-  # Public assets
-  - include: "public/**/*"
-  - exclude: "public/**/*.map"
-  
-  # Tests
-  - include: "**/*.test.{js,jsx,ts,tsx}"
-  - include: "**/*.spec.{js,jsx,ts,tsx}"
-  - include: "__tests__/**/*"
-  
-  # Configuration
-  - always: "package.json"
-  - always: "package-lock.json"
-  - always: "tsconfig.json"
-  - always: "README.md"
-  - always: "config.example.js"
-  
-  # Build artifacts
-  - exclude: "build/**"
-  - exclude: "dist/**"
-  - exclude: ".cache/**"
-  
-  # Dependencies
-  - exclude: "node_modules/**"
+# Source code
+include:
+  - "src/**/*.{js,jsx,ts,tsx}"
+  - "src/**/*.css"
+  - "src/**/*.module.css"
+  - "public/**/*"
+  - "**/*.test.{js,jsx,ts,tsx}"
+  - "**/*.spec.{js,jsx,ts,tsx}"
+  - "__tests__/**/*"
+
+# Build artifacts and dependencies
+exclude:
+  - "public/**/*.map"
+  - "build/**"
+  - "dist/**"
+  - ".cache/**"
+  - "node_modules/**"
+
+# Configuration files
+always:
+  - "package.json"
+  - "package-lock.json"
+  - "tsconfig.json"
+  - "README.md"
+  - "config.example.js"
 
 options:
   respectGitignore: true
   maxFileSize: 2097152  # 2MB
-  
+
 transformers:
-  # Optimize images
+  # Extract text from images
   image:
     enabled: true
     options:
-      quality: 80
-  
-  # Process CSS
-  css:
+      enableOCR: true
+      language: eng
+      includeMetadata: true
+
+  # Process markdown files
+  markdown:
     enabled: true
     options:
-      minify: false
+      mode: strip
 ```
 
 ## Node.js Backend with TypeScript
@@ -83,43 +81,41 @@ description: Node.js backend service with TypeScript
 
 extends: default
 
-rules:
-  # Source code
-  - include: "src/**/*.{js,ts}"
-  - exclude: "src/**/*.test.{js,ts}"
-  - exclude: "src/**/*.spec.{js,ts}"
-  
-  # Database
-  - include: "migrations/**/*.{js,ts}"
-  - include: "seeds/**/*.{js,ts}"
-  - include: "prisma/**/*.prisma"
-  
-  # API Documentation
-  - include: "docs/api/**/*.{md,yaml,json}"
-  - include: "**/swagger.{yaml,json}"
-  
-  # Scripts
-  - include: "scripts/**/*.{js,ts,sh}"
-  
-  # Configuration
-  - always: "package.json"
-  - always: "tsconfig.json"
-  - always: "ecosystem.config.js"
-  - always: "config.example.js"
-  - always: "docker-compose.yml"
-  
-  # Exclude
-  - exclude: "dist/**"
-  - exclude: "coverage/**"
-  - exclude: "logs/**"
-  - exclude: ".tmp/**"
+include:
+  - "src/**/*.{js,ts}"
+  - "migrations/**/*.{js,ts}"
+  - "seeds/**/*.{js,ts}"
+  - "prisma/**/*.prisma"
+  - "docs/api/**/*.{md,yaml,json}"
+  - "**/swagger.{yaml,json}"
+  - "scripts/**/*.{js,ts,sh}"
+
+exclude:
+  - "src/**/*.test.{js,ts}"
+  - "src/**/*.spec.{js,ts}"
+  - "dist/**"
+  - "coverage/**"
+  - "logs/**"
+  - ".tmp/**"
+
+always:
+  - "package.json"
+  - "tsconfig.json"
+  - "ecosystem.config.js"
+  - "config.example.js"
+  - "docker-compose.yml"
+
+options:
+  respectGitignore: true
+  maxFileSize: 2097152  # 2MB
 
 transformers:
-  # Preview large files
-  first-lines:
+  file-loader:
+    enabled: true
+  markdown:
     enabled: true
     options:
-      lineCount: 50
+      mode: strip
 ```
 
 ## Documentation Website
@@ -128,54 +124,55 @@ Documentation-focused profile for technical writing projects.
 
 ```yaml
 name: docs-site
-description: Documentation website with MDX support
+description: Documentation website with markdown and images
 
-rules:
-  # Documentation
-  - include: "**/*.{md,mdx}"
-  - include: "docs/**/*"
-  - include: "content/**/*"
-  
-  # Examples
-  - include: "examples/**/*.{js,jsx,ts,tsx}"
-  - include: "snippets/**/*"
-  
-  # Images and assets
-  - include: "**/*.{png,jpg,jpeg,svg,gif}"
-  - include: "static/**/*"
-  - include: "public/**/*"
-  
-  # Configuration
-  - always: "docusaurus.config.js"
-  - always: "mkdocs.yml"
-  - always: "gatsby-config.js"
-  - always: "_config.yml"
-  - always: "package.json"
-  
-  # Exclude
-  - exclude: ".docusaurus/**"
-  - exclude: "_site/**"
-  - exclude: ".cache/**"
-  - exclude: "node_modules/**"
+include:
+  - "**/*.{md,mdx}"
+  - "docs/**/*"
+  - "content/**/*"
+  - "examples/**/*.{js,jsx,ts,tsx}"
+  - "snippets/**/*"
+  - "**/*.{png,jpg,jpeg,svg,gif}"
+  - "static/**/*"
+  - "public/**/*"
+
+exclude:
+  - ".docusaurus/**"
+  - "_site/**"
+  - ".cache/**"
+  - "node_modules/**"
+
+always:
+  - "docusaurus.config.js"
+  - "mkdocs.yml"
+  - "gatsby-config.js"
+  - "_config.yml"
+  - "package.json"
+
+options:
+  respectGitignore: true
+  maxFileSize: 5242880  # 5MB for images
 
 transformers:
-  # Convert MDX to standard markdown
-  mdx:
-    enabled: true
-    options:
-      stripJsx: true
-  
-  # Optimize images
+  # Extract text from images
   image:
     enabled: true
     options:
-      description: true
-      
-  # Extract code from markdown
+      enableOCR: true
+      language: eng
+      includeMetadata: true
+
+  # Process markdown files
   markdown:
     enabled: true
     options:
-      extractCode: true
+      mode: strip
+
+  # Extract text from PDFs
+  pdf:
+    enabled: true
+    options:
+      maxPages: 100
 ```
 
 ## Express REST API
@@ -188,50 +185,44 @@ description: Express REST API with authentication and database
 
 extends: default
 
-rules:
-  # API code
-  - include: "routes/**/*.js"
-  - include: "controllers/**/*.js"
-  - include: "middleware/**/*.js"
-  - include: "models/**/*.js"
-  - include: "services/**/*.js"
-  - include: "utils/**/*.js"
-  
-  # Database
-  - include: "migrations/**/*.js"
-  - include: "seeders/**/*.js"
-  - include: "config/database.js"
-  
-  # API Documentation
-  - include: "**/*.swagger.{yaml,json}"
-  - include: "api-docs/**/*"
-  
-  # Tests
-  - include: "test/**/*.js"
-  - include: "**/*.test.js"
-  
-  # Configuration
-  - always: "app.js"
-  - always: "server.js"
-  - always: "package.json"
-  - always: "config.example.js"
-  - always: "nodemon.json"
-  
-  # Exclude
-  - exclude: "uploads/**"
-  - exclude: "temp/**"
-  - exclude: "logs/**"
+include:
+  - "routes/**/*.js"
+  - "controllers/**/*.js"
+  - "middleware/**/*.js"
+  - "models/**/*.js"
+  - "services/**/*.js"
+  - "utils/**/*.js"
+  - "migrations/**/*.js"
+  - "seeders/**/*.js"
+  - "config/database.js"
+  - "**/*.swagger.{yaml,json}"
+  - "api-docs/**/*"
+  - "test/**/*.js"
+  - "**/*.test.js"
+
+exclude:
+  - "uploads/**"
+  - "temp/**"
+  - "logs/**"
+
+always:
+  - "app.js"
+  - "server.js"
+  - "package.json"
+  - "config.example.js"
+  - "nodemon.json"
 
 options:
+  respectGitignore: true
   maxFileSize: 1048576  # 1MB
-  
+
 transformers:
-  # Summarize route files
-  route-summary:
+  file-loader:
     enabled: true
-    pattern: "routes/**/*.js"
+  csv:
+    enabled: true
     options:
-      extractEndpoints: true
+      maxRows: 20
 ```
 
 ## Component Library
@@ -244,49 +235,43 @@ description: React component library with Storybook
 
 extends: default
 
-rules:
-  # Components
-  - include: "src/components/**/*.{jsx,tsx}"
-  - include: "src/components/**/*.{css,scss}"
-  - include: "src/components/**/*.stories.{js,jsx,ts,tsx}"
-  - include: "src/components/**/*.test.{js,jsx,ts,tsx}"
-  
-  # Utilities and hooks
-  - include: "src/hooks/**/*.{js,ts}"
-  - include: "src/utils/**/*.{js,ts}"
-  - include: "src/themes/**/*"
-  
-  # Documentation
-  - include: "**/*.mdx"
-  - include: "docs/**/*"
-  - include: ".storybook/**/*"
-  
-  # Build output
-  - include: "dist/index.d.ts"  # Type definitions
-  
-  # Examples
-  - include: "examples/**/*"
-  
-  # Configuration
-  - always: "package.json"
-  - always: "tsconfig.json"
-  - always: "rollup.config.js"
-  - always: "webpack.config.js"
-  - always: ".babelrc"
-  
-  # Exclude
-  - exclude: "dist/**"
-  - exclude: "storybook-static/**"
-  - exclude: "coverage/**"
+include:
+  - "src/components/**/*.{jsx,tsx}"
+  - "src/components/**/*.{css,scss}"
+  - "src/components/**/*.stories.{js,jsx,ts,tsx}"
+  - "src/components/**/*.test.{js,jsx,ts,tsx}"
+  - "src/hooks/**/*.{js,ts}"
+  - "src/utils/**/*.{js,ts}"
+  - "src/themes/**/*"
+  - "**/*.mdx"
+  - "docs/**/*"
+  - ".storybook/**/*"
+  - "dist/index.d.ts"  # Type definitions
+  - "examples/**/*"
+
+exclude:
+  - "dist/**"
+  - "storybook-static/**"
+  - "coverage/**"
+
+always:
+  - "package.json"
+  - "tsconfig.json"
+  - "rollup.config.js"
+  - "webpack.config.js"
+  - ".babelrc"
+
+options:
+  respectGitignore: true
+  maxFileSize: 2097152  # 2MB
 
 transformers:
-  # Extract component props
-  component-docs:
+  file-loader:
     enabled: true
-    pattern: "**/*.tsx"
+  markdown:
+    enabled: true
     options:
-      extractProps: true
-      extractExamples: true
+      mode: strip
 ```
 
 ## Monorepo Project
@@ -299,48 +284,43 @@ description: Monorepo with multiple packages
 
 extends: default
 
-rules:
-  # Package sources
-  - include: "packages/*/src/**/*.{js,ts,jsx,tsx}"
-  - include: "packages/*/lib/**/*.{js,ts}"
-  
-  # Package configs
-  - include: "packages/*/package.json"
-  - include: "packages/*/tsconfig.json"
-  - include: "packages/*/README.md"
-  
-  # Shared code
-  - include: "shared/**/*.{js,ts}"
-  - include: "common/**/*.{js,ts}"
-  
-  # Apps
-  - include: "apps/*/src/**/*.{js,ts,jsx,tsx}"
-  - include: "apps/*/package.json"
-  
-  # Root configuration
-  - always: "package.json"
-  - always: "lerna.json"
-  - always: "nx.json"
-  - always: "pnpm-workspace.yaml"
-  - always: "yarn.lock"
-  - always: "tsconfig.base.json"
-  
-  # Exclude all node_modules
-  - exclude: "**/node_modules/**"
-  - exclude: "**/dist/**"
-  - exclude: "**/build/**"
-  - exclude: "**/.turbo/**"
+include:
+  - "packages/*/src/**/*.{js,ts,jsx,tsx}"
+  - "packages/*/lib/**/*.{js,ts}"
+  - "packages/*/package.json"
+  - "packages/*/tsconfig.json"
+  - "packages/*/README.md"
+  - "shared/**/*.{js,ts}"
+  - "common/**/*.{js,ts}"
+  - "apps/*/src/**/*.{js,ts,jsx,tsx}"
+  - "apps/*/package.json"
+
+exclude:
+  - "**/node_modules/**"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/.turbo/**"
+
+always:
+  - "package.json"
+  - "lerna.json"
+  - "nx.json"
+  - "pnpm-workspace.yaml"
+  - "yarn.lock"
+  - "tsconfig.base.json"
 
 options:
   respectGitignore: true
   followSymlinks: true  # For linked packages
-  
-external:
-  # Include related repos
-  - source: https://github.com/org/shared-types
-    destination: external/types
-    rules:
-      - include: "src/**/*.ts"
+  maxFileSize: 2097152  # 2MB
+
+transformers:
+  file-loader:
+    enabled: true
+  markdown:
+    enabled: true
+    options:
+      mode: strip
 ```
 
 ## Microservices Architecture
@@ -351,48 +331,43 @@ Multiple services with Docker configuration.
 name: microservices
 description: Microservices architecture with Docker
 
-rules:
-  # Service code
-  - include: "services/*/src/**/*.{js,ts}"
-  - include: "services/*/package.json"
-  - include: "services/*/Dockerfile"
-  - include: "services/*/config.example.js"
-  
-  # API Gateway
-  - include: "gateway/**/*.{js,ts}"
-  - include: "gateway/nginx.conf"
-  
-  # Shared libraries
-  - include: "libs/**/*.{js,ts}"
-  
-  # Infrastructure
-  - include: "docker-compose*.yml"
-  - include: "k8s/**/*.{yaml,yml}"
-  - include: ".github/workflows/**/*.yml"
-  
-  # Documentation
-  - include: "docs/**/*.md"
-  - include: "services/*/README.md"
-  - include: "services/*/api.yaml"
-  
-  # Scripts
-  - include: "scripts/**/*.{sh,js}"
-  
-  # Root files
-  - always: "Makefile"
-  - always: "config.example.js"
-  - always: "README.md"
-  
-  # Exclude
-  - exclude: "**/node_modules/**"
-  - exclude: "**/logs/**"
-  - exclude: "**/.cache/**"
+include:
+  - "services/*/src/**/*.{js,ts}"
+  - "services/*/package.json"
+  - "services/*/Dockerfile"
+  - "services/*/config.example.js"
+  - "gateway/**/*.{js,ts}"
+  - "gateway/nginx.conf"
+  - "libs/**/*.{js,ts}"
+  - "docker-compose*.yml"
+  - "k8s/**/*.{yaml,yml}"
+  - ".github/workflows/**/*.yml"
+  - "docs/**/*.md"
+  - "services/*/README.md"
+  - "services/*/api.yaml"
+  - "scripts/**/*.{sh,js}"
+
+exclude:
+  - "**/node_modules/**"
+  - "**/logs/**"
+  - "**/.cache/**"
+
+always:
+  - "Makefile"
+  - "config.example.js"
+  - "README.md"
+
+options:
+  respectGitignore: true
+  maxFileSize: 2097152  # 2MB
 
 transformers:
-  # Summarize service endpoints
-  service-summary:
+  file-loader:
     enabled: true
-    pattern: "services/*/src/routes/**/*.js"
+  markdown:
+    enabled: true
+    options:
+      mode: strip
 ```
 
 ## Open Source Project
@@ -405,47 +380,47 @@ description: Open source project with comprehensive docs
 
 extends: default
 
-rules:
-  # Source code
-  - include: "src/**/*.{js,ts,jsx,tsx}"
-  - include: "lib/**/*.{js,ts}"
-  
-  # Examples
-  - include: "examples/**/*"
-  - exclude: "examples/**/node_modules/**"
-  - exclude: "examples/**/dist/**"
-  
-  # Documentation
-  - include: "**/*.md"
-  - include: "docs/**/*"
-  - include: ".github/**/*.md"
-  
-  # Tests
-  - include: "test/**/*"
-  - include: "**/*.test.{js,ts}"
-  - include: "**/*.spec.{js,ts}"
-  
-  # CI/CD
-  - include: ".github/workflows/**/*"
-  - include: ".circleci/**/*"
-  - include: ".travis.yml"
-  
-  # Important files
-  - always: "package.json"
-  - always: "LICENSE"
-  - always: "CONTRIBUTING.md"
-  - always: "CODE_OF_CONDUCT.md"
-  - always: "CHANGELOG.md"
-  - always: ".npmignore"
-  
-  # Exclude
-  - exclude: "coverage/**"
-  - exclude: ".nyc_output/**"
-  - exclude: "dist/**"
+include:
+  - "src/**/*.{js,ts,jsx,tsx}"
+  - "lib/**/*.{js,ts}"
+  - "examples/**/*"
+  - "**/*.md"
+  - "docs/**/*"
+  - ".github/**/*.md"
+  - "test/**/*"
+  - "**/*.test.{js,ts}"
+  - "**/*.spec.{js,ts}"
+  - ".github/workflows/**/*"
+  - ".circleci/**/*"
+  - ".travis.yml"
+
+exclude:
+  - "examples/**/node_modules/**"
+  - "examples/**/dist/**"
+  - "coverage/**"
+  - ".nyc_output/**"
+  - "dist/**"
+
+always:
+  - "package.json"
+  - "LICENSE"
+  - "CONTRIBUTING.md"
+  - "CODE_OF_CONDUCT.md"
+  - "CHANGELOG.md"
+  - ".npmignore"
 
 options:
   includeHidden: false
   respectGitignore: true
+  maxFileSize: 2097152  # 2MB
+
+transformers:
+  file-loader:
+    enabled: true
+  markdown:
+    enabled: true
+    options:
+      mode: strip
 ```
 
 ## Development vs Production
@@ -460,27 +435,44 @@ description: Development environment with tests and docs
 
 extends: default
 
-rules:
-  # Everything for development
-  - include: "src/**/*"
-  - include: "test/**/*"
-  - include: "docs/**/*"
-  - include: "examples/**/*"
-  - include: "scripts/**/*"
-  
-  # Config files
-  - include: "*.config.js"
-  - include: ".*rc*"
-  - include: ".env.development"
-  
-  # Exclude production
-  - exclude: "dist/**"
-  - exclude: "build/**"
-  
+include:
+  - "src/**/*"
+  - "test/**/*"
+  - "docs/**/*"
+  - "examples/**/*"
+  - "scripts/**/*"
+  - "*.config.js"
+  - ".*rc*"
+  - ".env.development"
+
+exclude:
+  - "dist/**"
+  - "build/**"
+
+options:
+  respectGitignore: true
+  maxFileSize: 10485760  # 10MB
+
 transformers:
-  # Include all transformers
-  all:
+  file-loader:
     enabled: true
+  markdown:
+    enabled: true
+    options:
+      mode: strip
+  csv:
+    enabled: true
+    options:
+      maxRows: 20
+  pdf:
+    enabled: true
+    options:
+      maxPages: 50
+  image:
+    enabled: true
+    options:
+      enableOCR: true
+      language: eng
 ```
 
 ### Production Profile
@@ -491,33 +483,32 @@ description: Production-ready files only
 
 extends: default
 
-rules:
-  # Only source code
-  - include: "src/**/*.{js,ts}"
-  - exclude: "**/*.test.{js,ts}"
-  - exclude: "**/*.spec.{js,ts}"
-  - exclude: "**/*.stories.{js,ts}"
-  
-  # No examples or docs
-  - exclude: "examples/**"
-  - exclude: "docs/**"
-  
-  # Production configs only
-  - always: "package.json"
-  - always: "package-lock.json"
-  - always: ".env.production"
-  
-  # Exclude dev files
-  - exclude: "**/*.map"
-  - exclude: ".env.development"
-  - exclude: "nodemon.json"
+include:
+  - "src/**/*.{js,ts}"
+
+exclude:
+  - "**/*.test.{js,ts}"
+  - "**/*.spec.{js,ts}"
+  - "**/*.stories.{js,ts}"
+  - "examples/**"
+  - "docs/**"
+  - "**/*.map"
+  - ".env.development"
+  - "nodemon.json"
+
+always:
+  - "package.json"
+  - "package-lock.json"
+  - ".env.production"
 
 options:
+  respectGitignore: true
   maxFileSize: 524288  # 512KB - smaller for production
-  
+
 transformers:
-  # Minimal transformers
-  minimal:
+  file-loader:
+    enabled: true
+  binary:
     enabled: true
 ```
 
@@ -531,50 +522,45 @@ description: Custom project profile with our conventions
 
 extends: default  # Start with default profile
 
-rules:
-  # Next.js specific
-  - include: "pages/**/*.{js,jsx,ts,tsx}"
-  - include: "app/**/*.{js,jsx,ts,tsx}"
-  - include: "components/**/*.{js,jsx,ts,tsx}"
-  - include: "styles/**/*.{css,scss}"
-  - include: "public/**/*"
-  
-  # API routes
-  - include: "pages/api/**/*.{js,ts}"
-  - include: "app/api/**/*.{js,ts}"
-  
-  # Our conventions
-  - include: "src/features/**/*"
-  - include: "src/hooks/**/*.{js,ts}"
-  - include: "src/services/**/*.{js,ts}"
-  
-  # Config files
-  - always: "next.config.js"
-  - always: "next-env.d.ts"
-  - always: ".env.local.example"
-  
-  # Exclude Next.js build
-  - exclude: ".next/**"
-  - exclude: "out/**"
-  
-  # Our specific excludes
-  - exclude: "**/*.generated.{js,ts}"
-  - exclude: "**/temp/**"
+include:
+  - "pages/**/*.{js,jsx,ts,tsx}"
+  - "app/**/*.{js,jsx,ts,tsx}"
+  - "components/**/*.{js,jsx,ts,tsx}"
+  - "styles/**/*.{css,scss}"
+  - "public/**/*"
+  - "pages/api/**/*.{js,ts}"
+  - "app/api/**/*.{js,ts}"
+  - "src/features/**/*"
+  - "src/hooks/**/*.{js,ts}"
+  - "src/services/**/*.{js,ts}"
 
-# Add our external design system
-external:
-  - source: https://github.com/company/design-system
-    destination: external/design
-    rules:
-      - include: "packages/react/src/**/*.{jsx,tsx}"
+exclude:
+  - ".next/**"
+  - "out/**"
+  - "**/*.generated.{js,ts}"
+  - "**/temp/**"
+
+always:
+  - "next.config.js"
+  - "next-env.d.ts"
+  - ".env.local.example"
+
+options:
+  respectGitignore: true
+  maxFileSize: 2097152  # 2MB
 
 transformers:
-  # Custom transformer config
-  our-summarizer:
+  file-loader:
     enabled: true
-    pattern: "src/features/**/*.{jsx,tsx}"
+  markdown:
+    enabled: true
     options:
-      style: "component-doc"
+      mode: strip
+  image:
+    enabled: true
+    options:
+      enableOCR: true
+      language: eng
 ```
 
 ## Tips for Creating Profiles
@@ -586,22 +572,24 @@ transformers:
 extends: default
 
 # Add your customizations
-rules:
-  - include: "src/custom/**"
+include:
+  - "src/custom/**"
 ```
 
 ### 2. Use Comments
 
 ```yaml
-rules:
-  # Core application code
-  - include: "src/**/*.js"
-  
-  # Legacy code - exclude for now
-  - exclude: "src/legacy/**"
-  
-  # But we need this one legacy file
-  - always: "src/legacy/critical.js"
+# Core application code
+include:
+  - "src/**/*.js"
+
+# Legacy code - exclude for now
+exclude:
+  - "src/legacy/**"
+
+# But we need this one legacy file
+always:
+  - "src/legacy/critical.js"
 ```
 
 ### 3. Test Incrementally
@@ -628,16 +616,22 @@ options:
   maxFileSize: 1048576   # 1MB
 ```
 
-### 5. Use External Sources Wisely
+### 5. Document Your Choices
 
 ```yaml
-external:
-  # Always mark optional for external deps
-  - source: https://github.com/may/not-exist
-    optional: true
-    
-  # Use specific branches/tags
-  - source: https://github.com/stable/lib/tree/v1.2.3
+# Document why you made specific choices
+name: my-project
+description: Explain what this profile is for
+
+# Be explicit about what's included
+include:
+  - "src/**/*"  # All source code
+  - "docs/**/*"  # Documentation
+
+# Be specific with exclusions
+exclude:
+  - "**/*.generated.*"  # Auto-generated files change frequently
+  - "temp/**"  # Temporary working directory
 ```
 
 ## Next Steps

@@ -368,7 +368,7 @@ All CLI commands should have comprehensive tests covering:
 - All output formats (XML, JSON, Markdown, Tree)
 - Profile application
 - Include/exclude patterns
-- Git filters (--git-modified, --git-branch)
+- Git filters (--modified, --changed <ref>)
 - Transformer pipeline
 - Streaming output
 - Character limits
@@ -479,7 +479,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node: [18, 20, 22]
+        node: [20, 22]  # Node.js 20+ required
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:

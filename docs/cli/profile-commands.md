@@ -78,7 +78,7 @@ Details:
 - Rules: 5 include, 3 exclude
 - Transformers: 2 configured
 - External sources: 1 configured
-- Parent profile: laravel (valid)
+- Parent profile: default (valid)
 ```
 
 ### Example Error Output

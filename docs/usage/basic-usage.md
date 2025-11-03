@@ -33,20 +33,35 @@ copytree --display
 
 ## Understanding Profiles
 
-Profiles are the heart of CopyTree's intelligent file selection. All profiles must be custom-created.
+Profiles are the heart of CopyTree's intelligent file selection. CopyTree includes a default profile that works for most projects, or you can create custom profiles for specific needs.
 
-### Custom Profile Required
+### Profile Selection
 
-CopyTree requires a custom profile to be specified:
+CopyTree uses the following profile selection order:
+
+1. If `--profile` flag is provided → use the specified profile
+2. Else → use the built-in default profile automatically
 
 ```bash
-# Custom profile required
+# Use default profile (automatic)
+copytree
+
+# Explicitly specify default profile
+copytree --profile default
+
+# Use a custom profile
 copytree --profile mycustom
 ```
 
-### Using Custom Profiles
+The default profile provides sensible exclusions for common build artifacts, dependencies, and IDE files while including all source code and documentation.
 
-Specify your custom profile:
+### When to Use Custom Profiles
+
+Create custom profiles when you need to:
+- Focus on specific file types or directories
+- Apply transformers to certain files
+- Include files from external sources
+- Override default exclusion rules
 
 ```bash
 # Use custom React profile
@@ -55,21 +70,17 @@ copytree --profile my-react
 # Use custom API profile
 copytree --profile api-docs
 
-# See all available custom profiles
+# See all available profiles
 copytree profile:list
 ```
 
-### Example Custom Profiles
+### Example Custom Profile Use Cases
 
-Create custom profiles such as:
-- `my-laravel` - Laravel PHP framework setup
-- `react-app` - React applications
-- `vue-project` - Vue.js applications
-- `django-api` - Django Python framework
-- `nodejs-api` - Generic Node.js projects
-- `api-docs` - API-focused files
+- `react-components` - Only React component files
+- `api-docs` - API endpoints and schemas
 - `docs-only` - Documentation files only
-- `minimal-js` - Essential code files
+- `minimal-js` - Essential JavaScript files
+- `full-stack` - Both frontend and backend code
 
 ## File Selection Methods
 
@@ -97,10 +108,10 @@ Select files based on Git status:
 copytree --modified
 
 # Files changed between commits
-copytree --changes main..feature-branch
+copytree --changed main..feature-branch
 
 # Files changed in last 5 commits
-copytree --changes HEAD~5..HEAD
+copytree --changed HEAD~5..HEAD
 ```
 
 ## Output Options
@@ -242,8 +253,8 @@ Produces XML metadata and files; useful when integrating with XML-based tooling.
 # Copy project for AI analysis
 copytree --profile my-react
 
-# Copy with transformations
-copytree --profile my-react --transform
+# Copy with transformations (configured in profile)
+copytree --profile my-react
 ```
 
 ### 2. Code Review Preparation
@@ -253,10 +264,10 @@ copytree --profile my-react --transform
 copytree --modified
 
 # Copy feature branch changes
-copytree --changes main..feature/new-feature
+copytree --changed main..feature/new-feature
 
 # Include git status
-copytree --git-status
+copytree --with-git-status
 ```
 
 ### 3. Documentation Generation
@@ -266,7 +277,7 @@ copytree --git-status
 copytree --profile docs-only
 
 # Copy with file info
-copytree --profile mycustom --file-size --line-numbers
+copytree --profile mycustom --show-size --with-line-numbers
 
 # Tree structure only
 copytree --profile mycustom --only-tree
@@ -276,7 +287,7 @@ copytree --profile mycustom --only-tree
 
 ```bash
 # Copy with line numbers
-copytree --line-numbers
+copytree --with-line-numbers
 
 # Dry run to see what would be copied
 copytree --dry-run
@@ -287,41 +298,54 @@ copytree --dry-run
 ### Content Limiting
 
 ```bash
-# Limit directory depth
-copytree --depth 3
-
-# Limit lines per file
-copytree --max-lines 100
-
 # Limit characters per file
-copytree --max-characters 5000
+copytree --char-limit 5000
+
+# Limit to first N files
+copytree --head 50
 ```
 
 ### File Information
 
 ```bash
 # Include line numbers
-copytree --line-numbers
+copytree --with-line-numbers
 
 # Include file sizes
-copytree --file-size
+copytree --show-size
 
 # Include git status
-copytree --git-status
+copytree --with-git-status
 
-# Size report
-copytree --size-report
+# Show file info table
+copytree --info
 ```
 
 ### Transformations
 
-```bash
-# Apply transformers (PDF to text, etc.)
-copytree --transform
+Transformers are configured in profiles, not via CLI flags. To enable transformations like PDF-to-text or image OCR, configure them in your profile:
 
-# Skip transformations
-copytree --no-transform
+```yaml
+# In your profile (e.g., .copytree/myprofile.yml)
+transformers:
+  pdf:
+    enabled: true
+    options:
+      maxPages: 50
+
+  image:
+    enabled: true
+    options:
+      extractText: true
 ```
+
+Then use the profile:
+
+```bash
+copytree --profile myprofile
+```
+
+See the [Transformer Reference](../profiles/transformer-reference.md) for all available transformers and options.
 
 ## Working with External Sources
 
@@ -348,7 +372,8 @@ external:
   - source: https://github.com/org/docs
     destination: docs/external
     rules:
-      - include: "*.md"
+      - "*.md"
+      - "**/*.md"
 ```
 
 ## Performance Tips
@@ -369,16 +394,13 @@ copytree --profile full
 # Focus on specific directories
 copytree src/ --profile react
 
-# Use depth limits
-copytree --depth 3
+# Limit number of files
+copytree --head 100
 ```
 
 ### 3. Skip Unnecessary Processing
 
 ```bash
-# Skip transformations for speed
-copytree --no-transform
-
 # Skip cache for fresh results
 copytree --no-cache
 ```
@@ -398,14 +420,11 @@ copytree --validate --profile myprofile
 ### Debug Issues
 
 ```bash
-# Enable debug output
-copytree --debug
-
-# Verbose output
-copytree --verbose
-
 # Check configuration
 copytree config:validate
+
+# Inspect configuration with provenance
+copytree config:inspect
 ```
 
 ### Common Issues
@@ -413,7 +432,7 @@ copytree config:validate
 1. **Nothing copied**: Check if files match profile rules
 2. **Too many files**: Use more specific profile or filters
 3. **Missing files**: Check .copytreeignore and gitignore
-4. **Slow performance**: Limit scope or skip transformations
+4. **Slow performance**: Limit scope with `--head` or disable cache with `--no-cache`
 
 ## Next Steps
 

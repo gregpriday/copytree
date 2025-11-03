@@ -2,6 +2,8 @@
 
 Transformers process files to extract, convert, or enhance their content. This reference covers all available transformers and their configuration options.
 
+> **📘 Note**: Transformers are configured **in profiles only**, not via CLI flags.
+
 ## Overview
 
 Transformers are applied to files during the copy process to:
@@ -13,6 +15,8 @@ Transformers are applied to files during the copy process to:
 
 ## Enabling Transformers
 
+Transformers are configured in profiles only. There are no CLI flags to enable or disable transformers.
+
 ### In Profiles
 
 ```yaml
@@ -21,21 +25,17 @@ transformers:
     enabled: true
     options:
       maxPages: 20
-      
+
   markdown:
     enabled: true
     options:
       mode: strip
 ```
 
-### Command Line
+Then use the profile:
 
 ```bash
-# Enable all transformers
-copytree --transform
-
-# Disable transformers
-copytree --no-transform
+copytree --profile myprofile
 ```
 
 ## Available Transformers
@@ -107,8 +107,9 @@ transformers:
   image:
     enabled: true
     options:
-      extractText: true  # Enable OCR
-      language: eng     # OCR language
+      enableOCR: true        # Enable OCR
+      language: eng          # OCR language
+      includeMetadata: true  # Include image metadata
 ```
 
 **Use Cases**:
@@ -252,59 +253,29 @@ transformers:
       preserveText: true  # Keep link text
 ```
 
-### 10. File Summary
+### 10. Streaming File Loader
 
-Creates basic summaries of files without AI.
+Streams large files (>10MB) for memory-efficient processing.
 
-**Name**: `file-summary`
-
-**Options**:
-```yaml
-transformers:
-  file-summary:
-    enabled: true
-    options:
-      includeStats: true  # File statistics
-```
-
-### 11. SVG Description
-
-Generates descriptions of SVG graphics.
-
-**Name**: `svg-description`
+**Name**: `streaming-file-loader`
 
 **Options**:
 ```yaml
 transformers:
-  svg-description:
+  streaming-file-loader:
     enabled: true
     options:
-      extractText: true  # Extract text elements
+      chunkSize: 1048576  # Chunk size in bytes (default: 1MB)
 ```
 
-### 12. Unit Test Summary
+**Use Cases**:
+- Large log files
+- Large text files
+- Memory-constrained environments
 
-Analyzes and summarizes unit test files.
+**Note**: Automatically used for files exceeding the configured file size threshold.
 
-**Name**: `unit-test-summary`
-
-**Options**:
-```yaml
-transformers:
-  unit-test-summary:
-    enabled: true
-    options:
-      extractTestNames: true
-      countAssertions: true
-```
-
-**Features**:
-- Extracts test names
-- Counts test cases
-- Identifies test frameworks
-- Summarizes coverage
-
-### 13. Binary Handler
+### 11. Binary Handler
 
 Handles binary files with configurable behavior.
 
@@ -359,7 +330,7 @@ rules:
   - include: "screenshots/**/*.png"
     transform: image
     transform_options:
-      extractText: true
+      enableOCR: true
 
   - include: "src/**/*.md"
     transform: markdown
@@ -380,7 +351,7 @@ transformers:
   image:
     enabled: true
     options:
-      extractText: true
+      enableOCR: true
 
   first-lines:
     enabled: true
@@ -429,11 +400,11 @@ transformers:
 ### 3. Test Transformer Output
 
 ```bash
-# Test specific transformer
-copytree --transform --dry-run --verbose
+# Test with profile that has transformers enabled
+copytree --profile myprofile --dry-run --verbose
 
 # Check transformation results
-copytree --transform --display | less
+copytree --profile myprofile --display | less
 ```
 
 ## Troubleshooting

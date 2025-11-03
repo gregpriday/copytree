@@ -82,11 +82,12 @@ Configure transformers in your profile for better context:
 
 **Note:** Transformers are configured in profiles, not via CLI flags. See the [Transformer Reference](../profiles/transformer-reference.md) for details.
 
-Transformers include:
+Available transformers include:
 - PDF to text conversion
 - Image OCR and descriptions
-- Code summaries for large files
-- Test file summaries
+- Markdown processing
+- CSV formatting
+- Binary file handling
 
 ### 4. Manage Output Size
 

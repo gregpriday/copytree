@@ -84,22 +84,17 @@ Explicitly copy to clipboard (default behavior).
 copytree --clipboard
 ```
 
-#### `--no-clipboard`
-Prevent copying to clipboard.
-
-```bash
-copytree --no-clipboard --display
-```
-
 ### Format Options
 
 #### `--format=<type>`
-Output format: `markdown|md`, `xml`, `json`, or `tree`.
+Output format: `xml`, `markdown|md`, `json`, `ndjson`, `sarif`, or `tree`.
 
 **Default:** `xml`
 
 ```bash
 copytree --format json
+copytree --format ndjson
+copytree --format sarif
 copytree --format tree
 copytree --format xml  # default
 copytree --format markdown
@@ -228,13 +223,6 @@ Validate profile syntax without processing files.
 copytree --validate --profile myprofile
 ```
 
-#### `--debug`
-Enable debug logging.
-
-```bash
-copytree --debug
-```
-
 #### `--no-cache`
 Disable caching for AI operations and external sources.
 
@@ -264,14 +252,6 @@ Use custom instructions set (default: default).
 ```bash
 copytree --instructions custom
 copytree --instructions default
-```
-
-#### `--verbose`, `-v`
-Show detailed progress information.
-
-```bash
-copytree --verbose
-copytree -v
 ```
 
 ## Exit Codes
@@ -338,8 +318,8 @@ copytree --format tree
 # Combine multiple options
 copytree --profile myproject --modified --output snapshot.md
 
-# Debug mode with dry run
-copytree --debug --dry-run
+# Dry run with validation
+copytree --dry-run --validate
 
 # Limit output
 copytree --head 50 --char-limit 100000
