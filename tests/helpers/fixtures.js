@@ -95,7 +95,8 @@ export function readGolden(name) {
   if (!fs.existsSync(goldenFile)) {
     throw new Error(`Golden file not found: ${goldenFile}`);
   }
-  return fs.readFileSync(goldenFile, 'utf8');
+  // Normalize line endings to \n for cross-platform consistency
+  return fs.readFileSync(goldenFile, 'utf8').replace(/\r\n/g, '\n');
 }
 
 /**

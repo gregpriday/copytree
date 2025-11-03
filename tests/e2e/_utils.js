@@ -135,7 +135,13 @@ export function normalize(text, options = {}) {
     normalizeAll: true,
   });
 
-  // 7. Normalize Git-specific data
+  // 7. Normalize Windows backslashes in file paths
+  // Matches patterns like path="@src\test.js" and converts to path="@src/test.js"
+  output = output.replace(/(path=["']@[^"']*?)\\+([^"']*?["'])/g, '$1/$2');
+  // Also handle Windows paths in JSON "path": "src\test.js"
+  output = output.replace(/("path"\s*:\s*"[^"]*?)\\+([^"]*?")/g, '$1/$2');
+
+  // 8. Normalize Git-specific data
   output = normalizeGitData(output);
 
   // 8. Sort tree lines if requested (for cross-OS determinism)
