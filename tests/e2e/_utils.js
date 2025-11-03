@@ -135,7 +135,23 @@ export function normalize(text, options = {}) {
     normalizeAll: true,
   });
 
-  // 7. Normalize Git-specific data
+  // 7. Normalize Windows backslashes in file paths
+  // Matches patterns like path="@src\test.js" and converts to path="@src/test.js"
+  output = output.replace(/(path=["']@[^"']*?)\\+([^"']*?["'])/g, '$1/$2');
+  // Also handle Windows paths in JSON "path": "src\test.js" and "directory": "D:\a\b"
+  output = output.replace(/("(?:path|directory)"\s*:\s*"[^"]*?)\\+([^"]*?")/g, '$1/$2');
+  // Markdown headers like ### @src\test.js → ### @src/test.js
+  output = output.replace(/(###\s+@[^\n]*?)\\+([^\n]*)/g, '$1/$2');
+  // Markdown file comments like <!-- copytree:file-begin path="@src\test.js" -->
+  output = output.replace(/(<!--[^>]*?path=["']@[^"']*?)\\+([^"']*?["'][^>]*?-->)/g, '$1/$2');
+  // SARIF format "uri": "file:///src\test.js" → "file:///src/test.js"
+  output = output.replace(/("uri"\s*:\s*"[^"]*?)\\+([^"]*?")/g, '$1/$2');
+  // SARIF message text: "File discovered: src\test.js" → "File discovered: src/test.js"
+  output = output.replace(/("text"\s*:\s*"[^"]*?)\\+([^"]*?")/g, '$1/$2');
+  // SARIF workingDirectory: "file:///<PROJECT_ROOT>" → "file://<PROJECT_ROOT>"
+  output = output.replace(/"uri":\s*"file:\/\/\/(<PROJECT_ROOT>)"/g, '"uri": "file://$1"');
+
+  // 8. Normalize Git-specific data
   output = normalizeGitData(output);
 
   // 8. Sort tree lines if requested (for cross-OS determinism)
