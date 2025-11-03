@@ -40,13 +40,17 @@ describe('Performance Budgets', () => {
           FileDiscovery: 1000,
           Transformation: 2000,
         },
+        perStageMetrics: {
+          FileDiscovery: {
+            memoryUsage: { end: { heapUsed: 50 * 1024 * 1024 } }, // 50MB (well under 500MB budget)
+          },
+        },
       };
       const duration = 8000; // 8s for medium project (budget: 15s)
       const fileCount = 100;
 
       const grade = calculatePerformanceGrade(stats, duration, fileCount);
-      // Accept A/B/C - grading varies based on environment
-      expect(['A', 'B', 'C']).toContain(grade);
+      expect(grade).toBe('A');
     });
 
     test('gives F grade for poor performance', () => {
@@ -69,13 +73,17 @@ describe('Performance Budgets', () => {
       const stats = {
         filesProcessed: 100,
         totalSize: 20 * 1024 * 1024,
+        perStageMetrics: {
+          FileDiscovery: {
+            memoryUsage: { end: { heapUsed: 250 * 1024 * 1024 } }, // 250MB (50% of budget)
+          },
+        },
       };
-      const duration = 16000; // Slightly over budget
+      const duration = 16000; // Slightly over budget (15s budget)
       const fileCount = 100;
 
       const grade = calculatePerformanceGrade(stats, duration, fileCount);
-      // Accept B/C/D - grading varies based on environment
-      expect(['B', 'C', 'D']).toContain(grade);
+      expect(grade).toBe('C'); // Just over time budget, moderate memory
     });
   });
 
