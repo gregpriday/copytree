@@ -381,8 +381,8 @@ export async function* walkParallel(root, options = {}) {
       } else {
         recordPermanent(dir, error.code);
       }
-      // Can't read directory - skip it
-      return;
+      // Can't read directory - skip it (return empty array for proper handling)
+      return [];
     }
 
     // Sort entries for deterministic order across platforms
@@ -410,8 +410,11 @@ export async function* walkParallel(root, options = {}) {
       while (queue.length > 0 && running.size < concurrency) {
         const { dir, layers } = queue.shift();
         const task = processDirectory(dir, layers).then(async (results) => {
-          for (const result of results) {
-            await enqueueResult(result);
+          // Guard against undefined results (when readdir fails)
+          if (results) {
+            for (const result of results) {
+              await enqueueResult(result);
+            }
           }
         });
 
