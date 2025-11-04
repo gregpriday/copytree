@@ -560,6 +560,29 @@
             }
           },
           "additionalProperties": false
+        },
+        "discovery": {
+          "type": "object",
+          "description": "File discovery configuration",
+          "properties": {
+            "parallelEnabled": {
+              "type": "boolean",
+              "description": "Enable parallel directory traversal (default: false for gradual rollout)"
+            },
+            "maxConcurrency": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Maximum concurrent directory operations (falls back to app.maxConcurrency if not specified)"
+            },
+            "highWaterMark": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 10000,
+              "description": "Backpressure threshold - pauses scheduling when buffered results exceed this (default: 2x concurrency)"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

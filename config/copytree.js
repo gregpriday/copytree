@@ -117,4 +117,26 @@ export default {
     retryDelay: 100, // Initial delay in milliseconds
     maxDelay: 2000, // Maximum delay cap in milliseconds
   },
+
+  // File discovery configuration
+  discovery: {
+    // Enable parallel directory traversal (default: false for gradual rollout)
+    parallelEnabled: ['1', 'true', 'TRUE', 'True'].includes(
+      process.env.COPYTREE_DISCOVERY_PARALLEL
+    ),
+
+    // Maximum concurrent directory operations
+    // Falls back to app.maxConcurrency if not specified
+    maxConcurrency: (() => {
+      const val = parseInt(process.env.COPYTREE_DISCOVERY_CONCURRENCY, 10);
+      return Number.isInteger(val) && val > 0 ? val : undefined;
+    })(),
+
+    // Backpressure threshold (default: 2x concurrency)
+    // Pauses scheduling when buffered results exceed this
+    highWaterMark: (() => {
+      const val = parseInt(process.env.COPYTREE_DISCOVERY_HIGH_WATER_MARK, 10);
+      return Number.isInteger(val) && val > 0 ? val : undefined;
+    })(),
+  },
 };
