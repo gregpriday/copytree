@@ -1,7 +1,15 @@
 {
   "name": "copytree",
   "version": "0.13.1",
-  "description": "A Node.js CLI tool that copies directory structures and file contents into structured XML format",
+  "description": "A Node.js CLI tool and library that copies directory structures and file contents into structured formats",
+  "main": "./src/index.js",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
   "bin": {
     "copytree": "./bin/copytree.js"
   },
@@ -25,7 +33,12 @@
     "directory",
     "xml",
     "copy",
-    "ai"
+    "ai",
+    "programmatic",
+    "api",
+    "library",
+    "scan",
+    "format"
   ],
   "author": "Greg Priday <greg@siteorigin.com>",
   "license": "MIT",
@@ -41,6 +54,14 @@
     "node": ">=20.0.0"
   },
   "type": "module",
+  "sideEffects": false,
+  "files": [
+    "src/",
+    "bin/",
+    "types/",
+    "profiles/",
+    "config/"
+  ],
   "dependencies": {
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
