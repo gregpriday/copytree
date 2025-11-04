@@ -10,12 +10,14 @@
 
 import Stage from '../Stage.js';
 import { walkWithIgnore } from '../../utils/ignoreWalker.js';
+import { walkParallel } from '../../utils/parallelWalker.js';
 import micromatch from 'micromatch';
 import fastGlob from 'fast-glob';
 import ignore from 'ignore';
 import fs from 'fs-extra';
 import path from 'path';
 import { config } from '../../config/ConfigManager.js';
+import { getLimiterFor } from '../../utils/taskLimiter.js';
 
 class FileDiscoveryStage extends Stage {
   constructor(options = {}) {
@@ -77,6 +79,20 @@ class FileDiscoveryStage extends Stage {
     // Load .copytreeinclude patterns (force-include)
     await this.loadCopytreeInclude();
 
+    // Determine if parallel traversal is enabled
+    const discoveryConfig = config().get('copytree.discovery', {});
+    const parallelEnabled = discoveryConfig.parallelEnabled || false;
+    const discoveryConcurrency =
+      discoveryConfig.maxConcurrency ||
+      this.options.maxConcurrency ||
+      config().get('app.maxConcurrency', 5);
+    const highWaterMark = discoveryConfig.highWaterMark;
+
+    this.log(
+      `Using ${parallelEnabled ? 'parallel' : 'sequential'} file discovery (concurrency: ${discoveryConcurrency})`,
+      'debug',
+    );
+
     // Discover files using layered ignore walker
     const discoveredFiles = [];
     const walkOptions = {
@@ -85,9 +101,23 @@ class FileDiscoveryStage extends Stage {
       followSymlinks: false,
       explain: this.options.explain || false,
       initialLayers,
+      config: config().all(), // Pass full config for retry settings
     };
 
-    for await (const fileInfo of walkWithIgnore(this.basePath, walkOptions)) {
+    // Add parallel-specific options if enabled
+    if (parallelEnabled) {
+      walkOptions.concurrency = discoveryConcurrency;
+      if (highWaterMark) {
+        walkOptions.highWaterMark = highWaterMark;
+      }
+    }
+
+    // Choose walker based on configuration
+    const walker = parallelEnabled
+      ? walkParallel(this.basePath, walkOptions)
+      : walkWithIgnore(this.basePath, walkOptions);
+
+    for await (const fileInfo of walker) {
       // Convert to relative path
       const relativePath = path.relative(this.basePath, fileInfo.path);
 
@@ -110,6 +140,14 @@ class FileDiscoveryStage extends Stage {
     let forcedEntries = [];
     if (this.forceInclude.length > 0) {
       this.log(`Force-including ${this.forceInclude.length} pattern(s)`, 'debug');
+
+      // Use task limiter for fast-glob to prevent oversubscription
+      const globLimiter = getLimiterFor('glob', 100);
+      const globConcurrency = Math.min(
+        globLimiter.activeCount + 50, // Allow more for glob since it's usually quick
+        100,
+      );
+
       const globOptions = {
         cwd: this.basePath,
         absolute: false,
@@ -117,7 +155,7 @@ class FileDiscoveryStage extends Stage {
         onlyFiles: true,
         stats: true,
         ignore: [], // bypass all ignore patterns
-        concurrency: this.options.maxConcurrency || 100,
+        concurrency: globConcurrency,
       };
 
       const entries = await fastGlob(this.forceInclude, globOptions);
