@@ -205,9 +205,7 @@ describe('format()', () => {
     });
 
     it('should throw ValidationError for invalid format', async () => {
-      await expect(
-        format(sampleFiles, { format: 'invalid' }),
-      ).rejects.toThrow(ValidationError);
+      await expect(format(sampleFiles, { format: 'invalid' })).rejects.toThrow(ValidationError);
     });
 
     it('should throw ValidationError for empty file array', async () => {

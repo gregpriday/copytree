@@ -100,10 +100,7 @@ export async function format(files, options = {}) {
   const basePath =
     options.basePath ??
     (validFiles[0]?.absolutePath && validFiles[0]?.path
-      ? path.resolve(
-          validFiles[0].absolutePath,
-          ...validFiles[0].path.split('/').map(() => '..'),
-        )
+      ? path.resolve(validFiles[0].absolutePath, ...validFiles[0].path.split('/').map(() => '..'))
       : '.');
   const input = {
     basePath,
