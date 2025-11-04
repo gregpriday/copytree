@@ -1,6 +1,7 @@
 import Stage from '../Stage.js';
 import GitleaksAdapter from '../../services/GitleaksAdapter.js';
 import SecretRedactor from '../../utils/SecretRedactor.js';
+import { SecretDetector } from '../../utils/SecretDetector.js';
 import { SecretsDetectedError } from '../../utils/errors.js';
 import { minimatch } from 'minimatch';
 import pLimit from 'p-limit';
@@ -93,6 +94,7 @@ class SecretsGuardStage extends Stage {
 
     // Configuration from options or config
     this.enabled = options.enabled ?? this.config.get('secretsGuard.enabled', true);
+    this.engine = options.engine || this.config.get('secretsGuard.engine', 'auto');
     this.excludeGlobs =
       options.excludeGlobs || this.config.get('secretsGuard.exclude', SECRET_FILE_PATTERNS);
     this.allowlistGlobs = options.allowlistGlobs || this.config.get('secretsGuard.allowlist', []);
@@ -109,6 +111,19 @@ class SecretsGuardStage extends Stage {
     const gitleaksConfig = options.gitleaks || this.config.get('secretsGuard.gitleaks', {});
     this.gitleaks = new GitleaksAdapter(gitleaksConfig);
 
+    // Initialize built-in detector
+    const detectorConfig = {
+      allowlist: this.config.get('secretsGuard.allowlist', []),
+      customPatterns: this.config.get('secretsGuard.customPatterns', []),
+      aggressive: this.config.get('secretsGuard.aggressive', false),
+      maxFileBytes: this.maxFileBytes,
+    };
+    this.builtinDetector = new SecretDetector(detectorConfig);
+
+    // Engine selection state
+    this.activeEngine = null; // Will be determined in onInit
+    this.gitleaksAvailable = false;
+
     // Tracking
     this.filesExcluded = 0;
     this.secretsFound = 0;
@@ -118,19 +133,62 @@ class SecretsGuardStage extends Stage {
   }
 
   async onInit(context) {
-    // Check if gitleaks is available
-    if (this.enabled) {
-      const available = await this.gitleaks.isAvailable();
-      if (!available) {
-        this.log(
-          'Secrets Guard disabled: gitleaks not found. Install: brew install gitleaks',
-          'warn',
-        );
-        this.enabled = false;
-      } else {
-        const version = await this.gitleaks.getVersion();
-        this.log(`Secrets Guard enabled (gitleaks ${version || 'unknown'})`, 'debug');
-      }
+    if (!this.enabled) {
+      return;
+    }
+
+    // Check Gitleaks availability
+    this.gitleaksAvailable = await this.gitleaks.isAvailable();
+
+    // Determine active engine based on configuration and availability
+    switch (this.engine) {
+      case 'auto':
+        if (this.gitleaksAvailable) {
+          this.activeEngine = 'external';
+          const version = await this.gitleaks.getVersion();
+          this.log(`Secrets Guard: using Gitleaks ${version || 'unknown'}`, 'info');
+        } else {
+          this.activeEngine = 'builtin';
+          this.log('Secrets Guard: using built-in detector (Gitleaks not found)', 'info');
+        }
+        break;
+
+      case 'builtin':
+        this.activeEngine = 'builtin';
+        this.log('Secrets Guard: using built-in detector (forced)', 'info');
+        break;
+
+      case 'external':
+        if (this.gitleaksAvailable) {
+          this.activeEngine = 'external';
+          const version = await this.gitleaks.getVersion();
+          this.log(`Secrets Guard: using Gitleaks ${version || 'unknown'} (forced)`, 'info');
+        } else {
+          this.log(
+            'Secrets Guard: external engine forced but Gitleaks not available. Install: brew install gitleaks',
+            'warn',
+          );
+          this.enabled = false;
+        }
+        break;
+
+      case 'both':
+        if (this.gitleaksAvailable) {
+          this.activeEngine = 'both';
+          const version = await this.gitleaks.getVersion();
+          this.log(
+            `Secrets Guard: using both engines (Gitleaks ${version || 'unknown'} + built-in)`,
+            'info',
+          );
+        } else {
+          this.activeEngine = 'builtin';
+          this.log('Secrets Guard: Gitleaks not available, using built-in only', 'warn');
+        }
+        break;
+
+      default:
+        this.log(`Invalid engine: ${this.engine}, defaulting to auto`, 'warn');
+        this.activeEngine = this.gitleaksAvailable ? 'external' : 'builtin';
     }
   }
 
@@ -237,9 +295,29 @@ class SecretsGuardStage extends Stage {
       return file;
     }
 
-    // Scan content with gitleaks
+    // Scan content with selected engine
     try {
-      const findings = await this.gitleaks.scanString(file.content, file.path);
+      let findings = [];
+
+      // Run detection based on active engine
+      if (this.activeEngine === 'external') {
+        const gitleaksFindings = await this._scanWithGitleaks(file);
+        findings = Array.isArray(gitleaksFindings)
+          ? gitleaksFindings
+          : this.builtinDetector.scan(file.content, file.path);
+      } else if (this.activeEngine === 'builtin') {
+        findings = this.builtinDetector.scan(file.content, file.path);
+      } else if (this.activeEngine === 'both') {
+        // Run both engines and union findings
+        const [gitleaksFindingsRaw, builtinFindings] = await Promise.all([
+          this._scanWithGitleaks(file),
+          Promise.resolve(this.builtinDetector.scan(file.content, file.path)),
+        ]);
+
+        // Union findings and deduplicate by span
+        const gitleaksFindings = Array.isArray(gitleaksFindingsRaw) ? gitleaksFindingsRaw : [];
+        findings = this._unionFindings(gitleaksFindings, builtinFindings);
+      }
 
       if (findings.length === 0) {
         this.emitFileEvent(file.path, 'scanned-clean');
@@ -251,8 +329,9 @@ class SecretsGuardStage extends Stage {
       this.allFindings.push(
         ...findings.map((f) => ({
           file: file.path,
-          line: f.StartLine,
-          rule: f.RuleID,
+          line: f.StartLine || f.lineStart || 0,
+          rule: f.RuleID || f.type || 'UNKNOWN',
+          engine: f.source || this.activeEngine,
         })),
       );
 
@@ -266,7 +345,7 @@ class SecretsGuardStage extends Stage {
         return { ...file, secretsExcluded: true };
       }
 
-      // Apply redaction
+      // Apply redaction (works with both formats)
       const { content, count } = SecretRedactor.redact(file.content, findings, this.redactionMode);
 
       this.secretsRedacted += count;
@@ -283,6 +362,51 @@ class SecretsGuardStage extends Stage {
       this.emitFileEvent(file.path, 'scan-error');
       return file;
     }
+  }
+
+  /**
+   * Run gitleaks with defensive error handling so we can fall back when it fails.
+   * @private
+   */
+  async _scanWithGitleaks(file) {
+    try {
+      return await this.gitleaks.scanString(file.content, file.path);
+    } catch (error) {
+      this.log(
+        `Gitleaks scan failed for ${file.path}: ${error.message} (falling back to built-in detector)`,
+        'warn',
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Union findings from multiple engines and deduplicate
+   * @private
+   * @param {Array} gitleaksFindings - Findings from Gitleaks
+   * @param {Array} builtinFindings - Findings from built-in detector
+   * @returns {Array} Deduplicated findings
+   */
+  _unionFindings(gitleaksFindings, builtinFindings) {
+    const map = new Map();
+
+    // Add Gitleaks findings
+    for (const finding of gitleaksFindings) {
+      const key = `${finding.File}:${finding.StartLine}:${finding.StartColumn}:${finding.EndLine}:${finding.EndColumn}`;
+      if (!map.has(key)) {
+        map.set(key, { ...finding, source: 'external' });
+      }
+    }
+
+    // Add built-in findings (skip duplicates)
+    for (const finding of builtinFindings) {
+      const key = `${finding.file}:${finding.lineStart}:${finding.startColumn}:${finding.lineEnd}:${finding.endColumn}`;
+      if (!map.has(key)) {
+        map.set(key, finding);
+      }
+    }
+
+    return Array.from(map.values());
   }
 
   /**

@@ -119,7 +119,7 @@ secret";`;
 
     it('should preserve line numbers after redaction', () => {
       const content = `line1
-line2 SECRET
+line2 SECRET more
 line3`;
 
       const findings = [
@@ -128,7 +128,7 @@ line3`;
           StartLine: 2,
           EndLine: 2,
           StartColumn: 7,
-          EndColumn: 13,
+          EndColumn: 12, // Points to the 'T' in SECRET (last char of secret)
         },
       ];
 
@@ -137,7 +137,7 @@ line3`;
       const lines = result.split('\n');
       expect(lines).toHaveLength(3);
       expect(lines[0]).toBe('line1');
-      expect(lines[1]).toContain('***REDACTED:SECRET***');
+      expect(lines[1]).toBe('line2 ***REDACTED:SECRET*** more');
       expect(lines[2]).toBe('line3');
     });
 
@@ -306,7 +306,7 @@ line3`;
       const { startIndex, endIndex } = SecretRedactor._findingToIndices(finding, lines, offsets);
 
       expect(startIndex).toBe(4); // 0 + (5-1)
-      expect(endIndex).toBe(9); // 0 + (10-1)
+      expect(endIndex).toBe(10); // 0 + (10-1) + 1 (inclusive column, but clamped)
     });
 
     it('should convert multi-line finding to indices', () => {
@@ -322,7 +322,7 @@ line3`;
       const { startIndex, endIndex } = SecretRedactor._findingToIndices(finding, lines, offsets);
 
       expect(startIndex).toBe(6); // offset[1] + 0
-      expect(endIndex).toBe(16); // offset[2] + 4
+      expect(endIndex).toBe(17); // offset[2] + 4 + 1 (inclusive column + 1)
     });
 
     it('should return -1 for invalid line numbers', () => {

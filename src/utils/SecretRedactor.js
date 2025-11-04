@@ -5,13 +5,20 @@ import crypto from 'crypto';
  *
  * Implements span-based redaction that maintains line numbers, formatting,
  * and overall text structure. Supports multiple redaction modes.
+ *
+ * Accepts findings from both Gitleaks (GitleaksFinding) and built-in
+ * detector (SecretFinding), automatically normalizing the format.
  */
 class SecretRedactor {
   /**
    * Redact secrets from content based on findings
    *
+   * Accepts findings in either format:
+   * - GitleaksFinding: {RuleID, StartLine, EndLine, StartColumn, EndColumn, Match}
+   * - SecretFinding: {type, lineStart, lineEnd, startColumn, endColumn, match, redactionLabel}
+   *
    * @param {string} content - Original file content
-   * @param {Array<GitleaksFinding>} findings - Array of secret findings
+   * @param {Array<GitleaksFinding|SecretFinding>} findings - Array of secret findings
    * @param {'typed'|'generic'|'hash'} mode - Redaction mode
    * @returns {{content: string, count: number}} Redacted content and redaction count
    */
@@ -20,12 +27,15 @@ class SecretRedactor {
       return { content, count: 0 };
     }
 
+    // Normalize findings to unified format
+    const normalized = findings.map((f) => this._normalizeFinding(f));
+
     // Convert content to line array for precise indexing
     const lines = content.split('\n');
     const lineOffsets = this._calculateLineOffsets(content);
 
     // Sort findings in reverse order (bottom to top) to maintain indices
-    const sorted = [...findings].sort((a, b) => {
+    const sorted = [...normalized].sort((a, b) => {
       // Sort by line first, then by column
       if (b.StartLine !== a.StartLine) {
         return b.StartLine - a.StartLine;
@@ -54,6 +64,30 @@ class SecretRedactor {
     }
 
     return { content: redactedContent, count: redactionCount };
+  }
+
+  /**
+   * Normalize finding to Gitleaks-like format for processing
+   * @private
+   * @param {GitleaksFinding|SecretFinding} finding - Finding in any format
+   * @returns {Object} Normalized finding
+   */
+  static _normalizeFinding(finding) {
+    // Check if already in Gitleaks format
+    if (finding.RuleID !== undefined) {
+      return finding;
+    }
+
+    // Convert SecretFinding to Gitleaks-like format
+    return {
+      RuleID: finding.redactionLabel || finding.type || 'UNKNOWN',
+      StartLine: finding.lineStart,
+      EndLine: finding.lineEnd,
+      StartColumn: finding.startColumn,
+      EndColumn: finding.endColumn,
+      Match: finding.match,
+      File: finding.file,
+    };
   }
 
   /**
@@ -97,34 +131,40 @@ class SecretRedactor {
    * @returns {{startIndex: number, endIndex: number}} Absolute indices
    */
   static _findingToIndices(finding, lines, lineOffsets) {
-    const startLine = finding.StartLine - 1; // Convert to 0-indexed
-    const endLine = finding.EndLine - 1;
-    const startCol = finding.StartColumn - 1; // Convert to 0-indexed
-    const endCol = finding.EndColumn - 1;
+    const startLine = Math.max(0, (finding.StartLine ?? 1) - 1);
+    const endLine = Math.max(startLine, (finding.EndLine ?? finding.StartLine ?? 1) - 1);
+    const startCol = Math.max(0, (finding.StartColumn ?? 1) - 1);
+    const endCol = Math.max(startCol, (finding.EndColumn ?? finding.StartColumn ?? 1) - 1);
 
     // Validate line indices
-    if (startLine < 0 || startLine >= lines.length) {
+    if (startLine >= lines.length || endLine >= lines.length) {
       return { startIndex: -1, endIndex: -1 };
     }
 
-    if (endLine < 0 || endLine >= lines.length) {
-      return { startIndex: -1, endIndex: -1 };
-    }
+    // Calculate content length
+    const lastLineIndex = Math.max(lines.length - 1, 0);
+    const lastLineOffset = lineOffsets[lastLineIndex] ?? 0;
+    const lastLineLength = lines[lastLineIndex]?.length ?? 0;
+    const contentLength = lastLineOffset + lastLineLength;
 
     // Calculate absolute indices
     const startIndex = lineOffsets[startLine] + startCol;
 
-    // For end index, we need to account for potential multi-line secrets
-    let endIndex;
-    if (startLine === endLine) {
-      // Single line secret
-      endIndex = lineOffsets[startLine] + endCol;
-    } else {
-      // Multi-line secret
-      endIndex = lineOffsets[endLine] + endCol;
+    // For end index, add 1 because column positions are inclusive (point to the last char)
+    let endIndex =
+      startLine === endLine
+        ? lineOffsets[startLine] + (endCol + 1)
+        : lineOffsets[endLine] + (endCol + 1);
+
+    // Handle edge case: if end == start (single char or calculation error), use Match length
+    if (finding.Match && endIndex === startIndex) {
+      endIndex = startIndex + finding.Match.length;
     }
 
-    return { startIndex, endIndex };
+    return {
+      startIndex,
+      endIndex: Math.max(startIndex, Math.min(endIndex, contentLength)),
+    };
   }
 
   /**
@@ -135,7 +175,6 @@ class SecretRedactor {
    */
   static _calculateLineOffsets(content) {
     const offsets = [0]; // First line starts at 0
-    let offset = 0;
 
     for (let i = 0; i < content.length; i++) {
       if (content[i] === '\n') {
