@@ -7,13 +7,15 @@ class ProfileLoader {
   }
 
   async load(profileNameOrPath, overrides = {}) {
-    // Return a basic mock profile
+    // Return a basic mock profile, respecting filter/include overrides
     return {
       name: profileNameOrPath,
-      include: ['**/*'],
-      exclude: ['node_modules/**'],
+      include: overrides.include || overrides.filter || ['**/*'],
+      exclude: overrides.exclude || ['node_modules/**'],
+      filter: overrides.filter || [],
       transforms: [],
-      options: overrides,
+      options: overrides.options || {},
+      ...overrides,
     };
   }
 
