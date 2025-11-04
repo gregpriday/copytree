@@ -23,7 +23,7 @@ describe('SecretsGuardStage', () => {
   let stage;
   let mockGitleaks;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockGitleaks = {
       isAvailable: jest.fn().mockResolvedValue(true),
       getVersion: jest.fn().mockResolvedValue('8.19.0'),
@@ -34,9 +34,13 @@ describe('SecretsGuardStage', () => {
 
     stage = new SecretsGuardStage({
       enabled: true,
+      engine: 'external', // Force external engine to use Gitleaks mock
       redactionMode: 'typed',
       failOnSecrets: false,
     });
+
+    // Initialize the stage to set activeEngine
+    await stage.onInit({});
   });
 
   afterEach(() => {
@@ -78,8 +82,19 @@ describe('SecretsGuardStage', () => {
       expect(mockGitleaks.getVersion).toHaveBeenCalled();
     });
 
-    it('should disable stage if gitleaks not available', async () => {
+    it('should fallback to builtin detector if gitleaks not available (auto mode)', async () => {
       mockGitleaks.isAvailable.mockResolvedValue(false);
+      stage.engine = 'auto';
+
+      await stage.onInit({});
+
+      expect(stage.activeEngine).toBe('builtin');
+      expect(stage.enabled).toBe(true); // Stage should remain enabled with builtin
+    });
+
+    it('should disable stage if gitleaks not available in external-only mode', async () => {
+      mockGitleaks.isAvailable.mockResolvedValue(false);
+      stage.engine = 'external';
 
       await stage.onInit({});
 
@@ -366,13 +381,15 @@ describe('SecretsGuardStage', () => {
   });
 
   describe('getSummary', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       jest.clearAllMocks();
       stage = new SecretsGuardStage({
         enabled: true,
+        engine: 'external', // Force external engine
         redactionMode: 'typed',
         failOnSecrets: false,
       });
+      await stage.onInit({});
     });
 
     it('should return summary of findings', async () => {

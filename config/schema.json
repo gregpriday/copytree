@@ -723,6 +723,11 @@
           "type": "boolean",
           "description": "Enable automatic secret detection and redaction"
         },
+        "engine": {
+          "type": "string",
+          "enum": ["auto", "builtin", "external", "both"],
+          "description": "Detection engine: auto (try external, fallback builtin), builtin (force builtin), external (force Gitleaks), both (run both and union)"
+        },
         "exclude": {
           "type": "array",
           "description": "File patterns to exclude entirely (high-risk files)",
@@ -732,10 +737,73 @@
         },
         "allowlist": {
           "type": "array",
-          "description": "File patterns to always allow (e.g., test fixtures)",
+          "description": "Allowlist patterns to suppress false positives (strings, regexes, or globs)",
           "items": {
-            "type": "string"
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["string", "regex", "glob"]
+                  },
+                  "pattern": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": ["pattern"]
+              }
+            ]
           }
+        },
+        "customPatterns": {
+          "type": "array",
+          "description": "Custom secret patterns (denylist)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Pattern identifier"
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Regular expression pattern"
+              },
+              "description": {
+                "type": "string",
+                "description": "Pattern description"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["low", "medium", "high"],
+                "description": "Risk severity level"
+              },
+              "flags": {
+                "type": "string",
+                "description": "Regex flags (e.g., 'gi')"
+              },
+              "redactionLabel": {
+                "type": "string",
+                "description": "Custom label for redaction"
+              },
+              "reason": {
+                "type": "string",
+                "description": "Why this pattern is added"
+              }
+            },
+            "required": ["name", "pattern"]
+          }
+        },
+        "aggressive": {
+          "type": "boolean",
+          "description": "Lower confidence thresholds for more sensitive detection (more false positives)"
         },
         "redactInline": {
           "type": "boolean",
@@ -761,6 +829,13 @@
         "failOnSecrets": {
           "type": "boolean",
           "description": "Exit with error if secrets are found (CI mode)"
+        },
+        "ignoreGlobs": {
+          "type": "array",
+          "description": "Glob patterns to skip during scanning (e.g., '*.min.js', 'dist/**')",
+          "items": {
+            "type": "string"
+          }
         },
         "gitleaks": {
           "type": "object",
