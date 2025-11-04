@@ -160,8 +160,7 @@ export async function* walkParallel(root, options = {}) {
   // Buffered results ready to yield
   const buffer = [];
   // Backpressure control
-  const maxBuffer =
-    Number.isFinite(highWaterMark) && highWaterMark > 0 ? highWaterMark : Infinity;
+  const maxBuffer = Number.isFinite(highWaterMark) && highWaterMark > 0 ? highWaterMark : Infinity;
   const throttleEnabled = Number.isFinite(maxBuffer);
 
   let drainWaitPromise = null;
@@ -321,7 +320,10 @@ export async function* walkParallel(root, options = {}) {
           recordTiming('discovery.stat.duration_ms', Date.now() - statStart);
         } catch (error) {
           recordTiming('discovery.stat.duration_ms', Date.now() - statStart, { error: error.code });
-          incrementCounter('discovery.errors', 1, { code: error.code || 'UNKNOWN', operation: 'stat' });
+          incrementCounter('discovery.errors', 1, {
+            code: error.code || 'UNKNOWN',
+            operation: 'stat',
+          });
           if (isRetryableFsError(error)) {
             recordGiveUp(absPath, error.code);
           } else {
@@ -366,8 +368,13 @@ export async function* walkParallel(root, options = {}) {
       recordSuccessAfterRetry(dir);
       recordTiming('discovery.readdir.duration_ms', Date.now() - readdirStart);
     } catch (error) {
-      recordTiming('discovery.readdir.duration_ms', Date.now() - readdirStart, { error: error.code });
-      incrementCounter('discovery.errors', 1, { code: error.code || 'UNKNOWN', operation: 'readdir' });
+      recordTiming('discovery.readdir.duration_ms', Date.now() - readdirStart, {
+        error: error.code,
+      });
+      incrementCounter('discovery.errors', 1, {
+        code: error.code || 'UNKNOWN',
+        operation: 'readdir',
+      });
       // Record failure type based on error category
       if (isRetryableFsError(error)) {
         recordGiveUp(dir, error.code);
@@ -413,11 +420,13 @@ export async function* walkParallel(root, options = {}) {
         stats.maxInflight = Math.max(stats.maxInflight, stats.inflight);
         setGauge('discovery.inflight', stats.inflight);
 
-        task.finally(() => {
-          running.delete(task);
-          stats.inflight = running.size;
-          setGauge('discovery.inflight', stats.inflight);
-        }).catch(() => {});
+        task
+          .finally(() => {
+            running.delete(task);
+            stats.inflight = running.size;
+            setGauge('discovery.inflight', stats.inflight);
+          })
+          .catch(() => {});
       }
 
       // Yield buffered results (apply backpressure)

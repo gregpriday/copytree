@@ -26,7 +26,7 @@ describe('FileDiscoveryStage - Parallel Mode', () => {
 
   afterEach(async () => {
     // Clean up test directory
-    if (testDir && await fs.pathExists(testDir)) {
+    if (testDir && (await fs.pathExists(testDir))) {
       await fs.remove(testDir);
     }
 
@@ -141,13 +141,13 @@ describe('FileDiscoveryStage - Parallel Mode', () => {
       config().set('copytree.discovery.parallelEnabled', false);
       const sequentialStage = new FileDiscoveryStage({ basePath: testDir });
       const sequentialResult = await sequentialStage.process({ basePath: testDir });
-      const sequentialPaths = sequentialResult.files.map(f => f.path).sort();
+      const sequentialPaths = sequentialResult.files.map((f) => f.path).sort();
 
       // Test with parallel mode
       config().set('copytree.discovery.parallelEnabled', true);
       const parallelStage = new FileDiscoveryStage({ basePath: testDir });
       const parallelResult = await parallelStage.process({ basePath: testDir });
-      const parallelPaths = parallelResult.files.map(f => f.path).sort();
+      const parallelPaths = parallelResult.files.map((f) => f.path).sort();
 
       // Should discover same files
       expect(parallelPaths).toEqual(sequentialPaths);
@@ -224,7 +224,7 @@ describe('FileDiscoveryStage - Parallel Mode', () => {
       const result = await stage.process({ basePath: testDir });
 
       expect(result.files).toHaveLength(specialNames.length);
-      const discoveredNames = result.files.map(f => f.path).sort();
+      const discoveredNames = result.files.map((f) => f.path).sort();
       expect(discoveredNames).toEqual(specialNames.sort());
     });
   });
@@ -242,8 +242,8 @@ describe('FileDiscoveryStage - Parallel Mode', () => {
       const result = await stage.process({ basePath: testDir });
 
       expect(result.files.length).toBeGreaterThanOrEqual(2);
-      expect(result.files.some(f => f.path === '.example')).toBe(true);
-      expect(result.files.some(f => f.path === 'regular.js')).toBe(true);
+      expect(result.files.some((f) => f.path === '.example')).toBe(true);
+      expect(result.files.some((f) => f.path === 'regular.js')).toBe(true);
     });
   });
 });

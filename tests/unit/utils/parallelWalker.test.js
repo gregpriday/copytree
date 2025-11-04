@@ -19,7 +19,7 @@ describe('parallelWalker', () => {
 
   afterEach(async () => {
     // Clean up test directory
-    if (testDir && await fs.pathExists(testDir)) {
+    if (testDir && (await fs.pathExists(testDir))) {
       await fs.remove(testDir);
     }
   });
@@ -34,7 +34,7 @@ describe('parallelWalker', () => {
       const files = await getAllFilesParallel(testDir, { concurrency: 2 });
 
       expect(files).toHaveLength(3);
-      expect(files.every(f => f.path && f.stats)).toBe(true);
+      expect(files.every((f) => f.path && f.stats)).toBe(true);
     });
 
     it('should discover files in nested directories', async () => {
@@ -48,7 +48,7 @@ describe('parallelWalker', () => {
       const files = await getAllFilesParallel(testDir, { concurrency: 2 });
 
       expect(files).toHaveLength(3);
-      const filenames = files.map(f => path.basename(f.path)).sort();
+      const filenames = files.map((f) => path.basename(f.path)).sort();
       expect(filenames).toEqual(['file1.js', 'file2.js', 'file3.js']);
     });
 
@@ -98,7 +98,7 @@ describe('parallelWalker', () => {
       const files = await getAllFilesParallel(testDir, { concurrency: 2 });
 
       expect(files).toHaveLength(2);
-      const filenames = files.map(f => path.basename(f.path)).sort();
+      const filenames = files.map((f) => path.basename(f.path)).sort();
       expect(filenames).toEqual(['file1.js', 'file2.js']);
     });
 
@@ -123,10 +123,7 @@ describe('parallelWalker', () => {
 
       // Create symlink (skip on Windows if not supported)
       try {
-        await fs.symlink(
-          path.join(testDir, 'real.js'),
-          path.join(testDir, 'link.js'),
-        );
+        await fs.symlink(path.join(testDir, 'real.js'), path.join(testDir, 'link.js'));
       } catch (error) {
         if (error.code === 'EPERM') {
           // Skip test on Windows without symlink permissions
@@ -149,10 +146,7 @@ describe('parallelWalker', () => {
 
       // Create symlink (skip on Windows if not supported)
       try {
-        await fs.symlink(
-          path.join(testDir, 'real.js'),
-          path.join(testDir, 'link.js'),
-        );
+        await fs.symlink(path.join(testDir, 'real.js'), path.join(testDir, 'link.js'));
       } catch (error) {
         if (error.code === 'EPERM') {
           // Skip test on Windows without symlink permissions
@@ -188,7 +182,7 @@ describe('parallelWalker', () => {
 
         // Should find the readable file and skip the unreadable directory
         expect(files.length).toBeGreaterThanOrEqual(1);
-        expect(files.some(f => f.path.includes('readable'))).toBe(true);
+        expect(files.some((f) => f.path.includes('readable'))).toBe(true);
 
         // Cleanup: restore permissions
         await fs.chmod(unreadable, 0o755);
@@ -230,7 +224,7 @@ describe('parallelWalker', () => {
       for await (const _file of generator) {
         yieldedCount++;
         // Simulate slow consumer
-        await new Promise(resolve => setTimeout(resolve, 1));
+        await new Promise((resolve) => setTimeout(resolve, 1));
       }
 
       expect(yieldedCount).toBe(100);
@@ -249,7 +243,7 @@ describe('parallelWalker', () => {
       const runs = [];
       for (let i = 0; i < 3; i++) {
         const files = await getAllFilesParallel(testDir, { concurrency: 2 });
-        runs.push(files.map(f => path.basename(f.path)));
+        runs.push(files.map((f) => path.basename(f.path)));
       }
 
       // All runs should have files in the same order (within the root directory)

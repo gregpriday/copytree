@@ -96,10 +96,7 @@ export async function generateFixture(options = {}) {
   // Add root-level files
   await fs.writeFile(path.join(fixtureRoot, 'package.json'), '{"name": "bench-project"}');
   await fs.writeFile(path.join(fixtureRoot, 'README.md'), '# Benchmark Project\n');
-  await fs.writeFile(
-    path.join(fixtureRoot, '.gitignore'),
-    'node_modules\n*.log\n.DS_Store\n',
-  );
+  await fs.writeFile(path.join(fixtureRoot, '.gitignore'), 'node_modules\n*.log\n.DS_Store\n');
 
   return {
     path: fixtureRoot,
@@ -154,14 +151,7 @@ function generateFileContent(index, depth) {
  * Generate random ignore rules
  */
 function generateIgnoreRules() {
-  const rules = [
-    '# Generated ignore file',
-    '*.log',
-    '*.tmp',
-    'temp/',
-    'cache/',
-    '.DS_Store',
-  ];
+  const rules = ['# Generated ignore file', '*.log', '*.tmp', 'temp/', 'cache/', '.DS_Store'];
   return rules.join('\n');
 }
 

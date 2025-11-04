@@ -191,7 +191,8 @@ class MetricsCollector {
       for (const [name, entries] of Object.entries(histogramStats)) {
         lines.push(`  ${name}:`);
         for (const entry of entries) {
-          const labelStr = Object.keys(entry.labels).length > 0 ? ` {${JSON.stringify(entry.labels)}}` : '';
+          const labelStr =
+            Object.keys(entry.labels).length > 0 ? ` {${JSON.stringify(entry.labels)}}` : '';
           lines.push(
             `    ${labelStr} count=${entry.count}, min=${entry.min.toFixed(2)}ms, max=${entry.max.toFixed(2)}ms, ` +
               `mean=${entry.mean.toFixed(2)}ms, p50=${entry.p50.toFixed(2)}ms, p95=${entry.p95.toFixed(2)}ms, p99=${entry.p99.toFixed(2)}ms`,

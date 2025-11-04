@@ -83,7 +83,9 @@ class FileDiscoveryStage extends Stage {
     const discoveryConfig = config().get('copytree.discovery', {});
     const parallelEnabled = discoveryConfig.parallelEnabled || false;
     const discoveryConcurrency =
-      discoveryConfig.maxConcurrency || this.options.maxConcurrency || config().get('app.maxConcurrency', 5);
+      discoveryConfig.maxConcurrency ||
+      this.options.maxConcurrency ||
+      config().get('app.maxConcurrency', 5);
     const highWaterMark = discoveryConfig.highWaterMark;
 
     this.log(

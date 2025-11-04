@@ -131,7 +131,9 @@ async function benchmarkFileCount(fileCount, quick = false) {
       name: `sequential-run-${i + 1}`,
     });
     sequentialRuns.push(result);
-    console.log(`  Run ${i + 1}: ${result.duration.toFixed(2)}ms (${result.filesPerSecond.toFixed(0)} files/sec)`);
+    console.log(
+      `  Run ${i + 1}: ${result.duration.toFixed(2)}ms (${result.filesPerSecond.toFixed(0)} files/sec)`,
+    );
   }
 
   // Average sequential results
@@ -163,7 +165,9 @@ async function benchmarkFileCount(fileCount, quick = false) {
         name: `parallel-${concurrency}-run-${i + 1}`,
       });
       parallelRuns.push(result);
-      console.log(`  Run ${i + 1}: ${result.duration.toFixed(2)}ms (${result.filesPerSecond.toFixed(0)} files/sec)`);
+      console.log(
+        `  Run ${i + 1}: ${result.duration.toFixed(2)}ms (${result.filesPerSecond.toFixed(0)} files/sec)`,
+      );
     }
 
     // Average parallel results
@@ -239,7 +243,9 @@ function printResults(allResults) {
   // Find best configuration
   const best = allResults.flatMap((r) => r.parallel).sort((a, b) => b.speedup - a.speedup)[0];
   if (best) {
-    console.log(`\n✨ Best configuration: concurrency=${best.concurrency} (${best.speedup.toFixed(2)}x speedup)`);
+    console.log(
+      `\n✨ Best configuration: concurrency=${best.concurrency} (${best.speedup.toFixed(2)}x speedup)`,
+    );
   }
 
   // Check if we meet performance targets
@@ -251,8 +257,12 @@ function printResults(allResults) {
     const memoryOk = bestParallel.peakMemory < 500 * 1024 * 1024; // <500MB
 
     console.log('\n=== Performance Targets ===');
-    console.log(`10k files in <30s: ${meetsTarget ? '✓ PASS' : '✗ FAIL'} (${bestParallel.duration.toFixed(0)}ms)`);
-    console.log(`Memory <500MB: ${memoryOk ? '✓ PASS' : '✗ FAIL'} (${formatBytes(bestParallel.peakMemory)})`);
+    console.log(
+      `10k files in <30s: ${meetsTarget ? '✓ PASS' : '✗ FAIL'} (${bestParallel.duration.toFixed(0)}ms)`,
+    );
+    console.log(
+      `Memory <500MB: ${memoryOk ? '✓ PASS' : '✗ FAIL'} (${formatBytes(bestParallel.peakMemory)})`,
+    );
   }
 }
 
