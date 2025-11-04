@@ -339,8 +339,6 @@ export async function* walkParallel(root, options = {}) {
       incrementCounter('discovery.files_yielded');
       return result;
     }
-
-    return null;
   }
 
   /**
