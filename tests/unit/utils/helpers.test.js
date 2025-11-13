@@ -21,6 +21,7 @@ let hash,
   debounce,
   createCache,
   escapeXml,
+  sanitizeForXml,
   timestamp;
 
 beforeAll(async () => {
@@ -45,6 +46,7 @@ beforeAll(async () => {
     debounce,
     createCache,
     escapeXml,
+    sanitizeForXml,
     timestamp,
   } = helpersModule);
 });
@@ -294,6 +296,70 @@ describe('Helper Functions', () => {
       expect(escapeXml('<tag>content & "value"</tag>')).toBe(
         '&lt;tag&gt;content &amp; &quot;value&quot;&lt;/tag&gt;',
       );
+    });
+  });
+
+  describe('sanitizeForXml', () => {
+    test('should remove invalid control characters', () => {
+      const input = 'text before\x14separator\x13bullet point\x17end';
+      const result = sanitizeForXml(input);
+      expect(result).toBe('text beforeseparatorbullet pointend');
+      expect(result).not.toMatch(/\x14/);
+      expect(result).not.toMatch(/\x13/);
+      expect(result).not.toMatch(/\x17/);
+    });
+
+    test('should preserve valid whitespace (tab, LF, CR)', () => {
+      const input = 'line1\nline2\r\nline3\twith tab';
+      const result = sanitizeForXml(input);
+      expect(result).toBe(input);
+      expect(result).toContain('\n');
+      expect(result).toContain('\t');
+      expect(result).toContain('\r');
+    });
+
+    test('should remove all invalid control characters (0x00-0x1F except tab, LF, CR)', () => {
+      const invalidChars = [
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x0b, 0x0c, 0x0e, 0x0f, 0x10, 0x11,
+        0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+      ];
+      const input = `start${invalidChars.map((c) => String.fromCharCode(c)).join('')}end`;
+      const result = sanitizeForXml(input);
+      expect(result).toBe('startend');
+    });
+
+    test('should remove DEL character (0x7F)', () => {
+      const input = 'text\x7Fwith DEL';
+      const result = sanitizeForXml(input);
+      expect(result).toBe('textwith DEL');
+      expect(result).not.toMatch(/\x7F/);
+    });
+
+    test('should handle empty strings', () => {
+      expect(sanitizeForXml('')).toBe('');
+      expect(sanitizeForXml(null)).toBe('');
+      expect(sanitizeForXml(undefined)).toBe('');
+    });
+
+    test('should handle strings with only valid characters', () => {
+      const input = 'This is a normal string with letters, numbers 123, and punctuation!';
+      const result = sanitizeForXml(input);
+      expect(result).toBe(input);
+    });
+
+    test('should handle mixed valid and invalid content', () => {
+      const input = 'Normal text\x14with control\nand newline\x13mixed';
+      const result = sanitizeForXml(input);
+      expect(result).toBe('Normal textwith control\nand newlinemixed');
+      expect(result).toContain('\n'); // newline preserved
+      expect(result).not.toMatch(/\x14/); // control char removed
+      expect(result).not.toMatch(/\x13/); // control char removed
+    });
+
+    test('should handle non-string input gracefully', () => {
+      expect(sanitizeForXml(123)).toBe('');
+      expect(sanitizeForXml({})).toBe('');
+      expect(sanitizeForXml([])).toBe('');
     });
   });
 

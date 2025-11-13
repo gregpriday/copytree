@@ -355,6 +355,39 @@ function escapeXml(str) {
 }
 
 /**
+ * Sanitize content for use in XML (including CDATA sections)
+ * Removes invalid XML control characters while preserving valid whitespace
+ *
+ * Valid XML characters (per XML 1.0 spec):
+ * - 0x09 (tab)
+ * - 0x0A (line feed)
+ * - 0x0D (carriage return)
+ * - 0x20-0xD7FF
+ * - 0xE000-0xFFFD
+ * - 0x10000-0x10FFFF
+ *
+ * This function removes all control characters (0x00-0x1F) except tab, LF, and CR
+ *
+ * @param {string} content - Content to sanitize
+ * @returns {string} Sanitized content safe for XML
+ */
+function sanitizeForXml(content) {
+  // Handle non-string input by converting to empty string
+  if (content === null || content === undefined || typeof content !== 'string') {
+    return '';
+  }
+
+  // Handle empty strings
+  if (!content) {
+    return '';
+  }
+
+  // Remove invalid XML control characters (0x00-0x1F except 0x09, 0x0A, 0x0D)
+  // Also remove 0x7F (DEL) which is technically invalid in XML 1.0
+  return content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+}
+
+/**
  * Get current timestamp in ISO format
  */
 function timestamp() {
@@ -383,5 +416,6 @@ export {
   debounce,
   createCache,
   escapeXml,
+  sanitizeForXml,
   timestamp,
 };

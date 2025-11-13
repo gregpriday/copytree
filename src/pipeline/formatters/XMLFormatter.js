@@ -1,4 +1,4 @@
-import { sanitizeForComment } from '../../utils/helpers.js';
+import { sanitizeForComment, sanitizeForXml } from '../../utils/helpers.js';
 
 class XMLFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
@@ -8,13 +8,17 @@ class XMLFormatter {
   }
 
   /**
-   * Properly escape content for CDATA sections.
-   * Replaces occurrences of ']]>' with the correct escape sequence.
+   * Properly escape and sanitize content for CDATA sections.
+   * 1. Removes invalid XML control characters (0x00-0x1F except tab, LF, CR)
+   * 2. Replaces occurrences of ']]>' with the correct escape sequence
    * @param {string} content - Content to escape
    * @returns {string} Escaped content safe for CDATA
    */
   escapeCdata(content) {
-    return content.toString().replaceAll(']]>', ']]]]><![CDATA[>');
+    // First sanitize to remove invalid XML control characters
+    const sanitized = sanitizeForXml(content.toString());
+    // Then escape the ]]> sequence
+    return sanitized.replaceAll(']]>', ']]]]><![CDATA[>');
   }
 
   async format(input) {
