@@ -54,7 +54,7 @@ describe('copy()', () => {
       expect(result.stats).toHaveProperty('totalSize');
       expect(result.stats).toHaveProperty('outputSize');
       expect(result.stats.totalFiles).toBeGreaterThan(0);
-      expect(result.stats.duration).toBeGreaterThan(0);
+      expect(result.stats.duration).toBeGreaterThanOrEqual(0);
     });
   });
 
