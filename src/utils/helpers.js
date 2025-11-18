@@ -384,6 +384,7 @@ function sanitizeForXml(content) {
 
   // Remove invalid XML control characters (0x00-0x1F except 0x09, 0x0A, 0x0D)
   // Also remove 0x7F (DEL) which is technically invalid in XML 1.0
+  // eslint-disable-next-line no-control-regex
   return content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 }
 
