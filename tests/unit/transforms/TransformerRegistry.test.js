@@ -169,11 +169,13 @@ describe('TransformerRegistry', () => {
     test('should create registry with default transformers', async () => {
       const defaultRegistry = await TransformerRegistry.createDefault();
 
-      // Should have loaded some default transformers
-      expect(defaultRegistry.transformers.size).toBeGreaterThan(0);
+      // Should have loaded the 5 essential transformers
+      expect(defaultRegistry.transformers.size).toBe(5);
       expect(defaultRegistry.has('file-loader')).toBe(true);
-      expect(defaultRegistry.has('markdown')).toBe(true);
-      expect(defaultRegistry.has('csv')).toBe(true);
+      expect(defaultRegistry.has('streaming-file-loader')).toBe(true);
+      expect(defaultRegistry.has('binary')).toBe(true);
+      expect(defaultRegistry.has('pdf')).toBe(true);
+      expect(defaultRegistry.has('image')).toBe(true);
     });
   });
 

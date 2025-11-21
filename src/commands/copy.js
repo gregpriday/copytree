@@ -186,7 +186,7 @@ function buildProfileFromCliOptions(options) {
       ? Array.isArray(options.exclude)
         ? options.exclude
         : [options.exclude]
-      : [],
+      : copytreeConfig.globalExcludedDirectories || [],
 
     // Filter patterns (same as include for compatibility)
     filter: options.filter

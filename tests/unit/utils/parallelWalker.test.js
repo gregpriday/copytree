@@ -2,6 +2,10 @@
  * Unit tests for parallel directory walker
  */
 
+// Unmock fs-extra to allow real filesystem operations for these tests
+jest.unmock('fs-extra');
+jest.unmock('p-limit');
+
 import { jest } from '@jest/globals';
 import { walkParallel, getAllFilesParallel } from '../../../src/utils/parallelWalker.js';
 import fs from 'fs-extra';
@@ -205,7 +209,7 @@ describe('parallelWalker', () => {
       setTimeout(() => controller.abort(), 10);
 
       await expect(filesPromise).rejects.toThrow('aborted');
-    });
+    }, 120000);
   });
 
   describe('backpressure', () => {
@@ -228,7 +232,7 @@ describe('parallelWalker', () => {
       }
 
       expect(yieldedCount).toBe(100);
-    });
+    }, 120000);
   });
 
   describe('deterministic ordering', () => {

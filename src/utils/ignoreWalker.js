@@ -162,6 +162,11 @@ export async function* walkWithIgnore(root, options = {}) {
       return;
     }
 
+    // Filter out ignore files themselves to prevent them from appearing in output
+    entries = entries.filter(
+      (entry) => entry.name !== ignoreFileName && entry.name !== '.gitignore',
+    );
+
     // Sort entries for deterministic order across platforms
     // fs.readdir order is not guaranteed and differs between Windows/Unix
     entries.sort((a, b) => a.name.localeCompare(b.name));

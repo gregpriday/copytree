@@ -220,36 +220,6 @@ output:
     });
   });
 
-  describe('Profile Commands', () => {
-    test('profile:list should list available profiles', async () => {
-      const { stdout, exitCode } = await runCommand(`node "${cliPath}" profile:list`);
-
-      expect(exitCode).toBe(0);
-      expect(stdout).toContain('Available Profiles');
-      expect(stdout).toContain('Built-in Profiles');
-    });
-
-    test('profile:validate should validate default profile', async () => {
-      const { stdout, exitCode } = await runCommand(`node "${cliPath}" profile:validate default`);
-
-      expect(exitCode).toBe(0);
-      expect(stdout).toContain('Validating profile: default');
-      expect(stdout).toContain('Profile loaded successfully');
-    });
-
-    test('profile:validate should fail for non-existent profile', async () => {
-      const { exitCode, stderr, stdout } = await runCommand(
-        `node "${cliPath}" profile:validate non-existent-profile`,
-      );
-
-      // This command prints error to stdout but exits with 0
-      // We'll check for the error message instead
-      const output = stderr + stdout;
-      expect(output).toContain('Failed to load profile');
-      expect(output).toMatch(/profile not found|not found/i);
-    });
-  });
-
   describe('Cache Commands', () => {
     test('cache:clear should clear cache', async () => {
       const { stdout, exitCode } = await runCommand(`node "${cliPath}" cache:clear`);

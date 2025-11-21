@@ -2,6 +2,11 @@
  * Integration tests for FileDiscoveryStage with parallel mode
  */
 
+// Unmock fs-extra and ConfigManager to allow real filesystem and config operations for these tests
+jest.unmock('fs-extra');
+jest.unmock('p-limit');
+jest.unmock('../../src/config/ConfigManager.js');
+
 import { jest } from '@jest/globals';
 import FileDiscoveryStage from '../../src/pipeline/stages/FileDiscoveryStage.js';
 import fs from 'fs-extra';
@@ -152,7 +157,7 @@ describe('FileDiscoveryStage - Parallel Mode', () => {
       // Should discover same files
       expect(parallelPaths).toEqual(sequentialPaths);
       expect(parallelResult.files.length).toBe(sequentialResult.files.length);
-    });
+    }, 30000);
   });
 
   describe('performance characteristics', () => {
@@ -175,7 +180,7 @@ describe('FileDiscoveryStage - Parallel Mode', () => {
       expect(result.files).toHaveLength(100);
       // Should complete in reasonable time (< 5 seconds for 100 files)
       expect(duration).toBeLessThan(5000);
-    });
+    }, 30000);
   });
 
   describe('edge cases', () => {

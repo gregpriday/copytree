@@ -121,7 +121,7 @@ export async function* scan(basePath, options = {}) {
       ? Array.isArray(options.exclude)
         ? options.exclude
         : [options.exclude]
-      : copytreeConfig.defaultExclusions || [],
+      : copytreeConfig.globalExcludedDirectories || [],
 
     // Filter patterns
     filter: options.filter
