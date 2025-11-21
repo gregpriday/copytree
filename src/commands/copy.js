@@ -10,6 +10,7 @@ import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { summarize as getFsErrorSummary, reset as resetFsErrors } from '../utils/fsErrorReport.js';
+import FolderProfileLoader from '../config/FolderProfileLoader.js';
 
 // Lazy initialization for Jest compatibility
 let __filename, __dirname, pkg;
@@ -44,7 +45,7 @@ async function copyCommand(targetPath = '.', options = {}) {
     logger.startSpinner('Initializing');
 
     // 1. Build configuration from CLI options and defaults
-    const profileConfig = buildProfileFromCliOptions(options);
+    const profileConfig = await buildProfileFromCliOptions(options);
 
     // 2. Validate and resolve path
     let basePath;
@@ -166,34 +167,68 @@ async function copyCommand(targetPath = '.', options = {}) {
  * Load and prepare profile
  */
 /**
- * Build profile configuration from CLI options and config defaults
- * Replaces the old ProfileLoader system
+ * Build profile configuration from CLI options, folder profiles, and config defaults
+ * Integrates the new FolderProfileLoader system
  */
-function buildProfileFromCliOptions(options) {
+async function buildProfileFromCliOptions(options) {
   const copytreeConfig = config().get('copytree', {});
 
-  // Build profile-like configuration object from CLI options and defaults
+  // Try to load folder profile if requested or if -r/--as-reference is used
+  let folderProfile = null;
+  if (options.profile || options.asReference) {
+    const loader = new FolderProfileLoader({ cwd: process.cwd() });
+    try {
+      if (options.profile) {
+        // Load named profile: -p <name>
+        folderProfile = await loader.loadNamed(options.profile);
+        logger.debug(`Loaded folder profile: ${options.profile}`);
+      } else {
+        // Auto-discover profile for -r/--as-reference
+        folderProfile = await loader.discover();
+        if (folderProfile) {
+          logger.debug(`Auto-discovered folder profile: ${folderProfile.name}`);
+        }
+      }
+    } catch (error) {
+      // If profile was explicitly requested but not found, throw error
+      if (options.profile) {
+        throw error;
+      }
+      // For auto-discovery (-r), silently continue without profile
+    }
+  }
+
+  // Build profile-like configuration object from CLI options, folder profile, and defaults
+  // Precedence: CLI > folder profile > config defaults
   const profileConfig = {
-    // Include patterns (default to all files)
+    // Include patterns
+    // CLI filter takes highest priority, then folder profile, then default to all files
     include: options.filter
       ? Array.isArray(options.filter)
         ? options.filter
         : [options.filter]
-      : ['**/*'],
+      : folderProfile?.include?.length > 0
+        ? folderProfile.include
+        : ['**/*'],
 
-    // Exclude patterns (from CLI or config defaults)
-    exclude: options.exclude
-      ? Array.isArray(options.exclude)
-        ? options.exclude
-        : [options.exclude]
-      : copytreeConfig.globalExcludedDirectories || [],
+    // Exclude patterns
+    // Merge CLI excludes with folder profile excludes, then config defaults
+    exclude: [
+      ...(options.exclude
+        ? Array.isArray(options.exclude)
+          ? options.exclude
+          : [options.exclude]
+        : []),
+      ...(folderProfile?.exclude || []),
+      ...(copytreeConfig.globalExcludedDirectories || []),
+    ],
 
     // Filter patterns (same as include for compatibility)
     filter: options.filter
       ? Array.isArray(options.filter)
         ? options.filter
         : [options.filter]
-      : [],
+      : folderProfile?.include || [],
 
     // Force-include patterns (always option)
     always: options.always
@@ -230,6 +265,12 @@ function buildProfileFromCliOptions(options) {
       includeMetadata: options.info ?? false,
       showSize: options.showSize ?? false,
     },
+
+    // Store folder profile metadata for debugging
+    _folderProfile: folderProfile ? {
+      name: folderProfile.name,
+      source: 'folder',
+    } : null,
   };
 
   // Handle binary file inclusion
