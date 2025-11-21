@@ -16,6 +16,7 @@ export const readFileSync = jest.fn().mockReturnValue('');
 export const writeFileSync = jest.fn();
 export const existsSync = jest.fn().mockReturnValue(false);
 export const removeSync = jest.fn();
+export const mkdtemp = jest.fn().mockResolvedValue('/tmp/test-temp-dir');
 export const mkdtempSync = jest.fn().mockReturnValue('/tmp/test-temp-dir');
 export const readdirSync = jest.fn().mockReturnValue([]);
 export const rmSync = jest.fn();
@@ -49,6 +50,7 @@ const mock = {
   writeFileSync,
   existsSync,
   removeSync,
+  mkdtemp,
   mkdtempSync,
   readdirSync,
   rmSync,

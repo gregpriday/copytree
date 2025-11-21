@@ -44,6 +44,7 @@ program
   .description(
     'Copy directory structure to XML (default) or Markdown/JSON/NDJSON/SARIF/tree with customizable filters',
   )
+  .option('-p, --profile <name>', 'Use folder profile by name (.copytree-<name>.*)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
@@ -64,7 +65,7 @@ program
   .option('--info', 'Show info table')
   .option('--show-size', 'Show file sizes')
   .option('--with-git-status', 'Include git status in output')
-  .option('-r, --as-reference', 'Generate reference documentation')
+  .option('-r, --as-reference', 'Generate reference and auto-load folder profile if present')
   .option('--clipboard', 'Copy output to clipboard')
   .option('-s, --sort <by>', 'Sort files by: path, size, modified, name, extension')
   .option('--dedupe', 'Remove duplicate files')
