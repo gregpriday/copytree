@@ -1,7 +1,9 @@
 import { execSync } from 'child_process';
-import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+
+// E2E tests need real filesystem, not mocks
+const fs = jest.requireActual('fs-extra');
 
 describe('Folder Profile E2E Tests', () => {
   let tmpDir;
