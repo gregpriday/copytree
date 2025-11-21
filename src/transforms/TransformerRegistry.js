@@ -611,8 +611,9 @@ class TransformerRegistry {
     const { default: FileLoaderTransformer } = await import(
       './transformers/FileLoaderTransformer.js'
     );
-    const { default: MarkdownTransformer } = await import('./transformers/MarkdownTransformer.js');
-    const { default: CSVTransformer } = await import('./transformers/CSVTransformer.js');
+    const { default: StreamingFileLoaderTransformer } = await import(
+      './transformers/StreamingFileLoaderTransformer.js'
+    );
     const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
     const { default: PDFTransformer } = await import('./transformers/PDFTransformer.js');
     const { default: ImageTransformer } = await import('./transformers/ImageTransformer.js');
@@ -639,17 +640,16 @@ class TransformerRegistry {
       },
     );
 
-    // Markdown transformer
+    // Streaming File Loader - for large files
     registry.register(
-      'markdown',
-      new MarkdownTransformer(),
+      'streaming-file-loader',
+      new StreamingFileLoaderTransformer(),
       {
-        extensions: [], // Must be explicitly enabled - not applied automatically
-        priority: 10,
+        priority: 0,
       },
       {
-        inputTypes: ['text'],
-        outputTypes: ['text'],
+        inputTypes: ['any'],
+        outputTypes: ['text', 'binary'],
         idempotent: true,
         orderSensitive: false,
         heavy: false,
@@ -657,30 +657,7 @@ class TransformerRegistry {
         dependencies: [],
         conflictsWith: [],
         requirements: {},
-        tags: ['text-processing', 'markdown'],
-      },
-    );
-
-    // CSV transformer
-    registry.register(
-      'csv',
-      new CSVTransformer(),
-      {
-        extensions: [], // Must be explicitly enabled - not applied automatically
-        mimeTypes: [], // Must be explicitly enabled - not applied automatically
-        priority: 10,
-      },
-      {
-        inputTypes: ['text'],
-        outputTypes: ['text'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: false,
-        stateful: false,
-        dependencies: [],
-        conflictsWith: [],
-        requirements: {},
-        tags: ['data-processing', 'csv', 'formatting'],
+        tags: ['loader', 'streaming'],
       },
     );
 

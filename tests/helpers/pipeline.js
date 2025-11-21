@@ -32,14 +32,6 @@ export function createTestPipeline(stages = null, options = {}) {
  * Create a full pipeline with all stages
  */
 export async function createFullPipeline(options = {}) {
-  const { ConfigManager } = await import('../../src/config/ConfigManager.js');
-  const config = await ConfigManager.getInstance();
-
-  const { ProfileLoader } = await import('../../src/profiles/ProfileLoader.js');
-  const profileLoader = new ProfileLoader(config);
-
-  const profile = options.profile || (await profileLoader.load('default'));
-
   // Import all stages
   const GitFilterStage = (await import('../../src/pipeline/stages/GitFilterStage.js')).default;
   const ProfileFilterStage = (await import('../../src/pipeline/stages/ProfileFilterStage.js'))

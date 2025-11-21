@@ -16,7 +16,6 @@ let Text;
 });
 
 import CopyView from './components/CopyView.js';
-import ProfileListView from './components/ProfileListView.js';
 import ValidationView from './components/ValidationView.js';
 import ConfigInspectView from './components/ConfigInspectView.js';
 import DocsView from './components/DocsView.js';
@@ -36,9 +35,6 @@ const AppContent = () => {
     switch (command) {
       case 'copy':
         return React.createElement(CopyView);
-      case 'profile:list':
-        return React.createElement(ProfileListView);
-      case 'profile:validate':
       case 'config:validate':
         return React.createElement(ValidationView);
       case 'config:inspect':

@@ -1,5 +1,4 @@
 import Pipeline from '../pipeline/Pipeline.js';
-import ProfileLoader from '../profiles/ProfileLoader.js';
 import TransformerRegistry from '../transforms/TransformerRegistry.js';
 import { logger } from '../utils/logger.js';
 import { CommandError, handleError } from '../utils/errors.js';
@@ -44,10 +43,8 @@ async function copyCommand(targetPath = '.', options = {}) {
     // Start with initializing message
     logger.startSpinner('Initializing');
 
-    // 1. Load profile
-    const profileLoader = new ProfileLoader();
-    const profileName = options.profile || 'default';
-    const profile = await loadProfile(profileLoader, profileName, options);
+    // 1. Build configuration from CLI options and defaults
+    const profileConfig = buildProfileFromCliOptions(options);
 
     // 2. Validate and resolve path
     let basePath;
@@ -74,13 +71,13 @@ async function copyCommand(targetPath = '.', options = {}) {
     });
 
     // Setup pipeline stages
-    const stages = await setupPipelineStages(basePath, profile, options);
+    const stages = await setupPipelineStages(basePath, profileConfig, options);
     pipeline.through(stages);
 
     // 5. Execute pipeline
     const result = await pipeline.process({
       basePath,
-      profile,
+      profileConfig,
       options,
       startTime,
       version: pkg.version,
@@ -168,46 +165,82 @@ async function copyCommand(targetPath = '.', options = {}) {
 /**
  * Load and prepare profile
  */
-async function loadProfile(profileLoader, profileName, options) {
-  // Build overrides from command options
-  const overrides = {};
+/**
+ * Build profile configuration from CLI options and config defaults
+ * Replaces the old ProfileLoader system
+ */
+function buildProfileFromCliOptions(options) {
+  const copytreeConfig = config().get('copytree', {});
 
-  if (options.filter) {
-    overrides.filter = Array.isArray(options.filter) ? options.filter : [options.filter];
-    // Also update include patterns for file discovery
-    overrides.include = Array.isArray(options.filter) ? options.filter : [options.filter];
-  }
+  // Build profile-like configuration object from CLI options and defaults
+  const profileConfig = {
+    // Include patterns (default to all files)
+    include: options.filter
+      ? Array.isArray(options.filter)
+        ? options.filter
+        : [options.filter]
+      : ['**/*'],
 
-  if (options.includeHidden !== undefined) {
-    overrides.options = overrides.options || {};
-    overrides.options.includeHidden = options.includeHidden;
-  }
+    // Exclude patterns (from CLI or config defaults)
+    exclude: options.exclude
+      ? Array.isArray(options.exclude)
+        ? options.exclude
+        : [options.exclude]
+      : copytreeConfig.globalExcludedDirectories || [],
 
+    // Filter patterns (same as include for compatibility)
+    filter: options.filter
+      ? Array.isArray(options.filter)
+        ? options.filter
+        : [options.filter]
+      : [],
+
+    // Force-include patterns (always option)
+    always: options.always
+      ? Array.isArray(options.always)
+        ? options.always
+        : [options.always]
+      : [],
+
+    // External sources
+    external: options.external
+      ? Array.isArray(options.external)
+        ? options.external
+        : [options.external]
+      : [],
+
+    // Options for file discovery and processing (honor CLI flags)
+    options: {
+      respectGitignore: options.respectGitignore ?? copytreeConfig.respectGitignore ?? true,
+      includeHidden: options.includeHidden ?? copytreeConfig.includeHidden ?? false,
+      followSymlinks: options.followSymlinks ?? copytreeConfig.followSymlinks ?? false,
+      maxFileSize: options.maxFileSize ?? copytreeConfig.maxFileSize,
+      maxTotalSize: options.maxTotalSize ?? copytreeConfig.maxTotalSize,
+      maxFileCount: options.maxFileCount ?? copytreeConfig.maxFileCount,
+    },
+
+    // Transformer configuration
+    transformers: {},
+
+    // Output configuration
+    output: {
+      format: options.format || 'xml',
+      addLineNumbers: options.withLineNumbers ?? false,
+      prettyPrint: true,
+      includeMetadata: options.info ?? false,
+      showSize: options.showSize ?? false,
+    },
+  };
+
+  // Handle binary file inclusion
   if (options.includeBinary !== undefined) {
-    overrides.transformers = overrides.transformers || {};
-    overrides.transformers.binary = {
+    profileConfig.transformers.binary = {
       enabled: true,
       options: { action: 'include' },
     };
   }
 
-  // Load profile with overrides
-  let profile;
-  try {
-    profile = await profileLoader.load(profileName, overrides);
-  } catch (error) {
-    // Only fallback to default if the profile name was explicitly 'default'
-    // Otherwise, throw error to prevent silent failures
-    if (profileName === 'default') {
-      logger.warn(`Failed to load default profile, creating basic profile: ${error.message}`);
-      profile = ProfileLoader.createDefault();
-    } else {
-      // Re-throw error for non-existent profiles
-      throw error;
-    }
-  }
-
-  return profile;
+  return profileConfig;
 }
 
 /**

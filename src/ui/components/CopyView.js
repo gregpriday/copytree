@@ -27,7 +27,6 @@ import SummaryTable from './SummaryTable.js';
 import StaticLog from './StaticLog.js';
 
 import Pipeline from '../../pipeline/Pipeline.js';
-import ProfileLoader from '../../profiles/ProfileLoader.js';
 import GitHubUrlHandler from '../../services/GitHubUrlHandler.js';
 import { CommandError } from '../../utils/errors.js';
 import fs from 'fs-extra';
@@ -84,11 +83,9 @@ const CopyView = () => {
 
       updateState({ isLoading: true, currentStage: 'Initializing' });
 
-      // 1. Load profile
-      const profileLoader = new ProfileLoader();
       const profileName = options.profile || 'default';
-      updateState({ currentStage: 'Loading profile' });
-      const profile = await loadProfile(profileLoader, profileName, options);
+      updateState({ currentStage: 'Preparing configuration' });
+      const profile = buildPipelineProfile(options);
 
       // 2. Validate and resolve path
       let basePath;
@@ -167,33 +164,14 @@ const CopyView = () => {
     }
   };
 
-  const loadProfile = async (profileLoader, profileName, options) => {
-    const overrides = {};
-
-    if (options.filter) {
-      overrides.filter = Array.isArray(options.filter) ? options.filter : [options.filter];
-      overrides.include = Array.isArray(options.filter) ? options.filter : [options.filter];
-    }
-
-    if (options.includeHidden !== undefined) {
-      overrides.options = overrides.options || {};
-      overrides.options.includeHidden = options.includeHidden;
-    }
-
-    if (options.includeBinary !== undefined) {
-      overrides.transformers = overrides.transformers || {};
-      overrides.transformers.binary = {
-        enabled: true,
-        options: { action: 'include' },
-      };
-    }
-
-    try {
-      return await profileLoader.load(profileName, overrides);
-    } catch (error) {
-      return ProfileLoader.createDefault();
-    }
-  };
+  const buildPipelineProfile = (options) => ({
+    externalSources: Array.isArray(options.externalSources) ? options.externalSources : [],
+    alwaysInclude: Array.isArray(options.alwaysInclude) ? options.alwaysInclude : [],
+    limits: {
+      files: options.maxFiles,
+      charLimit: options.charLimit,
+    },
+  });
 
   const setupPipelineStages = async (basePath, profile, options) => {
     const stages = [];

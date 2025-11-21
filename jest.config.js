@@ -68,6 +68,8 @@ const mockedProject = {
     '**/tests/e2e/**/*.spec.js',
     '**/tests/performance/**/*.test.js',
     '!**/tests/real/**/*.test.js', // Exclude real tests
+    '!**/tests/integration/fileDiscoveryStage.parallel.test.js', // Requires real fs-extra and ConfigManager
+    '!**/tests/unit/utils/parallelWalker.test.js', // Requires real fs-extra
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
@@ -77,7 +79,6 @@ const mockedProject = {
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
     '^.*/services/InstructionsLoader\\.js$': '<rootDir>/tests/mocks/InstructionsLoader.js',
-    '^.*/profiles/ProfileLoader\\.js$': '<rootDir>/tests/mocks/ProfileLoader.js',
     '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
     '^ink$': '<rootDir>/tests/mocks/ink.js'
   },
@@ -90,7 +91,9 @@ const realProject = {
   displayName: 'real',
   testMatch: [
     '**/tests/real/**/*.test.js',
-    '**/tests/real/**/*.spec.js'
+    '**/tests/real/**/*.spec.js',
+    '**/tests/integration/fileDiscoveryStage.parallel.test.js', // Requires real fs-extra and ConfigManager
+    '**/tests/unit/utils/parallelWalker.test.js', // Requires real fs-extra
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
@@ -99,7 +102,6 @@ const realProject = {
     '^ora$': '<rootDir>/tests/mocks/ora.js',
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
-    '^.*/profiles/ProfileLoader\\.js$': '<rootDir>/tests/mocks/ProfileLoader.js',
     '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
     '^ink$': '<rootDir>/tests/mocks/ink.js'
     // Note: ConfigManager and InstructionsLoader are NOT mocked here

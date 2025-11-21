@@ -249,7 +249,6 @@ describe('Programmatic API Integration', () => {
       expect(api.copy).toBeDefined();
       expect(api.default).toBeDefined();
       expect(api.Pipeline).toBeDefined();
-      expect(api.ProfileLoader).toBeDefined();
       expect(api.TransformerRegistry).toBeDefined();
     });
 

@@ -2,6 +2,7 @@ export default {
   // Global excluded directories (always excluded regardless of location)
   // Only includes version control directories that can't be in .gitignore
   // Everything else (node_modules, .idea, etc.) should be in .gitignore
+  // Plain directory names - FileDiscoveryStage will append /** automatically
   globalExcludedDirectories: [
     '.git',      // Git repository metadata
     '.svn',      // Subversion
@@ -18,6 +19,11 @@ export default {
 
   // Global excluded files (excluded by name pattern)
   globalExcludedFiles: [
+    // Ignore/configuration files (CopyTree metadata)
+    '.copytreeignore',
+    '.gitignore',
+    '.copytreeinclude',
+
     // Lock files
     'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'shrinkwrap.yaml',
     'composer.lock', 'Gemfile.lock', 'Pipfile.lock', 'poetry.lock', 'uv.lock', 'pdm.lock', 'requirements.lock',

@@ -9,7 +9,7 @@ class ProfileFilterStage extends Stage {
   }
 
   async process(input) {
-    this.log('Applying profile filters', 'debug');
+    this.log('Applying filters', 'debug');
     const startTime = Date.now();
 
     const originalCount = input.files.length;

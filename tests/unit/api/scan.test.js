@@ -197,34 +197,6 @@ describe('scan()', () => {
     });
   });
 
-  describe('Profile support', () => {
-    it('should accept profile name as string', async () => {
-      const files = [];
-      for await (const file of scan(testDir, { profile: 'default' })) {
-        files.push(file);
-      }
-
-      expect(files.length).toBeGreaterThan(0);
-    });
-
-    it('should accept profile object', async () => {
-      const files = [];
-      const profile = {
-        include: ['**/*.js'],
-        exclude: [],
-      };
-
-      for await (const file of scan(testDir, { profile })) {
-        files.push(file);
-      }
-
-      expect(files.length).toBeGreaterThan(0);
-      files.forEach((file) => {
-        expect(file.path).toMatch(/\.js$/);
-      });
-    });
-  });
-
   describe('Deduplication', () => {
     it('should support dedupe option', async () => {
       const files = [];

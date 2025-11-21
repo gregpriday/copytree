@@ -4,7 +4,6 @@
     <ct:generated><TIMESTAMP></ct:generated>
     <ct:fileCount>3</ct:fileCount>
     <ct:totalSize>77</ct:totalSize>
-    <ct:profile>default</ct:profile>
   </ct:metadata>
   <ct:files>
     <ct:file path="@index.js" size="22" modified="<TIMESTAMP>"><![CDATA[console.log('Hello');

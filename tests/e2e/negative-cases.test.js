@@ -38,26 +38,6 @@ describe('Negative cases', () => {
     expect(normalized).toMatchGolden('negative/invalid-path.txt.golden');
   }, 30000);
 
-  test('invalid profile name', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--profile',
-      'nonexistent-profile-xyz',
-    ]);
-
-    // Document the actual behavior (may succeed with default or fail)
-    const errorOutput = stderr || stdout;
-    const normalized = normalize(errorOutput, { projectRoot: PROJECT });
-
-    if (code !== 0) {
-      // CLI rejected the profile - document the error
-      expect(normalized).toMatchGolden('negative/invalid-profile-error.txt.golden');
-    } else {
-      // CLI accepted or defaulted - document the output
-      expect(normalized).toMatchGolden('negative/invalid-profile-success.txt.golden');
-    }
-  }, 30000);
-
   test('conflicting flags --clipboard and --display', async () => {
     const { code, stdout, stderr } = await runCli([PROJECT, '--clipboard', '--display']);
 

@@ -1,6 +1,6 @@
 import Pipeline from '../pipeline/Pipeline.js';
-import ProfileLoader from '../profiles/ProfileLoader.js';
 import { ValidationError } from '../utils/errors.js';
+import { config } from '../config/ConfigManager.js';
 import path from 'path';
 import fs from 'fs-extra';
 
@@ -18,7 +18,6 @@ import fs from 'fs-extra';
 
 /**
  * @typedef {Object} ScanOptions
- * @property {string | Object} [profile='default'] - Profile name or profile object
  * @property {string[]} [filter] - Additional include patterns
  * @property {string[]} [exclude] - Additional exclude patterns
  * @property {boolean} [respectGitignore=true] - Use .gitignore rules
@@ -106,70 +105,48 @@ export async function* scan(basePath, options = {}) {
     throw error;
   }
 
-  // Load profile
-  const profileLoader = new ProfileLoader();
-  const profileName = typeof options.profile === 'string' ? options.profile : 'default';
-  const profileOverrides = typeof options.profile === 'object' ? options.profile : {};
+  // Build configuration from options and config defaults
+  const copytreeConfig = config().get('copytree', {});
 
-  // Build profile overrides from options
-  const overrides = { ...profileOverrides };
+  const profile = {
+    // Include patterns
+    include: options.filter
+      ? Array.isArray(options.filter)
+        ? options.filter
+        : [options.filter]
+      : ['**/*'],
 
-  if (options.filter) {
-    overrides.filter = Array.isArray(options.filter) ? options.filter : [options.filter];
-    overrides.include = Array.isArray(options.filter) ? options.filter : [options.filter];
-  }
+    // Exclude patterns
+    exclude: options.exclude
+      ? Array.isArray(options.exclude)
+        ? options.exclude
+        : [options.exclude]
+      : copytreeConfig.globalExcludedDirectories || [],
 
-  if (options.exclude) {
-    overrides.exclude = Array.isArray(options.exclude) ? options.exclude : [options.exclude];
-  }
+    // Filter patterns
+    filter: options.filter
+      ? Array.isArray(options.filter)
+        ? options.filter
+        : [options.filter]
+      : [],
 
-  if (options.includeHidden !== undefined) {
-    overrides.options = overrides.options || {};
-    overrides.options.includeHidden = options.includeHidden;
-  }
+    // Force-include patterns
+    always: options.always
+      ? Array.isArray(options.always)
+        ? options.always
+        : [options.always]
+      : [],
 
-  if (options.respectGitignore !== undefined) {
-    overrides.options = overrides.options || {};
-    overrides.options.respectGitignore = options.respectGitignore;
-  }
-
-  if (options.followSymlinks !== undefined) {
-    overrides.options = overrides.options || {};
-    overrides.options.followSymlinks = options.followSymlinks;
-  }
-
-  if (options.maxFileSize !== undefined) {
-    overrides.options = overrides.options || {};
-    overrides.options.maxFileSize = options.maxFileSize;
-  }
-
-  if (options.maxTotalSize !== undefined) {
-    overrides.options = overrides.options || {};
-    overrides.options.maxTotalSize = options.maxTotalSize;
-  }
-
-  if (options.maxFileCount !== undefined) {
-    overrides.options = overrides.options || {};
-    overrides.options.maxFileCount = options.maxFileCount;
-  }
-
-  if (options.always) {
-    overrides.always = Array.isArray(options.always) ? options.always : [options.always];
-  }
-
-  // Load profile with overrides
-  let profile;
-  try {
-    profile = await profileLoader.load(profileName, overrides);
-  } catch (error) {
-    if (profileName === 'default') {
-      profile = ProfileLoader.createDefault();
-      // Apply overrides to default profile
-      Object.assign(profile, overrides);
-    } else {
-      throw error;
-    }
-  }
+    // Options
+    options: {
+      respectGitignore: options.respectGitignore ?? copytreeConfig.respectGitignore ?? true,
+      includeHidden: options.includeHidden ?? copytreeConfig.includeHidden ?? false,
+      followSymlinks: options.followSymlinks ?? copytreeConfig.followSymlinks ?? false,
+      maxFileSize: options.maxFileSize ?? copytreeConfig.maxFileSize,
+      maxTotalSize: options.maxTotalSize ?? copytreeConfig.maxTotalSize,
+      maxFileCount: options.maxFileCount ?? copytreeConfig.maxFileCount,
+    },
+  };
 
   // Create pipeline with stages
   const pipeline = new Pipeline({
