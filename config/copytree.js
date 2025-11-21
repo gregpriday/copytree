@@ -2,14 +2,14 @@ export default {
   // Global excluded directories (always excluded regardless of location)
   // Only includes version control directories that can't be in .gitignore
   // Everything else (node_modules, .idea, etc.) should be in .gitignore
-  // Uses glob patterns to match directories and their contents
+  // Plain directory names - FileDiscoveryStage will append /** automatically
   globalExcludedDirectories: [
-    '**/.git/**',      // Git repository metadata
-    '**/.svn/**',      // Subversion
-    '**/.hg/**',       // Mercurial
-    '**/.bzr/**',      // Bazaar
-    '**/CVS/**',       // CVS
-    '**/_darcs/**',    // Darcs
+    '.git',      // Git repository metadata
+    '.svn',      // Subversion
+    '.hg',       // Mercurial
+    '.bzr',      // Bazaar
+    'CVS',       // CVS
+    '_darcs',    // Darcs
   ],
 
   // Base path excluded directories (only excluded at project root)

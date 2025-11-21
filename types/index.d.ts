@@ -317,6 +317,7 @@ export class PipelineError extends CopytreeError {}
 export class AIProviderError extends CopytreeError {}
 export class TransformError extends CopytreeError {}
 export class GitError extends CopytreeError {}
+export class ProfileError extends CopytreeError {}
 
 // ============================================================================
 // Default Export
