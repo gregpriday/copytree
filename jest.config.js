@@ -77,7 +77,6 @@ const mockedProject = {
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
     '^.*/services/InstructionsLoader\\.js$': '<rootDir>/tests/mocks/InstructionsLoader.js',
-    '^.*/profiles/ProfileLoader\\.js$': '<rootDir>/tests/mocks/ProfileLoader.js',
     '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
     '^ink$': '<rootDir>/tests/mocks/ink.js'
   },
@@ -99,7 +98,6 @@ const realProject = {
     '^ora$': '<rootDir>/tests/mocks/ora.js',
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
-    '^.*/profiles/ProfileLoader\\.js$': '<rootDir>/tests/mocks/ProfileLoader.js',
     '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
     '^ink$': '<rootDir>/tests/mocks/ink.js'
     // Note: ConfigManager and InstructionsLoader are NOT mocked here

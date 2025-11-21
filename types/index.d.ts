@@ -39,8 +39,6 @@ export interface FileResult {
  * Options for the scan() function
  */
 export interface ScanOptions {
-  /** Profile name or partial profile object */
-  profile?: string | Partial<Profile>;
   /** Additional include patterns */
   filter?: string | string[];
   /** Additional exclude patterns */
@@ -274,50 +272,6 @@ export class Stage {
   validate?(input: any): boolean;
 }
 
-/**
- * Profile definition
- */
-export interface Profile {
-  /** Profile name */
-  name: string;
-  /** Description */
-  description?: string;
-  /** Include patterns */
-  include?: string[];
-  /** Exclude patterns */
-  exclude?: string[];
-  /** Filter patterns */
-  filter?: string[];
-  /** Force include patterns */
-  always?: string[];
-  /** Profile options */
-  options?: {
-    respectGitignore?: boolean;
-    includeHidden?: boolean;
-    followSymlinks?: boolean;
-    maxFileSize?: number;
-    maxTotalSize?: number;
-    maxFileCount?: number;
-  };
-  /** Transformer configuration */
-  transformers?: {
-    [key: string]: {
-      enabled: boolean;
-      options?: any;
-    };
-  };
-  /** External sources */
-  external?: any[];
-}
-
-/**
- * Profile loader for managing profiles
- */
-export class ProfileLoader {
-  constructor();
-  load(name: string, overrides?: Partial<Profile>): Promise<Profile>;
-  static createDefault(): Profile;
-}
 
 /**
  * Base transformer class
@@ -363,7 +317,6 @@ export class PipelineError extends CopytreeError {}
 export class AIProviderError extends CopytreeError {}
 export class TransformError extends CopytreeError {}
 export class GitError extends CopytreeError {}
-export class ProfileError extends CopytreeError {}
 
 // ============================================================================
 // Default Export

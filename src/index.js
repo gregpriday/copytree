@@ -16,7 +16,6 @@ export { copy } from './api/copy.js';
 // Core classes for advanced usage
 export { default as Pipeline } from './pipeline/Pipeline.js';
 export { default as Stage } from './pipeline/Stage.js';
-export { default as ProfileLoader } from './profiles/ProfileLoader.js';
 export { default as TransformerRegistry } from './transforms/TransformerRegistry.js';
 export { default as BaseTransformer } from './transforms/BaseTransformer.js';
 

@@ -42,9 +42,8 @@ program
 program
   .command('copy [path]', { isDefault: true })
   .description(
-    'Copy directory structure to XML (default) or Markdown/JSON/NDJSON/SARIF/tree with customizable profiles and filters',
+    'Copy directory structure to XML (default) or Markdown/JSON/NDJSON/SARIF/tree with customizable filters',
   )
-  .option('-p, --profile <name>', 'Use a predefined profile (default: default)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
@@ -66,7 +65,6 @@ program
   .option('--show-size', 'Show file sizes')
   .option('--with-git-status', 'Include git status in output')
   .option('-r, --as-reference', 'Generate reference documentation')
-  .option('--validate', 'Validate profile without executing')
   .option('--clipboard', 'Copy output to clipboard')
   .option('-s, --sort <by>', 'Sort files by: path, size, modified, name, extension')
   .option('--dedupe', 'Remove duplicate files')
@@ -128,49 +126,7 @@ program
     );
   });
 
-// 2. Profile list command
-program
-  .command('profile:list')
-  .description('List all available profiles')
-  .option('--json', 'Output as JSON')
-  .action(async (options) => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'profile:list',
-        path: null,
-        options,
-      }),
-    );
-  });
-
-// 7. Profile validate command
-program
-  .command('profile:validate [profile]')
-  .description('Validate profile syntax and structure')
-  .option('--all', 'Validate all profiles')
-  .action(async (profile, options) => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'profile:validate',
-        path: null,
-        options: { ...options, profile },
-      }),
-    );
-  });
-
-// 8. Copy docs command
+// 2. Copy docs command
 program
   .command('copy:docs')
   .description('Copy CopyTree documentation (use --display to read all docs)')
@@ -250,7 +206,6 @@ program
   .description('Clear all caches')
   .option('--transformations', 'Clear only transformation cache')
   .option('--git', 'Clear only git cache')
-  .option('--profiles', 'Clear only profile detection cache')
   .option('--gc', 'Run garbage collection on expired entries')
   .option('--status', 'Show cache status after clearing')
   .option('-v, --verbose', 'Show verbose output')
