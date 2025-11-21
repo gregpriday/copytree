@@ -10,10 +10,10 @@ class Pipeline extends EventEmitter {
     this.stages = [];
     this.stageInstances = []; // Track instantiated stages for lifecycle hooks
     this.options = {
-      continueOnError: options.continueOnError ?? config().get('pipeline.continueOnError', false),
-      emitProgress: options.emitProgress ?? config().get('pipeline.emitProgress', true),
+      continueOnError: options.continueOnError, // Will be lazy-loaded from config if not provided
+      emitProgress: options.emitProgress, // Will be lazy-loaded from config if not provided
       parallel: options.parallel ?? false,
-      maxConcurrency: options.maxConcurrency ?? config().get('app.maxConcurrency', 5),
+      maxConcurrency: options.maxConcurrency, // Will be lazy-loaded from config if not provided
       ...options,
     };
 
@@ -110,6 +110,21 @@ class Pipeline extends EventEmitter {
   async process(input) {
     // Initialize stages if not already done
     await this._initializeStages();
+
+    // Refresh options from config now that we are async and likely fully loaded
+    // Only override if not explicitly provided in constructor options
+    const cfg = config();
+    if (this.options.continueOnError === undefined) {
+      this.options.continueOnError = cfg.get('pipeline.continueOnError', false);
+    }
+    if (this.options.emitProgress === undefined) {
+      this.options.emitProgress = cfg.get('pipeline.emitProgress', true);
+    }
+    if (this.options.maxConcurrency === undefined) {
+      this.options.maxConcurrency = cfg.get('app.maxConcurrency', 5);
+    }
+    // Update context options as well
+    this.context.options = this.options;
 
     this.stats.startTime = Date.now();
     this.stats.stagesCompleted = 0;

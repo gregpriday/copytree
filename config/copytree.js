@@ -1,15 +1,30 @@
 export default {
+  // 1. JUNK: Files that should never exist in output (complete noise)
   // Global excluded directories (always excluded regardless of location)
-  // Only includes version control directories that can't be in .gitignore
-  // Everything else (node_modules, .idea, etc.) should be in .gitignore
-  // Plain directory names - FileDiscoveryStage will append /** automatically
   globalExcludedDirectories: [
-    '.git',      // Git repository metadata
-    '.svn',      // Subversion
-    '.hg',       // Mercurial
-    '.bzr',      // Bazaar
-    'CVS',       // CVS
-    '_darcs',    // Darcs
+    // Version control
+    '.git', '.svn', '.hg', '.bzr', 'CVS', '_darcs',
+
+    // IDE/Editor directories
+    '.idea', '.vscode', '.eclipse', '.settings',
+
+    // Dependencies
+    'node_modules', 'bower_components', 'jspm_packages', 'vendor',
+
+    // Build artifacts
+    'dist', 'build', 'out', 'target', '.next', '.nuxt', '.output',
+
+    // Test coverage
+    'coverage', '.nyc_output',
+
+    // Python cache
+    '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache',
+
+    // Other caches
+    '.sass-cache', '.cache',
+
+    // Infrastructure temp
+    '.vagrant', '.serverless',
   ],
 
   // Base path excluded directories (only excluded at project root)
@@ -24,39 +39,69 @@ export default {
     '.gitignore',
     '.copytreeinclude',
 
-    // Lock files
+    // Environment files with secrets
+    '.env', '.env.local', '.env.*.local',
+
+    // OS metadata (pure noise)
+    '.DS_Store', 'Thumbs.db', 'desktop.ini', '.directory',
+    '$RECYCLE.BIN', 'ehthumbs.db', 'ehthumbs_vista.db',
+
+    // Logs and dumps (high token usage, low AI value)
+    '*.log', '*.pid', '*.seed', '*.pid.lock',
+    'npm-debug.log*', 'yarn-debug.log*', 'yarn-error.log*',
+    'lerna-debug.log*', 'pnpm-debug.log*',
+
+    // Map files (high token usage, AI can't read them)
+    '*.map', '*.css.map', '*.js.map',
+
+    // Minified code (AI can't read this effectively)
+    '*.min.js', '*.min.css',
+
+    // Editor backup/temp files
+    '*~', '*.swp', '*.swo', '*.bak', '*.tmp', '*.orig',
+    '*.sublime-workspace', '*.sublime-project',
+
+    // Compiled files (binary noise)
+    '*.pyc', '*.pyo', '*.pyd',
+    '*.class', '*.jar', '*.war', '*.ear',
+    '*.o', '*.obj', '*.exe', '*.dll', '*.so', '*.dylib',
+    '*.ncb', '*.sdf', '*.suo', '*.pdb', '*.idb',
+
+    // Archives (binary data)
+    '*.7z', '*.dmg', '*.gz', '*.iso', '*.rar', '*.tar', '*.zip',
+
+    // Media files (binary, high token usage)
+    '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.ico',
+    '*.mp3', '*.mp4', '*.avi', '*.mov', '*.wmv', '*.flv', '*.webm',
+    '*.wav', '*.flac', '*.aac', '*.ogg', '*.wma',
+  ],
+
+  // 2. STRUCTURE ONLY: Files to include in tree but exclude content (token optimization)
+  // These files provide important structural context but waste tokens if read fully
+  structureOnlyPatterns: [
+    // Lock files (show dependency state exists, but hash content is useless)
     'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'shrinkwrap.yaml',
     'composer.lock', 'Gemfile.lock', 'Pipfile.lock', 'poetry.lock', 'uv.lock', 'pdm.lock', 'requirements.lock',
     'Cargo.lock', 'go.sum', 'mix.lock', 'flake.lock',
     'pubspec.lock', 'Podfile.lock', 'Cartfile.resolved', 'Package.resolved', 'deno.lock',
 
-    // Environment files
-    '.env', '.env.local', '.env.*.local', '.env.example',
+    // SVG (often extremely verbose, low AI value)
+    '*.svg',
+  ],
 
-    // OS files
-    '.DS_Store', 'Thumbs.db', 'desktop.ini',
-    '$RECYCLE.BIN', 'ehthumbs.db', 'ehthumbs_vista.db',
-
-    // Logs
-    '*.log', 'npm-debug.log*', 'yarn-debug.log*', 'yarn-error.log*',
-    'lerna-debug.log*', 'pnpm-debug.log*',
-
-    // Editor files
-    '*.swp', '*.swo', '*~', '*.sublime-workspace', '*.sublime-project',
-
-    // Compiled files
-    '*.pyc', '*.pyo', '*.pyd', '__pycache__',
-    '*.class', '*.jar', '*.war', '*.ear',
-    '*.o', '*.obj', '*.exe', '*.dll', '*.so', '*.dylib',
-    '*.ncb', '*.sdf', '*.suo', '*.pdb', '*.idb',
-
-    // Archives
-    '*.7z', '*.dmg', '*.gz', '*.iso', '*.jar', '*.rar', '*.tar', '*.zip',
-
-    // Media files - always excluded
-    '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.svg', '*.ico',
-    '*.mp3', '*.mp4', '*.avi', '*.mov', '*.wmv', '*.flv', '*.webm',
-    '*.wav', '*.flac', '*.aac', '*.ogg', '*.wma',
+  // 3. ESSENTIAL DOTFILES: Force-include these even if includeHidden is false
+  // These provide high-value context about how to run/deploy the app
+  forceIncludeDotfiles: [
+    '.env.example',      // Safe environment template (no secrets)
+    '.editorconfig',     // Code style
+    '.eslintrc*',        // Linting rules
+    '.prettierrc*',      // Formatting rules
+    '.babelrc*',         // Transpilation config
+    '.dockerignore',     // Docker context
+    '.github/**',        // GitHub Actions/workflows (high value)
+    '.gitlab-ci.yml',    // GitLab CI
+    '.travis.yml',       // Travis CI
+    'circle.yml',        // CircleCI
   ],
 
   // File size limits

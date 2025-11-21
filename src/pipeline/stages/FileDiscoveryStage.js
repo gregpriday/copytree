@@ -37,6 +37,10 @@ class FileDiscoveryStage extends Stage {
     this.log(`Discovering files in ${this.basePath}`, 'debug');
     const startTime = Date.now();
 
+    // Merge config forceIncludeDotfiles with runtime forceInclude
+    const configForceIncludes = config().get('copytree.forceIncludeDotfiles', []);
+    this.forceInclude = [...this.forceInclude, ...configForceIncludes];
+
     // Build initial layers with global exclusions first
     const initialLayers = [];
 
@@ -51,8 +55,8 @@ class FileDiscoveryStage extends Stage {
       globalExcludedFiles.length > 0
     ) {
       const globalRules = [
+        ...globalExcluded.map((dir) => dir), // Exclude the directory itself
         ...globalExcluded.map((dir) => `${dir}/**`), // Exclude directory and all contents
-        ...globalExcluded.map((dir) => dir), // Also exclude the directory itself
         ...globalExcludedFiles, // Add file patterns (lock files, OS files, etc.)
       ];
 
@@ -66,6 +70,44 @@ class FileDiscoveryStage extends Stage {
         `Applied ${globalExcluded.length} global + ${basePathExcluded.length} base + ${globalExcludedFiles.length} file exclusions`,
         'debug',
       );
+    }
+
+    // 1a. Conditionally exclude tests if --no-tests flag is provided
+    if (input.options?.tests === false) {
+      const testExclusions = [
+        // Test directories
+        'test',
+        'tests',
+        '__tests__',
+        'spec',
+        'specs',
+        'test/**',
+        'tests/**',
+        '__tests__/**',
+        'spec/**',
+        'specs/**',
+        // Test files (scattered outside test directories)
+        '*.test.js',
+        '*.test.ts',
+        '*.test.jsx',
+        '*.test.tsx',
+        '*.spec.js',
+        '*.spec.ts',
+        '*.spec.jsx',
+        '*.spec.tsx',
+        '*.test.mjs',
+        '*.spec.mjs',
+        'jest.config.js',
+        'jest.config.ts',
+        'jest.setup.js',
+        'vitest.config.js',
+        'vitest.config.ts',
+      ];
+
+      const testLayer = ignore().add(testExclusions);
+      initialLayers.push({ base: this.basePath, ig: testLayer });
+
+      this.log(`Applied --no-tests: excluding test directories and files`, 'debug');
     }
 
     // 2. Add .gitignore layer if we should respect it

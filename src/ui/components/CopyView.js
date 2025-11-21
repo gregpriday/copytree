@@ -34,6 +34,7 @@ import path from 'path';
 import Clipboard from '../../utils/clipboard.js';
 import os from 'os';
 import { globalTelemetry } from '../../utils/performanceBudgets.js';
+import { config } from '../../config/ConfigManager.js';
 
 const CopyView = () => {
   const {
@@ -82,6 +83,9 @@ const CopyView = () => {
       }
 
       updateState({ isLoading: true, currentStage: 'Initializing' });
+
+      // Ensure configuration is loaded before proceeding
+      await config().loadConfiguration();
 
       const profileName = options.profile || 'default';
       updateState({ currentStage: 'Preparing configuration' });

@@ -71,9 +71,6 @@ class InstructionsLoader {
       else if (await fs.pathExists(appPath)) {
         content = await fs.readFile(appPath, 'utf8');
         foundPath = appPath;
-        if (this.logger?.debug) {
-          this.logger.debug(`Loading instructions from app directory: ${appPath}`);
-        }
       } else {
         const { InstructionsError, CopyTreeError } = await import('../utils/errors.js');
         const ErrorClass = InstructionsError || CopyTreeError;
@@ -87,9 +84,6 @@ class InstructionsLoader {
       // Cache the result
       this.instructionsCache.set(cacheKey, content);
 
-      if (this.logger?.debug) {
-        this.logger.debug(`Successfully loaded instructions '${name}' from ${foundPath}`);
-      }
       return content;
     } catch (error) {
       if (this.logger?.error) {

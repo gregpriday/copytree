@@ -2,6 +2,7 @@ import Stage from '../Stage.js';
 import fs from 'fs-extra';
 import path from 'path';
 import { detect, isConvertibleDocument } from '../../utils/BinaryDetector.js';
+import { minimatch } from 'minimatch';
 
 class FileLoadingStage extends Stage {
   constructor(options = {}) {
@@ -28,7 +29,22 @@ class FileLoadingStage extends Stage {
 
   async loadFileContent(file) {
     try {
-      // Use centralized binary detector
+      // 1. Check for Structure Only patterns (Token saving)
+      const structureOnlyPatterns = this.config.get('copytree.structureOnlyPatterns', []);
+      const isStructureOnly = structureOnlyPatterns.some((pattern) =>
+        minimatch(file.path, pattern, { dot: true }),
+      );
+
+      if (isStructureOnly) {
+        return {
+          ...file,
+          content: '[Content skipped for AI context optimization]', // Token-efficient placeholder
+          isBinary: true, // Treat as binary to skip line numbering/processing
+          binaryCategory: 'structure-only',
+        };
+      }
+
+      // 2. Use centralized binary detector
       const det = await detect(file.absolutePath, {
         sampleBytes: this.config.get('copytree.binaryDetect.sampleBytes', 8192),
         nonPrintableThreshold: this.config.get('copytree.binaryDetect.nonPrintableThreshold', 0.3),

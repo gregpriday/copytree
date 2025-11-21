@@ -44,6 +44,9 @@ async function copyCommand(targetPath = '.', options = {}) {
     // Start with initializing message
     logger.startSpinner('Initializing');
 
+    // Ensure configuration is loaded before proceeding
+    await config().loadConfiguration();
+
     // 1. Build configuration from CLI options and defaults
     const profileConfig = await buildProfileFromCliOptions(options);
 

@@ -384,6 +384,20 @@
           },
           "description": "Globally excluded file patterns"
         },
+        "structureOnlyPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Files to include in tree but exclude content (e.g., lockfiles for token optimization)"
+        },
+        "forceIncludeDotfiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Dotfiles to force-include even if includeHidden is false"
+        },
         "maxFileSize": {
           "type": "number",
           "minimum": 1024,

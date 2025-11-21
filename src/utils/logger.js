@@ -8,7 +8,7 @@ class Logger extends EventEmitter {
   constructor(options = {}) {
     super();
     this.options = {
-      debug: config().get('app.debug', false),
+      debug: options.debug, // Will be lazy-loaded from config if not provided
       silent: options.silent || false,
       prefix: options.prefix || 'CopyTree',
       useInkEvents: options.useInkEvents || false, // New option for Ink integration
@@ -16,6 +16,14 @@ class Logger extends EventEmitter {
     };
 
     this.spinner = null;
+  }
+
+  // Lazy-load debug setting from config
+  get debug() {
+    if (this.options.debug === undefined) {
+      this.options.debug = config().get('app.debug', false);
+    }
+    return this.options.debug;
   }
 
   /**
@@ -89,8 +97,8 @@ class Logger extends EventEmitter {
   /**
    * Log a debug message (only if debug mode is enabled)
    */
-  debug(message, ...args) {
-    if (!this.options.debug) return;
+  logDebug(message, ...args) {
+    if (!this.debug) return;
 
     if (this.options.useInkEvents) {
       this.emit('log', {

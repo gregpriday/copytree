@@ -70,6 +70,7 @@ program
   .option('-s, --sort <by>', 'Sort files by: path, size, modified, name, extension')
   .option('--dedupe', 'Remove duplicate files')
   .option('--always <patterns...>', 'Always include these patterns')
+  .option('--no-tests', 'Exclude test files and directories (for compact AI context)')
   .option('--no-cache', 'Disable caching for AI operations')
   .option('--no-instructions', 'Disable including instructions in output')
   .option('--instructions <name>', 'Use custom instructions set (default: default)')

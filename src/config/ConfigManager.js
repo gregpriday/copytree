@@ -81,6 +81,23 @@ class ConfigManager {
       return;
     }
 
+    // If already initializing, wait for completion
+    if (this._initializing) {
+      return this._initPromise;
+    }
+
+    // Mark as initializing and create promise
+    this._initializing = true;
+    this._initPromise = this._doLoadConfiguration();
+
+    try {
+      await this._initPromise;
+    } finally {
+      this._initializing = false;
+    }
+  }
+
+  async _doLoadConfiguration() {
     // 1. Load schema for validation
     await this.loadSchema();
 
