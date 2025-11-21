@@ -59,10 +59,7 @@ include:
           include: ['src/**/*.js'],
           exclude: ['node_modules/**'],
         };
-        await fs.writeFile(
-          path.join(tmpDir, '.copytree.json'),
-          JSON.stringify(profileData)
-        );
+        await fs.writeFile(path.join(tmpDir, '.copytree.json'), JSON.stringify(profileData));
 
         const loader = new FolderProfileLoader({ cwd: tmpDir });
         const profile = await loader.discover();
@@ -113,11 +110,11 @@ name = ini-profile
       await withTempDir('priority-yml', async (tmpDir) => {
         await fs.writeFile(
           path.join(tmpDir, '.copytree.yml'),
-          'name: yml-profile\ninclude: ["*.js"]'
+          'name: yml-profile\ninclude: ["*.js"]',
         );
         await fs.writeFile(
           path.join(tmpDir, '.copytree.yaml'),
-          'name: yaml-profile\ninclude: ["*.ts"]'
+          'name: yaml-profile\ninclude: ["*.ts"]',
         );
 
         const loader = new FolderProfileLoader({ cwd: tmpDir });
@@ -130,11 +127,11 @@ name = ini-profile
       await withTempDir('priority-yaml', async (tmpDir) => {
         await fs.writeFile(
           path.join(tmpDir, '.copytree.yaml'),
-          'name: yaml-profile\ninclude: ["*.js"]'
+          'name: yaml-profile\ninclude: ["*.js"]',
         );
         await fs.writeFile(
           path.join(tmpDir, '.copytree.json'),
-          JSON.stringify({ name: 'json-profile', include: ['*.ts'] })
+          JSON.stringify({ name: 'json-profile', include: ['*.ts'] }),
         );
 
         const loader = new FolderProfileLoader({ cwd: tmpDir });
@@ -147,7 +144,7 @@ name = ini-profile
       await withTempDir('priority-json', async (tmpDir) => {
         await fs.writeFile(
           path.join(tmpDir, '.copytree.json'),
-          JSON.stringify({ name: 'json-profile', include: ['*.js'] })
+          JSON.stringify({ name: 'json-profile', include: ['*.js'] }),
         );
         await fs.writeFile(path.join(tmpDir, '.copytree'), '[profile]\nname = ini-profile');
 
@@ -188,7 +185,7 @@ include:
         };
         await fs.writeFile(
           path.join(tmpDir, '.copytree-source-only.json'),
-          JSON.stringify(profileData)
+          JSON.stringify(profileData),
         );
 
         const loader = new FolderProfileLoader({ cwd: tmpDir });
@@ -208,13 +205,10 @@ include:
 
     it('should prioritize extensions for named profiles', async () => {
       await withTempDir('named-priority', async (tmpDir) => {
-        await fs.writeFile(
-          path.join(tmpDir, '.copytree-test.yml'),
-          'name: yml\ninclude: ["*.js"]'
-        );
+        await fs.writeFile(path.join(tmpDir, '.copytree-test.yml'), 'name: yml\ninclude: ["*.js"]');
         await fs.writeFile(
           path.join(tmpDir, '.copytree-test.json'),
-          JSON.stringify({ name: 'json', include: ['*.ts'] })
+          JSON.stringify({ name: 'json', include: ['*.ts'] }),
         );
 
         const loader = new FolderProfileLoader({ cwd: tmpDir });
@@ -394,7 +388,7 @@ node_modules/**
         await fs.writeFile(path.join(tmpDir, '.copytree-docs.yml'), 'name: docs');
         await fs.writeFile(
           path.join(tmpDir, '.copytree-source.json'),
-          JSON.stringify({ name: 'source' })
+          JSON.stringify({ name: 'source' }),
         );
         await fs.writeFile(path.join(tmpDir, '.copytree-tests'), '[profile]\nname=tests');
 
@@ -431,7 +425,7 @@ node_modules/**
         await fs.writeFile(path.join(tmpDir, '.copytree-test.yml'), 'name: test');
         await fs.writeFile(
           path.join(tmpDir, '.copytree-test.json'),
-          JSON.stringify({ name: 'test' })
+          JSON.stringify({ name: 'test' }),
         );
 
         const loader = new FolderProfileLoader({ cwd: tmpDir });
@@ -496,7 +490,7 @@ node_modules/**
       await withTempDir('exists-extensions', async (tmpDir) => {
         await fs.writeFile(
           path.join(tmpDir, '.copytree-test.json'),
-          JSON.stringify({ name: 'test' })
+          JSON.stringify({ name: 'test' }),
         );
 
         const loader = new FolderProfileLoader({ cwd: tmpDir });

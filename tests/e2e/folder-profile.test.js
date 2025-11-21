@@ -28,7 +28,7 @@ describe('Folder Profile E2E Tests', () => {
   });
 
   afterEach(async () => {
-    if (tmpDir && await fs.pathExists(tmpDir)) {
+    if (tmpDir && (await fs.pathExists(tmpDir))) {
       await fs.remove(tmpDir);
     }
   });
@@ -69,7 +69,7 @@ include:
       expect(await fs.pathExists(outputFile)).toBe(true);
 
       const output = await fs.readJson(outputFile);
-      const filePaths = output.files.map(f => f.path);
+      const filePaths = output.files.map((f) => f.path);
 
       // Should only include .md files
       expect(filePaths).toContain('README.md');
@@ -109,7 +109,7 @@ include:
       expect(await fs.pathExists(outputFile)).toBe(true);
 
       const output = await fs.readJson(outputFile);
-      const filePaths = output.files.map(f => f.path);
+      const filePaths = output.files.map((f) => f.path);
 
       expect(filePaths).toContain('README.md');
       expect(filePaths).not.toContain('index.js');
@@ -137,7 +137,7 @@ exclude:
       expect(exitCode).toBe(0);
 
       const output = await fs.readJson(outputFile);
-      const filePaths = output.files.map(f => f.path);
+      const filePaths = output.files.map((f) => f.path);
 
       expect(filePaths).toContain('src/app.js');
       expect(filePaths).not.toContain('src/app.test.js');
@@ -160,7 +160,7 @@ include:
       expect(exitCode).toBe(0);
 
       const output = await fs.readJson(outputFile);
-      const filePaths = output.files.map(f => f.path);
+      const filePaths = output.files.map((f) => f.path);
 
       // Should only have .md files (CLI override)
       expect(filePaths).toContain('README.md');
@@ -182,7 +182,7 @@ exclude:
       expect(exitCode).toBe(0);
 
       const output = await fs.readJson(outputFile);
-      const filePaths = output.files.map(f => f.path);
+      const filePaths = output.files.map((f) => f.path);
 
       // Should exclude both test files and docs
       expect(filePaths).not.toContain('index.test.js');
@@ -204,7 +204,7 @@ include:
 
       expect(exitCode).toBe(0);
       const output = await fs.readJson(outputFile);
-      expect(output.files.some(f => f.path === 'README.md')).toBe(true);
+      expect(output.files.some((f) => f.path === 'README.md')).toBe(true);
     });
 
     it('should support JSON format', async () => {
@@ -218,7 +218,7 @@ include:
 
       expect(exitCode).toBe(0);
       const output = await fs.readJson(outputFile);
-      expect(output.files.some(f => f.path === 'index.js')).toBe(true);
+      expect(output.files.some((f) => f.path === 'index.js')).toBe(true);
     });
 
     it('should support INI format (no extension)', async () => {
@@ -236,7 +236,7 @@ include:
 
       expect(exitCode).toBe(0);
       const output = await fs.readJson(outputFile);
-      expect(output.files.some(f => f.path === 'README.md')).toBe(true);
+      expect(output.files.some((f) => f.path === 'README.md')).toBe(true);
     });
   });
 
@@ -364,7 +364,7 @@ include:
 
       expect(exitCode).toBe(0);
       const output = await fs.readJson(outputFile);
-      const filePaths = output.files.map(f => f.path);
+      const filePaths = output.files.map((f) => f.path);
 
       // Should use .yml (prioritized)
       expect(filePaths).toContain('README.md');

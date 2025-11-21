@@ -267,10 +267,12 @@ async function buildProfileFromCliOptions(options) {
     },
 
     // Store folder profile metadata for debugging
-    _folderProfile: folderProfile ? {
-      name: folderProfile.name,
-      source: 'folder',
-    } : null,
+    _folderProfile: folderProfile
+      ? {
+          name: folderProfile.name,
+          source: 'folder',
+        }
+      : null,
   };
 
   // Handle binary file inclusion

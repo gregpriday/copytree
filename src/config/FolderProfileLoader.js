@@ -52,11 +52,10 @@ class FolderProfileLoader {
       }
     }
 
-    throw new ConfigurationError(
-      `Profile not found: ${name}`,
-      'FolderProfileLoader',
-      { name, searchPath: this.cwd },
-    );
+    throw new ConfigurationError(`Profile not found: ${name}`, 'FolderProfileLoader', {
+      name,
+      searchPath: this.cwd,
+    });
   }
 
   /**

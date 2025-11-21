@@ -26,7 +26,6 @@ async function createTestProject(tmpDir) {
 }
 
 describe('Folder Profile Integration', () => {
-
   describe('Profile Auto-Discovery', () => {
     it('should use folder profile include patterns', async () => {
       // Create folder profile that only includes .md files
@@ -48,7 +47,7 @@ include:
 
         // Parse the output
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         // Should only include .md files
         expect(filePaths).toContain('README.md');
@@ -78,7 +77,7 @@ exclude:
         });
 
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         // Should not include test files
         expect(filePaths).not.toContain('index.test.js');
@@ -113,7 +112,7 @@ include:
         });
 
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         // Should only include markdown files
         expect(filePaths).toContain('README.md');
@@ -133,7 +132,7 @@ include:
           copyCommand('.', {
             profile: 'nonexistent',
             format: 'json',
-          })
+          }),
         ).rejects.toThrow(/Profile not found/);
       } finally {
         process.chdir(originalCwd);
@@ -162,7 +161,7 @@ include:
         });
 
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         // Should only include .md files (CLI override)
         expect(filePaths).toContain('README.md');
@@ -192,7 +191,7 @@ exclude:
         });
 
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         // Should exclude both test files and md files
         expect(filePaths).not.toContain('index.test.js');
@@ -224,7 +223,7 @@ exclude:
         });
 
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         expect(filePaths).toContain('README.md');
         expect(filePaths).not.toContain('index.js');
@@ -256,7 +255,7 @@ name = ini-profile
         });
 
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         expect(filePaths).toContain('README.md');
         expect(filePaths).not.toContain('index.js');
@@ -288,7 +287,7 @@ include:
         });
 
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         // Should include root .js files
         expect(filePaths).toContain('index.js');
@@ -351,7 +350,7 @@ exclude:
         });
 
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         expect(filePaths).toContain('README.md');
         expect(filePaths).toContain('docs/guide.md');
@@ -389,7 +388,7 @@ exclude:
         });
 
         const files = JSON.parse(result.output).files;
-        const filePaths = files.map(f => f.path);
+        const filePaths = files.map((f) => f.path);
 
         expect(filePaths).toContain('src/app.js');
         expect(filePaths).toContain('package.json');
