@@ -111,8 +111,8 @@ async function copyCommand(targetPath = '.', options = {}) {
     logger.stopSpinner();
 
     // 9. Display final output
-  if (!options.dryRun && outputResult) {
-    await displayOutput(outputResult, options, basePath);
+    if (!options.dryRun && outputResult) {
+      await displayOutput(outputResult, options, basePath);
     } else if (options.dryRun) {
       logger.info('🔍 Dry run mode - no files were processed.');
       const fileCount = result.files.filter((f) => f !== null).length;
