@@ -156,7 +156,12 @@ const CopyView = () => {
       }
 
       // Handle output actions and create completion message
-      const completionMessage = await handleOutputAndCreateMessage(outputResult, options, result);
+      const completionMessage = await handleOutputAndCreateMessage(
+        outputResult,
+        options,
+        result,
+        basePath,
+      );
     } catch (err) {
       console.error(err.message);
       updateState({
@@ -283,7 +288,7 @@ const CopyView = () => {
     };
   };
 
-  const handleOutputAndCreateMessage = async (outputResult, options, result) => {
+  const handleOutputAndCreateMessage = async (outputResult, options, result, basePath) => {
     const stats = result.stats || {};
     // Count only non-null files (nulls are placeholders for filtered binary files)
     const fileCount = result.files
@@ -315,7 +320,10 @@ const CopyView = () => {
             : format === 'tree'
               ? 'txt'
               : 'xml';
-      const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
+      const dirName = basePath ? path.basename(basePath) : 'copytree';
+      const safeName = dirName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+      const prefix = safeName || 'copytree';
+      const tempFile = path.join(os.tmpdir(), `${prefix}-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, outputResult.content, 'utf8');
 
       try {

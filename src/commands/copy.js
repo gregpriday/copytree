@@ -111,8 +111,8 @@ async function copyCommand(targetPath = '.', options = {}) {
     logger.stopSpinner();
 
     // 9. Display final output
-    if (!options.dryRun && outputResult) {
-      await displayOutput(outputResult, options);
+  if (!options.dryRun && outputResult) {
+    await displayOutput(outputResult, options, basePath);
     } else if (options.dryRun) {
       logger.info('🔍 Dry run mode - no files were processed.');
       const fileCount = result.files.filter((f) => f !== null).length;
@@ -508,7 +508,7 @@ async function prepareOutput(result, options) {
 /**
  * Display the final output after Listr has cleared
  */
-async function displayOutput(outputResult, options) {
+async function displayOutput(outputResult, options, basePath) {
   const { type, output, outputSize, fileCount, totalSize, outputPath } = outputResult;
 
   if (type === 'streamed') {
@@ -539,7 +539,10 @@ async function displayOutput(outputResult, options) {
                 ? 'sarif'
                 : 'xml';
     const os = await import('os');
-    const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
+    const dirName = basePath ? path.basename(basePath) : 'copytree';
+    const safeName = dirName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+    const prefix = safeName || 'copytree';
+    const tempFile = path.join(os.tmpdir(), `${prefix}-${Date.now()}.${extension}`);
     await fs.writeFile(tempFile, output, 'utf8');
 
     try {
