@@ -29,7 +29,10 @@ const SECRET_FILE_PATTERNS = [
 
 const BASIC_PATTERNS = [
   { id: 'AWS_ACCESS_KEY', regex: /AKIA[0-9A-Z]{16}/gi },
-  { id: 'AWS_SECRET_KEY', regex: /aws(.{0,20})?(secret|access)[^\\s]{0,5}['\"`]?[A-Za-z0-9/+=]{32,40}['\"`]?/gi },
+  {
+    id: 'AWS_SECRET_KEY',
+    regex: /aws(.{0,20})?(secret|access)[^\\s]{0,5}['\"`]?[A-Za-z0-9/+=]{32,40}['\"`]?/gi,
+  },
   { id: 'PRIVATE_KEY', regex: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/gi },
   { id: 'GENERIC_TOKEN', regex: /(api|secret|token|password)[\\s:=]{1,4}[A-Za-z0-9._-]{12,}/gi },
 ];
@@ -127,10 +130,7 @@ class SecretsGuardStage extends Stage {
         }
 
         if (this.failOnSecrets) {
-          throw new SecretsDetectedError(
-            `Secrets detected in ${filePath}`,
-            fileFindings,
-          );
+          throw new SecretsDetectedError(`Secrets detected in ${filePath}`, fileFindings);
         }
       }
 

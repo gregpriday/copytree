@@ -22,81 +22,91 @@ class XMLFormatter {
   }
 
   async format(input) {
+    const chunks = [];
+    const generated = new Date().toISOString();
+    const totalSize = this.stage.calculateTotalSize(input.files);
+    const fileCount = input.files.filter((f) => f !== null).length;
+
     // Manual XML construction to avoid any escaping
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xml += `<ct:directory xmlns:ct="urn:copytree" path="${input.basePath}">\n`;
+    chunks.push('<?xml version="1.0" encoding="UTF-8"?>\n');
+    chunks.push(`<ct:directory xmlns:ct="urn:copytree" path="${input.basePath}">\n`);
 
     // Add metadata
-    xml += '  <ct:metadata>\n';
-    xml += `    <ct:generated>${new Date().toISOString()}</ct:generated>\n`;
-    xml += `    <ct:fileCount>${input.files.filter((f) => f !== null).length}</ct:fileCount>\n`;
-    xml += `    <ct:totalSize>${this.stage.calculateTotalSize(input.files)}</ct:totalSize>\n`;
+    chunks.push('  <ct:metadata>\n');
+    chunks.push(`    <ct:generated>${generated}</ct:generated>\n`);
+    chunks.push(`    <ct:fileCount>${fileCount}</ct:fileCount>\n`);
+    chunks.push(`    <ct:totalSize>${totalSize}</ct:totalSize>\n`);
 
     if (input.profile) {
-      xml += `    <ct:profile>${input.profile.name || 'default'}</ct:profile>\n`;
+      chunks.push(`    <ct:profile>${input.profile.name || 'default'}</ct:profile>\n`);
     }
 
     // Add git metadata if present
     if (input.gitMetadata) {
-      xml += '    <ct:git>\n';
+      chunks.push('    <ct:git>\n');
       if (input.gitMetadata.branch) {
-        xml += `      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`;
+        chunks.push(`      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`);
       }
       if (input.gitMetadata.lastCommit) {
         const msg = this.escapeCdata(input.gitMetadata.lastCommit.message || '');
-        xml += `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}"><![CDATA[${msg}]]></ct:lastCommit>\n`;
+        chunks.push(
+          `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}"><![CDATA[${msg}]]></ct:lastCommit>\n`,
+        );
       }
       if (input.gitMetadata.filterType) {
-        xml += `      <ct:filterType>${input.gitMetadata.filterType}</ct:filterType>\n`;
+        chunks.push(`      <ct:filterType>${input.gitMetadata.filterType}</ct:filterType>\n`);
       }
-      xml += `      <ct:hasUncommittedChanges>${input.gitMetadata.hasUncommittedChanges ? 'true' : 'false'}</ct:hasUncommittedChanges>\n`;
-      xml += '    </ct:git>\n';
+      chunks.push(
+        `      <ct:hasUncommittedChanges>${input.gitMetadata.hasUncommittedChanges ? 'true' : 'false'}</ct:hasUncommittedChanges>\n`,
+      );
+      chunks.push('    </ct:git>\n');
     }
 
     // Add directory structure to metadata
     const directoryStructure = this.stage.generateDirectoryStructure(input.files);
     if (directoryStructure) {
-      xml += `    <ct:directoryStructure>${directoryStructure}</ct:directoryStructure>\n`;
+      chunks.push(`    <ct:directoryStructure>${directoryStructure}</ct:directoryStructure>\n`);
     }
 
     // Add instructions if present (loaded by InstructionsStage)
     if (input.instructions) {
       const nameAttr = input.instructionsName ? ` name="${input.instructionsName}"` : '';
       const instr = this.escapeCdata(input.instructions);
-      xml += `    <ct:instructions${nameAttr}><![CDATA[${instr}]]></ct:instructions>\n`;
+      chunks.push(`    <ct:instructions${nameAttr}><![CDATA[${instr}]]></ct:instructions>\n`);
     }
 
-    xml += '  </ct:metadata>\n';
-    xml += '  <ct:files>\n';
+    chunks.push('  </ct:metadata>\n');
+    chunks.push('  <ct:files>\n');
 
     // Add files
     for (const file of input.files) {
       if (file === null) continue; // Skip files that were filtered out
 
-      xml += `    <ct:file path="@${file.path}" size="${file.size}"`;
+      let fileHeader = `    <ct:file path="@${file.path}" size="${file.size}"`;
 
       if (file.modified) {
         const modifiedDate =
           file.modified instanceof Date ? file.modified : new Date(file.modified);
-        xml += ` modified="${modifiedDate.toISOString()}"`;
+        fileHeader += ` modified="${modifiedDate.toISOString()}"`;
       }
 
       if (file.isBinary) {
-        xml += ' binary="true"';
+        fileHeader += ' binary="true"';
         if (file.encoding) {
-          xml += ` encoding="${file.encoding}"`;
+          fileHeader += ` encoding="${file.encoding}"`;
         }
       }
 
       if (file.binaryCategory) {
-        xml += ` binaryCategory="${file.binaryCategory}"`;
+        fileHeader += ` binaryCategory="${file.binaryCategory}"`;
       }
 
       if (file.gitStatus) {
-        xml += ` gitStatus="${file.gitStatus}"`;
+        fileHeader += ` gitStatus="${file.gitStatus}"`;
       }
 
-      xml += '>';
+      fileHeader += '>';
+      chunks.push(fileHeader);
 
       // Add content directly to file element (unless --only-tree is set)
       if (!this.onlyTree) {
@@ -116,7 +126,7 @@ class XMLFormatter {
             .replace('{TYPE}', sanitizeForComment(categoryName))
             .replace('{PATH}', sanitizeForComment(`@${file.path}`))
             .replace('{SIZE}', this.stage.formatBytes(file.size || 0));
-          xml += msg;
+          chunks.push(msg);
         } else {
           // Regular content handling
           let content = file.content || '';
@@ -127,17 +137,17 @@ class XMLFormatter {
 
           // Wrap content in CDATA to ensure well-formed XML
           const c = this.escapeCdata(content);
-          xml += `<![CDATA[${c}]]>`;
+          chunks.push(`<![CDATA[${c}]]>`);
         }
       }
 
-      xml += '</ct:file>\n';
+      chunks.push('</ct:file>\n');
     }
 
-    xml += '  </ct:files>\n';
-    xml += '</ct:directory>\n';
+    chunks.push('  </ct:files>\n');
+    chunks.push('</ct:directory>\n');
 
-    return xml;
+    return chunks.join('');
   }
 }
 

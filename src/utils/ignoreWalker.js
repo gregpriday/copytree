@@ -29,19 +29,30 @@ function toPosix(p) {
   return p.split(path.sep).join('/');
 }
 
+// Cache parsed ignore rules per file path to avoid repeated FS reads and parsing
+const ruleCache = new Map();
+
 /**
  * Read ignore rules from a file
  * @param {string} filePath - Absolute path to ignore file
  * @returns {Promise<string[]>} Array of rule lines (or empty if file doesn't exist)
  */
 async function readRules(filePath) {
+  const cached = ruleCache.get(filePath);
+  if (cached) {
+    return cached;
+  }
+
   try {
     const content = await fs.readFile(filePath, 'utf8');
     // Strip UTF-8 BOM if present
     const cleaned = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
-    return cleaned.split('\n');
+    const rules = cleaned.split('\n');
+    ruleCache.set(filePath, rules);
+    return rules;
   } catch {
     // File doesn't exist or can't be read - treat as no rules
+    ruleCache.set(filePath, []);
     return [];
   }
 }
