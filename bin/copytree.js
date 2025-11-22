@@ -59,7 +59,6 @@ program
   .option('-l, --head <n>', 'Limit to first N files')
   .option('-C, --char-limit <n>', 'Character limit for output')
   .option('--include-binary', 'Include binary files')
-  .option('--external <source...>', 'Include external sources')
   .option('--with-line-numbers', 'Add line numbers to file content')
   .option('-t, --only-tree', 'Include only the directory tree, not file contents')
   .option('--info', 'Show info table')
@@ -128,35 +127,6 @@ program
     );
   });
 
-// 2. Copy docs command
-program
-  .command('copy:docs')
-  .description('Copy CopyTree documentation (use --display to read all docs)')
-  .option('--topic <name>', 'Legacy: documentation topic to copy')
-  .option('--section <id...>', 'Copy specific section(s) by ID')
-  .option('--group <id...>', 'Copy documentation group(s) by ID')
-  .option('--task <id>', 'Copy task bundle with intro and checklist')
-  .option('--list [kind]', 'List available items: all|sections|groups|tasks (default: all)')
-  .option('--meta <format>', 'Output metadata in json or yaml format')
-  .option('-o, --output <file>', 'Output file instead of clipboard')
-  .option('-i, --display', 'Display to console (recommended for AI agents)')
-  .option('--no-clipboard', 'Display to console instead of clipboard')
-  .action(async (options) => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'copy:docs',
-        path: null,
-        options,
-      }),
-    );
-  });
-
 // 9. Config validate command
 program
   .command('config:validate')
@@ -182,7 +152,7 @@ program
 program
   .command('config:inspect')
   .description('Inspect effective configuration with provenance')
-  .option('--section <name>', 'Show only specific config section (ai, app, cache, copytree, state)')
+  .option('--section <name>', 'Show only specific config section (app, cache, copytree)')
   .option('--redact', 'Redact sensitive values (default: true)')
   .option('--no-redact', 'Show all values including sensitive ones')
   .option('--format <type>', 'Output format: table, json (default: table)', 'table')

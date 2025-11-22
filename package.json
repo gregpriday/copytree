@@ -73,17 +73,13 @@
     "ink": "^6.5.0",
     "ink-spinner": "^5.0.0",
     "inquirer": "^12.2.0",
-    "joi": "^18.0.1",
     "js-yaml": "^4.1.1",
     "lodash": "^4.17.21",
-    "marked": "^16.4.1",
     "minimatch": "^10.1.1",
     "ora": "^9.0.0",
     "p-limit": "^7.2.0",
-    "pdf-parse": "^2.4.5",
     "react": "^19.2.0",
     "simple-git": "^3.30.0",
-    "tesseract.js": "^6.0.1",
     "xmlbuilder2": "^4.0.0"
   },
   "devDependencies": {
@@ -98,7 +94,6 @@
     "ink-testing-library": "^4.0.0",
     "jest": "^30.0.4",
     "prettier": "^3.5.0",
-    "sharp": "^0.34.5",
     "strip-ansi": "^7.1.0",
     "typescript": "^5.8.3"
   },

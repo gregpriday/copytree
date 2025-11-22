@@ -209,7 +209,7 @@ class TransformerRegistry {
       stack.push(name);
 
       for (const dep of getDeps(name)) {
-        // Dependencies can be external resources (like 'tesseract', 'network')
+        // Dependencies can be external resources (like 'network')
         // Only validate dependencies that are registered transformers
         if (this.transformers.has(dep)) {
           visit(dep, stack);
@@ -615,8 +615,6 @@ class TransformerRegistry {
       './transformers/StreamingFileLoaderTransformer.js'
     );
     const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
-    const { default: PDFTransformer } = await import('./transformers/PDFTransformer.js');
-    const { default: ImageTransformer } = await import('./transformers/ImageTransformer.js');
 
     // File Loader - default transformer
     registry.register(
@@ -658,63 +656,6 @@ class TransformerRegistry {
         conflictsWith: [],
         requirements: {},
         tags: ['loader', 'streaming'],
-      },
-    );
-
-    // PDF transformer
-    registry.register(
-      'pdf',
-      new PDFTransformer(),
-      {
-        extensions: ['.pdf'],
-        mimeTypes: ['application/pdf'],
-        priority: 15,
-      },
-      {
-        inputTypes: ['binary'],
-        outputTypes: ['text'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: true,
-        stateful: false,
-        dependencies: [],
-        conflictsWith: [],
-        requirements: {
-          memory: '50MB',
-        },
-        tags: ['text-extraction', 'document', 'pdf'],
-      },
-    );
-
-    // Image transformer (OCR)
-    registry.register(
-      'image',
-      new ImageTransformer(),
-      {
-        extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp'],
-        mimeTypes: [
-          'image/jpeg',
-          'image/png',
-          'image/gif',
-          'image/bmp',
-          'image/tiff',
-          'image/webp',
-        ],
-        priority: 15,
-      },
-      {
-        inputTypes: ['binary'],
-        outputTypes: ['text'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: true,
-        stateful: false,
-        dependencies: ['tesseract'],
-        conflictsWith: [],
-        requirements: {
-          memory: '100MB',
-        },
-        tags: ['text-extraction', 'image', 'ocr'],
       },
     );
 

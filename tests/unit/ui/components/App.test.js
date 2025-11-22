@@ -57,23 +57,6 @@ describe('App Component', () => {
       }
     });
 
-    test('App renders profile:list command', async () => {
-      const { default: App } = await import('../../../../src/ui/App.js');
-
-      const instance = render(<App command="profile:list" options={{}} />);
-
-      // Give async components time to load
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const output = instance.lastFrame();
-      expect(output).toBeDefined();
-      expect(typeof output).toBe('string');
-
-      if (typeof instance.unmount === 'function') {
-        instance.unmount();
-      }
-    });
-
     test('App renders config:validate command', async () => {
       const { default: App } = await import('../../../../src/ui/App.js');
 
@@ -91,17 +74,15 @@ describe('App Component', () => {
       }
     });
 
-    test('App renders copy:docs command', async () => {
+    test('App handles unknown commands', async () => {
       const { default: App } = await import('../../../../src/ui/App.js');
 
-      const instance = render(<App command="copy:docs" options={{}} />);
+      const instance = render(<App command="unknown" options={{}} />);
 
-      // Give async components time to load
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       const output = instance.lastFrame();
-      expect(output).toBeDefined();
-      expect(typeof output).toBe('string');
+      expect(output).toContain('Unknown command');
 
       if (typeof instance.unmount === 'function') {
         instance.unmount();

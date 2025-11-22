@@ -19,7 +19,6 @@ import { fileURLToPath } from 'url';
 import { walkWithIgnore } from '../../src/utils/ignoreWalker.js';
 import { walkParallel } from '../../src/utils/parallelWalker.js';
 import { generateFixture, cleanupFixtures } from '../helpers/fixtureGenerator.js';
-import { getMetrics } from '../../src/telemetry/metrics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,9 +37,6 @@ const BENCHMARK_CONFIG = {
  */
 async function runBenchmark(walker, fixture, options = {}) {
   const { concurrency = 1, name = 'unnamed' } = options;
-
-  // Reset metrics
-  getMetrics().reset();
 
   // Force garbage collection if available
   if (global.gc) {
@@ -77,9 +73,6 @@ async function runBenchmark(walker, fixture, options = {}) {
     heapTotal: memAfter.heapTotal - memBefore.heapTotal,
   };
 
-  // Get metrics if enabled
-  const metrics = getMetrics().getAll();
-
   return {
     name,
     duration,
@@ -87,7 +80,7 @@ async function runBenchmark(walker, fixture, options = {}) {
     filesPerSecond: fileCount / (duration / 1000),
     memoryDelta,
     peakMemory: memAfter.heapUsed,
-    metrics: metrics.enabled ? metrics : null,
+    metrics: null,
   };
 }
 

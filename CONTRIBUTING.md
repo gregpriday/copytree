@@ -104,7 +104,7 @@ We follow Git Flow:
 
 ### Naming Conventions
 
-- **Classes**: `PascalCase` (e.g., `PDFTransformer`, `GitUtils`)
+- **Classes**: `PascalCase` (e.g., `BinaryTransformer`, `GitUtils`)
 - **Files**: `camelCase.js` or `PascalCase.js` matching class name
 - **Functions/Variables**: `camelCase`
 - **Constants**: `UPPER_SNAKE_CASE`

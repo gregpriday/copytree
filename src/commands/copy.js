@@ -240,13 +240,6 @@ async function buildProfileFromCliOptions(options) {
         : [options.always]
       : [],
 
-    // External sources
-    external: options.external
-      ? Array.isArray(options.external)
-        ? options.external
-        : [options.external]
-      : [],
-
     // Options for file discovery and processing (honor CLI flags)
     options: {
       respectGitignore: options.respectGitignore ?? copytreeConfig.respectGitignore ?? true,
@@ -348,15 +341,7 @@ async function setupPipelineStages(basePath, profile, options) {
     }),
   );
 
-  // 5. External Source Stage (if external sources are configured)
-  if (profile.external && profile.external.length > 0) {
-    const { default: ExternalSourceStage } = await import(
-      '../pipeline/stages/ExternalSourceStage.js'
-    );
-    stages.push(new ExternalSourceStage(profile.external));
-  }
-
-  // 6. Limit Stage (if --head option is used)
+  // 5. Limit Stage (if --head option is used)
   if (options.head) {
     const { default: LimitStage } = await import('../pipeline/stages/LimitStage.js');
     stages.push(
@@ -366,7 +351,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 7. File Loading Stage (skip if --only-tree)
+  // 6. File Loading Stage (skip if --only-tree)
   if (!options.onlyTree) {
     const { default: FileLoadingStage } = await import('../pipeline/stages/FileLoadingStage.js');
     stages.push(
@@ -375,7 +360,7 @@ async function setupPipelineStages(basePath, profile, options) {
       }),
     );
 
-    // 8. Secrets Guard Stage (automatic secret detection and redaction)
+    // 7. Secrets Guard Stage (automatic secret detection and redaction)
     // Only add if explicitly enabled or not explicitly disabled
     const secretsGuardEnabled =
       options.secretsGuard !== false &&
@@ -395,7 +380,7 @@ async function setupPipelineStages(basePath, profile, options) {
       );
     }
 
-    // 9. Transformer Stage
+    // 8. Transformer Stage
     const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
     const registry = await TransformerRegistry.createDefault();
     stages.push(
@@ -407,7 +392,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 10. Character Limit Stage (if --char-limit option is used)
+  // 9. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(
@@ -417,11 +402,11 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 11. Instructions Stage (load instructions unless disabled)
+  // 10. Instructions Stage (load instructions unless disabled)
   const { default: InstructionsStage } = await import('../pipeline/stages/InstructionsStage.js');
   stages.push(new InstructionsStage());
 
-  // 12. Output Formatting Stage
+  // 11. Output Formatting Stage
   // Determine output format (default to tree if --only-tree is used)
   const rawFormat = options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'xml');
   const outputFormat =

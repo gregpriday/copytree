@@ -281,7 +281,7 @@ For more help, see the [Troubleshooting Guide](../usage/troubleshooting.md).
 
 - **CLI Help**: `copytree --help`
 - **Command Help**: `copytree profile:list --help`
-- **Documentation**: Run `copytree copy:docs --display` to view all docs in terminal
+- **Documentation**: Browse the `docs/` folder for detailed guides
 - **Issues**: Report problems at [GitHub Issues](https://github.com/gregpriday/copytree/issues)
 
 ---

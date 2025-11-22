@@ -33,7 +33,6 @@ import fs from 'fs-extra';
 import path from 'path';
 import Clipboard from '../../utils/clipboard.js';
 import os from 'os';
-import { globalTelemetry } from '../../utils/performanceBudgets.js';
 import { config } from '../../config/ConfigManager.js';
 
 const CopyView = () => {
@@ -135,26 +134,6 @@ const CopyView = () => {
       const outputResult = await prepareOutput(result, options);
       setOutput(outputResult.content);
 
-      // Record performance telemetry if info mode is enabled
-      if (options.info && result.stats) {
-        const duration = Date.now() - startTime;
-        // Count only non-null files (nulls are placeholders for filtered binary files)
-        const fileCount = result.files
-          ? result.files.filter((f) => f !== null).length
-          : result.stats.filesProcessed || result.stats.totalFiles || 0;
-        globalTelemetry.recordSession(result.stats, duration, fileCount, {
-          profile: profileName,
-          hasTransformers: !options.noTransform,
-          format:
-            (options.format ? String(options.format).toLowerCase() : 'xml') === 'md'
-              ? 'markdown'
-              : options.format
-                ? String(options.format).toLowerCase()
-                : 'xml',
-          outputDestination: options.output ? 'file' : options.display ? 'terminal' : 'clipboard',
-        });
-      }
-
       // Handle output actions and create completion message
       const completionMessage = await handleOutputAndCreateMessage(
         outputResult,
@@ -174,7 +153,6 @@ const CopyView = () => {
   };
 
   const buildPipelineProfile = (options) => ({
-    externalSources: Array.isArray(options.externalSources) ? options.externalSources : [],
     alwaysInclude: Array.isArray(options.alwaysInclude) ? options.alwaysInclude : [],
     limits: {
       files: options.maxFiles,
@@ -193,9 +171,6 @@ const CopyView = () => {
       '../../pipeline/stages/ProfileFilterStage.js'
     );
     const { default: GitFilterStage } = await import('../../pipeline/stages/GitFilterStage.js');
-    const { default: ExternalSourceStage } = await import(
-      '../../pipeline/stages/ExternalSourceStage.js'
-    );
     const { default: LimitStage } = await import('../../pipeline/stages/LimitStage.js');
     const { default: SortFilesStage } = await import('../../pipeline/stages/SortFilesStage.js');
     const { default: AlwaysIncludeStage } = await import(
@@ -225,38 +200,33 @@ const CopyView = () => {
       stages.push(GitFilterStage);
     }
 
-    // 4. External Sources
-    if (profile.externalSources && profile.externalSources.length > 0) {
-      stages.push(ExternalSourceStage);
-    }
-
-    // 5. Limits
+    // 4. Limits
     if (options.maxFiles || profile.limits?.files) {
       stages.push(LimitStage);
     }
 
-    // 6. Sort Files
+    // 5. Sort Files
     stages.push(SortFilesStage);
 
-    // 7. Always Include
+    // 6. Always Include
     if (profile.alwaysInclude && profile.alwaysInclude.length > 0) {
       stages.push(AlwaysIncludeStage);
     }
 
-    // 8. File Loading
+    // 7. File Loading
     stages.push(FileLoadingStage);
 
-    // 9. Transform
+    // 8. Transform
     if (!options.noTransform) {
       stages.push(TransformStage);
     }
 
-    // 10. Character Limit
+    // 9. Character Limit
     if (options.charLimit || profile.limits?.charLimit) {
       stages.push(CharLimitStage);
     }
 
-    // 11. Deduplicate
+    // 10. Deduplicate
     stages.push(DeduplicateFilesStage);
 
     // 12. Instructions Stage (load instructions unless disabled)
@@ -438,7 +408,6 @@ const CopyView = () => {
           stats,
           duration: stats.duration,
           showDetailedTiming: options.info,
-          showPerformanceBudgets: options.info, // Enable performance budgets with --info flag
         }),
       ),
   );

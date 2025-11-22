@@ -125,7 +125,7 @@ Increase adherence by starting sessions with:
 - **Configuration**: Hierarchical (CLI > env > project > user > default) (`@src/config/ConfigManager.js`, `@config/schema.json`)
 - **Profiles**: YAML-based file selection + transformers (`@src/profiles/ProfileLoader.js`, `@profiles/default.yml`)
 - **Transformers**: Multiple file processors with traits system (`@src/transforms/transformers/`, `@docs/profiles/transformer-reference.md`)
-- **Commands**: 7 CLI commands (`@bin/copytree.js`): copy, profile:list, profile:validate, copy:docs, config:validate, config:inspect, cache:clear
+- **Commands**: Core CLI commands (`@bin/copytree.js`): copy, config:validate, config:inspect, cache:clear
 
 ## Critical Files
 

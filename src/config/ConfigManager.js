@@ -3,31 +3,11 @@ import path from 'path';
 import os from 'os';
 import _ from 'lodash';
 import { fileURLToPath, pathToFileURL } from 'url';
-import { createRequire } from 'module';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { ConfigurationError } from '../utils/errors.js';
 
-// Get module directory path - works in both ESM and CommonJS (Jest) contexts
-// Use function to avoid top-level await and handle both ESM and CJS
-const resolveEnv = () => {
-  // Try ESM first - will fail in CJS/Jest environment
-  try {
-    // Access import.meta directly - Babel will transform this for us
-    const metaUrl = import.meta.url;
-    return {
-      dir: path.dirname(fileURLToPath(metaUrl)),
-      req: createRequire(metaUrl),
-    };
-  } catch {
-    // Fallback to CJS globals (Jest/Node CommonJS environment)
-    const fallbackDir = typeof __dirname !== 'undefined' ? __dirname : path.dirname(__filename);
-    const fallbackReq = typeof require !== 'undefined' ? require : createRequire(__filename);
-    return { dir: fallbackDir, req: fallbackReq };
-  }
-};
-
-const { dir: moduleDir, req: moduleRequire } = resolveEnv();
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 class ConfigManager {
   constructor(options = {}) {

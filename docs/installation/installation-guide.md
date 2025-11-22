@@ -34,7 +34,6 @@ git --version   # Any recent version
 
 # Check optional tools
 pandoc --version    # Optional
-tesseract --version # Optional
 ```
 
 ## Installation Methods
@@ -132,11 +131,10 @@ export COPYTREE_CACHE_ENABLED="true"
 
 ```bash
 # Install all optional dependencies
-brew install pandoc tesseract
+brew install pandoc
 
 # Or install individually
 brew install pandoc      # Document conversion
-brew install tesseract   # OCR support
 ```
 
 ### Ubuntu/Debian
@@ -146,7 +144,7 @@ brew install tesseract   # OCR support
 sudo apt update
 
 # Install dependencies
-sudo apt install pandoc tesseract-ocr
+sudo apt install pandoc
 ```
 
 ### Windows (WSL)
@@ -300,10 +298,10 @@ copytree --help
 
 # View specific command help
 copytree copy --help
-copytree profile:list --help
+copytree config:validate --help
 
 # Check documentation
-copytree copy:docs
+See the docs/ folder in the repository
 ```
 
 If you encounter issues not covered here, please:

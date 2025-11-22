@@ -130,15 +130,12 @@ output:
 
 **Use your profile:**
 ```bash
-# Validate first
-copytree profile:validate my-profile
-
-# Then use it
+# Use a profile by name
 copytree -p my-profile -o summary.md
 copytree --profile my-profile
 
-# List all available profiles
-copytree profile:list
+# Auto-detect a folder profile as a reference
+copytree --as-reference
 ```
 
 ## ⚙️ Configuration
@@ -187,8 +184,7 @@ config/**
 
 - **Node.js 20+** (required by engines in package.json)
 - **Optional dependencies:**
-  - [Pandoc](https://pandoc.org) - For Word/ODT document conversion
-  - [Tesseract](https://github.com/tesseract-ocr/tesseract) - For image OCR capabilities
+- [Pandoc](https://pandoc.org) - For Word/ODT document conversion
 
 ## 📖 Documentation
 
@@ -197,22 +193,17 @@ For detailed guides, see the `docs/` directory:
 - **[Getting Started](docs/index.md)** - Introduction and quick start
 - **[CLI Reference](docs/cli/copytree-reference.md)** - Complete command options
 - **[Profile Overview](docs/profiles/profile-overview.md)** - Creating and using profiles
-- **[Transformer Reference](docs/profiles/transformer-reference.md)** - All 13 transformers explained
+- **[Transformer Reference](docs/profiles/transformer-reference.md)** - Transformer capabilities
 - **[Architecture](docs/technical/architecture.md)** - Pipeline and system design
 - **[Troubleshooting](docs/usage/troubleshooting.md)** - Common issues and solutions
-
-**Read in terminal:** `copytree copy:docs --display` - View all documentation interactively
 
 ## 📚 Commands Reference
 
 ### Main Commands
 - `copytree [path]` - Copy directory structure
-- `copytree profile:list` - List available profiles
-- `copytree profile:validate <name>` - Validate a profile
 - `copytree cache:clear` - Clear caches
 - `copytree config:validate` - Validate configuration
 - `copytree config:inspect` - Inspect effective configuration with source provenance (redacts secrets by default)
-- `copytree copy:docs` - Copy built-in documentation
 
 > **Note:** CopyTree automatically creates required directories (e.g., `~/.copytree/cache/`, `~/.copytree/profiles/`) on first use. No manual setup is required.
 
@@ -315,27 +306,11 @@ You can create custom profiles using AI assistants like Claude Code:
 ```bash
 # Create a profile interactively
 claude -p "Please create a CopyTree profile for this project.
-Start by running \`copytree copy:docs --topic all --display\` to read the docs,
-then create an optimal profile."
+Review the docs/ folder to understand filters and options, then create an optimal profile."
 
 # Or build a .copytreeignore file
 claude -p "Please create a .copytreeignore file for this project.
-Start by running \`copytree copy:docs --topic ignore-files --display\` to review ignore rules."
-```
-
-The `copytree copy:docs` command provides comprehensive documentation:
-
-```bash
-# Display all documentation (recommended for AI agents)
-copytree copy:docs --topic all --display
-
-# Display specific topics
-copytree copy:docs --topic ignore-files --display
-copytree copy:docs --topic profiles --display
-copytree copy:docs --topic transformers --display
-
-# List available topics
-copytree copy:docs
+See docs/usage/ignore-files.md for guidance."
 ```
 
 For detailed guidance: [Profile Creation Guide](docs/profiles/profile-creation-guide.md)

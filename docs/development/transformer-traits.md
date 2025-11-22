@@ -28,7 +28,7 @@ const traits = {
   stateful: false,                    // Maintains state between runs
   
   // Dependencies and Conflicts
-  dependencies: ['network', 'tesseract'], // External dependencies required
+  dependencies: ['network'], // External dependencies required
   conflictsWith: ['other-transformer'],   // Incompatible transformers
   
   // Resource Requirements
@@ -68,20 +68,20 @@ import TransformerRegistry from './TransformerRegistry.js';
 const registry = new TransformerRegistry();
 
 // Register transformer with traits
-registry.register('pdf', new PDFTransformer(), {
-  extensions: ['.pdf'],
+registry.register('binary', new BinaryTransformer(), {
+  extensions: ['.zip'],
   priority: 20
 }, {
   // Traits object
-  inputTypes: ['binary'],
-  outputTypes: ['text'],
+  inputTypes: ['any'],
+  outputTypes: ['binary'],
   idempotent: true,
   orderSensitive: false,
-  heavy: true,
+  heavy: false,
   requirements: {
     memory: '100MB'
   },
-  tags: ['pdf', 'text-extraction', 'heavy']
+  tags: ['binary']
 });
 ```
 
@@ -115,7 +115,7 @@ The system includes predefined traits for built-in transformers:
   outputTypes: ['text'],
   idempotent: true,
   heavy: true,
-  dependencies: ['tesseract'],
+  dependencies: [],
   requirements: {
     memory: '150MB'
   },

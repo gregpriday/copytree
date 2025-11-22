@@ -21,7 +21,6 @@ import {
   recordPermanent,
   recordSuccessAfterRetry,
 } from './fsErrorReport.js';
-import { recordTiming, incrementCounter, setGauge } from '../telemetry/metrics.js';
 
 /**
  * Normalize path to POSIX style (forward slashes)
@@ -317,13 +316,7 @@ export async function* walkParallel(root, options = {}) {
             onRetry: ({ code }) => recordRetry(absPath, code),
           });
           recordSuccessAfterRetry(absPath);
-          recordTiming('discovery.stat.duration_ms', Date.now() - statStart);
         } catch (error) {
-          recordTiming('discovery.stat.duration_ms', Date.now() - statStart, { error: error.code });
-          incrementCounter('discovery.errors', 1, {
-            code: error.code || 'UNKNOWN',
-            operation: 'stat',
-          });
           if (isRetryableFsError(error)) {
             recordGiveUp(absPath, error.code);
           } else {
@@ -336,7 +329,6 @@ export async function* walkParallel(root, options = {}) {
       if (explain) {
         result.explanation = decision;
       }
-      incrementCounter('discovery.files_yielded');
       return result;
     }
   }
@@ -348,7 +340,6 @@ export async function* walkParallel(root, options = {}) {
    */
   async function processDirectory(dir, layers) {
     stats.directoriesScanned++;
-    incrementCounter('discovery.dirs_visited');
 
     // Load ignore rules at this level
     const ignoreFilePath = path.join(dir, ignoreFileName);
@@ -364,15 +355,7 @@ export async function* walkParallel(root, options = {}) {
         onRetry: ({ code }) => recordRetry(dir, code),
       });
       recordSuccessAfterRetry(dir);
-      recordTiming('discovery.readdir.duration_ms', Date.now() - readdirStart);
     } catch (error) {
-      recordTiming('discovery.readdir.duration_ms', Date.now() - readdirStart, {
-        error: error.code,
-      });
-      incrementCounter('discovery.errors', 1, {
-        code: error.code || 'UNKNOWN',
-        operation: 'readdir',
-      });
       // Record failure type based on error category
       if (isRetryableFsError(error)) {
         recordGiveUp(dir, error.code);
@@ -424,13 +407,11 @@ export async function* walkParallel(root, options = {}) {
         running.add(task);
         stats.inflight = running.size;
         stats.maxInflight = Math.max(stats.maxInflight, stats.inflight);
-        setGauge('discovery.inflight', stats.inflight);
 
         task
           .finally(() => {
             running.delete(task);
             stats.inflight = running.size;
-            setGauge('discovery.inflight', stats.inflight);
           })
           .catch(() => {});
       }

@@ -18,7 +18,6 @@ let Text;
 import CopyView from './components/CopyView.js';
 import ValidationView from './components/ValidationView.js';
 import ConfigInspectView from './components/ConfigInspectView.js';
-import DocsView from './components/DocsView.js';
 
 const AppContent = () => {
   const { command, updateState } = useAppContext();
@@ -44,8 +43,6 @@ const AppContent = () => {
           successMessage: 'Cache cleared successfully',
           type: 'cache',
         });
-      case 'copy:docs':
-        return React.createElement(DocsView);
       default: {
         // Ensure Text is available
         if (!Text) {

@@ -38,14 +38,10 @@ export async function createFullPipeline(options = {}) {
     .default;
   const AlwaysIncludeStage = (await import('../../src/pipeline/stages/AlwaysIncludeStage.js'))
     .default;
-  const ExternalSourceStage = (await import('../../src/pipeline/stages/ExternalSourceStage.js'))
-    .default;
   const LimitStage = (await import('../../src/pipeline/stages/LimitStage.js')).default;
   const CharLimitStage = (await import('../../src/pipeline/stages/CharLimitStage.js')).default;
   const InstructionsStage = (await import('../../src/pipeline/stages/InstructionsStage.js'))
     .default;
-  const NPMStage = (await import('../../src/pipeline/stages/NPMStage.js')).default;
-  const ComposerStage = (await import('../../src/pipeline/stages/ComposerStage.js')).default;
   const DeduplicateFilesStage = (await import('../../src/pipeline/stages/DeduplicateFilesStage.js'))
     .default;
   const SortFilesStage = (await import('../../src/pipeline/stages/SortFilesStage.js')).default;
@@ -54,20 +50,17 @@ export async function createFullPipeline(options = {}) {
 
   const pipeline = new Pipeline();
 
-  // Add all 16 stages in order using .through()
+  // Add full stage set in order using .through()
   pipeline.through([
     new FileDiscoveryStage(),
     new GitFilterStage(),
     new ProfileFilterStage(),
     new AlwaysIncludeStage(),
-    new ExternalSourceStage(),
     new LimitStage(),
     new FileLoadingStage(),
     new TransformStage(),
     new CharLimitStage(),
     new InstructionsStage(),
-    new NPMStage(),
-    new ComposerStage(),
     new DeduplicateFilesStage(),
     new SortFilesStage(),
     new OutputFormattingStage(),
