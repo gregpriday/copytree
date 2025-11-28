@@ -83,7 +83,9 @@ describe('formatStream()', () => {
 
     it('should format as tree when requested', async () => {
       const files = await collectFiles(testDir);
-      const chunks = await collectChunks(formatStream(files, { format: 'tree', basePath: testDir }));
+      const chunks = await collectChunks(
+        formatStream(files, { format: 'tree', basePath: testDir }),
+      );
 
       const fullOutput = chunks.join('');
       expect(fullOutput).toContain('├──');
