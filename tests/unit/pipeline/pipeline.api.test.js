@@ -119,7 +119,10 @@ describe('Pipeline API Surface', () => {
       expect(p.options.maxConcurrency).toBe(10);
     });
 
-    it('has sensible defaults', () => {
+    it('has sensible defaults', async () => {
+      // Options are lazy-loaded in process(), so call a no-op process first
+      await pipeline.through([{ process: async (input) => input }]).process({});
+
       expect(pipeline.options).toMatchObject({
         continueOnError: expect.any(Boolean),
         emitProgress: expect.any(Boolean),
