@@ -32,7 +32,9 @@ describe('GitUtils', () => {
       error: jest.fn(),
       debug: jest.fn(),
       verbose: jest.fn(),
-      child: jest.fn(function() { return this; }),
+      child: jest.fn(function () {
+        return this;
+      }),
     };
   });
 
