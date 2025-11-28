@@ -11,6 +11,7 @@ jest.mock('simple-git', () => {
 
 describe('GitUtils', () => {
   let GitUtils;
+  let mockLogger;
 
   beforeAll(async () => {
     ({ default: GitUtils } = await import('../../../src/utils/GitUtils.js'));
@@ -23,18 +24,28 @@ describe('GitUtils', () => {
       diffSummary: jest.fn(),
       log: jest.fn(),
     };
+
+    // Create mock logger
+    mockLogger = {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+      verbose: jest.fn(),
+      child: jest.fn(function() { return this; }),
+    };
   });
 
   test('isGitRepository caches positive and negative results', async () => {
     // Positive
     mockGitInstance.revparse.mockResolvedValue('.git');
-    const utils1 = new GitUtils('/repo');
+    const utils1 = new GitUtils('/repo', { logger: mockLogger });
     expect(await utils1.isGitRepository()).toBe(true);
     expect(await utils1.isGitRepository()).toBe(true);
     expect(mockGitInstance.revparse).toHaveBeenCalledTimes(1);
 
     // Negative cached
-    const utils2 = new GitUtils('/not-repo');
+    const utils2 = new GitUtils('/not-repo', { logger: mockLogger });
     mockGitInstance.revparse.mockRejectedValue(new Error('not a repo'));
     expect(await utils2.isGitRepository()).toBe(false);
     expect(await utils2.isGitRepository()).toBe(false);
@@ -50,7 +61,7 @@ describe('GitUtils', () => {
       created: ['src/b.js'],
     });
 
-    const utils = new GitUtils('/repo');
+    const utils = new GitUtils('/repo', { logger: mockLogger });
     const files1 = await utils.getModifiedFiles();
     const expected = [
       path.normalize('src/a.js'),
@@ -74,7 +85,7 @@ describe('GitUtils', () => {
 
   test('getModifiedFiles wraps errors as GitError with context', async () => {
     mockGitInstance.revparse.mockRejectedValue(new Error('not a repo'));
-    const utils = new GitUtils('/not-repo');
+    const utils = new GitUtils('/not-repo', { logger: mockLogger });
     await expect(utils.getModifiedFiles()).rejects.toThrow('Failed to get modified files:');
   });
 
@@ -91,7 +102,7 @@ describe('GitUtils', () => {
       });
     });
 
-    const utils = new GitUtils('/repo');
+    const utils = new GitUtils('/repo', { logger: mockLogger });
     const filesHead = await utils.getChangedFiles('HEAD');
     expect(new Set(filesHead)).toEqual(
       new Set([path.normalize('README.md'), path.normalize('src/index.js')]),
@@ -107,7 +118,7 @@ describe('GitUtils', () => {
   test('getFileStatuses maps statuses and tolerates non-repo', async () => {
     // Non-repo
     mockGitInstance.revparse.mockRejectedValue(new Error('not a repo'));
-    const utils1 = new GitUtils('/not-repo');
+    const utils1 = new GitUtils('/not-repo', { logger: mockLogger });
     expect(await utils1.getFileStatuses(['a.js'])).toEqual({});
 
     // Repo with statuses
@@ -121,7 +132,7 @@ describe('GitUtils', () => {
       renamed: [],
       conflicted: [],
     });
-    const utils2 = new GitUtils('/repo');
+    const utils2 = new GitUtils('/repo', { logger: mockLogger });
     expect(await utils2.getFileStatuses(['a.js', 'b.js'])).toEqual({
       'a.js': 'modified',
       'b.js': 'unmodified',
@@ -132,7 +143,7 @@ describe('GitUtils', () => {
     // Repo: branch
     mockGitInstance.revparse.mockResolvedValueOnce('.git'); // for isGitRepository()
     mockGitInstance.revparse.mockResolvedValueOnce('main'); // for --abbrev-ref HEAD
-    const utils = new GitUtils('/repo');
+    const utils = new GitUtils('/repo', { logger: mockLogger });
     expect(await utils.getCurrentBranch()).toBe('main');
 
     // Repo: last commit
@@ -154,7 +165,7 @@ describe('GitUtils', () => {
     });
 
     // Non-repo: returns null without throwing (use fresh instance)
-    const utils3 = new GitUtils('/not-repo');
+    const utils3 = new GitUtils('/not-repo', { logger: mockLogger });
     mockGitInstance.revparse.mockRejectedValue(new Error('not a repo'));
     expect(await utils3.getCurrentBranch()).toBeNull();
     expect(await utils3.getLastCommit()).toBeNull();
@@ -164,7 +175,7 @@ describe('GitUtils', () => {
     // Repo clean
     mockGitInstance.revparse.mockResolvedValue('.git');
     mockGitInstance.status.mockResolvedValue({ isClean: () => true });
-    const utils = new GitUtils('/repo');
+    const utils = new GitUtils('/repo', { logger: mockLogger });
     expect(await utils.hasUncommittedChanges()).toBe(false);
 
     // Repo dirty
