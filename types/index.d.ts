@@ -1,9 +1,68 @@
 /**
  * CopyTree TypeScript Definitions
  *
- * Provides type definitions for the CopyTree programmatic API.
+ * Provides comprehensive type definitions for the CopyTree programmatic API.
+ * Full IntelliSense support for TypeScript consumers including Canopy.
+ *
  * @module copytree
+ * @version 0.14.0
  */
+
+// ============================================================================
+// Progress and Callback Types
+// ============================================================================
+
+/**
+ * Progress event emitted during copy/scan operations.
+ * Used by the onProgress callback to report progress updates.
+ */
+export interface ProgressEvent {
+  /** Progress percentage (0-100) */
+  percent: number;
+  /** Human-readable progress message */
+  message: string;
+  /** Current stage name */
+  stage?: string;
+  /** Files processed so far */
+  filesProcessed?: number;
+  /** Total files estimated */
+  totalFiles?: number;
+  /** Current file being processed */
+  currentFile?: string;
+  /** Timestamp of the progress event */
+  timestamp?: number;
+}
+
+/**
+ * Progress callback function signature
+ */
+export type ProgressCallback = (progress: ProgressEvent) => void;
+
+// ============================================================================
+// Logger Types
+// ============================================================================
+
+/**
+ * Logger interface for pipeline and stage logging
+ */
+export interface Logger {
+  /** Log a debug message (only in debug mode) */
+  logDebug(message: string, ...args: any[]): void;
+  /** Log an info message */
+  info(message: string, ...args: any[]): void;
+  /** Log a warning message */
+  warn(message: string, ...args: any[]): void;
+  /** Log an error message */
+  error(message: string, ...args: any[]): void;
+  /** Log a success message */
+  success(message: string, ...args: any[]): void;
+  /** Create a child logger with a prefixed name */
+  child(name: string): Logger;
+  /** Format bytes to human-readable string */
+  formatBytes(bytes: number): string;
+  /** Format duration in milliseconds to human-readable string */
+  formatDuration(ms: number): string;
+}
 
 // ============================================================================
 // File Results
@@ -13,7 +72,7 @@
  * Represents a file discovered and processed by scan()
  */
 export interface FileResult {
-  /** POSIX-style relative path (forward slashes) */
+  /** Relative path (may use platform-specific separators on Windows) */
   path: string;
   /** Platform-specific absolute path */
   absolutePath: string;
@@ -21,8 +80,8 @@ export interface FileResult {
   size: number;
   /** Last modified timestamp */
   modified: Date;
-  /** File content (if includeContent is true) */
-  content?: string;
+  /** File content (string for text files, Buffer for binary if included, null for excluded binaries) */
+  content?: string | Buffer | null;
   /** Whether file is binary */
   isBinary: boolean;
   /** Character encoding for text files */
@@ -77,14 +136,24 @@ export interface ScanOptions {
   includeContent?: boolean;
   /** Remove duplicate files */
   dedupe?: boolean;
-  /** Sort order: 'path', 'size', 'modified', 'name', 'extension' */
-  sort?: 'path' | 'size' | 'modified' | 'name' | 'extension';
+  /** Sort order: 'path', 'size', 'modified', 'name', 'extension', 'depth' */
+  sort?: 'path' | 'size' | 'modified' | 'name' | 'extension' | 'depth';
   /**
    * ConfigManager instance for isolated configuration.
    * If not provided, an isolated instance will be created.
    * This enables concurrent scan operations with different configurations.
    */
   config?: ConfigManager;
+  /**
+   * Progress callback function.
+   * Called periodically during scanning with progress updates.
+   */
+  onProgress?: ProgressCallback;
+  /**
+   * Progress throttle interval in milliseconds (default: 100).
+   * Limits how frequently progress callbacks are invoked.
+   */
+  progressThrottleMs?: number;
 }
 
 /**
@@ -205,6 +274,18 @@ export interface CopyOptions extends ScanOptions, FormatOptions {
    * Note: This overrides the config option from ScanOptions.
    */
   config?: ConfigManager;
+  /**
+   * Progress callback function.
+   * Called periodically during copy operations with progress updates.
+   * Note: Inherits from ScanOptions but documented here for clarity.
+   */
+  onProgress?: ProgressCallback;
+  /**
+   * Progress throttle interval in milliseconds (default: 100).
+   * Limits how frequently progress callbacks are invoked.
+   * Note: Inherits from ScanOptions but documented here for clarity.
+   */
+  progressThrottleMs?: number;
 }
 
 /**
@@ -312,40 +393,280 @@ export function copyStream(
 ): AsyncGenerator<string>;
 
 // ============================================================================
-// Core Classes
+// Pipeline Statistics and Metrics
 // ============================================================================
 
 /**
- * Pipeline context provided to stages
+ * Memory usage metrics captured during stage execution
  */
-export interface PipelineContext {
-  /** Logger instance */
-  logger: any;
-  /** Pipeline options */
-  options: any;
-  /** Pipeline statistics */
-  stats: any;
-  /** Configuration manager */
-  config: any;
-  /** Reference to pipeline */
-  pipeline: Pipeline;
+export interface MemoryUsage {
+  /** Memory usage before stage execution */
+  before: NodeJS.MemoryUsage;
+  /** Memory usage after stage execution */
+  after: NodeJS.MemoryUsage;
+  /** Delta (difference) in memory usage */
+  delta: {
+    /** Resident set size delta in bytes */
+    rss: number;
+    /** Heap used delta in bytes */
+    heapUsed: number;
+    /** Total heap delta in bytes */
+    heapTotal: number;
+  };
 }
 
 /**
- * Pipeline event data
+ * Stage performance metrics captured during execution
+ */
+export interface StageMetrics {
+  /** Number of input items (files) */
+  inputSize: number;
+  /** Number of output items (files) */
+  outputSize: number;
+  /** Memory usage metrics for this stage */
+  memoryUsage: MemoryUsage;
+  /** Timestamp when stage completed */
+  timestamp: number;
+}
+
+/**
+ * Error information captured during pipeline execution
+ */
+export interface StageError {
+  /** Name of the stage that failed */
+  stage: string;
+  /** Error message */
+  error: string;
+  /** Stack trace (if available) */
+  stack?: string;
+}
+
+/**
+ * Pipeline execution statistics
+ */
+export interface PipelineStats {
+  /** Pipeline start timestamp (milliseconds since epoch) */
+  startTime: number | null;
+  /** Pipeline end timestamp (milliseconds since epoch) */
+  endTime: number | null;
+  /** Number of stages that completed successfully */
+  stagesCompleted: number;
+  /** Number of stages that failed */
+  stagesFailed: number;
+  /** Collection of errors from failed stages */
+  errors: StageError[];
+  /** Execution time per stage (stage name -> milliseconds) */
+  perStageTimings: Record<string, number>;
+  /** Performance metrics per stage (stage name -> metrics) */
+  perStageMetrics: Record<string, StageMetrics>;
+  /** Total time spent in all stages (milliseconds) */
+  totalStageTime: number;
+  /** Average time per stage (milliseconds) */
+  averageStageTime: number;
+  /** Total pipeline duration (milliseconds) - calculated */
+  duration?: number;
+  /** Success rate (0-1) - calculated */
+  successRate?: number;
+}
+
+// ============================================================================
+// Pipeline Event Types
+// ============================================================================
+
+/**
+ * Data payload for 'stage:start' event
+ */
+export interface StageStartEvent {
+  /** Stage name */
+  stage: string;
+  /** Stage index in pipeline */
+  index: number;
+  /** Input data for this stage */
+  input: unknown;
+}
+
+/**
+ * Data payload for 'stage:complete' event
+ */
+export interface StageCompleteEvent {
+  /** Stage name */
+  stage: string;
+  /** Stage index in pipeline */
+  index: number;
+  /** Output data from this stage */
+  output: unknown;
+  /** Execution duration in milliseconds */
+  duration: number;
+  /** Number of input items */
+  inputSize: number;
+  /** Number of output items */
+  outputSize: number;
+  /** Memory usage metrics */
+  memoryUsage: MemoryUsage;
+  /** Completion timestamp */
+  timestamp: number;
+}
+
+/**
+ * Data payload for 'stage:error' event
+ */
+export interface StageErrorEvent {
+  /** Stage name that failed */
+  stage: string;
+  /** Stage index in pipeline */
+  index: number;
+  /** Error that occurred */
+  error: Error;
+}
+
+/**
+ * Data payload for 'stage:recover' event
+ */
+export interface StageRecoverEvent {
+  /** Stage name that recovered */
+  stage: string;
+  /** Stage index in pipeline */
+  index: number;
+  /** Original error that occurred */
+  originalError: Error;
+  /** Result returned by error handler */
+  recoveredResult: unknown;
+}
+
+/**
+ * Data payload for 'stage:progress' event
+ */
+export interface StageProgressEvent {
+  /** Stage name reporting progress */
+  stage: string;
+  /** Progress percentage (0-100) */
+  progress: number;
+  /** Optional progress message */
+  message?: string;
+  /** Progress report timestamp */
+  timestamp: number;
+}
+
+/**
+ * Data payload for 'file:batch' event
+ */
+export interface FileBatchEvent {
+  /** Stage processing files */
+  stage: string;
+  /** Number of files processed in batch */
+  count: number;
+  /** Path of most recent file */
+  lastFile: string;
+  /** Action performed (e.g., 'processed', 'transformed') */
+  action: string;
+  /** Batch completion timestamp */
+  timestamp: number;
+}
+
+/**
+ * Data payload for 'stage:log' event
+ */
+export interface StageLogEvent {
+  /** Stage that logged */
+  stage: string;
+  /** Log message */
+  message: string;
+  /** Log level (info, warn, error, debug) */
+  level: 'info' | 'warn' | 'error' | 'debug';
+  /** Log timestamp */
+  timestamp: number;
+}
+
+/**
+ * Data payload for 'pipeline:start' event
+ */
+export interface PipelineStartEvent {
+  /** Initial pipeline input */
+  input: unknown;
+  /** Total number of stages */
+  stages: number;
+  /** Pipeline configuration options */
+  options: PipelineOptions;
+}
+
+/**
+ * Data payload for 'pipeline:complete' event
+ */
+export interface PipelineCompleteEvent {
+  /** Final pipeline output */
+  result: unknown;
+  /** Complete pipeline statistics */
+  stats: PipelineStats;
+}
+
+/**
+ * Data payload for 'pipeline:error' event
+ */
+export interface PipelineErrorEvent {
+  /** Pipeline-level error */
+  error: Error;
+  /** Statistics at time of failure */
+  stats: PipelineStats;
+}
+
+/**
+ * Union type for all pipeline event data
+ */
+export type PipelineEventData =
+  | StageStartEvent
+  | StageCompleteEvent
+  | StageErrorEvent
+  | StageRecoverEvent
+  | StageProgressEvent
+  | FileBatchEvent
+  | StageLogEvent
+  | PipelineStartEvent
+  | PipelineCompleteEvent
+  | PipelineErrorEvent;
+
+/**
+ * Pipeline event types
+ */
+export type PipelineEventType =
+  | 'pipeline:start'
+  | 'pipeline:complete'
+  | 'pipeline:error'
+  | 'stage:start'
+  | 'stage:complete'
+  | 'stage:error'
+  | 'stage:recover'
+  | 'stage:progress'
+  | 'file:batch'
+  | 'stage:log';
+
+/**
+ * Pipeline event data (generic wrapper for event callbacks)
  */
 export interface PipelineEvent {
   /** Event type */
-  type:
-    | 'stage:start'
-    | 'stage:complete'
-    | 'stage:error'
-    | 'stage:recover'
-    | 'stage:progress'
-    | 'file:batch'
-    | 'stage:log';
+  type: PipelineEventType;
   /** Event data */
-  data: any;
+  data: PipelineEventData;
+}
+
+// ============================================================================
+// Pipeline Core Classes
+// ============================================================================
+
+/**
+ * Pipeline context provided to stages during initialization and execution
+ */
+export interface PipelineContext {
+  /** Logger instance for stage logging */
+  logger: Logger;
+  /** Pipeline options */
+  options: PipelineOptions;
+  /** Pipeline statistics (live, updated during execution) */
+  stats: PipelineStats;
+  /** Configuration manager instance */
+  config: ConfigManager;
+  /** Reference to parent pipeline for event emission */
+  pipeline: Pipeline;
 }
 
 /**
@@ -358,57 +679,338 @@ export interface PipelineOptions {
    * This enables concurrent pipeline operations with different configurations.
    */
   config?: ConfigManager;
-  /** Continue processing after stage failures */
+  /** Continue processing after stage failures (default: false) */
   continueOnError?: boolean;
-  /** Emit progress events */
+  /** Emit progress events (default: true) */
   emitProgress?: boolean;
-  /** Enable parallel stage processing */
+  /** Enable parallel stage processing (default: false) */
   parallel?: boolean;
-  /** Maximum concurrent operations */
+  /** Maximum concurrent operations (default: 5) */
   maxConcurrency?: number;
+  /** Progress callback function */
+  onProgress?: ProgressCallback;
 }
 
 /**
- * Pipeline for orchestrating file processing stages
+ * Stage options passed to stage constructor
+ */
+export interface StageOptions {
+  /** Reference to parent pipeline for event emission */
+  pipeline?: Pipeline;
+  /** ConfigManager instance (optional, will be set via onInit context) */
+  config?: ConfigManager;
+  /** Additional stage-specific options */
+  [key: string]: unknown;
+}
+
+/**
+ * Pipeline for orchestrating file processing stages.
+ * Implements the event-driven pipeline architecture described in the architecture docs.
  */
 export class Pipeline {
+  /** Create a new Pipeline instance */
   constructor(options?: PipelineOptions);
-  through(stages: any[]): Pipeline;
-  process(input: any): Promise<any>;
-  on(event: string, listener: (...args: any[]) => void): this;
-  emit(event: string, ...args: any[]): boolean;
+
+  /**
+   * Add stages to the pipeline
+   * @param stages - Stage class(es), instance(s), or functions to add
+   * @returns Pipeline instance for chaining
+   */
+  through(
+    stages:
+      | Stage
+      | Stage[]
+      | (new (options?: StageOptions) => Stage)
+      | Array<new (options?: StageOptions) => Stage>
+      | ((input: unknown) => Promise<unknown> | unknown)
+      | Array<Stage | (new (options?: StageOptions) => Stage) | ((input: unknown) => Promise<unknown> | unknown)>
+  ): Pipeline;
+
+  /**
+   * Process input through all pipeline stages
+   * @param input - Initial input to process
+   * @returns Final processed output
+   */
+  process<TInput = unknown, TOutput = unknown>(input: TInput): Promise<TOutput>;
+
+  /**
+   * Get pipeline statistics
+   * @returns Current pipeline stats
+   */
+  getStats(): PipelineStats;
+
+  /**
+   * Subscribe to pipeline events
+   * @param event - Event name
+   * @param listener - Event listener function
+   * @returns Pipeline instance for chaining
+   */
+  on(event: 'pipeline:start', listener: (data: PipelineStartEvent) => void): this;
+  on(event: 'pipeline:complete', listener: (data: PipelineCompleteEvent) => void): this;
+  on(event: 'pipeline:error', listener: (data: PipelineErrorEvent) => void): this;
+  on(event: 'stage:start', listener: (data: StageStartEvent) => void): this;
+  on(event: 'stage:complete', listener: (data: StageCompleteEvent) => void): this;
+  on(event: 'stage:error', listener: (data: StageErrorEvent) => void): this;
+  on(event: 'stage:recover', listener: (data: StageRecoverEvent) => void): this;
+  on(event: 'stage:progress', listener: (data: StageProgressEvent) => void): this;
+  on(event: 'file:batch', listener: (data: FileBatchEvent) => void): this;
+  on(event: 'stage:log', listener: (data: StageLogEvent) => void): this;
+  on(event: string, listener: (...args: unknown[]) => void): this;
+
+  /**
+   * Subscribe to pipeline events (once)
+   * @param event - Event name
+   * @param listener - Event listener function
+   * @returns Pipeline instance for chaining
+   */
+  once(event: 'pipeline:start', listener: (data: PipelineStartEvent) => void): this;
+  once(event: 'pipeline:complete', listener: (data: PipelineCompleteEvent) => void): this;
+  once(event: 'pipeline:error', listener: (data: PipelineErrorEvent) => void): this;
+  once(event: 'stage:start', listener: (data: StageStartEvent) => void): this;
+  once(event: 'stage:complete', listener: (data: StageCompleteEvent) => void): this;
+  once(event: 'stage:error', listener: (data: StageErrorEvent) => void): this;
+  once(event: 'stage:recover', listener: (data: StageRecoverEvent) => void): this;
+  once(event: 'stage:progress', listener: (data: StageProgressEvent) => void): this;
+  once(event: 'file:batch', listener: (data: FileBatchEvent) => void): this;
+  once(event: 'stage:log', listener: (data: StageLogEvent) => void): this;
+  once(event: string, listener: (...args: unknown[]) => void): this;
+
+  /**
+   * Emit a pipeline event
+   * @param event - Event name
+   * @param args - Event arguments
+   * @returns true if event had listeners
+   */
+  emit(event: string, ...args: unknown[]): boolean;
+
+  /**
+   * Remove an event listener
+   * @param event - Event name
+   * @param listener - Event listener to remove
+   * @returns Pipeline instance for chaining
+   */
+  removeListener(event: 'pipeline:start', listener: (data: PipelineStartEvent) => void): this;
+  removeListener(event: 'pipeline:complete', listener: (data: PipelineCompleteEvent) => void): this;
+  removeListener(event: 'pipeline:error', listener: (data: PipelineErrorEvent) => void): this;
+  removeListener(event: 'stage:start', listener: (data: StageStartEvent) => void): this;
+  removeListener(event: 'stage:complete', listener: (data: StageCompleteEvent) => void): this;
+  removeListener(event: 'stage:error', listener: (data: StageErrorEvent) => void): this;
+  removeListener(event: 'stage:recover', listener: (data: StageRecoverEvent) => void): this;
+  removeListener(event: 'stage:progress', listener: (data: StageProgressEvent) => void): this;
+  removeListener(event: 'file:batch', listener: (data: FileBatchEvent) => void): this;
+  removeListener(event: 'stage:log', listener: (data: StageLogEvent) => void): this;
+  removeListener(event: string, listener: (...args: unknown[]) => void): this;
+
+  /**
+   * Create a new pipeline instance (static factory)
+   * @param options - Pipeline options
+   * @returns New pipeline instance
+   */
+  static create(options?: PipelineOptions): Pipeline;
+
+  /**
+   * Laravel-style fluent pipeline interface
+   * @param passable - Data to process
+   * @returns Fluent interface for chaining
+   */
+  send<T>(passable: T): {
+    through(stages: Stage[] | Array<new (options?: StageOptions) => Stage>): {
+      then<TResult>(callback?: (result: T) => TResult): Promise<TResult>;
+      thenReturn(): Promise<T>;
+    };
+  };
 }
 
 /**
- * Base class for pipeline stages
+ * Base class for pipeline stages.
+ * All pipeline stages should extend this class.
  */
 export class Stage {
-  constructor(options?: any);
-  process(input: any): Promise<any>;
-  onInit?(context: PipelineContext): Promise<void>;
-  beforeRun?(input: any): Promise<void>;
-  afterRun?(output: any): Promise<void>;
-  handleError?(error: Error, input: any): Promise<any>;
-  validate?(input: any): boolean;
+  /** Stage name (defaults to constructor name) */
+  readonly name: string;
+  /** Stage options */
+  protected options: StageOptions;
+  /** Reference to parent pipeline for event emission */
+  protected pipeline?: Pipeline;
+  /** Configuration manager instance (available after onInit) */
+  protected get config(): ConfigManager;
+
+  /** Create a new Stage instance */
+  constructor(options?: StageOptions);
+
+  /**
+   * Process input data (must be implemented by subclasses)
+   * @param input - Input data from previous stage
+   * @returns Processed output for next stage
+   */
+  process(input: unknown): Promise<unknown> | unknown;
+
+  /**
+   * Validate input before processing (optional but recommended)
+   * Called automatically by Pipeline before process()
+   * @param input - Input to validate
+   * @returns true if valid, false/undefined otherwise
+   * @throws Error if validation fails
+   */
+  validate?(input: unknown): boolean | void | Promise<boolean | void>;
+
+  /**
+   * Handle errors during processing with recovery mechanism
+   * If recovery is possible, return a valid result to continue pipeline
+   * @param error - Error that occurred during stage processing
+   * @param input - Input data being processed when error occurred
+   * @returns Recovered result to continue pipeline
+   * @throws Error if recovery is not possible
+   */
+  handleError?(error: Error, input: unknown): Promise<unknown> | unknown;
+
+  /**
+   * Initialize stage with pipeline context
+   * Called once when pipeline is created, before any processing
+   * @param context - Pipeline context with shared resources
+   */
+  onInit?(context: PipelineContext): Promise<void> | void;
+
+  /**
+   * Called before each stage execution
+   * @param input - Input data about to be processed
+   */
+  beforeRun?(input: unknown): Promise<void> | void;
+
+  /**
+   * Called after successful stage execution
+   * @param output - Output data from stage processing
+   */
+  afterRun?(output: unknown): Promise<void> | void;
+
+  /**
+   * Called when stage encounters an error (before handleError)
+   * @param error - Error that occurred
+   * @param input - Input data being processed when error occurred
+   */
+  onError?(error: Error, input: unknown): Promise<void> | void;
+
+  /**
+   * Log a message and emit stage events
+   * @param message - Message to log
+   * @param level - Log level (default: 'info')
+   */
+  protected log(message: string, level?: 'info' | 'warn' | 'error' | 'debug'): void;
+
+  /**
+   * Emit progress update for current stage
+   * @param progress - Progress percentage (0-100)
+   * @param message - Optional progress message
+   */
+  protected emitProgress(progress: number, message?: string): void;
+
+  /**
+   * Emit file processing event (throttled for performance)
+   * @param filePath - Path of file being processed
+   * @param action - Action being performed (default: 'processed')
+   */
+  protected emitFileEvent(filePath: string, action?: string): void;
+
+  /**
+   * Get elapsed time since a start time
+   * @param startTime - Start time from Date.now()
+   * @returns Formatted elapsed time string
+   */
+  protected getElapsedTime(startTime: number): string;
+
+  /**
+   * Format bytes to human readable string
+   * @param bytes - Number of bytes
+   * @returns Formatted string
+   */
+  protected formatBytes(bytes: number): string;
 }
 
+// ============================================================================
+// Transformer Classes
+// ============================================================================
 
 /**
- * Base transformer class
+ * Transformer trait definitions
+ */
+export interface TransformerTraits {
+  /** Input content types (e.g., ['text', 'binary']) */
+  inputTypes: string[];
+  /** Output content types */
+  outputTypes: string[];
+  /** Whether the transformer is idempotent (can be safely reapplied) */
+  idempotent: boolean;
+  /** Whether the transformer is resource-intensive */
+  heavy: boolean;
+  /** Required external tools (e.g., ['pandoc']) */
+  dependencies?: string[];
+}
+
+/**
+ * Base transformer class for file content transformation
  */
 export class BaseTransformer {
-  constructor(options?: any);
+  /** Transformer name (kebab-case identifier) */
+  readonly name: string;
+  /** Transformer traits */
+  readonly traits: TransformerTraits;
+
+  /** Create a new transformer instance */
+  constructor(options?: Record<string, unknown>);
+
+  /**
+   * Transform a file
+   * @param file - File to transform
+   * @returns Transformed file
+   */
   transform(file: FileResult): Promise<FileResult>;
 }
 
 /**
- * Transformer registry for managing transformers
+ * Options for creating a TransformerRegistry
+ */
+export interface TransformerRegistryOptions {
+  /** ConfigManager instance for isolated configuration */
+  config?: ConfigManager;
+}
+
+/**
+ * Transformer registry for managing and scheduling transformers
  */
 export class TransformerRegistry {
-  static createDefault(): Promise<TransformerRegistry>;
+  /**
+   * Create the default registry with all built-in transformers
+   * @param options - Registry options
+   * @returns Initialized registry
+   */
+  static createDefault(options?: TransformerRegistryOptions): Promise<TransformerRegistry>;
+
+  /**
+   * Register a transformer
+   * @param name - Transformer name
+   * @param transformer - Transformer instance
+   */
   register(name: string, transformer: BaseTransformer): void;
+
+  /**
+   * Get a transformer by name
+   * @param name - Transformer name
+   * @returns Transformer instance or undefined
+   */
   get(name: string): BaseTransformer | undefined;
+
+  /**
+   * Get all registered transformers
+   * @returns Array of all transformer instances
+   */
   getAll(): BaseTransformer[];
+
+  /**
+   * Check if a transformer is registered
+   * @param name - Transformer name
+   * @returns true if registered
+   */
+  has(name: string): boolean;
 }
 
 // ============================================================================
@@ -483,6 +1085,18 @@ export class ConfigManager {
       redacted: boolean;
     }
   >;
+
+  /**
+   * Enable or disable configuration validation
+   * @param enabled - Whether to enable validation
+   */
+  setValidationEnabled(enabled: boolean): void;
+
+  /**
+   * Check if configuration validation is enabled
+   * @returns true if validation is enabled and schema is loaded
+   */
+  isValidationEnabled(): boolean;
 }
 
 /**
@@ -507,20 +1121,33 @@ export function configAsync(options?: { noValidate?: boolean }): Promise<ConfigM
 // Error Classes
 // ============================================================================
 
-export class CopytreeError extends Error {
-  constructor(message: string, code?: string);
-  code?: string;
+export class CopyTreeError extends Error {
+  constructor(message: string, code?: string, details?: Record<string, any>);
+  code: string;
+  details: Record<string, any>;
+  timestamp: string;
+  toJSON(): object;
 }
 
-export class CommandError extends CopytreeError {}
-export class FileSystemError extends CopytreeError {}
-export class ConfigurationError extends CopytreeError {}
-export class ValidationError extends CopytreeError {}
-export class PipelineError extends CopytreeError {}
-export class AIProviderError extends CopytreeError {}
-export class TransformError extends CopytreeError {}
-export class GitError extends CopytreeError {}
-export class ProfileError extends CopytreeError {}
+export class CommandError extends CopyTreeError {
+  constructor(message: string, command: string, details?: Record<string, any>);
+  command: string;
+}
+
+export class FileSystemError extends CopyTreeError {
+  constructor(message: string, path: string, operation: string, details?: Record<string, any>);
+  path: string;
+  operation: string;
+}
+
+export class ConfigurationError extends CopyTreeError {}
+export class ValidationError extends CopyTreeError {}
+export class PipelineError extends CopyTreeError {}
+export class TransformError extends CopyTreeError {}
+export class GitError extends CopyTreeError {}
+export class ProfileError extends CopyTreeError {}
+export class InstructionsError extends CopyTreeError {}
+export class SecretsDetectedError extends CopyTreeError {}
 
 // ============================================================================
 // Default Export
