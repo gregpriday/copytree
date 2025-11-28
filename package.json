@@ -7,8 +7,10 @@
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
-      "import": "./src/index.js"
-    }
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./package.json": "./package.json"
   },
   "bin": {
     "copytree": "./bin/copytree.js"
@@ -21,6 +23,7 @@
     "test:unit": "jest tests/unit",
     "test:integration": "jest --config jest.integration.config.js",
     "test:e2e": "jest tests/e2e",
+    "test:electron": "cd tests/electron && npm install && npm test",
     "benchmark": "node tests/performance/benchmark.js",
     "lint": "eslint src/ bin/",
     "lint:fix": "eslint src/ bin/ --fix",
@@ -37,6 +40,8 @@
     "programmatic",
     "api",
     "library",
+    "electron",
+    "sdk",
     "scan",
     "format"
   ],
