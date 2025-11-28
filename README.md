@@ -56,6 +56,7 @@ copytree --display
 - **Git Integration** - Filter by modified files, branch diffs, staged changes
 - **External Sources** - Include files from GitHub repos or other directories
 - **Character Limiting** - Stay within AI context windows automatically
+- **Electron Ready** - Works in Electron ≥28 main processes for desktop apps
 
 ## 🔧 Frequently Used Flags
 
@@ -196,6 +197,7 @@ For detailed guides, see the `docs/` directory:
 - **[Transformer Reference](docs/profiles/transformer-reference.md)** - Transformer capabilities
 - **[Architecture](docs/technical/architecture.md)** - Pipeline and system design
 - **[Troubleshooting](docs/usage/troubleshooting.md)** - Common issues and solutions
+- **[Electron Integration](docs/installation/electron-integration.md)** - Using CopyTree in Electron apps
 
 ## 📚 Commands Reference
 
