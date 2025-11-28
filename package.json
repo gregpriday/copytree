@@ -21,12 +21,13 @@
     "test:unit": "jest tests/unit",
     "test:integration": "jest --config jest.integration.config.js",
     "test:e2e": "jest tests/e2e",
+    "typecheck": "tsc --noEmit -p tests/types/tsconfig.json",
     "benchmark": "node tests/performance/benchmark.js",
     "lint": "eslint src/ bin/",
     "lint:fix": "eslint src/ bin/ --fix",
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
-    "prepublishOnly": "npm run lint && npm run test"
+    "prepublishOnly": "npm run lint && npm run test && npm run typecheck"
   },
   "keywords": [
     "cli",
