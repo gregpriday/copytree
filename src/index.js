@@ -13,6 +13,10 @@ export { scan } from './api/scan.js';
 export { format } from './api/format.js';
 export { copy } from './api/copy.js';
 
+// Streaming API functions (for large outputs)
+export { copyStream } from './api/copyStream.js';
+export { formatStream } from './api/formatStream.js';
+
 // Core classes for advanced usage
 export { default as Pipeline } from './pipeline/Pipeline.js';
 export { default as Stage } from './pipeline/Stage.js';

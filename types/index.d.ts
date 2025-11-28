@@ -138,6 +138,37 @@ export function format(
 ): Promise<string>;
 
 // ============================================================================
+// Streaming Format API
+// ============================================================================
+
+/**
+ * Options for the formatStream() function
+ */
+export interface FormatStreamOptions extends FormatOptions {
+  /**
+   * ConfigManager instance for isolated configuration.
+   * If not provided, an isolated instance will be created.
+   */
+  config?: ConfigManager;
+  /** Progress callback function */
+  onProgress?: (progress: { percent: number; message: string }) => void;
+}
+
+/**
+ * Format a collection of files as a streaming async generator.
+ * Yields formatted output chunks incrementally, enabling memory-efficient
+ * processing of large file collections.
+ *
+ * @param files - Files to format (array or async iterable)
+ * @param options - Format options
+ * @returns Async generator yielding formatted chunks
+ */
+export function formatStream(
+  files: FileResult[] | AsyncIterable<FileResult>,
+  options?: FormatStreamOptions,
+): AsyncGenerator<string>;
+
+// ============================================================================
 // Copy API
 // ============================================================================
 
@@ -223,6 +254,62 @@ export function copy(
   basePath: string,
   options?: CopyOptions,
 ): Promise<CopyResult>;
+
+// ============================================================================
+// Streaming Copy API
+// ============================================================================
+
+/**
+ * Options for the copyStream() function
+ */
+export interface CopyStreamOptions extends ScanOptions, FormatOptions {
+  /**
+   * ConfigManager instance for isolated configuration.
+   * If not provided, an isolated instance will be created.
+   */
+  config?: ConfigManager;
+  /** Progress callback function */
+  onProgress?: (progress: { percent: number; message: string }) => void;
+  /** Add line numbers (alias for addLineNumbers) */
+  withLineNumbers?: boolean;
+}
+
+/**
+ * Stream copy operation that yields formatted output chunks incrementally.
+ * This prevents UI freezing in applications when processing large codebases
+ * by yielding output as it's generated instead of buffering everything in memory.
+ *
+ * IMPORTANT: Unlike copy(), this function streams output incrementally.
+ * - Memory efficient: Only one file's content in memory at a time
+ * - Non-blocking: Yields chunks as they're ready
+ * - Concatenated output equals copy() output for same inputs
+ *
+ * @param basePath - Path to directory to copy
+ * @param options - Combined options
+ * @returns Async generator yielding formatted output chunks
+ *
+ * @example
+ * // Stream to file (Electron)
+ * import { copyStream } from 'copytree';
+ * import { createWriteStream } from 'fs';
+ *
+ * const stream = createWriteStream('output.xml');
+ * for await (const chunk of copyStream('./src')) {
+ *   stream.write(chunk);
+ * }
+ * stream.end();
+ *
+ * @example
+ * // Stream to string with progress
+ * let output = '';
+ * for await (const chunk of copyStream('./large-repo', { format: 'json' })) {
+ *   output += chunk;
+ * }
+ */
+export function copyStream(
+  basePath: string,
+  options?: CopyStreamOptions,
+): AsyncGenerator<string>;
 
 // ============================================================================
 // Core Classes
