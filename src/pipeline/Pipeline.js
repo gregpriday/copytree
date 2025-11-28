@@ -1,14 +1,29 @@
 import { EventEmitter } from 'events';
-import { config } from '../config/ConfigManager.js';
+import { ConfigManager } from '../config/ConfigManager.js';
 import { ValidationError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 
 class Pipeline extends EventEmitter {
+  /**
+   * Create a new Pipeline instance
+   * @param {Object} options - Pipeline options
+   * @param {ConfigManager} [options.config] - ConfigManager instance for isolated configuration.
+   *   If not provided, an isolated instance will be created during initialization.
+   *   This enables concurrent pipeline operations with different configurations.
+   * @param {boolean} [options.continueOnError] - Continue processing after stage failures
+   * @param {boolean} [options.emitProgress] - Emit progress events
+   * @param {boolean} [options.parallel=false] - Enable parallel stage processing
+   * @param {number} [options.maxConcurrency] - Maximum concurrent operations
+   */
   constructor(options = {}) {
     super();
 
     this.stages = [];
     this.stageInstances = []; // Track instantiated stages for lifecycle hooks
+
+    // Store config instance if provided, otherwise will be created during init
+    this._configInstance = options.config || null;
+
     this.options = {
       continueOnError: options.continueOnError, // Will be lazy-loaded from config if not provided
       emitProgress: options.emitProgress, // Will be lazy-loaded from config if not provided
@@ -30,6 +45,7 @@ class Pipeline extends EventEmitter {
     };
 
     // Create pipeline context for stages
+    // Note: config will be populated during initialization if not provided
     this.context = {
       logger: logger?.child?.('Pipeline') || {
         debug: () => {},
@@ -40,7 +56,7 @@ class Pipeline extends EventEmitter {
       },
       options: this.options,
       stats: this.stats,
-      config: config(),
+      config: this._configInstance, // May be null until _initializeStages runs
       pipeline: this, // Reference to pipeline for event emission
     };
   }
@@ -62,6 +78,7 @@ class Pipeline extends EventEmitter {
   /**
    * Initialize all stages and call their onInit hooks
    * This method should be called after all stages are added via through()
+   * Creates an isolated ConfigManager instance if not provided via options.
    * @private
    */
   async _initializeStages() {
@@ -69,6 +86,13 @@ class Pipeline extends EventEmitter {
       // Already initialized
       return;
     }
+
+    // Create isolated config instance if not provided
+    if (!this._configInstance) {
+      this._configInstance = await ConfigManager.create();
+    }
+    // Update context with config instance
+    this.context.config = this._configInstance;
 
     // Instantiate all stages and call onInit hooks
     for (let i = 0; i < this.stages.length; i++) {
@@ -108,12 +132,13 @@ class Pipeline extends EventEmitter {
    * @returns {Promise<*>} - Final processed output
    */
   async process(input) {
-    // Initialize stages if not already done
+    // Initialize stages if not already done (also creates isolated config if needed)
     await this._initializeStages();
 
     // Refresh options from config now that we are async and likely fully loaded
     // Only override if not explicitly provided in constructor options
-    const cfg = config();
+    // Use the isolated config instance, not the singleton
+    const cfg = this._configInstance;
     if (this.options.continueOnError === undefined) {
       this.options.continueOnError = cfg.get('pipeline.continueOnError', false);
     }

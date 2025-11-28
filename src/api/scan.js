@@ -1,6 +1,6 @@
 import Pipeline from '../pipeline/Pipeline.js';
 import { ValidationError } from '../utils/errors.js';
-import { config } from '../config/ConfigManager.js';
+import { ConfigManager } from '../config/ConfigManager.js';
 import path from 'path';
 import fs from 'fs-extra';
 
@@ -38,6 +38,9 @@ import fs from 'fs-extra';
  * @property {boolean} [includeContent=true] - Include file content in results
  * @property {boolean} [dedupe=false] - Remove duplicate files
  * @property {string} [sort] - Sort order: 'path', 'size', 'modified', 'name', 'extension'
+ * @property {ConfigManager} [config] - ConfigManager instance for isolated configuration.
+ *   If not provided, an isolated instance will be created. This enables concurrent
+ *   scan operations with different configurations.
  */
 
 /**
@@ -105,8 +108,11 @@ export async function* scan(basePath, options = {}) {
     throw error;
   }
 
+  // Create or use provided config instance for isolation
+  const configInstance = options.config || (await ConfigManager.create());
+
   // Build configuration from options and config defaults
-  const copytreeConfig = config().get('copytree', {});
+  const copytreeConfig = configInstance.get('copytree', {});
 
   const profile = {
     // Include patterns
@@ -148,10 +154,11 @@ export async function* scan(basePath, options = {}) {
     },
   };
 
-  // Create pipeline with stages
+  // Create pipeline with stages and pass config instance for isolation
   const pipeline = new Pipeline({
     continueOnError: true,
     emitProgress: Boolean(options.onEvent),
+    config: configInstance,
   });
 
   // Setup stages
@@ -236,7 +243,8 @@ export async function* scan(basePath, options = {}) {
     if (options.transform) {
       const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
       const TransformerRegistry = (await import('../transforms/TransformerRegistry.js')).default;
-      const registry = await TransformerRegistry.createDefault();
+      // Pass config to registry for isolation
+      const registry = await TransformerRegistry.createDefault({ config: configInstance });
 
       stages.push(
         new TransformStage({

@@ -415,12 +415,25 @@ export { ConfigManager };
 
 /**
  * Get or create the singleton ConfigManager instance
+ *
+ * @deprecated Use `ConfigManager.create()` instead for new code. The singleton
+ * pattern prevents safe concurrent operations with different configurations.
+ * This function will be removed in the next major version.
+ *
  * For synchronous usage (backward compatibility), creates instance without waiting
  * Ensures initialization happens in background for first access
  * @param {Object} options - Configuration options
  * @returns {ConfigManager} ConfigManager instance (may not be fully initialized yet)
  */
 export function config(options = {}) {
+  // Emit deprecation warning (only once per process)
+  if (!config._deprecationWarned && process.env.NODE_ENV !== 'test') {
+    config._deprecationWarned = true;
+    console.warn(
+      '[CopyTree] config() singleton is deprecated. Use ConfigManager.create() for concurrent operations.',
+    );
+  }
+
   if (!instance) {
     instance = new ConfigManager(options);
     // Initialize asynchronously in background (for backward compatibility)
@@ -435,15 +448,33 @@ export function config(options = {}) {
 
 /**
  * Async version of config() that ensures full initialization
- * Recommended for new code
+ *
+ * @deprecated Use `ConfigManager.create()` instead for new code. The singleton
+ * pattern prevents safe concurrent operations with different configurations.
+ * This function will be removed in the next major version.
+ *
  * @param {Object} options - Configuration options
  * @returns {Promise<ConfigManager>} Fully initialized ConfigManager instance
  */
 export async function configAsync(options = {}) {
+  // Emit deprecation warning (only once per process)
+  if (!configAsync._deprecationWarned && process.env.NODE_ENV !== 'test') {
+    configAsync._deprecationWarned = true;
+    console.warn(
+      '[CopyTree] configAsync() singleton is deprecated. Use ConfigManager.create() for concurrent operations.',
+    );
+  }
+
   if (!instance) {
     instance = await ConfigManager.create(options);
-  } else if (options.noValidate !== undefined) {
-    instance.setValidationEnabled(!options.noValidate);
+  } else {
+    // Await any in-flight initialization
+    if (initPromise) {
+      await initPromise;
+    }
+    if (options.noValidate !== undefined) {
+      instance.setValidationEnabled(!options.noValidate);
+    }
   }
   return instance;
 }

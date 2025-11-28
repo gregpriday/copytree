@@ -69,7 +69,9 @@ const mockedProject = {
     '**/tests/performance/**/*.test.js',
     '!**/tests/real/**/*.test.js', // Exclude real tests
     '!**/tests/integration/fileDiscoveryStage.parallel.test.js', // Requires real fs-extra and ConfigManager
+    '!**/tests/integration/concurrent-operations.test.js', // Requires real ConfigManager
     '!**/tests/unit/utils/parallelWalker.test.js', // Requires real fs-extra
+    '!**/tests/unit/config/config.isolation.test.js', // Requires real ConfigManager
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
@@ -93,7 +95,9 @@ const realProject = {
     '**/tests/real/**/*.test.js',
     '**/tests/real/**/*.spec.js',
     '**/tests/integration/fileDiscoveryStage.parallel.test.js', // Requires real fs-extra and ConfigManager
+    '**/tests/integration/concurrent-operations.test.js', // Requires real ConfigManager
     '**/tests/unit/utils/parallelWalker.test.js', // Requires real fs-extra
+    '**/tests/unit/config/config.isolation.test.js', // Requires real ConfigManager
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',

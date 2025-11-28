@@ -79,6 +79,12 @@ export interface ScanOptions {
   dedupe?: boolean;
   /** Sort order: 'path', 'size', 'modified', 'name', 'extension' */
   sort?: 'path' | 'size' | 'modified' | 'name' | 'extension';
+  /**
+   * ConfigManager instance for isolated configuration.
+   * If not provided, an isolated instance will be created.
+   * This enables concurrent scan operations with different configurations.
+   */
+  config?: ConfigManager;
 }
 
 /**
@@ -161,6 +167,13 @@ export interface CopyOptions extends ScanOptions, FormatOptions {
   instructions?: string;
   /** Add line numbers (alias for addLineNumbers) */
   withLineNumbers?: boolean;
+  /**
+   * ConfigManager instance for isolated configuration.
+   * If not provided, an isolated instance will be created.
+   * This enables concurrent copy operations with different configurations.
+   * Note: This overrides the config option from ScanOptions.
+   */
+  config?: ConfigManager;
 }
 
 /**
@@ -249,10 +262,30 @@ export interface PipelineEvent {
 }
 
 /**
+ * Options for Pipeline construction
+ */
+export interface PipelineOptions {
+  /**
+   * ConfigManager instance for isolated configuration.
+   * If not provided, an isolated instance will be created during initialization.
+   * This enables concurrent pipeline operations with different configurations.
+   */
+  config?: ConfigManager;
+  /** Continue processing after stage failures */
+  continueOnError?: boolean;
+  /** Emit progress events */
+  emitProgress?: boolean;
+  /** Enable parallel stage processing */
+  parallel?: boolean;
+  /** Maximum concurrent operations */
+  maxConcurrency?: number;
+}
+
+/**
  * Pipeline for orchestrating file processing stages
  */
 export class Pipeline {
-  constructor(options?: any);
+  constructor(options?: PipelineOptions);
   through(stages: any[]): Pipeline;
   process(input: any): Promise<any>;
   on(event: string, listener: (...args: any[]) => void): this;
@@ -296,9 +329,92 @@ export class TransformerRegistry {
 // ============================================================================
 
 /**
- * Get configuration manager instance
+ * Configuration manager for CopyTree.
+ * Supports both singleton pattern (deprecated) and instance-based usage.
  */
-export function config(): any;
+export class ConfigManager {
+  /**
+   * Create a new ConfigManager instance (use ConfigManager.create() instead)
+   */
+  constructor(options?: { noValidate?: boolean });
+
+  /**
+   * Static factory method to create and initialize a ConfigManager instance.
+   * Recommended for new code - enables concurrent operations with isolated configuration.
+   * @param options - Configuration options
+   * @returns Promise resolving to an initialized ConfigManager instance
+   */
+  static create(options?: { noValidate?: boolean }): Promise<ConfigManager>;
+
+  /**
+   * Get configuration value using dot notation
+   * @param path - Configuration path (e.g., 'ai.providers.openai.apiKey')
+   * @param defaultValue - Default value if config not found
+   * @returns Configuration value
+   */
+  get<T = any>(path: string, defaultValue?: T): T;
+
+  /**
+   * Set configuration value at runtime
+   * @param path - Configuration path
+   * @param value - Value to set
+   */
+  set(path: string, value: any): void;
+
+  /**
+   * Check if configuration path exists
+   * @param path - Configuration path
+   * @returns true if path exists
+   */
+  has(path: string): boolean;
+
+  /**
+   * Get all configuration
+   * @returns Deep copy of all configuration
+   */
+  all(): Record<string, any>;
+
+  /**
+   * Load configuration (called automatically by create())
+   */
+  loadConfiguration(): Promise<void>;
+
+  /**
+   * Reload configuration
+   */
+  reload(): Promise<void>;
+
+  /**
+   * Get effective configuration with provenance information
+   */
+  effective(options?: { redact?: boolean; section?: string }): Record<
+    string,
+    {
+      value: any;
+      source: string;
+      type: string;
+      redacted: boolean;
+    }
+  >;
+}
+
+/**
+ * Get or create the singleton ConfigManager instance.
+ *
+ * @deprecated Use `ConfigManager.create()` instead for new code. The singleton
+ * pattern prevents safe concurrent operations with different configurations.
+ * This function will be removed in the next major version.
+ */
+export function config(options?: { noValidate?: boolean }): ConfigManager;
+
+/**
+ * Async version of config() that ensures full initialization.
+ *
+ * @deprecated Use `ConfigManager.create()` instead for new code. The singleton
+ * pattern prevents safe concurrent operations with different configurations.
+ * This function will be removed in the next major version.
+ */
+export function configAsync(options?: { noValidate?: boolean }): Promise<ConfigManager>;
 
 // ============================================================================
 // Error Classes

@@ -82,6 +82,35 @@ class ConfigManager {
   all() {
     return { ...this.config };
   }
+
+  has(key) {
+    const keys = key.split('.');
+    let value = this.config;
+
+    for (const k of keys) {
+      if (value && typeof value === 'object' && k in value) {
+        value = value[k];
+      } else {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  async loadConfiguration() {
+    // Mock - already initialized
+    return this;
+  }
+
+  /**
+   * Static factory method for creating isolated ConfigManager instances
+   * Matches the real ConfigManager.create() API
+   */
+  static async create(_options = {}) {
+    const instance = new ConfigManager();
+    return instance;
+  }
 }
 
 // Helper function to get environment variables with defaults
@@ -101,4 +130,14 @@ export function config() {
   return instance;
 }
 
+export async function configAsync() {
+  if (!instance) {
+    instance = new ConfigManager();
+  }
+  return instance;
+}
+
 export { env };
+
+// Default export for CommonJS interop
+export default { ConfigManager, config, configAsync, env };
