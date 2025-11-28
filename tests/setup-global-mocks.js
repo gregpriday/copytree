@@ -103,13 +103,69 @@ jest.mock('../src/config/ConfigManager.js', () => {
   };
 
   // Mock ConfigManager class
-  const MockConfigManager = {
-    get: (key, defaultValue) => mockConfig().get(key, defaultValue),
-    set: (key, value) => mockConfig().set(key, value),
-    all: () => mockConfig().all(),
-    has: (key) => mockConfig().has(key),
-    env: mockConfig.env,
-  };
+  class MockConfigManager {
+    constructor() {
+      // Deep clone to ensure each instance has fully isolated config
+      this._data = JSON.parse(JSON.stringify(mockConfigData));
+    }
+
+    get(key, defaultValue = null) {
+      const keys = key.split('.');
+      let value = this._data;
+
+      for (const k of keys) {
+        if (value && typeof value === 'object' && k in value) {
+          value = value[k];
+        } else {
+          return defaultValue;
+        }
+      }
+
+      return value;
+    }
+
+    set(key, value) {
+      const keys = key.split('.');
+      let target = this._data;
+
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!(keys[i] in target)) {
+          target[keys[i]] = {};
+        }
+        target = target[keys[i]];
+      }
+
+      target[keys[keys.length - 1]] = value;
+    }
+
+    all() {
+      return { ...this._data };
+    }
+
+    has(key) {
+      const keys = key.split('.');
+      let value = this._data;
+
+      for (const k of keys) {
+        if (value && typeof value === 'object' && k in value) {
+          value = value[k];
+        } else {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    async loadConfiguration() {
+      return this;
+    }
+
+    static async create(_options = {}) {
+      const instance = new MockConfigManager();
+      return instance;
+    }
+  }
 
   // Create singleton instance
   let singletonInstance = null;
@@ -121,9 +177,17 @@ jest.mock('../src/config/ConfigManager.js', () => {
     return singletonInstance;
   };
 
+  const configAsyncFactory = async () => {
+    if (!singletonInstance) {
+      singletonInstance = mockConfig();
+    }
+    return singletonInstance;
+  };
+
   return {
     ConfigManager: MockConfigManager,
     config: configFactory,
+    configAsync: configAsyncFactory,
     env: mockConfig.env,
   };
 });

@@ -1,6 +1,7 @@
 import { scan } from './scan.js';
 import { format } from './format.js';
 import { ValidationError } from '../utils/errors.js';
+import { ConfigManager } from '../config/ConfigManager.js';
 import fs from 'fs-extra';
 import path from 'path';
 import Clipboard from '../utils/clipboard.js';
@@ -22,6 +23,9 @@ import Clipboard from '../utils/clipboard.js';
  * @property {boolean} [verbose=false] - Verbose error output
  * @property {number} [charLimit] - Character limit per file
  * @property {string} [instructions] - Instructions to include in output
+ * @property {ConfigManager} [config] - ConfigManager instance for isolated configuration.
+ *   If not provided, an isolated instance will be created. This enables concurrent
+ *   copy operations with different configurations.
  */
 
 /**
@@ -84,12 +88,17 @@ export async function copy(basePath, options = {}) {
     throw new ValidationError('basePath must be a non-empty string', 'copy', basePath);
   }
 
+  // Create isolated config instance for this operation if not provided
+  // This enables concurrent copy operations with different configurations
+  const configInstance = options.config || (await ConfigManager.create());
+
   // Handle dry run
   if (options.dryRun) {
     // For dry run, collect file list without content
     const files = [];
     for await (const file of scan(basePath, {
       ...options,
+      config: configInstance,
       includeContent: false,
       transform: false,
     })) {
@@ -110,12 +119,12 @@ export async function copy(basePath, options = {}) {
     };
   }
 
-  // Scan files with options
+  // Scan files with options (pass config for isolation)
   const files = [];
   const scanErrors = [];
 
   try {
-    for await (const file of scan(basePath, options)) {
+    for await (const file of scan(basePath, { ...options, config: configInstance })) {
       files.push(file);
     }
   } catch (error) {

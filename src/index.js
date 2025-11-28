@@ -20,7 +20,7 @@ export { default as TransformerRegistry } from './transforms/TransformerRegistry
 export { default as BaseTransformer } from './transforms/BaseTransformer.js';
 
 // Configuration utilities
-export { config } from './config/ConfigManager.js';
+export { config, configAsync, ConfigManager } from './config/ConfigManager.js';
 
 // Error classes
 export {

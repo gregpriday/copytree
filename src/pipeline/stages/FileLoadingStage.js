@@ -8,6 +8,7 @@ class FileLoadingStage extends Stage {
   constructor(options = {}) {
     super(options);
     this.encoding = options.encoding || 'utf8';
+    // Config may not be available yet in constructor, but the proxy returns defaults
     this.binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
   }
 

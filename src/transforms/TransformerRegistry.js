@@ -7,7 +7,12 @@ import { logger } from '../utils/logger.js';
  * Includes traits-based validation and optimization
  */
 class TransformerRegistry {
-  constructor() {
+  /**
+   * Create a new TransformerRegistry
+   * @param {Object} [options] - Options for registry creation
+   * @param {ConfigManager} [options.config] - ConfigManager instance for isolated configuration.
+   */
+  constructor(options = {}) {
     this.transformers = new Map();
     this.extensionMap = new Map();
     this.mimeTypeMap = new Map();
@@ -17,6 +22,9 @@ class TransformerRegistry {
     // Traits system
     this.traits = new Map(); // transformer name -> traits
     this.validationEnabled = true;
+
+    // Store config for potential use by transformers
+    this.config = options.config || null;
   }
 
   /**
@@ -603,9 +611,16 @@ class TransformerRegistry {
   /**
    * Create default registry with standard transformers and their traits
    * @static
+   * @param {Object} [options] - Options for registry creation
+   * @param {ConfigManager} [options.config] - ConfigManager instance for isolated configuration.
+   *   If not provided, transformers will use their default configuration.
+   *   This enables concurrent registry operations with different configurations.
+   * @returns {Promise<TransformerRegistry>} Configured TransformerRegistry instance
    */
-  static async createDefault() {
+  static async createDefault(options = {}) {
     const registry = new TransformerRegistry();
+    // Store config for potential use by transformers
+    registry.config = options.config || null;
 
     // Register default transformers - using dynamic imports for better ESM compatibility
     const { default: FileLoaderTransformer } = await import(

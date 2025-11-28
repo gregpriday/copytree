@@ -1,19 +1,46 @@
-import { config } from '../config/ConfigManager.js';
-
 /**
  * Base class for pipeline stages
  * All pipeline stages should extend this class
  */
 class Stage {
+  /**
+   * Create a new Stage instance
+   * @param {Object} options - Stage options
+   * @param {Object} [options.pipeline] - Reference to parent pipeline for event emission
+   * @param {Object} [options.config] - ConfigManager instance (optional, will be set via onInit context)
+   */
   constructor(options = {}) {
     this.options = options;
-    this.config = config();
+    // Config is now provided via the pipeline context in onInit()
+    // For backward compatibility, accept config in options, but prefer context
+    this._config = options.config || null;
     this.name = this.constructor.name;
     this.pipeline = options.pipeline; // Reference to parent pipeline for event emission
 
     // Performance optimization: throttle file events
     this.fileEventCount = 0;
     this.lastFileEventTime = 0;
+  }
+
+  /**
+   * Get the config instance
+   * Prefers config from pipeline context (set during onInit), falls back to options
+   * Returns a safe proxy if no config is available yet (allows stages to access config
+   * in constructors with defaults)
+   * @returns {Object} ConfigManager instance or safe proxy
+   */
+  get config() {
+    if (this._config) {
+      return this._config;
+    }
+    // Return a safe proxy that returns defaults when config isn't available yet
+    // This allows stages to access config in constructors before onInit is called
+    return {
+      get: (_path, defaultValue) => defaultValue,
+      set: () => {},
+      has: () => false,
+      all: () => ({}),
+    };
   }
 
   /**
@@ -59,15 +86,23 @@ class Stage {
    * Called once when pipeline is created, before any processing
    * This hook allows stages to set up resources, warm caches, or prepare for processing
    *
+   * This method also receives the config instance from the pipeline context,
+   * enabling stages to use isolated configuration for concurrent operations.
+   *
    * @param {Object} context - Pipeline context with shared resources
    * @param {Object} context.logger - Logger instance
    * @param {Object} context.options - Pipeline options
    * @param {Object} context.stats - Pipeline statistics
-   * @param {Object} context.config - Configuration manager
+   * @param {Object} context.config - Configuration manager instance
+   * @param {Object} context.pipeline - Reference to parent pipeline
    * @returns {Promise<void>}
    */
-  async onInit(_context) {
-    // Default implementation - no operation
+  async onInit(context) {
+    // Set config from pipeline context if not already set
+    if (context?.config && !this._config) {
+      this._config = context.config;
+    }
+    // Default implementation - subclasses can override for custom initialization
   }
 
   /**
@@ -129,7 +164,9 @@ class Stage {
     }
 
     // Original logging behavior for debug mode or errors
-    if (this.config.get('app.debug') || level === 'error') {
+    // Handle case where config might not be available yet
+    const isDebugMode = this._config?.get?.('app.debug') ?? false;
+    if (isDebugMode || level === 'error') {
       const prefix = `[${this.name}]`;
 
       switch (level) {
@@ -140,7 +177,7 @@ class Stage {
           console.warn(prefix, message);
           break;
         case 'debug':
-          if (this.config.get('app.debug')) {
+          if (isDebugMode) {
             console.log(prefix, '[DEBUG]', message);
           }
           break;
