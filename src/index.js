@@ -28,16 +28,17 @@ export { config, configAsync, ConfigManager } from './config/ConfigManager.js';
 
 // Error classes
 export {
-  CopytreeError,
+  CopyTreeError,
   CommandError,
   FileSystemError,
   ConfigurationError,
   ValidationError,
   PipelineError,
-  AIProviderError,
   TransformError,
   GitError,
   ProfileError,
+  InstructionsError,
+  SecretsDetectedError,
 } from './utils/errors.js';
 
 // Default export for convenience
