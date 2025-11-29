@@ -426,6 +426,8 @@ export { ConfigManager };
  * @returns {ConfigManager} ConfigManager instance (may not be fully initialized yet)
  */
 export function config(options = {}) {
+  // Deprecation warning removed to prevent CLI noise until migration is complete
+  /*
   // Emit deprecation warning (only once per process)
   if (!config._deprecationWarned && process.env.NODE_ENV !== 'test') {
     config._deprecationWarned = true;
@@ -433,6 +435,7 @@ export function config(options = {}) {
       '[CopyTree] config() singleton is deprecated. Use ConfigManager.create() for concurrent operations.',
     );
   }
+  */
 
   if (!instance) {
     instance = new ConfigManager(options);
@@ -457,6 +460,8 @@ export function config(options = {}) {
  * @returns {Promise<ConfigManager>} Fully initialized ConfigManager instance
  */
 export async function configAsync(options = {}) {
+  // Deprecation warning removed to prevent CLI noise until migration is complete
+  /*
   // Emit deprecation warning (only once per process)
   if (!configAsync._deprecationWarned && process.env.NODE_ENV !== 'test') {
     configAsync._deprecationWarned = true;
@@ -464,6 +469,7 @@ export async function configAsync(options = {}) {
       '[CopyTree] configAsync() singleton is deprecated. Use ConfigManager.create() for concurrent operations.',
     );
   }
+  */
 
   if (!instance) {
     instance = await ConfigManager.create(options);
