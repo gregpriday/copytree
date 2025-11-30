@@ -28,9 +28,8 @@ Perfect for newcomers and quick reference:
 For day-to-day usage:
 
 - **[Basic Usage](./usage/basic-usage.md)** - Common commands and workflows
-- **[Profile Overview](./profiles/profile-overview.md)** - Understanding the profile system
-- **[Profile Examples](./profiles/profile-examples.md)** - Real-world profile configurations
 - **[Troubleshooting](./usage/troubleshooting.md)** - Solve common problems
+- **[Secrets Guard](./usage/secrets-guard.md)** - Prevent accidental secret exposure
 
 ### Reference
 
@@ -38,15 +37,6 @@ Authoritative technical references:
 
 - **[Configuration Reference](./reference/configuration.md)** - Complete config system with precedence rules
 - **[CLI Reference](./cli/copytree-reference.md)** - All commands and options
-- **[Transformer Reference](./profiles/transformer-reference.md)** - PDF, OCR, and file transformers
-
-### Advanced Topics
-
-For power users:
-
-- **[Advanced Profile Features](./profiles/profile-advanced.md)** - External sources, inheritance, optimization
-- **[Profile Creation Guide](./profiles/profile-creation-guide.md)** - Comprehensive profile authoring
-- **[Secrets Guard](./usage/secrets-guard.md)** - Prevent accidental secret exposure
 
 ### Developer Documentation
 
@@ -63,20 +53,16 @@ For contributors and extenders:
 - **Git Integration**: Copy only modified or changed files
 - **Pattern Matching**: Flexible include/exclude rules
 
-### 2. **Advanced Transformations**
-- **PDF to Text**: Extract text from PDF documents
-- **Image OCR**: Extract text from images using Tesseract
-- **Format Conversion**: Markdown processing, CSV formatting, and more
-
-### 3. **Multiple Output Options**
+### 2. **Multiple Output Options**
 - **Clipboard**: Default output for easy pasting
 - **File Output**: Save to file
 - **Streaming**: Real-time output for large projects
 - **Multiple Formats**: XML (default), Markdown, JSON, NDJSON, SARIF, or tree view
 
-### 4. **Developer-Friendly**
+### 3. **Developer-Friendly**
 - **External Sources**: Include files from GitHub or other directories
 - **Editor Integration**: Works with VS Code, Cursor, and Claude Code
+- **Secrets Detection**: Prevent accidental exposure of API keys and credentials
 
 ## 🎯 Common Use Cases
 
@@ -131,19 +117,7 @@ copytree cache:clear
 
 - [Basic Usage Guide](./usage/basic-usage.md) - Complete usage documentation
 - [Troubleshooting Guide](./usage/troubleshooting.md) - Solve common issues
-- [Profile Examples](./profiles/profile-examples.md) - Example custom profiles
-- [Creating Custom Profiles](./profiles/profile-creation-guide.md) - Build your own profiles
-- [Transformer Reference](./profiles/transformer-reference.md) - File transformation options
-- [Advanced Features](./profiles/profile-advanced.md) - Power user features
-
-## 🤝 Integration Guides
-
 - [Claude Code Integration](./installation/claude-integration.md) - Use with Claude Code
-
-## 📘 Usage Guides
-
-- [Basic Usage](./usage/basic-usage.md) - Get started with CopyTree
-- [Troubleshooting](./usage/troubleshooting.md) - Solve common problems
 
 ## 🐛 Troubleshooting
 

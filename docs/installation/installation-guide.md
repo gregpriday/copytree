@@ -185,9 +185,6 @@ copytree config:inspect
 # Copy current directory (dry run)
 copytree --dry-run
 
-# List available profiles
-copytree profile:list
-
 # Validate configuration
 copytree config:validate
 ```
@@ -287,7 +284,7 @@ nvm use 20
 ## Next Steps
 
 1. [Configure Claude Code Integration](./claude-integration.md) - Set up Claude Code integration
-2. [Explore Profiles](../profiles/profile-overview.md) - Learn about file selection profiles
+2. [Create Your First Profile](../getting-started/first-profile.md) - Learn about file selection profiles
 3. [Read CLI Reference](../cli/copytree-reference.md) - Explore all available commands
 
 ## Getting Help

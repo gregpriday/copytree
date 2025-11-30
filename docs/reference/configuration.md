@@ -109,7 +109,7 @@ export default {
 
 ## Profile Configuration
 
-Profiles control file selection and transformation. See [Profile Overview](../profiles/profile-overview.md) for details.
+Profiles control file selection. See [Your First Custom Profile](../getting-started/first-profile.md) for details.
 
 ### Profile Selection Precedence
 
@@ -147,27 +147,17 @@ When loading a profile by name, CopyTree searches in this order:
 
 ## Transformer Configuration
 
-**Canonical Rule**: Transformers are configured **in profiles only**, not via CLI or configuration files.
+Transformers handle file loading and processing. The built-in transformers include:
 
-See [Transformer Reference](../profiles/transformer-reference.md) for details.
+- **file-loader**: Loads file content
+- **binary**: Handles binary files with placeholder or base64 encoding
+- **streaming-file-loader**: Streams large files (>10MB) for memory efficiency
 
 ```yaml
 # In profile file (.copytree/myprofile.yml)
 transformers:
-  pdf:
+  file-loader:
     enabled: true
-    options:
-      maxPages: 50
-
-  image:
-    enabled: true
-    options:
-      extractText: true
-
-  markdown:
-    enabled: true
-    options:
-      mode: strip
 ```
 
 ## Configuration Validation
@@ -503,7 +493,6 @@ copytree config:inspect
 
 ## Related Documentation
 
-- **[Profile Overview](../profiles/profile-overview.md)** - Complete guide to profiles
-- **[Transformer Reference](../profiles/transformer-reference.md)** - All available transformers
+- **[Your First Custom Profile](../getting-started/first-profile.md)** - Creating custom profiles
 - **[CLI Reference](../cli/copytree-reference.md)** - Command-line options
 - **[Troubleshooting Guide](../usage/troubleshooting.md)** - Common issues and solutions

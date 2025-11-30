@@ -691,5 +691,4 @@ This architecture supports CopyTree's performance targets while maintaining code
 
 **Related Documentation:**
 - [CLI Reference](../cli/copytree-reference.md) - Command-line interface
-- [Profile System](../profiles/profile-overview.md) - File filtering architecture
 - [Troubleshooting Guide](../usage/troubleshooting.md) - Common issues and solutions

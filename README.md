@@ -50,12 +50,12 @@ copytree --display
 ## 🎯 Why CopyTree?
 
 - **Smart File Discovery** - Intelligent selection with `.gitignore`, `.copytreeignore`, and `.copytreeinclude` support
-- **File Transformers** - PDF text extraction, image OCR, CSV formatting, and more
 - **Multiple Output Formats** - XML (default), Markdown, JSON, tree view
 - **Profile System** - Default profile with customizable overrides
 - **Git Integration** - Filter by modified files, branch diffs, staged changes
 - **External Sources** - Include files from GitHub repos or other directories
 - **Character Limiting** - Stay within AI context windows automatically
+- **Secrets Detection** - Prevent accidental exposure of API keys and credentials
 - **Electron Ready** - Works in Electron ≥28 main processes for desktop apps
 
 ## 🔧 Frequently Used Flags
@@ -92,9 +92,6 @@ copytree -f "*.js" -f "*.ts" --exclude "node_modules"
 # Copy GitHub folder to XML
 copytree https://github.com/user/repo/tree/main/src -o repo-src.xml
 
-# Include external source explicitly
-copytree --external https://github.com/user/repo -o repo.xml
-
 # Stream output (great for CI or large projects)
 copytree -S --format markdown > output.md
 copytree --stream --format json | jq .
@@ -122,9 +119,6 @@ Profiles control which files are included and how they're processed.
 name: my-profile
 include: ["src/**/*.js", "README.md"]
 exclude: ["**/*.test.js"]
-transformers:
-  file-loader: true
-  markdown: true
 output:
   format: markdown
 ```
@@ -184,8 +178,6 @@ config/**
 ## 🛠️ Requirements
 
 - **Node.js 20+** (required by engines in package.json)
-- **Optional dependencies:**
-- [Pandoc](https://pandoc.org) - For Word/ODT document conversion
 
 ## 📖 Documentation
 
@@ -193,8 +185,6 @@ For detailed guides, see the `docs/` directory:
 
 - **[Getting Started](docs/index.md)** - Introduction and quick start
 - **[CLI Reference](docs/cli/copytree-reference.md)** - Complete command options
-- **[Profile Overview](docs/profiles/profile-overview.md)** - Creating and using profiles
-- **[Transformer Reference](docs/profiles/transformer-reference.md)** - Transformer capabilities
 - **[Architecture](docs/technical/architecture.md)** - Pipeline and system design
 - **[Troubleshooting](docs/usage/troubleshooting.md)** - Common issues and solutions
 - **[Electron Integration](docs/installation/electron-integration.md)** - Using CopyTree in Electron apps
@@ -223,7 +213,7 @@ For detailed guides, see the `docs/` directory:
 → Reduce `COPYTREE_MAX_TOTAL_SIZE` or enable streaming mode with `-S/--stream`
 
 **Slow performance**
-→ Enable caching, use lighter transformers, add more exclusion patterns
+→ Enable caching, add more exclusion patterns
 
 **Profile not found**
 → Check search paths: project `.copytree/` → user `~/.copytree/profiles/` → built-in `profiles/`
@@ -265,7 +255,7 @@ npm link  # Makes 'copytree' available globally
 
 ```bash
 npm test                   # Run all tests
-npm run test:watch         # Watch mode
+npm test -- --watch        # Watch mode
 npm run test:coverage      # Coverage report
 npm run lint               # Lint code
 npm run format             # Format code
@@ -293,29 +283,13 @@ CopyTree is optimized for large codebases:
 
 - **Streaming processing** - Memory efficient for large files (>10MB)
 - **Parallel file processing** - Faster for many files
-- **Smart caching** - Avoid redundant AI calls and transformations
+- **Smart caching** - Avoid redundant transformations
 - **Configurable limits** - Prevent resource exhaustion
 
 **Performance targets:**
 - Process 10,000 files in < 30 seconds
 - Memory usage < 500MB for large projects
 - Support projects up to 100MB total size
-
-## 🎯 Creating Profiles with AI
-
-You can create custom profiles using AI assistants like Claude Code:
-
-```bash
-# Create a profile interactively
-claude -p "Please create a CopyTree profile for this project.
-Review the docs/ folder to understand filters and options, then create an optimal profile."
-
-# Or build a .copytreeignore file
-claude -p "Please create a .copytreeignore file for this project.
-See docs/usage/ignore-files.md for guidance."
-```
-
-For detailed guidance: [Profile Creation Guide](docs/profiles/profile-creation-guide.md)
 
 ## 📄 License
 

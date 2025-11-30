@@ -99,27 +99,22 @@ The system includes predefined traits for built-in transformers:
   tags: ['loader', 'default']
 }
 
-// PDF Transformer
+// Binary Transformer
 {
   inputTypes: ['binary'],
   outputTypes: ['text'],
   idempotent: true,
-  heavy: true,
-  requirements: { memory: '50MB' },
-  tags: ['text-extraction', 'document', 'pdf']
+  heavy: false,
+  tags: ['binary', 'placeholder']
 }
 
-// Image Transformer (OCR)
+// Streaming File Loader
 {
-  inputTypes: ['binary'],
-  outputTypes: ['text'],
+  inputTypes: ['any'],
+  outputTypes: ['text', 'binary'],
   idempotent: true,
-  heavy: true,
-  dependencies: [],
-  requirements: {
-    memory: '150MB'
-  },
-  tags: ['ocr', 'image', 'text-extraction']
+  heavy: false,
+  tags: ['loader', 'streaming', 'large-files']
 }
 ```
 
@@ -433,6 +428,4 @@ The traits system is designed for extensibility:
 
 ## Related Documentation
 
-- [Transformer Reference](../profiles/transformer-reference.md) - Complete list of built-in transformers
 - [Architecture Guide](../technical/architecture.md) - Pipeline and system design
-- [Profile System](../profiles/profile-overview.md) - Configuring transformers in profiles

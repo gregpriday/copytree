@@ -29,7 +29,6 @@
 
 **Heavy transformers:**
 - Marked `heavy: true` if CPU/memory intensive or uses external APIs
-- Examples: PDF extraction, AI summarization, OCR
 - Registry schedules these last, respects performance budgets
 
 ## Registration Rules
@@ -43,12 +42,5 @@
 
 - Add unit tests in `@tests/unit/transformers/`
 - Test with various input types
-- Mock external APIs (AI, OCR)
 - Verify traits are enforced
 - Test error handling and fallbacks
-
-## Documentation
-
-- Add entry to `@docs/profiles/transformer-reference.md`
-- Include: name, purpose, options, example usage
-- Document any external dependencies

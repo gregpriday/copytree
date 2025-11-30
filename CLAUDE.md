@@ -46,7 +46,6 @@ npm run format          # Auto-format code (use when formatting is requested)
 # Debugging
 DEBUG=copytree:* copytree        # Verbose logging
 copytree config:validate         # Check config
-copytree profile:validate NAME   # Check profile
 ```
 
 <paved_path>
@@ -58,8 +57,7 @@ copytree profile:validate NAME   # Check profile
 3. Implement `async transform(file)` method
 4. Register in `@src/transforms/TransformerRegistry.js`
 5. Add tests in `@tests/unit/transformers/`
-6. Document in `@docs/profiles/transformer-reference.md`
-7. Run `npm run test:coverage` (must pass 80%)
+6. Run `npm run test:coverage` (must pass 80%)
 
 ### Add a New Pipeline Stage
 1. Create class in `@src/pipeline/stages/`, extend `Stage`
@@ -71,9 +69,9 @@ copytree profile:validate NAME   # Check profile
 7. Run `npm run test:coverage` (must pass 80%)
 
 ### Diagnose Slow/Large Runs
-1. Use git filters first: `--git-modified`, `--changed <ref>`
+1. Use git filters first: `--modified`, `--changed <ref>`
 2. Enable streaming: `--stream` or `-S`
-3. Set limits: `--limit N`, `--max-file-size`, `--max-total-size`
+3. Set limits: `--head N`
 4. Check cache: `copytree cache:clear` if stale
 5. Profile with: `DEBUG=copytree:* copytree --dry-run`
 </paved_path>
@@ -123,8 +121,8 @@ Increase adherence by starting sessions with:
 
 - **Pipeline**: Event-driven stages, streaming >10MB (`@src/pipeline/Pipeline.js`, `@docs/technical/architecture.md`)
 - **Configuration**: Hierarchical (CLI > env > project > user > default) (`@src/config/ConfigManager.js`, `@config/schema.json`)
-- **Profiles**: YAML-based file selection + transformers (`@src/profiles/ProfileLoader.js`, `@profiles/default.yml`)
-- **Transformers**: Multiple file processors with traits system (`@src/transforms/transformers/`, `@docs/profiles/transformer-reference.md`)
+- **Profiles**: YAML-based file selection (`@src/config/FolderProfileLoader.js`)
+- **Transformers**: File processors with traits system (`@src/transforms/transformers/`)
 - **Commands**: Core CLI commands (`@bin/copytree.js`): copy, config:validate, config:inspect, cache:clear
 
 ## Critical Files
@@ -133,25 +131,20 @@ Increase adherence by starting sessions with:
 - `src/pipeline/Pipeline.js` - Pipeline orchestration
 - `src/pipeline/Stage.js` - Stage base class
 - `src/config/ConfigManager.js` - Config system
-- `src/profiles/ProfileLoader.js` - Profile loading
+- `src/config/FolderProfileLoader.js` - Profile loading
 - `src/transforms/TransformerRegistry.js` - Transformer registry
 - `src/utils/errors.js` - Custom errors
 
 ## Error Handling Rules
 
 **Use Custom Errors** (`@src/utils/errors.js`):
-`CommandError`, `FileSystemError`, `ConfigurationError`, `ValidationError`, `PipelineError`, `AIProviderError`, `TransformError`, `GitError`, `ProfileError`
-
-**Retry Logic**:
-- Retryable: `RATE_LIMIT`, `TIMEOUT`, `SERVICE_UNAVAILABLE`, network errors (max 3 attempts, exponential backoff)
-- Non-retryable: `INVALID_API_KEY`, `SAFETY_FILTER`, `QUOTA_EXCEEDED`, validation errors
+`CommandError`, `FileSystemError`, `ConfigurationError`, `ValidationError`, `PipelineError`, `TransformError`, `GitError`, `ProfileError`
 
 ## Performance Constraints
 
 - Process 10,000 files in <30s
 - Memory usage <500MB for large projects
 - Stream files >10MB automatically
-- Heavy transformers (PDF, Image, AI) only when requested
 
 ## Module-Specific Context
 
@@ -167,5 +160,4 @@ When bug #2571 is fixed, these will load automatically.
 @README.md
 @docs/index.md
 @docs/technical/architecture.md
-@docs/profiles/transformer-reference.md
 @tests/README.md

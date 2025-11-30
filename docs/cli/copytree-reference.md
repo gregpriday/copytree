@@ -205,7 +205,7 @@ copytree --external https://github.com/user/repo
 
 ### Transformation Options
 
-**Note:** Transformers are configured in profiles, not via CLI flags. See the [Transformer Reference](../profiles/transformer-reference.md) for details on enabling and configuring transformers in your profile.
+**Note:** Transformers are configured in profiles, not via CLI flags. Built-in transformers include file-loader, binary, and streaming-file-loader.
 
 ### Debug & Optimization Options
 
@@ -283,8 +283,8 @@ copytree
 # Use custom profile
 copytree --profile mycustom
 
-# List available profiles
-copytree profile:list
+# Preview profile selection
+copytree --profile mycustom --dry-run
 ```
 
 ### Filtering Files

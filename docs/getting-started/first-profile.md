@@ -66,20 +66,6 @@ exclude:
 
 ### Step 3: Test Your Profile
 
-Validate the profile syntax:
-
-```bash
-copytree profile:validate docs-only
-```
-
-**Expected output**:
-```
-✓ Profile 'docs-only' is valid
-  - Found 3 include rules
-  - Found 2 exclude rules
-  - No transformers configured
-```
-
 Preview what files will be selected:
 
 ```bash
@@ -182,39 +168,26 @@ always:
 
 ### Using Transformers
 
-Add transformers to process specific file types:
+Add transformers to handle file loading:
 
 ```yaml
 name: with-transformers
-description: Extract text from PDFs and images
+description: Profile with file loading
 
 include:
-  - "**/*.{md,pdf,png,jpg}"
+  - "**/*.{md,txt,js,ts}"
   - "docs/**/*"
 
 transformers:
-  # Extract text from PDFs
-  pdf:
+  # Load file content
+  file-loader:
     enabled: true
-    options:
-      maxPages: 20
-      includeMetadata: true
-
-  # OCR on images
-  image:
-    enabled: true
-    options:
-      extractText: true
-      language: eng
-
-  # Strip markdown formatting
-  markdown:
-    enabled: true
-    options:
-      mode: strip
 ```
 
-See [Transformer Reference](../profiles/transformer-reference.md) for all available transformers.
+Built-in transformers:
+- **file-loader**: Loads text file content
+- **binary**: Handles binary files (placeholder or base64)
+- **streaming-file-loader**: Streams large files (>10MB)
 
 ### Profile Inheritance
 
@@ -364,12 +337,9 @@ version: 1.0.0
 
 ### 4. Test Before Using
 
-Always validate and dry-run:
+Always preview before copying:
 
 ```bash
-# Validate syntax
-copytree profile:validate myprofile
-
 # Preview selection
 copytree --profile myprofile --dry-run
 
@@ -397,9 +367,6 @@ git commit -m "Add CopyTree profiles for documentation and API"
 Check search paths:
 
 ```bash
-# List available profiles
-copytree profile:list
-
 # Check specific locations
 ls .copytree/                    # Project profiles
 ls ~/.copytree/profiles/         # User profiles
@@ -424,9 +391,6 @@ copytree --profile myprofile --dry-run
 Check YAML syntax:
 
 ```bash
-# Validate profile
-copytree profile:validate myprofile
-
 # Common issues:
 # - Incorrect indentation (use spaces, not tabs)
 # - Missing colons after keys
@@ -437,20 +401,16 @@ copytree profile:validate myprofile
 
 Now that you can create custom profiles:
 
-1. **[Transformer Reference](../profiles/transformer-reference.md)** - Learn about all available transformers (PDF, image, OCR, etc.)
+1. **[Configuration Reference](../reference/configuration.md)** - Project-wide and global settings
 
-2. **[Advanced Profile Features](../profiles/profile-advanced.md)** - External sources, complex rules, optimization
+2. **[Basic Usage](../usage/basic-usage.md)** - Common workflows and patterns
 
-3. **[Profile Examples](../profiles/profile-examples.md)** - Real-world configurations for common scenarios
-
-4. **[Configuration Reference](../reference/configuration.md)** - Project-wide and global settings
+3. **[CLI Reference](../cli/copytree-reference.md)** - All command-line options
 
 ## Quick Reference
 
 ```bash
-# Profile management
-copytree profile:list                       # List available profiles
-copytree profile:validate <name>            # Validate profile
+# Profile usage
 copytree --profile <name> --dry-run         # Preview file selection
 
 # Using profiles

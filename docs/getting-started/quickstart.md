@@ -201,11 +201,9 @@ Now that you've completed your first copy operation:
 
 1. **[Create a Custom Profile](./first-profile.md)** - Learn to customize file selection for your specific needs
 
-2. **[Explore Transformers](../profiles/transformer-reference.md)** - Extract text from PDFs, images, and more
+2. **[Basic Usage](../usage/basic-usage.md)** - Master common workflows and patterns
 
-3. **[Advanced Usage](../usage/basic-usage.md)** - Master powerful features like external sources and streaming
-
-4. **[Configure CopyTree](../reference/configuration.md)** - Set up project-wide or global configurations
+3. **[Configure CopyTree](../reference/configuration.md)** - Set up project-wide or global configurations
 
 ## Quick Reference
 
@@ -228,8 +226,7 @@ copytree --filter "*.js"                    # Specific patterns
 
 # Custom profiles
 copytree --profile myprofile                # Use custom profile
-copytree profile:list                       # Show available profiles
-copytree profile:validate myprofile         # Validate profile
+copytree --profile myprofile --dry-run      # Preview profile selection
 
 # Configuration
 copytree config:validate                    # Check configuration
@@ -280,7 +277,6 @@ For more help, see the [Troubleshooting Guide](../usage/troubleshooting.md).
 ## Get Help
 
 - **CLI Help**: `copytree --help`
-- **Command Help**: `copytree profile:list --help`
 - **Documentation**: Browse the `docs/` folder for detailed guides
 - **Issues**: Report problems at [GitHub Issues](https://github.com/gregpriday/copytree/issues)
 

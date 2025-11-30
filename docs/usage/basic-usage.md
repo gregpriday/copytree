@@ -70,8 +70,8 @@ copytree --profile my-react
 # Use custom API profile
 copytree --profile api-docs
 
-# See all available profiles
-copytree profile:list
+# Preview profile selection
+copytree --profile api-docs --dry-run
 ```
 
 ### Example Custom Profile Use Cases
@@ -345,7 +345,7 @@ Then use the profile:
 copytree --profile myprofile
 ```
 
-See the [Transformer Reference](../profiles/transformer-reference.md) for all available transformers and options.
+Built-in transformers: file-loader, binary, streaming-file-loader.
 
 ## Working with External Sources
 
@@ -436,7 +436,6 @@ copytree config:inspect
 
 ## Next Steps
 
-- [Create Custom Profiles](../profiles/profile-creation-guide.md)
-- [Learn About Transformers](../profiles/transformer-reference.md)
-- [Set Up AI Integration](../installation/claude-integration.md)
-- [Explore Advanced Features](../profiles/profile-advanced.md)
+- [Create Your First Profile](../getting-started/first-profile.md) - Custom file selection
+- [Claude Code Integration](../installation/claude-integration.md) - Use with Claude Code
+- [Configuration Reference](../reference/configuration.md) - Project-wide settings

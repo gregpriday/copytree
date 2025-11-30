@@ -382,8 +382,8 @@ ls -la ~/.copytree/cache/
 
 ### "Profile not found"
 - Check profile name spelling
-- Run `copytree profile:list` to see available profiles
 - Ensure profile file exists in `.copytree/` or `~/.copytree/profiles/`
+- Check with `ls .copytree/` or `ls ~/.copytree/profiles/`
 
 ### "No files found matching criteria"
 - Current directory might be empty
