@@ -1,6 +1,7 @@
 import Pipeline from '../pipeline/Pipeline.js';
 import { ValidationError } from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
+import FolderProfileLoader from '../config/FolderProfileLoader.js';
 import path from 'path';
 import fs from 'fs-extra';
 
@@ -108,26 +109,48 @@ export async function* scan(basePath, options = {}) {
     throw error;
   }
 
+  // 1. Load Folder Profile (Fix: Use FolderProfileLoader with basePath)
+  const loader = new FolderProfileLoader({ cwd: resolvedPath });
+  let folderProfile = null;
+
+  // If a specific profile name is passed in options, load it; otherwise auto-discover
+  try {
+    if (options.profile) {
+      folderProfile = await loader.loadNamed(options.profile);
+    } else {
+      folderProfile = await loader.discover();
+    }
+  } catch (e) {
+    // If explicit profile failed, throw. If auto-discovery failed, ignore.
+    if (options.profile) throw e;
+  }
+
   // Create or use provided config instance for isolation
   const configInstance = options.config || (await ConfigManager.create());
 
   // Build configuration from options and config defaults
   const copytreeConfig = configInstance.get('copytree', {});
 
+  // 2. Build Profile Config (Merging Logic)
+  // Precedence: Options (API) > Folder Profile (.copytree.yml) > Global Defaults
+
+  // Helper to ensure array
+  const toArray = (val) => (Array.isArray(val) ? val : val ? [val] : []);
+
   const profile = {
     // Include patterns
     include: options.filter
-      ? Array.isArray(options.filter)
-        ? options.filter
-        : [options.filter]
+      ? toArray(options.filter)
+      : folderProfile?.include?.length > 0
+      ? folderProfile.include
       : ['**/*'],
 
-    // Exclude patterns
-    exclude: options.exclude
-      ? Array.isArray(options.exclude)
-        ? options.exclude
-        : [options.exclude]
-      : copytreeConfig.globalExcludedDirectories || [],
+    // Exclude patterns - FIX: Merge all sources instead of overriding
+    exclude: [
+      ...toArray(options.exclude),
+      ...(folderProfile?.exclude || []),
+      ...(copytreeConfig.globalExcludedDirectories || []),
+    ],
 
     // Filter patterns
     filter: options.filter
@@ -137,20 +160,37 @@ export async function* scan(basePath, options = {}) {
       : [],
 
     // Force-include patterns
-    always: options.always
-      ? Array.isArray(options.always)
-        ? options.always
-        : [options.always]
-      : [],
+    always: [...toArray(options.always), ...toArray(folderProfile?.always)],
 
-    // Options
+    // Options merging
     options: {
-      respectGitignore: options.respectGitignore ?? copytreeConfig.respectGitignore ?? true,
-      includeHidden: options.includeHidden ?? copytreeConfig.includeHidden ?? false,
-      followSymlinks: options.followSymlinks ?? copytreeConfig.followSymlinks ?? false,
-      maxFileSize: options.maxFileSize ?? copytreeConfig.maxFileSize,
-      maxTotalSize: options.maxTotalSize ?? copytreeConfig.maxTotalSize,
-      maxFileCount: options.maxFileCount ?? copytreeConfig.maxFileCount,
+      respectGitignore:
+        options.respectGitignore ??
+        folderProfile?.options?.respectGitignore ??
+        copytreeConfig.respectGitignore ??
+        true,
+      includeHidden:
+        options.includeHidden ??
+        folderProfile?.options?.includeHidden ??
+        copytreeConfig.includeHidden ??
+        false,
+      followSymlinks:
+        options.followSymlinks ??
+        folderProfile?.options?.followSymlinks ??
+        copytreeConfig.followSymlinks ??
+        false,
+      maxFileSize:
+        options.maxFileSize ??
+        folderProfile?.options?.maxFileSize ??
+        copytreeConfig.maxFileSize,
+      maxTotalSize:
+        options.maxTotalSize ??
+        folderProfile?.options?.maxTotalSize ??
+        copytreeConfig.maxTotalSize,
+      maxFileCount:
+        options.maxFileCount ??
+        folderProfile?.options?.maxFileCount ??
+        copytreeConfig.maxFileCount,
     },
   };
 
@@ -176,6 +216,7 @@ export async function* scan(basePath, options = {}) {
     new FileDiscoveryStage({
       basePath: resolvedPath,
       patterns: profile.include || ['**/*'],
+      excludes: profile.exclude || [],
       respectGitignore: profile.options?.respectGitignore ?? true,
       includeHidden: profile.options?.includeHidden ?? false,
       followSymlinks: profile.options?.followSymlinks ?? false,

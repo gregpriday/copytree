@@ -16,7 +16,6 @@ import fastGlob from 'fast-glob';
 import ignore from 'ignore';
 import fs from 'fs-extra';
 import path from 'path';
-import { config } from '../../config/ConfigManager.js';
 import { getLimiterFor } from '../../utils/taskLimiter.js';
 
 class FileDiscoveryStage extends Stage {
@@ -26,6 +25,7 @@ class FileDiscoveryStage extends Stage {
     this.patterns = options.patterns || ['**/*'];
     this.respectGitignore = options.respectGitignore !== false;
     this.forceInclude = options.forceInclude || [];
+    this.excludes = options.excludes || [];
   }
 
   async process(input) {
@@ -38,38 +38,42 @@ class FileDiscoveryStage extends Stage {
     const startTime = Date.now();
 
     // Merge config forceIncludeDotfiles with runtime forceInclude
-    const configForceIncludes = config().get('copytree.forceIncludeDotfiles', []);
+    const configForceIncludes = this.config.get('copytree.forceIncludeDotfiles', []);
     this.forceInclude = [...this.forceInclude, ...configForceIncludes];
 
     // Build initial layers with global exclusions first
     const initialLayers = [];
 
-    // 1. Add global exclusions from config (highest priority, always excluded)
-    const globalExcluded = config().get('copytree.globalExcludedDirectories', []);
-    const basePathExcluded = config().get('copytree.basePathExcludedDirectories', []);
-    const globalExcludedFiles = config().get('copytree.globalExcludedFiles', []);
+    // 1. Add global exclusions
+    // Use excludes passed from options (which includes merged global defaults from scan.js)
+    // fallback to config loading if empty (legacy support)
+    let effectiveExcludes = [...this.excludes];
 
-    if (
-      globalExcluded.length > 0 ||
-      basePathExcluded.length > 0 ||
-      globalExcludedFiles.length > 0
-    ) {
-      const globalRules = [
-        ...globalExcluded.map((dir) => dir), // Exclude the directory itself
-        ...globalExcluded.map((dir) => `${dir}/**`), // Exclude directory and all contents
-        ...globalExcludedFiles, // Add file patterns (lock files, OS files, etc.)
+    if (effectiveExcludes.length === 0) {
+      const globalExcluded = this.config.get('copytree.globalExcludedDirectories', []);
+      const globalExcludedFiles = this.config.get('copytree.globalExcludedFiles', []);
+      effectiveExcludes = [
+        ...globalExcluded,
+        ...globalExcluded.map((dir) => `${dir}/**`),
+        ...globalExcludedFiles,
       ];
+    }
 
-      // Base path exclusions only apply at project root
-      const baseRules = basePathExcluded.map((dir) => `/${dir}/**`);
+    // Always add base path exclusions (anchored to root)
+    const basePathExcluded = this.config.get('copytree.basePathExcludedDirectories', []);
+    const baseRules = basePathExcluded.map((dir) => `/${dir}/**`);
 
-      const globalLayer = ignore().add([...globalRules, ...baseRules]);
+    // Combine all rules
+    const allRules = [...effectiveExcludes, ...baseRules];
+
+    // Failsafe: If no rules at all, force exclude dangerous directories
+    if (allRules.length === 0) {
+      allRules.push('.git', '.git/**', 'node_modules', 'node_modules/**');
+    }
+
+    if (allRules.length > 0) {
+      const globalLayer = ignore().add(allRules);
       initialLayers.push({ base: this.basePath, ig: globalLayer });
-
-      this.log(
-        `Applied ${globalExcluded.length} global + ${basePathExcluded.length} base + ${globalExcludedFiles.length} file exclusions`,
-        'debug',
-      );
     }
 
     // 1a. Conditionally exclude tests if --no-tests flag is provided
@@ -122,12 +126,12 @@ class FileDiscoveryStage extends Stage {
     await this.loadCopytreeInclude();
 
     // Determine if parallel traversal is enabled
-    const discoveryConfig = config().get('copytree.discovery', {});
+    const discoveryConfig = this.config.get('copytree.discovery', {});
     const parallelEnabled = discoveryConfig.parallelEnabled || false;
     const discoveryConcurrency =
       discoveryConfig.maxConcurrency ||
       this.options.maxConcurrency ||
-      config().get('app.maxConcurrency', 5);
+      this.config.get('app.maxConcurrency', 5);
     const highWaterMark = discoveryConfig.highWaterMark;
 
     this.log(
@@ -143,7 +147,7 @@ class FileDiscoveryStage extends Stage {
       followSymlinks: false,
       explain: this.options.explain || false,
       initialLayers,
-      config: config().all(), // Pass full config for retry settings
+      config: this.config.all(), // Pass full config for retry settings
     };
 
     // Add parallel-specific options if enabled

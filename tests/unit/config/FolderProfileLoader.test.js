@@ -28,6 +28,8 @@ exclude:
           name: 'test-profile',
           include: ['**/*.js', '**/*.ts'],
           exclude: ['**/*.test.js'],
+          always: [],
+          options: {},
         });
       });
     });
@@ -48,6 +50,8 @@ include:
           name: 'yaml-profile',
           include: ['*.md'],
           exclude: [],
+          always: [],
+          options: {},
         });
       });
     });
@@ -68,6 +72,8 @@ include:
           name: 'json-profile',
           include: ['src/**/*.js'],
           exclude: ['node_modules/**'],
+          always: [],
+          options: {},
         });
       });
     });
@@ -94,6 +100,8 @@ name = ini-profile
           name: 'ini-profile',
           include: ['**/*.md', '**/*.txt'],
           exclude: ['**/draft/**'],
+          always: [],
+          options: {},
         });
       });
     });
@@ -173,6 +181,8 @@ include:
           name: 'api-docs',
           include: ['**/*.md', '**/*.pdf'],
           exclude: [],
+          always: [],
+          options: {},
         });
       });
     });

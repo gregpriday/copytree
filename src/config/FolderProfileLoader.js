@@ -129,10 +129,28 @@ class FolderProfileLoader {
       }
     }
 
+    // Normalize always patterns
+    let always = [];
+    if (data.always) {
+      if (Array.isArray(data.always)) {
+        always = data.always.filter((p) => typeof p === 'string' && p.trim().length > 0);
+      } else if (typeof data.always === 'string' && data.always.trim().length > 0) {
+        always = [data.always];
+      }
+    }
+
+    // Normalize options
+    const options = {};
+    if (data.options && typeof data.options === 'object' && !Array.isArray(data.options)) {
+      Object.assign(options, data.options);
+    }
+
     return {
       name: data.name || path.basename(filePath, path.extname(filePath)),
       include,
       exclude,
+      always,
+      options,
     };
   }
 
@@ -143,7 +161,7 @@ class FolderProfileLoader {
    * @returns {Object} Parsed profile data
    */
   parseINI(content) {
-    const profile = { include: [], exclude: [] };
+    const profile = { include: [], exclude: [], always: [], options: {} };
     let currentSection = null;
 
     for (const line of content.split('\n')) {
@@ -165,6 +183,17 @@ class FolderProfileLoader {
         profile.include.push(trimmed);
       } else if (currentSection === 'exclude') {
         profile.exclude.push(trimmed);
+      } else if (currentSection === 'always') {
+        profile.always.push(trimmed);
+      } else if (currentSection === 'options' && trimmed.includes('=')) {
+        const [key, value] = trimmed.split('=').map((s) => s.trim());
+        if (key) {
+          // Try to parse boolean/number values
+          if (value === 'true') profile.options[key] = true;
+          else if (value === 'false') profile.options[key] = false;
+          else if (!isNaN(Number(value))) profile.options[key] = Number(value);
+          else profile.options[key] = value;
+        }
       } else if (currentSection === 'profile' && trimmed.includes('=')) {
         const [key, value] = trimmed.split('=').map((s) => s.trim());
         if (key === 'name') {
