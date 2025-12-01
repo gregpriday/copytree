@@ -66,9 +66,18 @@ class FileDiscoveryStage extends Stage {
     // Combine all rules
     const allRules = [...effectiveExcludes, ...baseRules];
 
-    // Failsafe: If no rules at all, force exclude dangerous directories
-    if (allRules.length === 0) {
-      allRules.push('.git', '.git/**', 'node_modules', 'node_modules/**');
+    // ALWAYS exclude dangerous directories - these should never be included
+    // regardless of what other exclude rules are present
+    const dangerousDirectories = ['.git', 'node_modules'];
+    for (const dir of dangerousDirectories) {
+      // Add both the directory itself and its contents pattern
+      if (!allRules.includes(dir)) {
+        allRules.push(dir);
+      }
+      const contentsPattern = `${dir}/**`;
+      if (!allRules.includes(contentsPattern)) {
+        allRules.push(contentsPattern);
+      }
     }
 
     if (allRules.length > 0) {
