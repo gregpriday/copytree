@@ -73,7 +73,7 @@ class GitUtils {
       const uniqueFiles = [...new Set(modifiedFiles)].map((file) => path.normalize(file));
 
       this.cache.set(cacheKey, uniqueFiles);
-      this.logger.debug(`Found ${uniqueFiles.length} modified files`);
+      this.logger.logDebug(`Found ${uniqueFiles.length} modified files`);
 
       return uniqueFiles;
     } catch (error) {
@@ -114,7 +114,7 @@ class GitUtils {
         .map((file) => path.normalize(file.file));
 
       this.cache.set(cacheKey, changedFiles);
-      this.logger.debug(
+      this.logger.logDebug(
         `Found ${changedFiles.length} changed files between ${fromRef} and ${toRef || 'working directory'}`,
       );
 

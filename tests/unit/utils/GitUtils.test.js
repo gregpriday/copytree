@@ -31,6 +31,7 @@ describe('GitUtils', () => {
       warn: jest.fn(),
       error: jest.fn(),
       debug: jest.fn(),
+      logDebug: jest.fn(),
       verbose: jest.fn(),
       child: jest.fn(function () {
         return this;

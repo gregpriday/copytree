@@ -196,7 +196,7 @@ const CopyView = () => {
     stages.push(ProfileFilterStage);
 
     // 3. Git Filtering (if enabled)
-    if (options.gitModified || options.gitBranch || options.gitStaged) {
+    if (options.modified || options.changed) {
       stages.push(GitFilterStage);
     }
 
