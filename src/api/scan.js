@@ -142,8 +142,8 @@ export async function* scan(basePath, options = {}) {
     include: options.filter
       ? toArray(options.filter)
       : folderProfile?.include?.length > 0
-      ? folderProfile.include
-      : ['**/*'],
+        ? folderProfile.include
+        : ['**/*'],
 
     // Exclude patterns - FIX: Merge all sources instead of overriding
     exclude: [
@@ -180,17 +180,11 @@ export async function* scan(basePath, options = {}) {
         copytreeConfig.followSymlinks ??
         false,
       maxFileSize:
-        options.maxFileSize ??
-        folderProfile?.options?.maxFileSize ??
-        copytreeConfig.maxFileSize,
+        options.maxFileSize ?? folderProfile?.options?.maxFileSize ?? copytreeConfig.maxFileSize,
       maxTotalSize:
-        options.maxTotalSize ??
-        folderProfile?.options?.maxTotalSize ??
-        copytreeConfig.maxTotalSize,
+        options.maxTotalSize ?? folderProfile?.options?.maxTotalSize ?? copytreeConfig.maxTotalSize,
       maxFileCount:
-        options.maxFileCount ??
-        folderProfile?.options?.maxFileCount ??
-        copytreeConfig.maxFileCount,
+        options.maxFileCount ?? folderProfile?.options?.maxFileCount ?? copytreeConfig.maxFileCount,
     },
   };
 
