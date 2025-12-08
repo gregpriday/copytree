@@ -99,7 +99,7 @@
     "fast-xml-parser": "^5.3.2",
     "ink-testing-library": "^4.0.0",
     "jest": "^30.0.4",
-    "prettier": "^3.5.0",
+    "prettier": "^3.7.4",
     "strip-ansi": "^7.1.0",
     "typescript": "^5.8.3"
   },
