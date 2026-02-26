@@ -19,6 +19,7 @@ import {
   ScanOptions,
   FormatOptions,
   FileResult,
+  ManifestEntry,
 } from 'copytree';
 
 // ============================================================================
@@ -212,6 +213,13 @@ async function testCopyApi() {
   const totalSize: number = result.stats.totalSize;
   const outputSize: number | undefined = result.stats.outputSize;
   const outputPath: string | undefined = result.outputPath;
+
+  // Manifest type checks
+  const manifest: ManifestEntry[] = result.manifest;
+  manifest.forEach((entry: ManifestEntry) => {
+    const entryPath: string = entry.path;
+    const entrySize: number = entry.size;
+  });
 
   // Copy with all options
   const config = await ConfigManager.create();
