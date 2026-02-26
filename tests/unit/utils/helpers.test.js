@@ -1,5 +1,6 @@
 // Static import for fs-extra (mocked)
 import fs from 'fs-extra';
+import { randomUUID } from 'crypto';
 
 // Use dynamic import for module under test
 let hash,
@@ -373,16 +374,10 @@ describe('Helper Functions', () => {
 
   describe('ensureDir', () => {
     test('should ensure directory exists', async () => {
-      const tempPath = `/tmp/test-${Date.now()}`;
-
-      // Mock pathExists to return true after ensureDir is called
-      fs.pathExists.mockResolvedValue(true);
+      const tempPath = `/tmp/test-${randomUUID()}`;
 
       await ensureDir(tempPath);
-      expect(await fs.pathExists(tempPath)).toBe(true);
-
-      // Cleanup
-      await fs.remove(tempPath);
+      expect(fs.ensureDir).toHaveBeenCalledWith(tempPath);
     });
   });
 

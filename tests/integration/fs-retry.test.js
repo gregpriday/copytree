@@ -1,5 +1,6 @@
 import path from 'node:path';
 import os from 'node:os';
+import { randomUUID } from 'node:crypto';
 
 let fs;
 let withFsRetry;
@@ -34,7 +35,7 @@ describe('Filesystem Retry Integration Tests', () => {
 
   describe('withFsRetry with real filesystem operations', () => {
     it('should successfully read existing files', async () => {
-      const testPath = path.join(os.tmpdir(), `test-${Date.now()}.txt`);
+      const testPath = path.join(os.tmpdir(), `test-${randomUUID()}.txt`);
       await fs.writeFile(testPath, 'test content', 'utf8');
 
       try {
@@ -50,7 +51,7 @@ describe('Filesystem Retry Integration Tests', () => {
     });
 
     it('should fail permanently on ENOENT without retries', async () => {
-      const nonExistentPath = path.join(os.tmpdir(), 'does-not-exist.txt');
+      const nonExistentPath = path.join(os.tmpdir(), `does-not-exist-${randomUUID()}.txt`);
 
       // Track retry attempts
       let retryCount = 0;
@@ -73,7 +74,7 @@ describe('Filesystem Retry Integration Tests', () => {
 
   describe('ignoreWalker with retry and error reporting', () => {
     it('should track successful operations', async () => {
-      const testDir = path.join(os.tmpdir(), `test-walker-${Date.now()}`);
+      const testDir = path.join(os.tmpdir(), `test-walker-${randomUUID()}`);
       await fs.mkdir(testDir, { recursive: true });
       await fs.writeFile(path.join(testDir, 'file.txt'), 'content', 'utf8');
 
@@ -105,7 +106,7 @@ describe('Filesystem Retry Integration Tests', () => {
     });
 
     it('should handle non-existent directories gracefully', async () => {
-      const nonExistentDir = path.join(os.tmpdir(), 'does-not-exist');
+      const nonExistentDir = path.join(os.tmpdir(), `does-not-exist-${randomUUID()}`);
 
       const files = [];
       for await (const file of walkWithIgnore(nonExistentDir, {
@@ -133,7 +134,7 @@ describe('Filesystem Retry Integration Tests', () => {
 
   describe('FileLoader with retry and error reporting', () => {
     it('should load files successfully', async () => {
-      const testDir = path.join(os.tmpdir(), `test-loader-${Date.now()}`);
+      const testDir = path.join(os.tmpdir(), `test-loader-${randomUUID()}`);
       await fs.mkdir(testDir, { recursive: true });
       const testFile = path.join(testDir, 'test.txt');
       await fs.writeFile(testFile, 'test content', 'utf8');
@@ -167,7 +168,7 @@ describe('Filesystem Retry Integration Tests', () => {
     });
 
     it('should handle missing files and report errors', async () => {
-      const testDir = path.join(os.tmpdir(), `test-loader-${Date.now()}`);
+      const testDir = path.join(os.tmpdir(), `test-loader-${randomUUID()}`);
       await fs.mkdir(testDir, { recursive: true });
 
       try {
@@ -235,7 +236,7 @@ describe('Filesystem Retry Integration Tests', () => {
 
   describe('retry configuration from config object', () => {
     it('should respect config retry settings in walkWithIgnore', async () => {
-      const testDir = path.join(os.tmpdir(), `test-config-${Date.now()}`);
+      const testDir = path.join(os.tmpdir(), `test-config-${randomUUID()}`);
       await fs.mkdir(testDir, { recursive: true });
 
       try {
@@ -262,7 +263,7 @@ describe('Filesystem Retry Integration Tests', () => {
     });
 
     it('should use defaults when config not provided', async () => {
-      const testDir = path.join(os.tmpdir(), `test-defaults-${Date.now()}`);
+      const testDir = path.join(os.tmpdir(), `test-defaults-${randomUUID()}`);
       await fs.mkdir(testDir, { recursive: true });
 
       try {
@@ -281,7 +282,7 @@ describe('Filesystem Retry Integration Tests', () => {
 
   describe('real-world scenarios', () => {
     it('should handle rapid file operations', async () => {
-      const testDir = path.join(os.tmpdir(), `test-rapid-${Date.now()}`);
+      const testDir = path.join(os.tmpdir(), `test-rapid-${randomUUID()}`);
       await fs.mkdir(testDir, { recursive: true });
 
       try {
@@ -319,7 +320,7 @@ describe('Filesystem Retry Integration Tests', () => {
     });
 
     it('should handle large directory trees', async () => {
-      const testDir = path.join(os.tmpdir(), `test-large-${Date.now()}`);
+      const testDir = path.join(os.tmpdir(), `test-large-${randomUUID()}`);
       await fs.mkdir(testDir, { recursive: true });
 
       try {

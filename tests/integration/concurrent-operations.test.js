@@ -16,6 +16,7 @@ import Pipeline from '../../src/pipeline/Pipeline.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { randomUUID } from 'crypto';
 
 // Use test fixture
 const testDir = path.resolve(process.cwd(), 'tests/fixtures/simple-project');
@@ -24,7 +25,7 @@ describe('Concurrent Operations Integration', () => {
   let outputDir;
 
   beforeEach(async () => {
-    outputDir = path.join(os.tmpdir(), `copytree-concurrent-${Date.now()}`);
+    outputDir = path.join(os.tmpdir(), `copytree-concurrent-${randomUUID()}`);
     await fs.ensureDir(outputDir);
   });
 

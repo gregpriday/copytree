@@ -11,13 +11,14 @@ import { walkParallel, getAllFilesParallel } from '../../../src/utils/parallelWa
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { randomUUID } from 'crypto';
 
 describe('parallelWalker', () => {
   let testDir;
 
   beforeEach(async () => {
     // Create a unique test directory
-    testDir = path.join(os.tmpdir(), `copytree-test-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `copytree-test-${randomUUID()}`);
     await fs.ensureDir(testDir);
   });
 
