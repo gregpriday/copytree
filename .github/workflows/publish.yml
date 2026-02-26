@@ -62,7 +62,16 @@ jobs:
         run: npm ci
 
       - name: Publish to NPM
-        run: npm publish --access public
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          LATEST=$(npm view copytree version 2>/dev/null || echo "0.0.0")
+          if [ "$(npx semver "$VERSION" "$LATEST" | tail -1)" != "$VERSION" ]; then
+            echo "Publishing $VERSION with --tag hotfix (latest is $LATEST)"
+            npm publish --access public --tag hotfix
+            npm dist-tag add "copytree@$VERSION" latest
+          else
+            npm publish --access public
+          fi
 
   create-release:
     name: Create GitHub Release
