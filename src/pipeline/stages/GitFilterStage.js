@@ -1,6 +1,6 @@
 import Stage from '../Stage.js';
 import GitUtils from '../../utils/GitUtils.js';
-import path from 'path';
+import { toPosix } from '../../utils/pathUtils.js';
 
 /**
  * Git filter stage - filters files based on git status
@@ -52,11 +52,10 @@ class GitFilterStage extends Stage {
 
       // Filter files if git filtering is active
       if (this.modified || this.changed) {
-        const gitFileSet = new Set(gitFiles.map((f) => path.normalize(f)));
+        const gitFileSet = new Set(gitFiles.map((f) => toPosix(f)));
 
         const gitLimited = input.files.filter((file) => {
-          const normalizedPath = path.normalize(file.path);
-          return gitFileSet.has(normalizedPath) || gitFileSet.has(file.path);
+          return gitFileSet.has(file.path);
         });
 
         // Preserve files marked as alwaysInclude even if not in git set

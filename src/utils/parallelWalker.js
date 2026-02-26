@@ -21,15 +21,7 @@ import {
   recordPermanent,
   recordSuccessAfterRetry,
 } from './fsErrorReport.js';
-
-/**
- * Normalize path to POSIX style (forward slashes)
- * @param {string} p - Path to normalize
- * @returns {string} POSIX-normalized path
- */
-function toPosix(p) {
-  return p.split(path.sep).join('/');
-}
+import { toPosix } from './pathUtils.js';
 
 /**
  * Read ignore rules from a file

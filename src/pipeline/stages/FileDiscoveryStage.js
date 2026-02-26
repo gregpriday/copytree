@@ -17,6 +17,7 @@ import ignore from 'ignore';
 import fs from 'fs-extra';
 import path from 'path';
 import { getLimiterFor } from '../../utils/taskLimiter.js';
+import { toPosix } from '../../utils/pathUtils.js';
 
 class FileDiscoveryStage extends Stage {
   constructor(options = {}) {
@@ -174,7 +175,7 @@ class FileDiscoveryStage extends Stage {
 
     for await (const fileInfo of walker) {
       // Convert to relative path
-      const relativePath = path.relative(this.basePath, fileInfo.path);
+      const relativePath = toPosix(path.relative(this.basePath, fileInfo.path));
 
       // Check if this file matches our include patterns (if specified)
       if (this.patterns.length > 0 && !this.patterns.includes('**/*')) {
@@ -214,13 +215,16 @@ class FileDiscoveryStage extends Stage {
       };
 
       const entries = await fastGlob(this.forceInclude, globOptions);
-      forcedEntries = entries.map((entry) => ({
-        path: entry.path || entry,
-        absolutePath: path.join(this.basePath, entry.path || entry),
-        size: entry.stats?.size || 0,
-        modified: entry.stats?.mtime || null,
-        stats: entry.stats,
-      }));
+      forcedEntries = entries.map((entry) => {
+        const entryPath = entry.path || entry;
+        return {
+          path: toPosix(entryPath),
+          absolutePath: path.join(this.basePath, entryPath),
+          size: entry.stats?.size || 0,
+          modified: entry.stats?.mtime || null,
+          stats: entry.stats,
+        };
+      });
     }
 
     // Merge discovered files with forced entries, deduplicating by path

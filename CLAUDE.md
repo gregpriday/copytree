@@ -28,7 +28,7 @@ Rules and constraints for working with CopyTree. Keep this file lean; detailed d
 ## Commands (Daily Use)
 
 ```bash
-# Development
+# Setup (ALWAYS run first in a new worktree — node_modules is not shared between worktrees)
 npm install              # Install dependencies
 npm link                 # Link CLI locally
 npm start               # Run CLI
@@ -38,9 +38,13 @@ npm test                # All tests
 npm run test:coverage   # Coverage report (80% threshold)
 npm run test:unit       # Unit tests only
 
+# Running specific tests (jest is NOT on PATH — use node_modules/.bin/jest directly)
+node_modules/.bin/jest --testPathPatterns='SortFilesStage'          # Match by file path
+node_modules/.bin/jest --testPathPatterns='pathUtils|GitFilterStage' # Multiple patterns
+
 # Code Quality (REQUIRED before commits)
 npm run lint            # ESLint check
-npm run format:check    # Prettier check
+npm run format:check    # Prettier check (ignore tests/real/ warnings — pre-existing)
 npm run format          # Auto-format code (use when formatting is requested)
 
 # Debugging
@@ -125,6 +129,14 @@ Increase adherence by starting sessions with:
 - **Transformers**: File processors with traits system (`@src/transforms/transformers/`)
 - **Commands**: Core CLI commands (`@bin/copytree.js`): copy, config:validate, config:inspect, cache:clear
 
+## Path Handling Rules
+
+- **`file.path` is always POSIX** — forward slashes (`src/utils/file.js`), never backslashes. Normalized at discovery time in `FileDiscoveryStage` via `toPosix()`.
+- **Use `toPosix()`** from `@src/utils/pathUtils.js` when converting any `path.relative()`, `path.join()`, or `path.normalize()` result that will be stored on a file object or used in glob matching.
+- **Split `file.path` on `'/'`**, never `path.sep`. The `path` module's separator is OS-dependent; `file.path` is always POSIX.
+- **`file.absolutePath` stays platform-native** — it is used for actual filesystem I/O where the OS needs native separators.
+- **Git paths**: `simple-git` returns forward-slash paths; use `toPosix()` before Set/Map lookups against `file.path` to guarantee consistent matching.
+
 ## Critical Files
 
 - `bin/copytree.js` - CLI entry
@@ -134,6 +146,7 @@ Increase adherence by starting sessions with:
 - `src/config/FolderProfileLoader.js` - Profile loading
 - `src/transforms/TransformerRegistry.js` - Transformer registry
 - `src/utils/errors.js` - Custom errors
+- `src/utils/pathUtils.js` - POSIX path normalization (used by walkers, stages, GitUtils)
 
 ## Error Handling Rules
 
