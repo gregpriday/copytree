@@ -172,13 +172,18 @@ describe('TransformStage (real)', () => {
     const stage = new TransformStage({ cache: makeCache() });
     const input = { files: [{ path: 'a' }, { path: 'b' }], stats: { discoveredCount: 2 } };
 
-    const recovered = await stage.handleError(new TransformError('transform failed', 't', 'a'), input);
+    const recovered = await stage.handleError(
+      new TransformError('transform failed', 't', 'a'),
+      input,
+    );
 
     expect(recovered.stats.transformedCount).toBe(0);
     expect(recovered.stats.transformErrors).toBe(2);
     expect(recovered.stats.recoveredFromError).toBe(true);
 
-    await expect(stage.handleError(new Error('totally fatal'), input)).rejects.toThrow('totally fatal');
+    await expect(stage.handleError(new Error('totally fatal'), input)).rejects.toThrow(
+      'totally fatal',
+    );
   });
 
   test('getTransformerForFile honors enable flags and noCache mode', () => {

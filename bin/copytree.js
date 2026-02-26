@@ -44,7 +44,9 @@ program
   .description(
     'Copy directory structure to XML (default) or Markdown/JSON/NDJSON/SARIF/tree with customizable filters',
   )
-  .option('-p, --profile <name>', 'Use folder profile by name (.copytree-<name>.*)')
+  .option('-p, --folder-profile <name>', 'Use folder profile by name (.copytree-<name>.*)')
+  .option('--profile <type>', 'Enable performance profiling: cpu, heap, all')
+  .option('--profile-dir <dir>', 'Profile output directory (default: .profiles)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
@@ -99,8 +101,8 @@ program
       }
     }
 
-    // When streaming, skip UI and run command directly
-    if (options.stream) {
+    // When streaming or profiling, skip UI and run command directly
+    if (options.stream || options.profile) {
       const copyCommand = (await import('../src/commands/copy.js')).default;
       try {
         await copyCommand(targetPath || '.', options);

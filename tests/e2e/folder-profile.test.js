@@ -67,7 +67,7 @@ describe('Folder Profile E2E Tests', () => {
     expect(filePaths).not.toContain('index.js');
   });
 
-  it('loads named profile with -p and --profile', async () => {
+  it('loads named profile with -p and --folder-profile', async () => {
     await fs.writeFile(
       path.join(testProjectDir, '.copytree-docs.yml'),
       'include:\n  - "**/*.md"\n',
@@ -83,7 +83,7 @@ describe('Folder Profile E2E Tests', () => {
     expect(pathsA).not.toContain('index.js');
 
     const outputB = path.join(testProjectDir, 'output-b.json');
-    const second = runCopytree(`--profile docs --format json -o "${outputB}" --stream`);
+    const second = runCopytree(`--folder-profile docs --format json -o "${outputB}" --stream`);
     expect(second.exitCode).toBe(0);
 
     const parsedB = await fs.readJson(outputB);
