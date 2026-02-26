@@ -19,7 +19,7 @@ class Logger extends EventEmitter {
   }
 
   // Lazy-load debug setting from config
-  get debug() {
+  get _isDebugEnabled() {
     if (this.options.debug === undefined) {
       this.options.debug = config().get('app.debug', false);
     }
@@ -96,9 +96,15 @@ class Logger extends EventEmitter {
 
   /**
    * Log a debug message (only if debug mode is enabled)
+   * Alias: debug() — kept for backward compatibility with callers that use the
+   * standard logger interface (debug/info/warn/error).
    */
+  debug(message, ...args) {
+    return this.logDebug(message, ...args);
+  }
+
   logDebug(message, ...args) {
-    if (!this.debug) return;
+    if (!this._isDebugEnabled) return;
 
     if (this.options.useInkEvents) {
       this.emit('log', {
