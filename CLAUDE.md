@@ -80,12 +80,9 @@ copytree config:validate         # Check config
 5. Profile with: `DEBUG=copytree:* copytree --dry-run`
 
 ### Release to NPM
-Releases are automated via `.github/workflows/publish.yml` using OIDC trusted publishing (no NPM token secrets).
+**Use `/release [version]` to run the full release workflow.** This handles version determination, GitFlow merges, tagging, pushing, and monitoring the CI publish job.
 
-1. Update `package.json` version and CHANGELOG.md on a release branch
-2. Merge release branch into `main` per Git Flow
-3. Tag and push: `git tag v0.X.X && git push origin main --tags`
-4. Workflow runs quality checks, publishes to NPM, and creates a GitHub Release
+Publishing is automated via `.github/workflows/publish.yml` using OIDC trusted publishing (no NPM token secrets). The workflow triggers on `v*` tag pushes and runs quality checks, publishes to NPM, and creates a GitHub Release.
 
 **NPM package**: `copytree` on npmjs.com. Publishing is linked to `gregpriday/copytree` via NPM trusted publishing (OIDC).
 </paved_path>
