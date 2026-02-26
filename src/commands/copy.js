@@ -11,6 +11,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { summarize as getFsErrorSummary, reset as resetFsErrors } from '../utils/fsErrorReport.js';
 import FolderProfileLoader from '../config/FolderProfileLoader.js';
+import { Profiler, writeProfilingReport } from '../utils/profiler.js';
 
 // Lazy initialization for Jest compatibility
 let __filename, __dirname, pkg;
@@ -32,20 +33,32 @@ try {
 async function copyCommand(targetPath = '.', options = {}) {
   const startTime = Date.now();
 
+  // Start performance profiler if --profile flag is set.
+  // Profiler.start() rolls back (disconnects) on partial failure, so no resource
+  // leak if startup throws — the error propagates to bin/copytree.js for exit(1).
+  let profiler = null;
+  if (options.profile) {
+    profiler = new Profiler({
+      type: options.profile,
+      profileDir: options.profileDir || '.profiles',
+    });
+    await profiler.start();
+  }
+
   try {
     // Reset filesystem error tracking at start
     resetFsErrors();
 
     // Apply logging configuration from CLI options (level, format, color).
     // This must run before any logger calls so the options take effect.
-    // In stream mode we force logs to stderr (standard Unix practice) so the
-    // output on stdout is never polluted by log lines regardless of config.
+    // In stream or profiling mode we force logs to stderr (standard Unix practice)
+    // so stdout is never polluted by log lines regardless of config.
     {
       const logOptions = {};
       if (options.logLevel !== undefined) logOptions.level = options.logLevel;
       if (options.logFormat !== undefined) logOptions.format = options.logFormat;
       if (options.color === false) logOptions.colorize = 'never';
-      if (options.stream) logOptions.destination = 'stderr';
+      if (options.stream || options.profile) logOptions.destination = 'stderr';
       if (Object.keys(logOptions).length > 0) {
         logger.configure(logOptions);
       }
@@ -96,6 +109,43 @@ async function copyCommand(targetPath = '.', options = {}) {
       startTime,
       version: pkg.version,
     });
+
+    // 6a. Stop profiler and write report
+    if (profiler) {
+      const duration = Date.now() - startTime;
+      const savedTimestamp = profiler.timestamp; // capture before stop (avoids brittle filename parsing)
+      let profileFiles = {};
+      try {
+        profileFiles = await profiler.stop();
+      } catch (_err) {
+        // Profiler stop failure is non-fatal
+      } finally {
+        profiler = null; // prevent double-stop if subsequent code throws
+      }
+
+      const pipelineStats = pipeline.getStats();
+      const reportPath = await writeProfilingReport({
+        profileDir: options.profileDir || '.profiles',
+        timestamp: savedTimestamp,
+        duration,
+        version: pkg.version,
+        command: `copytree ${[targetPath, '--profile', options.profile].filter(Boolean).join(' ')}`,
+        files: {
+          total: result.files?.length ?? 0,
+          processed: result.files?.filter((f) => f !== null).length ?? 0,
+          excluded: result.stats?.excludedFiles ?? 0,
+        },
+        memory: process.memoryUsage(),
+        perStageTimings: pipelineStats.perStageTimings || {},
+        perStageMetrics: pipelineStats.perStageMetrics || {},
+        profileFiles,
+      });
+
+      logger.options.silent = false;
+      logger.success(`Profile report saved: ${reportPath}`);
+      if (profileFiles.cpu) logger.info(`CPU profile: ${profileFiles.cpu}`);
+      if (profileFiles.heap) logger.info(`Heap profile: ${profileFiles.heap}`);
+    }
 
     // 6. Write secrets report if requested
     if (options.secretsReport && result.stats?.secretsGuard?.report) {
@@ -168,6 +218,16 @@ async function copyCommand(targetPath = '.', options = {}) {
       process.exitCode = 1;
     }
   } catch (error) {
+    // Ensure profiler is stopped and disconnected on error
+    if (profiler) {
+      try {
+        await profiler.stop();
+      } catch (_stopErr) {
+        // Ignore stop errors during error handling
+      } finally {
+        profiler = null;
+      }
+    }
     logger.stopSpinner();
     handleError(error, {
       exit: true,
@@ -187,14 +247,16 @@ async function buildProfileFromCliOptions(options) {
   const copytreeConfig = config().get('copytree', {});
 
   // Try to load folder profile if requested or if -r/--as-reference is used
+  // Note: options.folderProfile is the renamed --folder-profile/-p flag;
+  //       options.profile is now reserved for performance profiling (cpu/heap/all).
   let folderProfile = null;
-  if (options.profile || options.asReference) {
+  if (options.folderProfile || options.asReference) {
     const loader = new FolderProfileLoader({ cwd: process.cwd() });
     try {
-      if (options.profile) {
-        // Load named profile: -p <name>
-        folderProfile = await loader.loadNamed(options.profile);
-        logger.debug(`Loaded folder profile: ${options.profile}`);
+      if (options.folderProfile) {
+        // Load named profile: -p <name> / --folder-profile <name>
+        folderProfile = await loader.loadNamed(options.folderProfile);
+        logger.debug(`Loaded folder profile: ${options.folderProfile}`);
       } else {
         // Auto-discover profile for -r/--as-reference
         folderProfile = await loader.discover();
@@ -204,7 +266,7 @@ async function buildProfileFromCliOptions(options) {
       }
     } catch (error) {
       // If profile was explicitly requested but not found, throw error
-      if (options.profile) {
+      if (options.folderProfile) {
         throw error;
       }
       // For auto-discovery (-r), silently continue without profile
