@@ -8,6 +8,7 @@ import path from 'path';
 import os from 'os';
 import { promisify } from 'util';
 import { utimes } from 'fs';
+import { randomUUID } from 'crypto';
 
 // Use dynamic imports for modules under test
 let Pipeline,
@@ -50,7 +51,7 @@ describe('Pipeline Integration Tests', () => {
     process.env.COPYTREE_CACHE_ENABLED = 'false';
 
     // Create temporary test directory
-    tempDir = path.join(os.tmpdir(), `copytree-test-${Date.now()}`);
+    tempDir = path.join(os.tmpdir(), `copytree-test-${randomUUID()}`);
     await fs.ensureDir(tempDir);
 
     // Create test files

@@ -10,6 +10,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { randomUUID } from 'crypto';
 import { ConfigManager } from '../../../src/config/ConfigManager.js';
 
 // Mock logger to avoid import.meta issues
@@ -40,7 +41,7 @@ describe('Configuration Hierarchy (Real ConfigManager)', () => {
     originalHome = os.homedir();
 
     // Create temp home directory
-    const tempHome = path.join(os.tmpdir(), `.copytree-test-${Date.now()}`);
+    const tempHome = path.join(os.tmpdir(), `.copytree-test-${randomUUID()}`);
     await fs.ensureDir(tempHome);
 
     // Set tempUserConfigPath to the .copytree directory within temp home

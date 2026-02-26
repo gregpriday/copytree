@@ -6,6 +6,7 @@ import { ValidationError } from '../../../src/utils/errors.js';
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { randomUUID } from 'crypto';
 
 // Use test fixture - works in both Jest and direct Node execution
 const testDir = path.resolve(process.cwd(), 'tests/fixtures/simple-project');
@@ -16,7 +17,7 @@ describe('copy()', () => {
 
   beforeEach(async () => {
     // Create temporary directory for output files
-    outputDir = path.join(os.tmpdir(), `copytree-output-${Date.now()}`);
+    outputDir = path.join(os.tmpdir(), `copytree-output-${randomUUID()}`);
     await fs.ensureDir(outputDir);
   });
 

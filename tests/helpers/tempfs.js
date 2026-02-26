@@ -96,14 +96,14 @@ export async function safeRemove(target, { maxRetries = 5, retryDelay = 100 } = 
  * - cleanup: Async function to remove the directory
  *
  * Directory structure:
- * <os.tmpdir()>/copytree-tests/<PID>-<WORKER_ID>-<timestamp>-<uuid>/<label>/
+ * <os.tmpdir()>/copytree-tests/<PID>-<WORKER_ID>-<uuid>/<label>/
  *
  * @param {string} label - Optional label for the directory
  * @returns {Promise<{path: string, cleanup: () => Promise<void>}>}
  */
 export async function createTestTempDir(label = '') {
   const base = path.join(os.tmpdir(), 'copytree-tests');
-  const unique = `${process.pid}-${process.env.JEST_WORKER_ID || '0'}-${Date.now()}-${randomUUID()}`;
+  const unique = `${process.pid}-${process.env.JEST_WORKER_ID || '0'}-${randomUUID()}`;
   const dir = path.join(base, unique, sanitize(label));
 
   await fsp.mkdir(dir, { recursive: true });
