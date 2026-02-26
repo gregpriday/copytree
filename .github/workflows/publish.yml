@@ -106,24 +106,3 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  notify-website:
-    name: Notify Website
-    runs-on: ubuntu-latest
-    needs: [publish, create-release]
-
-    steps:
-      - name: Wait for registries to propagate
-        run: sleep 1
-
-      - name: Trigger website refresh
-        run: |
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST https://canopyide.com/api/refresh-releases \
-            -H "Authorization: Bearer ${{ secrets.WEBSITE_WEBHOOK_SECRET }}")
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | sed '$d')
-          echo "Response: $BODY"
-          echo "HTTP Status: $HTTP_CODE"
-          if [ "$HTTP_CODE" -ne 200 ]; then
-            echo "::warning::Website refresh failed with HTTP $HTTP_CODE"
-          fi
