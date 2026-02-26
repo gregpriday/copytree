@@ -2,6 +2,7 @@ import Pipeline from '../pipeline/Pipeline.js';
 import { ValidationError } from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
 import FolderProfileLoader from '../config/FolderProfileLoader.js';
+import { ProgressTracker } from '../utils/ProgressTracker.js';
 import path from 'path';
 import fs from 'fs-extra';
 
@@ -42,6 +43,9 @@ import fs from 'fs-extra';
  * @property {ConfigManager} [config] - ConfigManager instance for isolated configuration.
  *   If not provided, an isolated instance will be created. This enables concurrent
  *   scan operations with different configurations.
+ * @property {Function} [onProgress] - Progress callback ({ percent, message }).
+ *   Called periodically during scanning with normalized progress updates (0-100%).
+ * @property {number} [progressThrottleMs=100] - Minimum ms between progress emissions.
  */
 
 /**
@@ -290,6 +294,16 @@ export async function* scan(basePath, options = {}) {
   }
 
   pipeline.through(stages);
+
+  // Setup progress tracking
+  if (options.onProgress) {
+    const tracker = new ProgressTracker({
+      totalStages: stages.length,
+      onProgress: options.onProgress,
+      throttleMs: options.progressThrottleMs ?? 100,
+    });
+    tracker.attach(pipeline);
+  }
 
   // Setup abort handler with cleanup
   let abortHandler = null;

@@ -22,6 +22,7 @@ export { default as Pipeline } from './pipeline/Pipeline.js';
 export { default as Stage } from './pipeline/Stage.js';
 export { default as TransformerRegistry } from './transforms/TransformerRegistry.js';
 export { default as BaseTransformer } from './transforms/BaseTransformer.js';
+export { ProgressTracker } from './utils/ProgressTracker.js';
 
 // Configuration utilities
 export { config, configAsync, ConfigManager } from './config/ConfigManager.js';

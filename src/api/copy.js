@@ -26,6 +26,10 @@ import Clipboard from '../utils/clipboard.js';
  * @property {ConfigManager} [config] - ConfigManager instance for isolated configuration.
  *   If not provided, an isolated instance will be created. This enables concurrent
  *   copy operations with different configurations.
+ * @property {Function} [onProgress] - Progress callback ({ percent, message }).
+ *   Called periodically during copy with normalized progress updates (0-100%).
+ *   Scan phase covers 0-80%, formatting 80-100%.
+ * @property {number} [progressThrottleMs=100] - Minimum ms between progress emissions.
  */
 
 /**
@@ -110,6 +114,35 @@ export async function copy(basePath, options = {}) {
   // This enables concurrent copy operations with different configurations
   const configInstance = options.config || (await ConfigManager.create());
 
+  // Build progress wrapper: scan gets 0-80%, format gets 80-100%
+  const { onProgress, progressThrottleMs } = options;
+  let scanProgress = null;
+  let lastEmittedPercent = -1;
+
+  /**
+   * Emit progress with a monotonic guard so percent never decreases.
+   * Swallows exceptions so a buggy callback never breaks the operation.
+   */
+  const emitProgress = onProgress
+    ? (percent, message) => {
+        const clamped = Math.max(percent, lastEmittedPercent);
+        lastEmittedPercent = clamped;
+        try {
+          onProgress({ percent: clamped, message });
+        } catch {
+          // Swallow callback exceptions
+        }
+      }
+    : null;
+
+  if (emitProgress) {
+    emitProgress(0, 'Starting...');
+    scanProgress = (progress) => {
+      // Scale scan progress to 0-80%
+      emitProgress(Math.round(progress.percent * 0.8), progress.message);
+    };
+  }
+
   // Handle dry run
   if (options.dryRun) {
     // For dry run, collect file list without content
@@ -119,12 +152,18 @@ export async function copy(basePath, options = {}) {
       config: configInstance,
       includeContent: false,
       transform: false,
+      onProgress: scanProgress,
+      progressThrottleMs,
     })) {
       files.push(file);
     }
 
     const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
     const manifest = files.map((file) => ({ path: file.path, size: file.size || 0 }));
+
+    if (emitProgress) {
+      emitProgress(100, 'Complete');
+    }
 
     return {
       output: '',
@@ -144,7 +183,12 @@ export async function copy(basePath, options = {}) {
   const scanErrors = [];
 
   try {
-    for await (const file of scan(basePath, { ...options, config: configInstance })) {
+    for await (const file of scan(basePath, {
+      ...options,
+      config: configInstance,
+      onProgress: scanProgress,
+      progressThrottleMs,
+    })) {
       files.push(file);
     }
   } catch (error) {
@@ -157,6 +201,10 @@ export async function copy(basePath, options = {}) {
 
   // Calculate stats
   const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
+
+  if (emitProgress) {
+    emitProgress(80, 'Formatting output...');
+  }
 
   // Format output
   const output = await format(files, {
@@ -171,6 +219,10 @@ export async function copy(basePath, options = {}) {
 
   // Build lightweight manifest (path + size only — no content)
   const manifest = files.map((file) => ({ path: file.path, size: file.size || 0 }));
+
+  if (emitProgress) {
+    emitProgress(95, 'Finalizing...');
+  }
 
   // Build result
   const result = {
@@ -214,6 +266,10 @@ export async function copy(basePath, options = {}) {
       // Don't fail the operation if clipboard copy fails
       result.stats.clipboardError = error.message;
     }
+  }
+
+  if (emitProgress) {
+    emitProgress(100, 'Complete');
   }
 
   return result;
