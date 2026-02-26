@@ -33,6 +33,10 @@ export function runCli(args = [], options = {}) {
         TZ: 'UTC',
         LANG: 'C',
         LC_ALL: 'C',
+        // Suppress info/warn log output in E2E tests: these tests verify
+        // stdout program output (golden files), not log verbosity.
+        // Error-level messages still appear so that negative test cases work.
+        COPYTREE_LOG_LEVEL: 'error',
         ...options.env,
       },
       stdio: ['ignore', 'pipe', 'pipe'],

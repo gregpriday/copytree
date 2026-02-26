@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { ConfigManager } from '../config/ConfigManager.js';
 import { ValidationError } from '../utils/errors.js';
-import { logger } from '../utils/logger.js';
+import { logger as defaultLogger } from '../utils/logger.js';
 
 class Pipeline extends EventEmitter {
   /**
@@ -47,7 +47,7 @@ class Pipeline extends EventEmitter {
     // Create pipeline context for stages
     // Note: config will be populated during initialization if not provided
     this.context = {
-      logger: logger?.child?.('Pipeline') || {
+      logger: defaultLogger?.child?.('Pipeline') || {
         debug: () => {},
         info: () => {},
         warn: () => {},
@@ -247,7 +247,7 @@ class Pipeline extends EventEmitter {
                   );
 
             if (this.options.continueOnError) {
-              console.warn(
+              this.context.logger.warn(
                 `[Pipeline] Validation warning in ${stageName}: ${validationError.message}`,
               );
             } else {

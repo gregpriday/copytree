@@ -110,6 +110,8 @@ describe('FileLoaderTransformer (real)', () => {
   test('validateInput throws without absolutePath', () => {
     const transformer = new FileLoaderTransformer();
 
-    expect(() => transformer.validateInput({ path: 'x.txt' })).toThrow('File absolute path is required');
+    expect(() => transformer.validateInput({ path: 'x.txt' })).toThrow(
+      'File absolute path is required',
+    );
   });
 });
