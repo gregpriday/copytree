@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.0] - 2026-02-26
+
+### Fixed
+- Expose `formatBytes` utility to all format helpers (XML, JSON, Markdown, tree) so formatters can render human-readable file sizes
+
+### Infrastructure
+- Add release command and update CLAUDE.md release docs
+
 ## [0.14.0] - 2026-02-26
 
 ### Major Changes
