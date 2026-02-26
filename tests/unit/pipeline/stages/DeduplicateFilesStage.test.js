@@ -5,9 +5,8 @@ import crypto from 'crypto';
 let DeduplicateFilesStage;
 
 beforeAll(async () => {
-  const deduplicateFilesStageModule = await import(
-    '../../../../src/pipeline/stages/DeduplicateFilesStage.js'
-  );
+  const deduplicateFilesStageModule =
+    await import('../../../../src/pipeline/stages/DeduplicateFilesStage.js');
   DeduplicateFilesStage = deduplicateFilesStageModule.default;
 });
 

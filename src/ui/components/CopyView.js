@@ -164,30 +164,24 @@ const CopyView = () => {
     const stages = [];
 
     // Import stage classes
-    const { default: FileDiscoveryStage } = await import(
-      '../../pipeline/stages/FileDiscoveryStage.js'
-    );
-    const { default: ProfileFilterStage } = await import(
-      '../../pipeline/stages/ProfileFilterStage.js'
-    );
+    const { default: FileDiscoveryStage } =
+      await import('../../pipeline/stages/FileDiscoveryStage.js');
+    const { default: ProfileFilterStage } =
+      await import('../../pipeline/stages/ProfileFilterStage.js');
     const { default: GitFilterStage } = await import('../../pipeline/stages/GitFilterStage.js');
     const { default: LimitStage } = await import('../../pipeline/stages/LimitStage.js');
     const { default: SortFilesStage } = await import('../../pipeline/stages/SortFilesStage.js');
-    const { default: AlwaysIncludeStage } = await import(
-      '../../pipeline/stages/AlwaysIncludeStage.js'
-    );
+    const { default: AlwaysIncludeStage } =
+      await import('../../pipeline/stages/AlwaysIncludeStage.js');
     const { default: FileLoadingStage } = await import('../../pipeline/stages/FileLoadingStage.js');
     const { default: TransformStage } = await import('../../pipeline/stages/TransformStage.js');
     const { default: CharLimitStage } = await import('../../pipeline/stages/CharLimitStage.js');
-    const { default: DeduplicateFilesStage } = await import(
-      '../../pipeline/stages/DeduplicateFilesStage.js'
-    );
-    const { default: InstructionsStage } = await import(
-      '../../pipeline/stages/InstructionsStage.js'
-    );
-    const { default: OutputFormattingStage } = await import(
-      '../../pipeline/stages/OutputFormattingStage.js'
-    );
+    const { default: DeduplicateFilesStage } =
+      await import('../../pipeline/stages/DeduplicateFilesStage.js');
+    const { default: InstructionsStage } =
+      await import('../../pipeline/stages/InstructionsStage.js');
+    const { default: OutputFormattingStage } =
+      await import('../../pipeline/stages/OutputFormattingStage.js');
 
     // 1. File Discovery
     stages.push(FileDiscoveryStage);

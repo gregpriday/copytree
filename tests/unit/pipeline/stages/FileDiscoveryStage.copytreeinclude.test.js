@@ -8,9 +8,8 @@ import os from 'os';
 let FileDiscoveryStage;
 
 beforeAll(async () => {
-  const fileDiscoveryStageModule = await import(
-    '../../../../src/pipeline/stages/FileDiscoveryStage.js'
-  );
+  const fileDiscoveryStageModule =
+    await import('../../../../src/pipeline/stages/FileDiscoveryStage.js');
   FileDiscoveryStage = fileDiscoveryStageModule.default;
 });
 

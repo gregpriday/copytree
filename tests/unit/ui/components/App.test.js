@@ -9,21 +9,18 @@ describe('App Component', () => {
     });
 
     test('AppContext can be imported without errors', async () => {
-      const { AppProvider, useAppContext } = await import(
-        '../../../../src/ui/contexts/AppContext.js'
-      );
+      const { AppProvider, useAppContext } =
+        await import('../../../../src/ui/contexts/AppContext.js');
       expect(typeof AppProvider).toBe('function');
       expect(typeof useAppContext).toBe('function');
     });
 
     test('UI components can be imported without errors', async () => {
-      const { default: PipelineStatus } = await import(
-        '../../../../src/ui/components/PipelineStatus.js'
-      );
+      const { default: PipelineStatus } =
+        await import('../../../../src/ui/components/PipelineStatus.js');
       const { default: Results } = await import('../../../../src/ui/components/Results.js');
-      const { default: SummaryTable } = await import(
-        '../../../../src/ui/components/SummaryTable.js'
-      );
+      const { default: SummaryTable } =
+        await import('../../../../src/ui/components/SummaryTable.js');
       const { default: StaticLog } = await import('../../../../src/ui/components/StaticLog.js');
 
       expect(typeof PipelineStatus).toBe('function');

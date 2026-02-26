@@ -223,9 +223,8 @@ export async function* scan(basePath, options = {}) {
 
   // 2. Always Include Stage
   if (mergedAlways.length > 0) {
-    const { default: AlwaysIncludeStage } = await import(
-      '../pipeline/stages/AlwaysIncludeStage.js'
-    );
+    const { default: AlwaysIncludeStage } =
+      await import('../pipeline/stages/AlwaysIncludeStage.js');
     stages.push(new AlwaysIncludeStage(mergedAlways));
   }
 
@@ -253,9 +252,8 @@ export async function* scan(basePath, options = {}) {
 
   // 5. Deduplicate Stage
   if (options.dedupe) {
-    const { default: DeduplicateFilesStage } = await import(
-      '../pipeline/stages/DeduplicateFilesStage.js'
-    );
+    const { default: DeduplicateFilesStage } =
+      await import('../pipeline/stages/DeduplicateFilesStage.js');
     stages.push(new DeduplicateFilesStage());
   }
 

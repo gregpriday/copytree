@@ -24,9 +24,8 @@ beforeAll(async () => {
   const fileDiscoveryStageModule = await import('../../src/pipeline/stages/FileDiscoveryStage.js');
   const profileFilterStageModule = await import('../../src/pipeline/stages/ProfileFilterStage.js');
   const fileLoadingStageModule = await import('../../src/pipeline/stages/FileLoadingStage.js');
-  const outputFormattingStageModule = await import(
-    '../../src/pipeline/stages/OutputFormattingStage.js'
-  );
+  const outputFormattingStageModule =
+    await import('../../src/pipeline/stages/OutputFormattingStage.js');
   const limitStageModule = await import('../../src/pipeline/stages/LimitStage.js');
   const charLimitStageModule = await import('../../src/pipeline/stages/CharLimitStage.js');
   const instructionsStageModule = await import('../../src/pipeline/stages/InstructionsStage.js');

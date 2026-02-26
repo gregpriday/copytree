@@ -313,9 +313,8 @@ async function setupPipelineStages(basePath, profile, options) {
 
   // 2. Always Include Stage (mark files before any filtering)
   if (mergedAlways.length > 0) {
-    const { default: AlwaysIncludeStage } = await import(
-      '../pipeline/stages/AlwaysIncludeStage.js'
-    );
+    const { default: AlwaysIncludeStage } =
+      await import('../pipeline/stages/AlwaysIncludeStage.js');
     stages.push(new AlwaysIncludeStage(mergedAlways));
   }
 
@@ -367,9 +366,8 @@ async function setupPipelineStages(basePath, profile, options) {
       (options.secretsGuard === true || config().get('secretsGuard.enabled', true));
 
     if (secretsGuardEnabled) {
-      const { default: SecretsGuardStage } = await import(
-        '../pipeline/stages/SecretsGuardStage.js'
-      );
+      const { default: SecretsGuardStage } =
+        await import('../pipeline/stages/SecretsGuardStage.js');
       stages.push(
         new SecretsGuardStage({
           enabled: true,
@@ -416,9 +414,8 @@ async function setupPipelineStages(basePath, profile, options) {
 
   // Use streaming stage for stream option or large outputs
   if (options.stream || (profile.options?.streaming ?? false)) {
-    const { default: StreamingOutputStage } = await import(
-      '../pipeline/stages/StreamingOutputStage.js'
-    );
+    const { default: StreamingOutputStage } =
+      await import('../pipeline/stages/StreamingOutputStage.js');
     const fsSync = await import('fs');
 
     let outputStream = process.stdout;
@@ -435,9 +432,8 @@ async function setupPipelineStages(basePath, profile, options) {
       }),
     );
   } else {
-    const { default: OutputFormattingStage } = await import(
-      '../pipeline/stages/OutputFormattingStage.js'
-    );
+    const { default: OutputFormattingStage } =
+      await import('../pipeline/stages/OutputFormattingStage.js');
     stages.push(
       new OutputFormattingStage({
         format: outputFormat,

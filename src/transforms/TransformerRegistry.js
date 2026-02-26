@@ -623,12 +623,10 @@ class TransformerRegistry {
     registry.config = options.config || null;
 
     // Register default transformers - using dynamic imports for better ESM compatibility
-    const { default: FileLoaderTransformer } = await import(
-      './transformers/FileLoaderTransformer.js'
-    );
-    const { default: StreamingFileLoaderTransformer } = await import(
-      './transformers/StreamingFileLoaderTransformer.js'
-    );
+    const { default: FileLoaderTransformer } =
+      await import('./transformers/FileLoaderTransformer.js');
+    const { default: StreamingFileLoaderTransformer } =
+      await import('./transformers/StreamingFileLoaderTransformer.js');
     const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
 
     // File Loader - default transformer
