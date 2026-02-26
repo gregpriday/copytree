@@ -1,6 +1,8 @@
 // Unmock fs-extra for these tests to use real filesystem
 jest.unmock('fs-extra');
 
+import Clipboard from '../../../src/utils/clipboard.js';
+
 import { copy } from '../../../src/api/copy.js';
 import { ValidationError } from '../../../src/utils/errors.js';
 import fs from 'fs-extra';
@@ -152,6 +154,28 @@ describe('copy()', () => {
       const result = await copy(testDir, { display: false });
 
       expect(result.output).toBeDefined();
+    });
+
+    it('should call Clipboard.copyText with formatted output when clipboard: true', async () => {
+      const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
+
+      const result = await copy(testDir, { clipboard: true });
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith(result.output);
+      spy.mockRestore();
+    });
+
+    it('should succeed and record clipboardError when Clipboard.copyText throws', async () => {
+      const spy = jest
+        .spyOn(Clipboard, 'copyText')
+        .mockRejectedValueOnce(new Error('clipboard unavailable'));
+
+      const result = await copy(testDir, { clipboard: true });
+
+      expect(result.output).toBeDefined();
+      expect(result.stats.clipboardError).toBe('clipboard unavailable');
+      spy.mockRestore();
     });
   });
 

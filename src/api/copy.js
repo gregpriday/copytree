@@ -185,7 +185,7 @@ export async function copy(basePath, options = {}) {
   // Copy to clipboard if explicitly requested
   if (options.clipboard) {
     try {
-      await Clipboard.copy(output);
+      await Clipboard.copyText(output);
     } catch (error) {
       // Don't fail the operation if clipboard copy fails
       result.stats.clipboardError = error.message;
