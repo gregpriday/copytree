@@ -235,6 +235,77 @@ describe('copy()', () => {
     });
   });
 
+  describe('Manifest', () => {
+    it('should include a manifest array in the result', async () => {
+      const result = await copy(testDir);
+
+      expect(Array.isArray(result.manifest)).toBe(true);
+      expect(result.manifest.length).toBeGreaterThan(0);
+    });
+
+    it('should have correct shape on each manifest entry (path and size, no content)', async () => {
+      const result = await copy(testDir);
+
+      result.manifest.forEach((entry) => {
+        expect(typeof entry.path).toBe('string');
+        expect(entry.path.length).toBeGreaterThan(0);
+        expect(typeof entry.size).toBe('number');
+        expect(entry.size).toBeGreaterThanOrEqual(0);
+        expect(entry).not.toHaveProperty('content');
+        expect(entry).not.toHaveProperty('absolutePath');
+      });
+    });
+
+    it('should have manifest.length equal to stats.totalFiles', async () => {
+      const result = await copy(testDir);
+
+      expect(result.manifest.length).toBe(result.stats.totalFiles);
+    });
+
+    it('should have manifest paths that match result.files paths', async () => {
+      const result = await copy(testDir);
+
+      const manifestPaths = result.manifest.map((e) => e.path).sort();
+      const filePaths = result.files.map((f) => f.path).sort();
+      expect(manifestPaths).toEqual(filePaths);
+    });
+
+    it('should include manifest in dry run with same lightweight shape', async () => {
+      const result = await copy(testDir, { dryRun: true });
+
+      expect(Array.isArray(result.manifest)).toBe(true);
+      expect(result.manifest.length).toBeGreaterThan(0);
+      result.manifest.forEach((entry) => {
+        expect(typeof entry.path).toBe('string');
+        expect(typeof entry.size).toBe('number');
+        expect(entry).not.toHaveProperty('content');
+      });
+    });
+
+    it('should have manifest.length equal to stats.totalFiles in dry run', async () => {
+      const result = await copy(testDir, { dryRun: true });
+
+      expect(result.manifest.length).toBe(result.stats.totalFiles);
+    });
+
+    it('should reflect file filters in manifest', async () => {
+      const result = await copy(testDir, { filter: ['**/*.js'] });
+
+      result.manifest.forEach((entry) => {
+        expect(entry.path).toMatch(/\.js$/);
+      });
+    });
+
+    it('should return an empty manifest in dry run when filter matches no files', async () => {
+      // format() throws when files is empty, so use dryRun to test the zero-result path
+      const result = await copy(testDir, { filter: ['**/*.nope_no_match'], dryRun: true });
+
+      expect(Array.isArray(result.manifest)).toBe(true);
+      expect(result.manifest.length).toBe(0);
+      expect(result.manifest.length).toBe(result.stats.totalFiles);
+    });
+  });
+
   describe('Performance', () => {
     it('should complete within reasonable time', async () => {
       const start = Date.now();
