@@ -46,11 +46,9 @@ describe('OS-specific file reference copy', () => {
 
     if (process.platform === 'darwin') {
       const wrapper = path.join(binDir, 'osascript');
-      writeFileSync(
-        wrapper,
-        '#!/bin/sh\nprintf "%s\\n" "$@" > "$COPYTREE_TEST_LOG"\nexit 0\n',
-        { mode: 0o755 },
-      );
+      writeFileSync(wrapper, '#!/bin/sh\nprintf "%s\\n" "$@" > "$COPYTREE_TEST_LOG"\nexit 0\n', {
+        mode: 0o755,
+      });
 
       const { code } = await runCli([PROJECT, '--as-reference', '--format', 'xml'], { env });
       expect(code).toBe(0);
