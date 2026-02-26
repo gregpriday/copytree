@@ -927,6 +927,54 @@ export class Stage {
 }
 
 // ============================================================================
+// Progress Tracker
+// ============================================================================
+
+/**
+ * Options for constructing a ProgressTracker
+ */
+export interface ProgressTrackerOptions {
+  /** Total number of pipeline stages (default: 1) */
+  totalStages?: number;
+  /** Progress callback function */
+  onProgress?: ProgressCallback;
+  /** Minimum milliseconds between throttled emissions (default: 100) */
+  throttleMs?: number;
+}
+
+/**
+ * Normalizes pipeline events into simple progress updates.
+ *
+ * Translates detailed pipeline events (stage:start, stage:complete, file:batch,
+ * stage:progress) into a simple { percent, message } format for UI consumers.
+ *
+ * Progress guarantees:
+ * - Always starts at 0%
+ * - Always ends at 100% on success
+ * - Monotonically increasing (never goes backward)
+ * - Throttled to avoid overwhelming UI (default 100ms)
+ */
+export class ProgressTracker {
+  /** Total number of pipeline stages */
+  totalStages: number;
+  /** Progress callback function */
+  onProgress: ProgressCallback;
+  /** Throttle interval in milliseconds */
+  throttleMs: number;
+
+  /** Create a new ProgressTracker instance */
+  constructor(options?: ProgressTrackerOptions);
+
+  /**
+   * Attach event listeners to a pipeline instance.
+   * Once attached, the tracker will listen to pipeline events and
+   * invoke the onProgress callback with normalized progress updates.
+   * @param pipeline - Pipeline instance to track
+   */
+  attach(pipeline: Pipeline): void;
+}
+
+// ============================================================================
 // Transformer Classes
 // ============================================================================
 
