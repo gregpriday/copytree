@@ -156,7 +156,7 @@ class GitleaksAdapter {
       const timer = setTimeout(() => {
         timedOut = true;
         try {
-          child.kill('SIGKILL');
+          child.kill();
         } catch (e) {
           // Process may have already exited
         }

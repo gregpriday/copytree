@@ -33,7 +33,7 @@ class FileLoadingStage extends Stage {
       // 1. Check for Structure Only patterns (Token saving)
       const structureOnlyPatterns = this.config.get('copytree.structureOnlyPatterns', []);
       const isStructureOnly = structureOnlyPatterns.some((pattern) =>
-        minimatch(file.path, pattern, { dot: true }),
+        minimatch(file.path, pattern, { dot: true, nocase: process.platform === 'win32' }),
       );
 
       if (isStructureOnly) {
@@ -74,7 +74,8 @@ class FileLoadingStage extends Stage {
       }
 
       // Regular text file
-      const content = await fs.readFile(file.absolutePath, this.encoding);
+      const raw = await fs.readFile(file.absolutePath, this.encoding);
+      const content = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
       return {
         ...file,

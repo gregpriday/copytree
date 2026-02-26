@@ -69,6 +69,26 @@ export interface Logger {
 // ============================================================================
 
 /**
+ * Lightweight manifest entry representing a single included file.
+ * Contains only path and size — no file content — making it safe to retain
+ * in long-lived UI processes (e.g. Electron apps) without holding megabytes
+ * of file data in memory.
+ *
+ * @example
+ * const result = await copy('./src');
+ * // Show a file breakdown without retaining file content
+ * result.manifest.forEach(({ path, size }) => {
+ *   console.log(`${path} (${size} bytes)`);
+ * });
+ */
+export interface ManifestEntry {
+  /** Relative path to the file (e.g. "src/utils/helpers.js"). Same value as `FileResult.path`. */
+  path: string;
+  /** File size in bytes */
+  size: number;
+}
+
+/**
  * Represents a file discovered and processed by scan()
  */
 export interface FileResult {
@@ -294,8 +314,33 @@ export interface CopyOptions extends ScanOptions, FormatOptions {
 export interface CopyResult {
   /** Formatted output string */
   output: string;
-  /** Array of file results */
+  /**
+   * Full file results including content, metadata, and git status.
+   * Use `manifest` instead when you only need paths and sizes — it avoids
+   * retaining megabytes of file content in memory.
+   */
   files: FileResult[];
+  /**
+   * Lightweight manifest of included files — an array of `{ path, size }` objects.
+   * Ideal for building UI file-breakdowns (e.g. tooltips or lists) without
+   * holding the full file content in memory.
+   *
+   * Consistent shape across both normal runs and dry runs: entries always have
+   * `path` and `size` (bytes), never `content` — but the set of files in the
+   * manifest follows the same inclusion rules as `result.files` for each mode.
+   *
+   * @example
+   * const result = await copy('./src');
+   * result.manifest.forEach(({ path, size }) => {
+   *   console.log(`${path}: ${size} bytes`);
+   * });
+   *
+   * @example
+   * // Dry run: get file list without processing content
+   * const { manifest } = await copy('./src', { dryRun: true });
+   * console.log(`Would include ${manifest.length} files`);
+   */
+  manifest: ManifestEntry[];
   /** Processing statistics */
   stats: {
     /** Total number of files processed */

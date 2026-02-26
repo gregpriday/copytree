@@ -156,7 +156,9 @@ class SecretsGuardStage extends Stage {
   }
 
   _isExcluded(filePath) {
-    return this.excludeGlobs.some((pattern) => minimatch(filePath, pattern, { dot: true }));
+    return this.excludeGlobs.some((pattern) =>
+      minimatch(filePath, pattern, { dot: true, nocase: process.platform === 'win32' }),
+    );
   }
 
   _basicScan(file) {

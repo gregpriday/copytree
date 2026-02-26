@@ -225,13 +225,19 @@ jest.mock('../src/utils/logger.js', () => ({
   logger: mockLogger,
 }));
 
-// Mock clipboardy to prevent ESM import issues
-jest.mock('clipboardy', () => ({
-  write: jest.fn().mockResolvedValue(undefined),
-  read: jest.fn().mockResolvedValue(''),
-  writeSync: jest.fn(),
-  readSync: jest.fn().mockReturnValue(''),
-}));
+// Mock clipboardy to prevent ESM import issues.
+// The mock object is set as its own `.default` so that dynamic ESM imports
+// (`const { default: clipboardy } = await import('clipboardy')`) resolve correctly.
+jest.mock('clipboardy', () => {
+  const mock = {
+    write: jest.fn().mockResolvedValue(undefined),
+    read: jest.fn().mockResolvedValue(''),
+    writeSync: jest.fn(),
+    readSync: jest.fn().mockReturnValue(''),
+  };
+  mock.default = mock;
+  return mock;
+});
 
 // Mock fs-extra (comprehensive mock with all functions)
 jest.mock('fs-extra', () => {

@@ -33,9 +33,18 @@ import Clipboard from '../utils/clipboard.js';
  */
 
 /**
+ * @typedef {Object} ManifestEntry
+ * @property {string} path - Relative POSIX path to the file
+ * @property {number} size - File size in bytes
+ */
+
+/**
  * @typedef {Object} CopyResult
  * @property {string} output - Formatted output string
- * @property {Array<FileResult>} files - Array of file results
+ * @property {Array<FileResult>} files - Full file results (includes content). Use `manifest` when you only need paths and sizes.
+ * @property {Array<ManifestEntry>} manifest - Lightweight list of included files with only `path` and `size`.
+ *   Safe to retain in long-lived processes (e.g. Electron) without holding megabytes of file content in memory.
+ *   Consistent shape across normal runs and dry runs — entries never include `content`.
  * @property {Object} stats - Processing statistics
  * @property {number} stats.totalFiles - Total number of files processed
  * @property {number} stats.duration - Processing duration in milliseconds
@@ -75,11 +84,20 @@ import Clipboard from '../utils/clipboard.js';
  * });
  *
  * @example
+ * // Access the lightweight file manifest (no content retained in memory)
+ * const result = await copy('./src');
+ * result.manifest.forEach(({ path, size }) => {
+ *   console.log(`${path}: ${size} bytes`);
+ * });
+ *
+ * @example
  * // Dry run to preview
  * const result = await copy('./src', {
  *   dryRun: true
  * });
  * console.log(`Would process ${result.stats.totalFiles} files`);
+ * // manifest is also available in dry-run mode
+ * result.manifest.forEach(({ path }) => console.log(path));
  */
 export async function copy(basePath, options = {}) {
   const startTime = Date.now();
@@ -141,6 +159,7 @@ export async function copy(basePath, options = {}) {
     }
 
     const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
+    const manifest = files.map((file) => ({ path: file.path, size: file.size || 0 }));
 
     if (emitProgress) {
       emitProgress(100, 'Complete');
@@ -149,6 +168,7 @@ export async function copy(basePath, options = {}) {
     return {
       output: '',
       files: files,
+      manifest,
       stats: {
         totalFiles: files.length,
         duration: Date.now() - startTime,
@@ -197,6 +217,9 @@ export async function copy(basePath, options = {}) {
     prettyPrint: options.prettyPrint,
   });
 
+  // Build lightweight manifest (path + size only — no content)
+  const manifest = files.map((file) => ({ path: file.path, size: file.size || 0 }));
+
   if (emitProgress) {
     emitProgress(95, 'Finalizing...');
   }
@@ -205,6 +228,7 @@ export async function copy(basePath, options = {}) {
   const result = {
     output,
     files,
+    manifest,
     stats: {
       totalFiles: files.length,
       duration: Date.now() - startTime,
@@ -237,7 +261,7 @@ export async function copy(basePath, options = {}) {
   // Copy to clipboard if explicitly requested
   if (options.clipboard) {
     try {
-      await Clipboard.copy(output);
+      await Clipboard.copyText(output);
     } catch (error) {
       // Don't fail the operation if clipboard copy fails
       result.stats.clipboardError = error.message;
