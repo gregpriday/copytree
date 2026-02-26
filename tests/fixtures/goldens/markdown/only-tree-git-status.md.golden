@@ -1,0 +1,36 @@
+---
+format: copytree-md@1
+tool: copytree
+generated: "<TIMESTAMP>"
+base_path: "<PROJECT_ROOT>"
+profile: "default"
+file_count: 3
+total_size_bytes: 102
+char_limit_applied: false
+only_tree: true
+include_git_status: true
+include_line_numbers: false
+instructions:
+  name: "default"
+  included: true
+---
+
+# CopyTree Export — copytree-md-tree-git-<UUID>
+
+## Directory Tree
+```text
+├── src/
+│   └── test.js (40 B)
+├── index.js (22 B)
+└── README.md (40 B)
+```
+
+## Instructions
+
+<!-- copytree:instructions-begin name="default" -->
+```text
+This XML document represents the directory structure and contents of a project, which you will analyze to answer user questions. Reference files using @ followed by the relative path from the project root (e.g., @README.md, @src/app.js). The @ notation must not be enclosed in backticks. For example, always write "...in the file @app/page.tsx..." and never "...in the file `@app/page.tsx`...". You can also reference directories with @directory/path to instruct the agent to examine multiple files.
+```
+
+<!-- copytree:instructions-end name="default" -->
+🖥️ 3 files [<MEMORY>] displayed to terminal
