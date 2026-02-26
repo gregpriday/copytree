@@ -13,6 +13,7 @@
  */
 
 import { performance } from 'node:perf_hooks';
+import os from 'os';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -267,10 +268,11 @@ async function saveResults(allResults, outputPath) {
     timestamp: new Date().toISOString(),
     platform: process.platform,
     nodeVersion: process.version,
-    cpuCount: require('os').cpus().length,
+    cpuCount: os.cpus().length,
     results: allResults,
   };
 
+  await fs.ensureDir(path.dirname(outputPath));
   await fs.writeJson(outputPath, output, { spaces: 2 });
   console.log(`\n✓ Results saved to ${outputPath}`);
 }
@@ -286,7 +288,7 @@ async function main() {
   console.log('=== File Discovery Performance Benchmark ===');
   console.log(`Platform: ${process.platform}`);
   console.log(`Node: ${process.version}`);
-  console.log(`CPUs: ${require('os').cpus().length}`);
+  console.log(`CPUs: ${os.cpus().length}`);
   console.log(`Quick mode: ${quick ? 'yes' : 'no'}`);
 
   const fileCounts = quick ? [1000] : BENCHMARK_CONFIG.fileCounts;

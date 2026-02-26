@@ -1,0 +1,115 @@
+name: Performance Benchmarks
+
+on:
+  # Nightly at 02:00 UTC on the default branch
+  schedule:
+    - cron: '0 2 * * *'
+
+  # Manual trigger — useful for pre-release validation or ad-hoc testing
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to benchmark (branch, tag, or SHA). Defaults to the workflow ref (usually the default branch).'
+        required: false
+        default: ''
+
+jobs:
+  benchmark:
+    name: Performance Budget Check
+    runs-on: ubuntu-latest
+
+    # Budget tests spin up 10k+ file trees — 30 minutes is ample
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ------------------------------------------------------------------ #
+      # Step 1: Run Jest-based budget assertion tests                        #
+      # These fail the build if any budget (duration / memory) is exceeded. #
+      # ------------------------------------------------------------------ #
+      - name: Run performance budget tests
+        id: budget_tests
+        run: npm run test:performance
+        env:
+          # Disable colour output so CI logs are clean
+          NO_COLOR: '1'
+          FORCE_COLOR: '0'
+
+      # ------------------------------------------------------------------ #
+      # Step 2: Run the file-discovery standalone benchmark                 #
+      # Produces a detailed JSON report for trend analysis.                 #
+      # Always runs even if budget tests passed, to capture baseline data.  #
+      # ------------------------------------------------------------------ #
+      - name: Run file-discovery benchmark
+        id: bench_discovery
+        if: always()
+        # Only run for 1k files in CI to keep total time manageable
+        run: |
+          mkdir -p tests/performance/results
+          node tests/performance/file-discovery.bench.js --quick --out tests/performance/results/discovery-ci.json
+        continue-on-error: true
+        env:
+          NO_COLOR: '1'
+
+      # ------------------------------------------------------------------ #
+      # Step 3: Emit GitHub Actions step summary                            #
+      # ------------------------------------------------------------------ #
+      - name: Write CI summary
+        if: always()
+        run: |
+          echo "## Performance Benchmark Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Node.js | $(node --version) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Runner OS | ${{ runner.os }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ref | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # If the budget test produced result files, surface the key numbers
+          RESULT_DIR="tests/performance/results"
+          if ls "$RESULT_DIR"/*.json 2>/dev/null | grep -v discovery-ci; then
+            echo "### Budget Test Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            # Print the largest result file (most recently produced)
+            LATEST=$(ls -t "$RESULT_DIR"/budget-large-*.json 2>/dev/null | head -1)
+            if [ -n "$LATEST" ]; then
+              cat "$LATEST" >> $GITHUB_STEP_SUMMARY
+            fi
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -f "tests/performance/results/discovery-ci.json" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### File-Discovery Benchmark" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat tests/performance/results/discovery-ci.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # ------------------------------------------------------------------ #
+      # Step 4: Upload all result JSON files as workflow artifacts           #
+      # ------------------------------------------------------------------ #
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.sha }}
+          path: tests/performance/results/
+          retention-days: 90
+          if-no-files-found: ignore
