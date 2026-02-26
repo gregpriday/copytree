@@ -93,6 +93,25 @@ program
   .option('--no-instructions', 'Disable including instructions in output')
   .option('--instructions <name>', 'Use custom instructions set (default: default)')
   .option('--no-validate', 'Disable configuration validation')
+  .option(
+    '--ext <extensions>',
+    'Filter by file extensions, comma-separated (e.g., .js,.ts,.tsx or js,ts)',
+  )
+  .option(
+    '--max-depth <n>',
+    'Maximum directory traversal depth (0 = root files only, 1 = one level deep, etc.)',
+    (val) => {
+      const n = parseInt(val, 10);
+      if (isNaN(n) || n < 0) {
+        throw new InvalidArgumentError(
+          `'${val}' is not a valid depth. Must be a non-negative integer.`,
+        );
+      }
+      return n;
+    },
+  )
+  .option('--min-size <size>', 'Exclude files smaller than this size (e.g., 1KB, 500B, 10MB)')
+  .option('--max-size <size>', 'Exclude files larger than this size (e.g., 10MB, 1GB)')
   .option('--secrets-guard', 'Enable automatic secret detection and redaction (default: enabled)')
   .option('--no-secrets-guard', 'Disable secret detection and redaction')
   .option(

@@ -280,4 +280,51 @@ describe('parallelWalker', () => {
       expect(files[0].explanation.ignored).toBe(false);
     });
   });
+
+  describe('maxDepth traversal limiting', () => {
+    let deepDir;
+
+    beforeEach(async () => {
+      deepDir = path.join(testDir, 'root');
+      await fs.ensureDir(path.join(deepDir, 'a', 'b', 'c'));
+      await fs.writeFile(path.join(deepDir, 'depth0.txt'), 'root');
+      await fs.writeFile(path.join(deepDir, 'a', 'depth1.txt'), 'd1');
+      await fs.writeFile(path.join(deepDir, 'a', 'b', 'depth2.txt'), 'd2');
+      await fs.writeFile(path.join(deepDir, 'a', 'b', 'c', 'depth3.txt'), 'd3');
+    });
+
+    it('should return only root-level files at maxDepth=0', async () => {
+      const files = await getAllFilesParallel(deepDir, { concurrency: 2, maxDepth: 0 });
+      const names = files.map((f) => path.basename(f.path)).sort();
+      expect(names).toEqual(['depth0.txt']);
+    });
+
+    it('should include one directory level at maxDepth=1', async () => {
+      const files = await getAllFilesParallel(deepDir, { concurrency: 2, maxDepth: 1 });
+      const names = files.map((f) => path.basename(f.path)).sort();
+      expect(names).toEqual(['depth0.txt', 'depth1.txt']);
+    });
+
+    it('should include two directory levels at maxDepth=2', async () => {
+      const files = await getAllFilesParallel(deepDir, { concurrency: 2, maxDepth: 2 });
+      const names = files.map((f) => path.basename(f.path)).sort();
+      expect(names).toEqual(['depth0.txt', 'depth1.txt', 'depth2.txt']);
+    });
+
+    it('should include all files when maxDepth is undefined', async () => {
+      const files = await getAllFilesParallel(deepDir, { concurrency: 2, maxDepth: undefined });
+      const names = files.map((f) => path.basename(f.path)).sort();
+      expect(names).toEqual(['depth0.txt', 'depth1.txt', 'depth2.txt', 'depth3.txt']);
+    });
+
+    it('should produce the same results as ignoreWalker for maxDepth=1', async () => {
+      const { getAllFiles } = await import('../../../src/utils/ignoreWalker.js');
+      const parallelFiles = await getAllFilesParallel(deepDir, { concurrency: 2, maxDepth: 1 });
+      const sequentialFiles = await getAllFiles(deepDir, { maxDepth: 1 });
+
+      const parallelPaths = parallelFiles.map((f) => f.path).sort();
+      const sequentialPaths = sequentialFiles.map((f) => f.path).sort();
+      expect(parallelPaths).toEqual(sequentialPaths);
+    });
+  });
 });

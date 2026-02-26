@@ -119,6 +119,7 @@ export async function* walkParallel(root, options = {}) {
     concurrency = 5,
     highWaterMark = concurrency * 2,
     signal,
+    maxDepth = undefined,
   } = options;
 
   // Extract retry configuration with defaults
@@ -213,8 +214,9 @@ export async function* walkParallel(root, options = {}) {
    * @param {string} dir - Parent directory path
    * @param {fs.Dirent} entry - Directory entry
    * @param {Array} layers - Current ignore layers
+   * @param {number} depth - Current traversal depth (0 = root)
    */
-  async function processEntry(dir, entry, layers) {
+  async function processEntry(dir, entry, layers, depth) {
     if (signal?.aborted) {
       throw new Error('Traversal aborted');
     }
@@ -288,8 +290,10 @@ export async function* walkParallel(root, options = {}) {
         queuedResult = result;
       }
 
-      // Add subdirectory to queue for processing
-      queue.push({ dir: absPath, layers });
+      // Add subdirectory to queue for processing (respect maxDepth)
+      if (maxDepth === undefined || depth < maxDepth) {
+        queue.push({ dir: absPath, layers, depth: depth + 1 });
+      }
       return queuedResult;
     } else {
       stats.filesScanned++;
@@ -329,8 +333,9 @@ export async function* walkParallel(root, options = {}) {
    * Process a single directory: read entries and schedule them
    * @param {string} dir - Directory path
    * @param {Array} layers - Current ignore layers
+   * @param {number} depth - Current traversal depth (0 = root)
    */
-  async function processDirectory(dir, layers) {
+  async function processDirectory(dir, layers, depth) {
     stats.directoriesScanned++;
 
     // Load ignore rules at this level
@@ -368,13 +373,13 @@ export async function* walkParallel(root, options = {}) {
 
     // Process all entries in this directory in parallel (bounded by limit)
     const entryResults = await Promise.all(
-      entries.map((entry) => limit(() => processEntry(dir, entry, nextLayers))),
+      entries.map((entry) => limit(() => processEntry(dir, entry, nextLayers, depth))),
     );
     return entryResults.filter(Boolean);
   }
 
   // Initialize queue with root directory
-  queue.push({ dir: root, layers: initialLayers });
+  queue.push({ dir: root, layers: initialLayers, depth: 0 });
 
   // Main traversal loop
   try {
@@ -386,8 +391,8 @@ export async function* walkParallel(root, options = {}) {
       }
 
       while (queue.length > 0 && running.size < concurrency) {
-        const { dir, layers } = queue.shift();
-        const task = processDirectory(dir, layers).then(async (results) => {
+        const { dir, layers, depth } = queue.shift();
+        const task = processDirectory(dir, layers, depth).then(async (results) => {
           // Guard against undefined results (when readdir fails)
           if (results) {
             for (const result of results) {

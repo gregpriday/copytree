@@ -147,6 +147,7 @@ export async function* walkWithIgnore(root, options = {}) {
     initialLayers = [],
     config = {},
     cache = false,
+    maxDepth = undefined,
   } = options;
 
   // Extract retry configuration with defaults
@@ -162,7 +163,7 @@ export async function* walkWithIgnore(root, options = {}) {
   stats.directoriesPruned = 0;
   stats.filesExcluded = 0;
 
-  async function* walk(dir, layers) {
+  async function* walk(dir, layers, depth = 0) {
     stats.directoriesScanned++;
 
     // Load ignore rules at this level
@@ -262,8 +263,10 @@ export async function* walkWithIgnore(root, options = {}) {
           yield result;
         }
 
-        // Recurse into subdirectory
-        yield* walk(absPath, nextLayers);
+        // Recurse into subdirectory (respect maxDepth if set)
+        if (maxDepth === undefined || depth < maxDepth) {
+          yield* walk(absPath, nextLayers, depth + 1);
+        }
       } else {
         stats.filesScanned++;
 

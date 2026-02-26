@@ -27,6 +27,18 @@ class FileDiscoveryStage extends Stage {
     this.respectGitignore = options.respectGitignore !== false;
     this.forceInclude = options.forceInclude || [];
     this.excludes = options.excludes || [];
+    // Convenience filter options
+    this.extFilter = options.extFilter || null; // e.g. ['.js', '.ts']
+    this.maxDepth =
+      options.maxDepth !== undefined && options.maxDepth !== null ? options.maxDepth : null;
+    this.minSizeBytes =
+      options.minSizeBytes !== undefined && options.minSizeBytes !== null
+        ? options.minSizeBytes
+        : null;
+    this.maxSizeBytes =
+      options.maxSizeBytes !== undefined && options.maxSizeBytes !== null
+        ? options.maxSizeBytes
+        : null;
   }
 
   async process(input) {
@@ -158,6 +170,7 @@ class FileDiscoveryStage extends Stage {
       explain: this.options.explain || false,
       initialLayers,
       config: this.config.all(), // Pass full config for retry settings
+      maxDepth: this.maxDepth !== null ? this.maxDepth : undefined,
     };
 
     // Add parallel-specific options if enabled
@@ -183,10 +196,21 @@ class FileDiscoveryStage extends Stage {
         if (!matches) continue;
       }
 
+      // Apply extension filter (--ext)
+      if (this.extFilter && this.extFilter.length > 0) {
+        const ext = path.extname(relativePath).toLowerCase();
+        if (!this.extFilter.includes(ext)) continue;
+      }
+
+      // Apply size filters (--min-size, --max-size)
+      const fileSize = fileInfo.stats.size;
+      if (this.minSizeBytes !== null && fileSize < this.minSizeBytes) continue;
+      if (this.maxSizeBytes !== null && fileSize > this.maxSizeBytes) continue;
+
       discoveredFiles.push({
         path: relativePath,
         absolutePath: fileInfo.path,
-        size: fileInfo.stats.size,
+        size: fileSize,
         modified: fileInfo.stats.mtime,
         stats: fileInfo.stats,
       });
@@ -232,8 +256,17 @@ class FileDiscoveryStage extends Stage {
     const byPath = new Map(merged.map((f) => [f.path, f]));
     const finalFiles = [...byPath.values()];
 
+    const filterDesc = [
+      this.extFilter ? `ext: ${this.extFilter.join(',')}` : null,
+      this.maxDepth !== null ? `max-depth: ${this.maxDepth}` : null,
+      this.minSizeBytes !== null ? `min-size: ${this.minSizeBytes}B` : null,
+      this.maxSizeBytes !== null ? `max-size: ${this.maxSizeBytes}B` : null,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
     this.log(
-      `Discovered ${finalFiles.length} files (${forcedEntries.length} force-included) in ${this.getElapsedTime(startTime)}`,
+      `Discovered ${finalFiles.length} files (${forcedEntries.length} force-included)${filterDesc ? ` [filters: ${filterDesc}]` : ''} in ${this.getElapsedTime(startTime)}`,
       'info',
     );
 
@@ -243,7 +276,7 @@ class FileDiscoveryStage extends Stage {
       files: finalFiles,
       stats: {
         totalFiles: discoveredFiles.length,
-        filteredFiles: discoveredFiles.length, // No post-filtering needed
+        filteredFiles: discoveredFiles.length,
         forcedFiles: forcedEntries.length,
         excludedFiles: 0, // Not tracked with walker approach
       },
