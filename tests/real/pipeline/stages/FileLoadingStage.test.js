@@ -100,7 +100,11 @@ describe('FileLoadingStage (real)', () => {
 
       expect(stage.handleBinaryFile({ path: 'file.bin', absolutePath }, det, 'skip')).toBeNull();
 
-      const commentResult = stage.handleBinaryFile({ path: 'file.bin', absolutePath }, det, 'comment');
+      const commentResult = stage.handleBinaryFile(
+        { path: 'file.bin', absolutePath },
+        det,
+        'comment',
+      );
       expect(commentResult.excluded).toBe(true);
       expect(commentResult.excludedReason).toBe('other');
 
