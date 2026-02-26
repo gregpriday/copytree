@@ -254,8 +254,8 @@ describe('GitleaksAdapter', () => {
       // We expect it to reject with a timeout error
       await expect(promise).rejects.toThrow('Gitleaks scan timed out after 10 seconds');
 
-      // And we expect that the process was killed
-      expect(mockChild.kill).toHaveBeenCalledWith('SIGKILL');
+      // And we expect that the process was killed (no-arg kill for cross-platform compat)
+      expect(mockChild.kill).toHaveBeenCalledWith();
     }, 12000); // Set a test timeout longer than the 10s in the code
   });
 

@@ -133,4 +133,62 @@ describe('SecretsGuardStage', () => {
     expect(result.files[0]).toBeNull();
     expect(result.files[1].content).toBe('hello');
   });
+
+  describe('case-insensitive exclusion on Windows', () => {
+    let originalPlatform;
+
+    beforeEach(() => {
+      originalPlatform = process.platform;
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+
+    test('excludes secret-prone files case-insensitively on win32', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+
+      const stage = new SecretsGuardStage({ enabled: true });
+      await stage.onInit();
+
+      const input = {
+        files: [
+          { path: '.ENV', relativePath: '.ENV', content: 'SECRET=123', size: 10 },
+          { path: 'Credentials.JSON', relativePath: 'Credentials.JSON', content: '{}', size: 2 },
+          { path: 'normal.txt', relativePath: 'normal.txt', content: 'hello', size: 5 },
+        ],
+        stats: {},
+      };
+
+      const result = await stage.process(input);
+
+      expect(result.files[0]).toBeNull();
+      expect(result.files[1]).toBeNull();
+      expect(result.files[2].content).toBe('hello');
+    });
+
+    test('is case-sensitive on non-Windows platforms', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+
+      const stage = new SecretsGuardStage({ enabled: true });
+      await stage.onInit();
+
+      const input = {
+        files: [
+          { path: '.ENV', relativePath: '.ENV', content: 'SECRET=123', size: 10 },
+          { path: '.env', relativePath: '.env', content: 'SECRET=456', size: 10 },
+        ],
+        stats: {},
+      };
+
+      const result = await stage.process(input);
+
+      // .ENV should NOT be excluded on Linux (case-sensitive) — content must pass through unchanged
+      expect(result.files[0]).not.toBeNull();
+      expect(result.files[0].content).toBe('SECRET=123');
+      expect(result.findings).toHaveLength(0);
+      // .env should be excluded
+      expect(result.files[1]).toBeNull();
+    });
+  });
 });

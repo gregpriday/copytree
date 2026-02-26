@@ -25,7 +25,7 @@ class ProfileFilterStage extends Stage {
       if (this.filter.length > 0) {
         let matched = false;
         for (const pattern of this.filter) {
-          if (minimatch(file.path, pattern, { dot: true })) {
+          if (minimatch(file.path, pattern, { dot: true, nocase: process.platform === 'win32' })) {
             matched = true;
             break;
           }
@@ -39,7 +39,7 @@ class ProfileFilterStage extends Stage {
 
       // Check exclusion patterns
       for (const pattern of this.exclude) {
-        if (minimatch(file.path, pattern, { dot: true })) {
+        if (minimatch(file.path, pattern, { dot: true, nocase: process.platform === 'win32' })) {
           this.log(`Excluding ${file.path} (matches ${pattern})`, 'debug');
           return false;
         }
