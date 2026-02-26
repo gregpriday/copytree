@@ -30,6 +30,8 @@
     "profile:heap": "node scripts/profile.js --type heap",
     "profile:compare": "node scripts/profile-compare.js",
     "benchmark": "node tests/performance/benchmark.js",
+    "benchmark:discovery": "node tests/performance/file-discovery.bench.js",
+    "test:performance": "jest --config jest.performance.config.js --runInBand",
     "lint": "eslint src/ bin/",
     "lint:fix": "eslint src/ bin/ --fix",
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",

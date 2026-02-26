@@ -59,6 +59,7 @@ const mockedProject = {
     '**/tests/e2e/**/*.test.js',
     '**/tests/e2e/**/*.spec.js',
     '**/tests/performance/**/*.test.js',
+    '!**/tests/performance/budget.test.js', // Requires real fs-extra — run via jest.performance.config.js
     '!**/tests/real/**/*.test.js', // Exclude real tests
     '!**/tests/integration/fileDiscoveryStage.parallel.test.js', // Requires real fs-extra and ConfigManager
     '!**/tests/integration/concurrent-operations.test.js', // Requires real ConfigManager
