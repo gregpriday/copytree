@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.15.0] - 2026-02-26
+## [0.14.1] - 2026-02-26
 
 ### Fixed
 - Expose `formatBytes` utility to all format helpers (XML, JSON, Markdown, tree) so formatters can render human-readable file sizes
