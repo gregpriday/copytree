@@ -91,10 +91,13 @@ class FileLoader {
       }
 
       // Read file content with retry logic
-      const content = await withFsRetry(() => fs.readFile(fullPath, 'utf8'), {
+      const raw = await withFsRetry(() => fs.readFile(fullPath, 'utf8'), {
         ...this.retryConfig,
         onRetry: ({ code }) => recordRetry(fullPath, code),
       });
+
+      // Normalize CRLF to LF for cross-platform consistency
+      const content = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
       // Record successful operation after retries
       recordSuccessAfterRetry(fullPath);
