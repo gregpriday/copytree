@@ -358,7 +358,7 @@ async function* streamJSON(files, options, helpers) {
 
   // Header
   yield '{\n';
-  yield `  "directory": "${basePath}",\n`;
+  yield `  "directory": ${JSON.stringify(basePath)},\n`;
   yield '  "metadata": {\n';
   yield `    "generated": "${generated}",\n`;
   yield `    "fileCount": ${fileArray.length},\n`;

@@ -351,7 +351,7 @@ class StreamingOutputStage extends Stage {
 
     // Write JSON header
     stream.write('{\n');
-    stream.write(`  "directory": "${input.basePath}",\n`);
+    stream.write(`  "directory": ${JSON.stringify(input.basePath)},\n`);
     stream.write('  "metadata": {\n');
     stream.write(`    "generated": "${new Date().toISOString()}",\n`);
     stream.write(`    "fileCount": ${input.files.length},\n`);
@@ -359,7 +359,7 @@ class StreamingOutputStage extends Stage {
 
     if (input.profile) {
       stream.write(',\n');
-      stream.write(`    "profile": "${input.profile.name || 'default'}"`);
+      stream.write(`    "profile": ${JSON.stringify(input.profile.name || 'default')}`);
     }
 
     stream.write('\n  },\n');
