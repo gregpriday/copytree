@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { summarize as getFsErrorSummary, reset as resetFsErrors } from '../utils/fsErrorReport.js';
 import FolderProfileLoader from '../config/FolderProfileLoader.js';
 import { Profiler, writeProfilingReport } from '../utils/profiler.js';
+import { parseSize } from '../utils/helpers.js';
 
 // Lazy initialization for Jest compatibility
 let __filename, __dirname, pkg;
@@ -237,8 +238,44 @@ async function copyCommand(targetPath = '.', options = {}) {
 }
 
 /**
- * Load and prepare profile
+ * Parse comma-separated file extensions into a normalized array.
+ * Accepts formats like ".js,.ts" or "js,ts" (with or without leading dot).
+ * Returns an array of lowercase extensions with leading dots, e.g., ['.js', '.ts'].
+ *
+ * @param {string} extStr - Comma-separated extension string from --ext flag
+ * @returns {string[]} Normalized extensions array
  */
+function parseExtensions(extStr) {
+  const exts = extStr
+    .split(',')
+    .map((e) => e.trim())
+    .filter(Boolean)
+    .map((e) => (e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`));
+  if (exts.length === 0) {
+    throw new CommandError(
+      `Invalid --ext value '${extStr}'. Provide at least one extension, e.g., .js,.ts`,
+    );
+  }
+  return exts;
+}
+
+/**
+ * Parse a human-readable size string to bytes, throwing a CommandError on invalid input.
+ *
+ * @param {string} sizeStr - Size string (e.g., '1KB', '10MB')
+ * @param {string} flagName - Flag name for error messages
+ * @returns {number} Size in bytes
+ */
+function parseSizeOption(sizeStr, flagName) {
+  try {
+    return parseSize(sizeStr);
+  } catch {
+    throw new CommandError(
+      `Invalid --${flagName} value '${sizeStr}'. Use a format like 1KB, 500B, 10MB, 1GB.`,
+    );
+  }
+}
+
 /**
  * Build profile configuration from CLI options, folder profiles, and config defaults
  * Integrates the new FolderProfileLoader system
@@ -320,6 +357,11 @@ async function buildProfileFromCliOptions(options) {
       maxFileSize: options.maxFileSize ?? copytreeConfig.maxFileSize,
       maxTotalSize: options.maxTotalSize ?? copytreeConfig.maxTotalSize,
       maxFileCount: options.maxFileCount ?? copytreeConfig.maxFileCount,
+      // Convenience filter flags
+      extFilter: options.ext ? parseExtensions(options.ext) : null,
+      maxDepth: options.maxDepth !== undefined ? options.maxDepth : null,
+      minSizeBytes: options.minSize ? parseSizeOption(options.minSize, 'min-size') : null,
+      maxSizeBytes: options.maxSize ? parseSizeOption(options.maxSize, 'max-size') : null,
     },
 
     // Transformer configuration
@@ -380,6 +422,11 @@ async function setupPipelineStages(basePath, profile, options) {
       maxTotalSize: profile.options?.maxTotalSize,
       maxFileCount: profile.options?.maxFileCount,
       forceInclude: mergedAlways,
+      // Convenience filter flags
+      extFilter: profile.options?.extFilter ?? null,
+      maxDepth: profile.options?.maxDepth ?? null,
+      minSizeBytes: profile.options?.minSizeBytes ?? null,
+      maxSizeBytes: profile.options?.maxSizeBytes ?? null,
     }),
   );
 

@@ -303,4 +303,65 @@ describe('ignoreWalker', () => {
       });
     });
   });
+
+  describe('maxDepth traversal limiting', () => {
+    it('should return only root-level files at maxDepth=0', async () => {
+      await withTempDir('depth-0', async (tempDir) => {
+        await createProject(tempDir, {
+          'root.txt': 'root',
+          'sub/depth1.txt': 'd1',
+          'sub/deep/depth2.txt': 'd2',
+        });
+        await settleFs(50);
+
+        const result = await getAllFiles(tempDir, { maxDepth: 0 });
+        const names = result.map((f) => path.basename(f.path)).sort();
+        expect(names).toEqual(['root.txt']);
+      });
+    });
+
+    it('should include one directory level at maxDepth=1', async () => {
+      await withTempDir('depth-1', async (tempDir) => {
+        await createProject(tempDir, {
+          'root.txt': 'root',
+          'sub/depth1.txt': 'd1',
+          'sub/deep/depth2.txt': 'd2',
+        });
+        await settleFs(50);
+
+        const result = await getAllFiles(tempDir, { maxDepth: 1 });
+        const names = result.map((f) => path.basename(f.path)).sort();
+        expect(names).toEqual(['depth1.txt', 'root.txt']);
+      });
+    });
+
+    it('should include two directory levels at maxDepth=2', async () => {
+      await withTempDir('depth-2', async (tempDir) => {
+        await createProject(tempDir, {
+          'root.txt': 'root',
+          'sub/depth1.txt': 'd1',
+          'sub/deep/depth2.txt': 'd2',
+          'sub/deep/deeper/depth3.txt': 'd3',
+        });
+        await settleFs(50);
+
+        const result = await getAllFiles(tempDir, { maxDepth: 2 });
+        const names = result.map((f) => path.basename(f.path)).sort();
+        expect(names).toEqual(['depth1.txt', 'depth2.txt', 'root.txt']);
+      });
+    });
+
+    it('should include all files when maxDepth is undefined', async () => {
+      await withTempDir('depth-unlimited', async (tempDir) => {
+        await createProject(tempDir, {
+          'root.txt': 'root',
+          'a/b/c/deep.txt': 'deep',
+        });
+        await settleFs(50);
+
+        const result = await getAllFiles(tempDir, { maxDepth: undefined });
+        expect(result).toHaveLength(2);
+      });
+    });
+  });
 });
