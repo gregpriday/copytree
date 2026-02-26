@@ -142,15 +142,325 @@ describe('Clipboard', () => {
   });
 
   describe('copyFileReference — Linux', () => {
-    beforeEach(() => setPlatform('linux'));
+    const savedEnv = {};
 
-    it('copies file:// URI to clipboard', async () => {
+    beforeEach(() => {
+      setPlatform('linux');
+      // Save and clear relevant env vars
+      savedEnv.DISPLAY = process.env.DISPLAY;
+      savedEnv.WAYLAND_DISPLAY = process.env.WAYLAND_DISPLAY;
+      savedEnv.XDG_CURRENT_DESKTOP = process.env.XDG_CURRENT_DESKTOP;
+      delete process.env.DISPLAY;
+      delete process.env.WAYLAND_DISPLAY;
+      delete process.env.XDG_CURRENT_DESKTOP;
+    });
+
+    afterEach(() => {
+      // Restore env vars
+      if (savedEnv.DISPLAY !== undefined) process.env.DISPLAY = savedEnv.DISPLAY;
+      else delete process.env.DISPLAY;
+      if (savedEnv.WAYLAND_DISPLAY !== undefined)
+        process.env.WAYLAND_DISPLAY = savedEnv.WAYLAND_DISPLAY;
+      else delete process.env.WAYLAND_DISPLAY;
+      if (savedEnv.XDG_CURRENT_DESKTOP !== undefined)
+        process.env.XDG_CURRENT_DESKTOP = savedEnv.XDG_CURRENT_DESKTOP;
+      else delete process.env.XDG_CURRENT_DESKTOP;
+    });
+
+    it('X11 + GTK: uses xclip with x-special/gnome-copied-files', async () => {
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'GNOME';
+      spawnSync.mockReturnValueOnce({ status: 0, error: null });
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'xclip',
+        ['-selection', 'clipboard', '-t', 'x-special/gnome-copied-files'],
+        expect.objectContaining({
+          input: 'copy\nfile:///home/user/file.txt',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        }),
+      );
+    });
+
+    it('X11 + KDE: uses xclip with text/uri-list', async () => {
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'KDE';
+      spawnSync.mockReturnValueOnce({ status: 0, error: null });
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'xclip',
+        ['-selection', 'clipboard', '-t', 'text/uri-list'],
+        expect.objectContaining({
+          input: 'file:///home/user/file.txt\r\n',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        }),
+      );
+    });
+
+    it('Wayland + GTK: uses wl-copy with x-special/gnome-copied-files', async () => {
+      process.env.WAYLAND_DISPLAY = 'wayland-0';
+      process.env.XDG_CURRENT_DESKTOP = 'GNOME';
+      spawnSync.mockReturnValueOnce({ status: 0, error: null });
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'wl-copy',
+        ['--type', 'x-special/gnome-copied-files'],
+        expect.objectContaining({
+          input: 'copy\nfile:///home/user/file.txt',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        }),
+      );
+    });
+
+    it('Wayland + KDE: uses wl-copy with text/uri-list', async () => {
+      process.env.WAYLAND_DISPLAY = 'wayland-0';
+      process.env.XDG_CURRENT_DESKTOP = 'KDE';
+      spawnSync.mockReturnValueOnce({ status: 0, error: null });
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'wl-copy',
+        ['--type', 'text/uri-list'],
+        expect.objectContaining({
+          input: 'file:///home/user/file.txt\r\n',
+          stdio: ['pipe', 'pipe', 'pipe'],
+        }),
+      );
+    });
+
+    it('no display server: falls back to plain-text URI copy', async () => {
+      // Neither DISPLAY nor WAYLAND_DISPLAY set
       const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
 
       await Clipboard.copyFileReference('/home/user/file.txt');
 
-      expect(spy).toHaveBeenCalledWith(expect.stringMatching(/^file:\/\/\/home\/user\/file\.txt$/));
+      expect(spy).toHaveBeenCalledWith('file:///home/user/file.txt');
+      expect(spawnSync).not.toHaveBeenCalled();
       spy.mockRestore();
+    });
+
+    it('tool failure: falls back to plain-text URI copy', async () => {
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'GNOME';
+      spawnSync.mockReturnValueOnce({ status: 1, error: null });
+      const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledTimes(1);
+      expect(spawnSync).toHaveBeenCalledWith(
+        'xclip',
+        ['-selection', 'clipboard', '-t', 'x-special/gnome-copied-files'],
+        expect.objectContaining({ input: 'copy\nfile:///home/user/file.txt' }),
+      );
+      expect(spy).toHaveBeenCalledWith('file:///home/user/file.txt');
+      spy.mockRestore();
+    });
+
+    it('tool spawn error: falls back to plain-text URI copy', async () => {
+      process.env.DISPLAY = ':0';
+      spawnSync.mockReturnValueOnce({ status: null, error: new Error('ENOENT') });
+      const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith('file:///home/user/file.txt');
+      spy.mockRestore();
+    });
+
+    it('spawnSync throws synchronously: falls back to plain-text URI copy', async () => {
+      process.env.DISPLAY = ':0';
+      spawnSync.mockImplementationOnce(() => {
+        throw new Error('spawn exploded');
+      });
+      const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spy).toHaveBeenCalledWith('file:///home/user/file.txt');
+      spy.mockRestore();
+    });
+
+    it('URI-encodes paths with spaces correctly', async () => {
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'GNOME';
+      spawnSync.mockReturnValueOnce({ status: 0, error: null });
+
+      await Clipboard.copyFileReference('/home/user/my documents/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'xclip',
+        ['-selection', 'clipboard', '-t', 'x-special/gnome-copied-files'],
+        expect.objectContaining({
+          input: 'copy\nfile:///home/user/my%20documents/file.txt',
+        }),
+      );
+    });
+
+    it('no display server: URI-encodes spaces in fallback plain-text copy', async () => {
+      const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
+
+      await Clipboard.copyFileReference('/home/user/my documents/file.txt');
+
+      expect(spy).toHaveBeenCalledWith('file:///home/user/my%20documents/file.txt');
+      expect(spawnSync).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('XFCE desktop uses GTK format', async () => {
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'XFCE';
+      spawnSync.mockReturnValueOnce({ status: 0, error: null });
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'xclip',
+        ['-selection', 'clipboard', '-t', 'x-special/gnome-copied-files'],
+        expect.objectContaining({
+          input: 'copy\nfile:///home/user/file.txt',
+        }),
+      );
+    });
+
+    it('Cinnamon desktop uses GTK format', async () => {
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'X-Cinnamon';
+      spawnSync.mockReturnValueOnce({ status: 0, error: null });
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'xclip',
+        ['-selection', 'clipboard', '-t', 'x-special/gnome-copied-files'],
+        expect.objectContaining({
+          input: 'copy\nfile:///home/user/file.txt',
+        }),
+      );
+    });
+
+    it('unknown desktop defaults to GTK format', async () => {
+      process.env.DISPLAY = ':0';
+      // XDG_CURRENT_DESKTOP not set
+      spawnSync.mockReturnValueOnce({ status: 0, error: null });
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledWith(
+        'xclip',
+        ['-selection', 'clipboard', '-t', 'x-special/gnome-copied-files'],
+        expect.objectContaining({
+          input: 'copy\nfile:///home/user/file.txt',
+        }),
+      );
+    });
+
+    it('Wayland takes priority over X11 when both are set', async () => {
+      process.env.WAYLAND_DISPLAY = 'wayland-0';
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'GNOME';
+      spawnSync.mockReturnValueOnce({ status: 0, error: null });
+
+      await Clipboard.copyFileReference('/home/user/file.txt');
+
+      expect(spawnSync).toHaveBeenCalledTimes(1);
+      expect(spawnSync).toHaveBeenCalledWith(
+        'wl-copy',
+        ['--type', 'x-special/gnome-copied-files'],
+        expect.objectContaining({
+          input: 'copy\nfile:///home/user/file.txt',
+        }),
+      );
+    });
+  });
+
+  describe('_detectLinuxClipboardMethod', () => {
+    const savedEnv = {};
+
+    beforeEach(() => {
+      savedEnv.DISPLAY = process.env.DISPLAY;
+      savedEnv.WAYLAND_DISPLAY = process.env.WAYLAND_DISPLAY;
+      savedEnv.XDG_CURRENT_DESKTOP = process.env.XDG_CURRENT_DESKTOP;
+      delete process.env.DISPLAY;
+      delete process.env.WAYLAND_DISPLAY;
+      delete process.env.XDG_CURRENT_DESKTOP;
+    });
+
+    afterEach(() => {
+      if (savedEnv.DISPLAY !== undefined) process.env.DISPLAY = savedEnv.DISPLAY;
+      else delete process.env.DISPLAY;
+      if (savedEnv.WAYLAND_DISPLAY !== undefined)
+        process.env.WAYLAND_DISPLAY = savedEnv.WAYLAND_DISPLAY;
+      else delete process.env.WAYLAND_DISPLAY;
+      if (savedEnv.XDG_CURRENT_DESKTOP !== undefined)
+        process.env.XDG_CURRENT_DESKTOP = savedEnv.XDG_CURRENT_DESKTOP;
+      else delete process.env.XDG_CURRENT_DESKTOP;
+    });
+
+    it('returns null when no display server is available', () => {
+      const result = Clipboard._detectLinuxClipboardMethod('file:///test');
+      expect(result).toBeNull();
+    });
+
+    it('returns xclip config for X11', () => {
+      process.env.DISPLAY = ':0';
+      const result = Clipboard._detectLinuxClipboardMethod('file:///test');
+      expect(result.tool).toBe('xclip');
+      expect(result.args).toContain('-selection');
+      expect(result.args).toContain('clipboard');
+    });
+
+    it('returns wl-copy config for Wayland', () => {
+      process.env.WAYLAND_DISPLAY = 'wayland-0';
+      const result = Clipboard._detectLinuxClipboardMethod('file:///test');
+      expect(result.tool).toBe('wl-copy');
+      expect(result.args).toContain('--type');
+    });
+
+    it('uses GTK MIME type for GNOME', () => {
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'GNOME';
+      const result = Clipboard._detectLinuxClipboardMethod('file:///test');
+      expect(result.args).toContain('x-special/gnome-copied-files');
+      expect(result.payload).toBe('copy\nfile:///test');
+    });
+
+    it('uses KDE MIME type for KDE', () => {
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'KDE';
+      const result = Clipboard._detectLinuxClipboardMethod('file:///test');
+      expect(result.args).toContain('text/uri-list');
+      expect(result.payload).toBe('file:///test\r\n');
+    });
+
+    it('is case-insensitive for KDE detection', () => {
+      process.env.DISPLAY = ':0';
+      process.env.XDG_CURRENT_DESKTOP = 'kde';
+      const result = Clipboard._detectLinuxClipboardMethod('file:///test');
+      expect(result.args).toContain('text/uri-list');
+      expect(result.payload).toBe('file:///test\r\n');
+    });
+
+    it('prefers Wayland when both WAYLAND_DISPLAY and DISPLAY are set', () => {
+      process.env.WAYLAND_DISPLAY = 'wayland-0';
+      process.env.DISPLAY = ':0';
+      const result = Clipboard._detectLinuxClipboardMethod('file:///test');
+      expect(result.tool).toBe('wl-copy');
+    });
+
+    it('returns null when env vars are whitespace-only', () => {
+      process.env.DISPLAY = '   ';
+      process.env.WAYLAND_DISPLAY = '   ';
+      const result = Clipboard._detectLinuxClipboardMethod('file:///test');
+      expect(result).toBeNull();
     });
   });
 
