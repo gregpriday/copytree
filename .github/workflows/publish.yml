@@ -66,9 +66,8 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           LATEST=$(npm view copytree version 2>/dev/null || echo "0.0.0")
           if [ "$(npx semver "$VERSION" "$LATEST" | tail -1)" != "$VERSION" ]; then
-            echo "Publishing $VERSION with --tag hotfix (latest is $LATEST)"
+            echo "::warning::Publishing $VERSION with --tag hotfix (latest is $LATEST). Run 'npm dist-tag add copytree@$VERSION latest' manually after publish."
             npm publish --access public --tag hotfix
-            npm dist-tag add "copytree@$VERSION" latest
           else
             npm publish --access public
           fi
