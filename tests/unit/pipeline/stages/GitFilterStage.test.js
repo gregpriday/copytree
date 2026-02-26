@@ -318,8 +318,8 @@ describe('GitFilterStage', () => {
       expect(result.stats.gitFiltered).toBe(0);
     });
 
-    it('should handle files with relative paths', async () => {
-      mockGitUtils.getModifiedFiles.mockResolvedValue(['./src/file1.js']);
+    it('should handle POSIX-normalized file paths from git', async () => {
+      mockGitUtils.getModifiedFiles.mockResolvedValue(['src/file1.js']);
       stage = new GitFilterStage({ modified: true, basePath: '/project' });
       const input = {
         files: [{ path: 'src/file1.js', content: 'file1' }],
@@ -329,6 +329,7 @@ describe('GitFilterStage', () => {
       const result = await stage.process(input);
 
       expect(result.files).toHaveLength(1);
+      expect(result.files[0].path).toBe('src/file1.js');
     });
   });
 

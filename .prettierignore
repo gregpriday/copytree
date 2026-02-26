@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+build/
+*.min.js
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Test outputs
+test-results/
+*.log
+
+# Cache
+.cache/
+.eslintcache
+
+# Generated files
+*.generated.js
+*.bundle.js
+
+# Docs (preserve manual formatting)
+CHANGELOG.md
+LICENSE
+
+# Git
+.git/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Fixtures (preserve exact formatting for tests)
+tests/fixtures/**/*.golden.*
+tests/fixtures/goldens/**/*

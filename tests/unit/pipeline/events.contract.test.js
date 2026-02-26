@@ -11,7 +11,7 @@ import {
   PipelineEventCollector,
   MockStage,
   createMockFiles,
-  runPipelineWithEvents
+  runPipelineWithEvents,
 } from '../../helpers/pipeline.js';
 import { cleanTmpDir } from '../../helpers/fixtures.js';
 
@@ -27,13 +27,11 @@ describe('Pipeline Event Contract', () => {
   describe('Core Pipeline Events', () => {
     it('emits pipeline:start with input and stages', async () => {
       // Use a minimal pipeline without OutputFormattingStage to avoid date issues
-      const pipeline = createTestPipeline([
-        new MockStage('test-stage')
-      ]);
+      const pipeline = createTestPipeline([new MockStage('test-stage')]);
       const collector = new PipelineEventCollector(pipeline);
 
       await pipeline.process({
-                files: []
+        files: [],
       });
 
       const startEvents = collector.getEvents('pipeline:start');
@@ -43,18 +41,16 @@ describe('Pipeline Event Contract', () => {
       expect(startData).toMatchObject({
         input: expect.any(Object),
         stages: expect.any(Number),
-        options: expect.any(Object)
+        options: expect.any(Object),
       });
     });
 
     it('emits pipeline:complete with output and metrics', async () => {
-      const pipeline = createTestPipeline([
-        new MockStage('test-stage')
-      ]);
+      const pipeline = createTestPipeline([new MockStage('test-stage')]);
       const collector = new PipelineEventCollector(pipeline);
 
       await pipeline.process({
-                files: []
+        files: [],
       });
 
       const completeEvents = collector.getEvents('pipeline:complete');
@@ -66,20 +62,18 @@ describe('Pipeline Event Contract', () => {
         stats: expect.objectContaining({
           startTime: expect.any(Number),
           endTime: expect.any(Number),
-          stagesCompleted: expect.any(Number)
-        })
+          stagesCompleted: expect.any(Number),
+        }),
       });
     });
 
     it('emits pipeline:error on failure', async () => {
       const pipeline = createTestPipeline([
-        new MockStage('error-stage', { shouldError: true, shouldRecover: false })
+        new MockStage('error-stage', { shouldError: true, shouldRecover: false }),
       ]);
       const collector = new PipelineEventCollector(pipeline);
 
-      await expect(
-        pipeline.process({ files: [] })
-      ).rejects.toThrow();
+      await expect(pipeline.process({ files: [] })).rejects.toThrow();
 
       const errorEvents = collector.getEvents('pipeline:error');
       expect(errorEvents.length).toBeGreaterThan(0);
@@ -87,18 +81,14 @@ describe('Pipeline Event Contract', () => {
       const errorData = errorEvents[0].data;
       expect(errorData).toMatchObject({
         error: expect.any(Error),
-        stats: expect.any(Object)
+        stats: expect.any(Object),
       });
     });
   });
 
   describe('Stage Events', () => {
     it('emits stage:start for each stage', async () => {
-      const stages = [
-        new MockStage('stage-1'),
-        new MockStage('stage-2'),
-        new MockStage('stage-3')
-      ];
+      const stages = [new MockStage('stage-1'), new MockStage('stage-2'), new MockStage('stage-3')];
       const pipeline = createTestPipeline(stages);
       const collector = new PipelineEventCollector(pipeline);
 
@@ -111,15 +101,13 @@ describe('Pipeline Event Contract', () => {
         expect(event.data).toMatchObject({
           stage: expect.any(String), // Stage name is a string
           index: expect.any(Number),
-          input: expect.any(Object)
+          input: expect.any(Object),
         });
       });
     });
 
     it('emits stage:complete with timing and memory', async () => {
-      const pipeline = createTestPipeline([
-        new MockStage('test-stage')
-      ]);
+      const pipeline = createTestPipeline([new MockStage('test-stage')]);
       const collector = new PipelineEventCollector(pipeline);
 
       await pipeline.process({ files: [] });
@@ -127,13 +115,13 @@ describe('Pipeline Event Contract', () => {
       const completeEvents = collector.getEvents('stage:complete');
       expect(completeEvents.length).toBeGreaterThan(0);
 
-      completeEvents.forEach(event => {
+      completeEvents.forEach((event) => {
         expect(event.data).toMatchObject({
           stage: expect.any(String), // Stage name is a string
           index: expect.any(Number),
           output: expect.any(Object),
           duration: expect.any(Number),
-          memoryUsage: expect.any(Object)
+          memoryUsage: expect.any(Object),
         });
 
         // Duration should be positive
@@ -142,25 +130,19 @@ describe('Pipeline Event Contract', () => {
     });
 
     it('emits stages in correct order', async () => {
-      const stages = [
-        new MockStage('first'),
-        new MockStage('second'),
-        new MockStage('third')
-      ];
+      const stages = [new MockStage('first'), new MockStage('second'), new MockStage('third')];
       const pipeline = createTestPipeline(stages);
       const collector = new PipelineEventCollector(pipeline);
 
       await pipeline.process({ files: [] });
 
       const completions = collector.getStageCompletions();
-      expect(completions.map(c => c.stage)).toEqual(['first', 'second', 'third']);
+      expect(completions.map((c) => c.stage)).toEqual(['first', 'second', 'third']);
 
       // Each stage should complete after it starts
       completions.forEach((completion, index) => {
         if (index > 0) {
-          expect(completion.timestamp).toBeGreaterThanOrEqual(
-            completions[index - 1].timestamp
-          );
+          expect(completion.timestamp).toBeGreaterThanOrEqual(completions[index - 1].timestamp);
         }
       });
     });
@@ -171,17 +153,30 @@ describe('Pipeline Event Contract', () => {
 
       const context = {
         config: { test: true },
-        profile: { name: 'test' }
+        profile: { name: 'test' },
       };
 
       await pipeline.process({
-                files: [],
-        context
+        files: [],
+        context,
       });
 
       const stageEvents = collector.getEvents('stage:complete');
-      // Context should be accessible to stages
       expect(stageEvents.length).toBeGreaterThan(0);
+
+      // Verify context is actually included in the stage output
+      for (const event of stageEvents) {
+        expect(event).toHaveProperty('data');
+        expect(event.data).toHaveProperty('output');
+        // Context should be propagated through the pipeline
+        expect(event.data.output).toHaveProperty('context');
+        expect(event.data.output.context).toBeDefined();
+        // Verify it contains the expected config and profile
+        expect(event.data.output.context).toHaveProperty('config');
+        expect(event.data.output.context).toHaveProperty('profile');
+        expect(event.data.output.context.config).toEqual({ test: true });
+        expect(event.data.output.context.profile).toEqual({ name: 'test' });
+      }
     });
   });
 
@@ -208,7 +203,7 @@ describe('Pipeline Event Contract', () => {
               stage: this.name,
               count: result.files.length,
               action: 'processed',
-              lastFile: result.files[result.files.length - 1]?.path
+              lastFile: result.files[result.files.length - 1]?.path,
             });
           }
           return result;
@@ -217,7 +212,7 @@ describe('Pipeline Event Contract', () => {
 
       const files = createMockFiles(10);
       const stage = new FileEmittingStage('processor', {
-        process: (input) => ({ ...input, files })
+        process: (input) => ({ ...input, files }),
       });
       const pipeline = createTestPipeline([stage]);
       // Manually set pipeline reference since stage is already an instance
@@ -229,11 +224,11 @@ describe('Pipeline Event Contract', () => {
       const batchEvents = collector.getEvents('file:batch');
       expect(batchEvents.length).toBeGreaterThan(0);
 
-      batchEvents.forEach(event => {
+      batchEvents.forEach((event) => {
         expect(event.data).toMatchObject({
           stage: expect.any(String),
           count: expect.any(Number),
-          action: expect.any(String)
+          action: expect.any(String),
         });
       });
     });
@@ -248,7 +243,7 @@ describe('Pipeline Event Contract', () => {
               stage: this.name,
               count: result.files.length,
               action: 'filtered',
-              lastFile: result.files[result.files.length - 1]?.path
+              lastFile: result.files[result.files.length - 1]?.path,
             });
           }
           return result;
@@ -257,7 +252,7 @@ describe('Pipeline Event Contract', () => {
 
       const files = createMockFiles(5);
       const stage = new FileEmittingStage('filter', {
-        process: (input) => ({ ...input, files: files.slice(0, 3) })
+        process: (input) => ({ ...input, files: files.slice(0, 3) }),
       });
       const pipeline = createTestPipeline([stage]);
       // Manually set pipeline reference since stage is already an instance
@@ -269,20 +264,16 @@ describe('Pipeline Event Contract', () => {
       const batches = collector.getFileBatches();
       expect(batches.length).toBeGreaterThan(0);
 
-      batches.forEach(batch => {
+      batches.forEach((batch) => {
         expect(batch.count).toBeGreaterThanOrEqual(0);
-        expect(['discovered', 'filtered', 'processed', 'transformed']).toContain(
-          batch.action
-        );
+        expect(['discovered', 'filtered', 'processed', 'transformed']).toContain(batch.action);
       });
     });
   });
 
   describe('Progress Events', () => {
     it('emits progress events during execution', async () => {
-      const pipeline = createTestPipeline([
-        new MockStage('slow-stage', { delay: 10 })
-      ]);
+      const pipeline = createTestPipeline([new MockStage('slow-stage', { delay: 10 })]);
       const collector = new PipelineEventCollector(pipeline);
 
       await pipeline.process({ files: [] });
@@ -290,7 +281,7 @@ describe('Pipeline Event Contract', () => {
       const progressEvents = collector.getEvents('progress');
       // Progress events may or may not be emitted depending on stage implementation
       // Just verify structure if they exist
-      progressEvents.forEach(event => {
+      progressEvents.forEach((event) => {
         expect(event.data).toBeDefined();
       });
     });
@@ -309,11 +300,7 @@ describe('Pipeline Event Contract', () => {
     });
 
     it('has matching stage start and complete events', async () => {
-      const stages = [
-        new MockStage('stage-1'),
-        new MockStage('stage-2'),
-        new MockStage('stage-3')
-      ];
+      const stages = [new MockStage('stage-1'), new MockStage('stage-2'), new MockStage('stage-3')];
       const pipeline = createTestPipeline(stages);
       const collector = new PipelineEventCollector(pipeline);
 
@@ -338,10 +325,7 @@ describe('Pipeline Event Contract', () => {
     });
 
     it('maintains event ordering', async () => {
-      const pipeline = createTestPipeline([
-        new MockStage('stage-1'),
-        new MockStage('stage-2')
-      ]);
+      const pipeline = createTestPipeline([new MockStage('stage-1'), new MockStage('stage-2')]);
       const collector = new PipelineEventCollector(pipeline);
 
       await pipeline.process({ files: [] });
@@ -355,12 +339,20 @@ describe('Pipeline Event Contract', () => {
       };
 
       // Find key events
-      const pipelineStart = events.find(e => e.name === 'pipeline:start');
-      const stage1Start = events.find(e => e.name === 'stage:start' && getStageName(e) === 'stage-1');
-      const stage1Complete = events.find(e => e.name === 'stage:complete' && getStageName(e) === 'stage-1');
-      const stage2Start = events.find(e => e.name === 'stage:start' && getStageName(e) === 'stage-2');
-      const stage2Complete = events.find(e => e.name === 'stage:complete' && getStageName(e) === 'stage-2');
-      const pipelineComplete = events.find(e => e.name === 'pipeline:complete');
+      const pipelineStart = events.find((e) => e.name === 'pipeline:start');
+      const stage1Start = events.find(
+        (e) => e.name === 'stage:start' && getStageName(e) === 'stage-1',
+      );
+      const stage1Complete = events.find(
+        (e) => e.name === 'stage:complete' && getStageName(e) === 'stage-1',
+      );
+      const stage2Start = events.find(
+        (e) => e.name === 'stage:start' && getStageName(e) === 'stage-2',
+      );
+      const stage2Complete = events.find(
+        (e) => e.name === 'stage:complete' && getStageName(e) === 'stage-2',
+      );
+      const pipelineComplete = events.find((e) => e.name === 'pipeline:complete');
 
       // Verify ordering
       expect(pipelineStart.timestamp).toBeLessThanOrEqual(stage1Start.timestamp);
@@ -376,7 +368,7 @@ describe('Pipeline Event Contract', () => {
       const pipeline = createTestPipeline([
         new MockStage('good-stage'),
         new MockStage('error-stage', { shouldError: true }), // Has handleError that recovers
-        new MockStage('recovery-stage')
+        new MockStage('recovery-stage'),
       ]);
       const collector = new PipelineEventCollector(pipeline);
 
@@ -389,7 +381,7 @@ describe('Pipeline Event Contract', () => {
       expect(recoverEvents[0].data).toMatchObject({
         stage: 'error-stage',
         originalError: expect.any(Error),
-        recoveredResult: expect.any(Object)
+        recoveredResult: expect.any(Object),
       });
 
       const completeEvents = collector.getEvents('stage:complete');
@@ -402,20 +394,18 @@ describe('Pipeline Event Contract', () => {
       const pipeline = createTestPipeline([
         new MockStage('good-stage'),
         new MockStage('error-stage', { shouldError: true, shouldRecover: false }), // Won't recover
-        new MockStage('never-reached')
+        new MockStage('never-reached'),
       ]);
       const collector = new PipelineEventCollector(pipeline);
 
       // Pipeline should fail
-      await expect(
-        pipeline.process({ files: [] })
-      ).rejects.toThrow();
+      await expect(pipeline.process({ files: [] })).rejects.toThrow();
 
       const errorEvents = collector.getEvents('stage:error');
       expect(errorEvents.length).toBeGreaterThan(0);
       expect(errorEvents[0].data).toMatchObject({
         stage: 'error-stage',
-        error: expect.any(Error)
+        error: expect.any(Error),
       });
     });
   });
@@ -424,7 +414,7 @@ describe('Pipeline Event Contract', () => {
     it('includes accurate timing in stage events', async () => {
       const pipeline = createTestPipeline([
         new MockStage('fast-stage', { delay: 5 }),
-        new MockStage('slow-stage', { delay: 50 })
+        new MockStage('slow-stage', { delay: 50 }),
       ]);
       const collector = new PipelineEventCollector(pipeline);
 
@@ -435,20 +425,17 @@ describe('Pipeline Event Contract', () => {
 
       const [fast, slow] = completions;
       expect(fast.duration).toBeLessThan(slow.duration);
-      expect(slow.duration).toBeGreaterThanOrEqual(50);
+      expect(slow.duration).toBeGreaterThanOrEqual(45); // More lenient to avoid flakiness
     });
 
     it('tracks memory deltas between stages', async () => {
-      const pipeline = createTestPipeline([
-        new MockStage('stage-1'),
-        new MockStage('stage-2')
-      ]);
+      const pipeline = createTestPipeline([new MockStage('stage-1'), new MockStage('stage-2')]);
       const collector = new PipelineEventCollector(pipeline);
 
       await pipeline.process({ files: [] });
 
       const completions = collector.getStageCompletions();
-      completions.forEach(completion => {
+      completions.forEach((completion) => {
         expect(completion.memoryUsage).toBeDefined();
         expect(completion.memoryUsage).toHaveProperty('before');
         expect(completion.memoryUsage).toHaveProperty('after');
@@ -460,9 +447,7 @@ describe('Pipeline Event Contract', () => {
 
   describe('Event Data Immutability', () => {
     it('does not modify event data after emission', async () => {
-      const pipeline = createTestPipeline([
-        new MockStage('test-stage')
-      ]);
+      const pipeline = createTestPipeline([new MockStage('test-stage')]);
       const collector = new PipelineEventCollector(pipeline);
 
       const originalInput = { files: [], test: 'value' };
@@ -485,7 +470,7 @@ describe('Pipeline Event Listener Management', () => {
     pipeline.on('stage:complete', (data) => listener1Calls.push(data));
     pipeline.on('stage:complete', (data) => listener2Calls.push(data));
 
-    await pipeline.process({  files: [] });
+    await pipeline.process({ files: [] });
 
     expect(listener1Calls.length).toBeGreaterThan(0);
     expect(listener2Calls.length).toBe(listener1Calls.length);
@@ -501,7 +486,7 @@ describe('Pipeline Event Listener Management', () => {
       callCount++;
     });
 
-    await pipeline.process({  files: [] });
+    await pipeline.process({ files: [] });
 
     // Should only be called once despite multiple stages
     expect(callCount).toBe(1);

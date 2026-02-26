@@ -1,0 +1,29 @@
+{
+  "fileDiscovery": {
+    "small": {
+      "fileCount": 100,
+      "maxDurationMs": 500,
+      "maxMemoryDeltaMb": 30,
+      "description": "Small project (100 files) should complete in < 500ms with < 30 MB RSS growth"
+    },
+    "medium": {
+      "fileCount": 1000,
+      "maxDurationMs": 3000,
+      "maxMemoryDeltaMb": 80,
+      "description": "Medium project (1k files) should complete in < 3s with < 80 MB RSS growth"
+    },
+    "large": {
+      "fileCount": 10000,
+      "maxDurationMs": 30000,
+      "maxMemoryDeltaMb": 350,
+      "description": "Large project (10k files) should complete in < 30s with < 350 MB RSS growth (total < 500 MB)"
+    }
+  },
+  "regressionThresholdPercent": 10,
+  "notes": {
+    "memoryMeasurement": "Delta RSS (peak RSS minus baseline before walk) in MB — excludes Node.js/Jest process overhead",
+    "durationMeasurement": "Wall-clock time from walk start to last file yielded (ms)",
+    "regressionPolicy": "A build fails if measured metric exceeds budget by more than regressionThresholdPercent",
+    "totalMemoryTarget": "Process target from CLAUDE.md is < 500 MB total RSS; delta budget of 350 MB leaves headroom for the ~150 MB baseline"
+  }
+}

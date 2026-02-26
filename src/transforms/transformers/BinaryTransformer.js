@@ -70,15 +70,15 @@ class BinaryTransformer extends BaseTransformer {
     const action = this.config.get('copytree.binaryFileAction', 'placeholder');
 
     switch (action) {
-    case 'skip':
-      return null;
+      case 'skip':
+        return null;
 
-    case 'base64':
-      return await this.transformToBase64(file);
+      case 'base64':
+        return await this.transformToBase64(file);
 
-    case 'placeholder':
-    default:
-      return this.transformToPlaceholder(file);
+      case 'placeholder':
+      default:
+        return this.transformToPlaceholder(file);
     }
   }
 

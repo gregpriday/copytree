@@ -51,16 +51,7 @@ CopyTree can fetch files from external sources (GitHub repositories). Be aware:
 - External sources are fetched over HTTPS
 - Git commands are executed via `simple-git` library
 - No arbitrary command execution from external sources
-- External sources can be disabled by not using the `--external` flag
-
-### AI Provider Integration
-
-CopyTree integrates with AI providers (Google Gemini by default):
-
-- API keys are read from environment variables
-- API keys are never logged or written to files
-- AI features are opt-in via specific transformers
-- Caching can be disabled with `--no-cache`
+- External sources are triggered by passing a URL as the path argument
 
 ### File System Access
 
@@ -83,17 +74,16 @@ These files are executed as JavaScript/JSON. Only use configuration files from t
 
 When using CopyTree:
 
-1. **API Keys**: Store API keys in environment variables, never commit them
-2. **External Sources**: Only include external sources from trusted repositories
-3. **Configuration**: Review custom profiles and configuration files before use
-4. **Output**: Review generated output before sharing, especially with AI tools
-5. **Binary Files**: Be cautious with binary file handling in sensitive projects
+1. **External Sources**: Only include external sources from trusted repositories
+2. **Configuration**: Review custom profiles and configuration files before use
+3. **Output**: Review generated output before sharing, especially with AI tools
+4. **Binary Files**: Be cautious with binary file handling in sensitive projects
+5. **Secrets Detection**: Use `--secrets-guard` (enabled by default) to prevent accidental secret exposure
 
 ## Known Limitations
 
 - CopyTree shells out to `git` for repository operations
 - External sources require network access
-- AI transformers send file contents to third-party APIs (opt-in)
 
 ## Updates
 

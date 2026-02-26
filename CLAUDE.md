@@ -17,16 +17,18 @@ Rules and constraints for working with CopyTree. Keep this file lean; detailed d
 - Achieve 80% test coverage (global threshold).
 
 **NEVER:**
+- **COMMIT CODE WITHOUT EXPLICIT USER PERMISSION** - Always ask first, even if tests pass!
 - Commit directly to `main` or `develop` without explicit user request.
 - Auto-generate commits or CHANGELOG entries (except on release/* branch when asked).
 - Leave TODOs, mocks, stubs, or partial implementations in final code.
 - Touch generated/vendor/lock files or Git metadata.
+- **Create documentation files in the project root** (README.md, *.md reports, etc.) - Use `@docs/` instead.
 </critical_notes>
 
 ## Commands (Daily Use)
 
 ```bash
-# Development
+# Setup (ALWAYS run first in a new worktree — node_modules is not shared between worktrees)
 npm install              # Install dependencies
 npm link                 # Link CLI locally
 npm start               # Run CLI
@@ -36,15 +38,18 @@ npm test                # All tests
 npm run test:coverage   # Coverage report (80% threshold)
 npm run test:unit       # Unit tests only
 
+# Running specific tests (jest is NOT on PATH — use node_modules/.bin/jest directly)
+node_modules/.bin/jest --testPathPatterns='SortFilesStage'          # Match by file path
+node_modules/.bin/jest --testPathPatterns='pathUtils|GitFilterStage' # Multiple patterns
+
 # Code Quality (REQUIRED before commits)
 npm run lint            # ESLint check
-npm run format:check    # Prettier check
-npm run format          # Auto-format
+npm run format:check    # Prettier check (ignore tests/real/ warnings — pre-existing)
+npm run format          # Auto-format code (use when formatting is requested)
 
 # Debugging
 DEBUG=copytree:* copytree        # Verbose logging
 copytree config:validate         # Check config
-copytree profile:validate NAME   # Check profile
 ```
 
 <paved_path>
@@ -56,8 +61,7 @@ copytree profile:validate NAME   # Check profile
 3. Implement `async transform(file)` method
 4. Register in `@src/transforms/TransformerRegistry.js`
 5. Add tests in `@tests/unit/transformers/`
-6. Document in `@docs/profiles/transformer-reference.md`
-7. Run `npm run test:coverage` (must pass 80%)
+6. Run `npm run test:coverage` (must pass 80%)
 
 ### Add a New Pipeline Stage
 1. Create class in `@src/pipeline/stages/`, extend `Stage`
@@ -69,11 +73,21 @@ copytree profile:validate NAME   # Check profile
 7. Run `npm run test:coverage` (must pass 80%)
 
 ### Diagnose Slow/Large Runs
-1. Use git filters first: `--git-modified`, `--changed <ref>`
+1. Use git filters first: `--modified`, `--changed <ref>`
 2. Enable streaming: `--stream` or `-S`
-3. Set limits: `--limit N`, `--max-file-size`, `--max-total-size`
+3. Set limits: `--head N`
 4. Check cache: `copytree cache:clear` if stale
 5. Profile with: `DEBUG=copytree:* copytree --dry-run`
+
+### Release to NPM
+Releases are automated via `.github/workflows/publish.yml` using OIDC trusted publishing (no NPM token secrets).
+
+1. Update `package.json` version and CHANGELOG.md on a release branch
+2. Merge release branch into `main` per Git Flow
+3. Tag and push: `git tag v0.X.X && git push origin main --tags`
+4. Workflow runs quality checks, publishes to NPM, and creates a GitHub Release
+
+**NPM package**: `copytree` on npmjs.com. Publishing is linked to `gregpriday/copytree` via NPM trusted publishing (OIDC).
 </paved_path>
 
 ## Review Checklist (Read Before Submitting)
@@ -87,6 +101,29 @@ Before finishing any code changes, verify:
 5. ✅ **Git Flow followed** - Correct branch type, no direct commits to main/develop
 6. ✅ **Docs updated** - If public API changed, update relevant `@docs/` files
 
+## Issue Prioritization
+
+When creating or triaging issues, assign priority labels using `gh issue edit <number> --add-label "priority-X"`:
+
+**Priority Labels:**
+- `priority-0 🔥` - Production outage, security incident, data loss. **Immediate response required.**
+- `priority-1 ⏱️` - High impact or blocks quality work. Flaky tests, critical test gaps, user-facing bugs with no workaround.
+- `priority-2 ⚙️` - Planned work. Quality improvements, feature additions, security enhancements, code cleanup.
+- `priority-3 🌿` - Low impact polish. Documentation improvements, UX enhancements, nice-to-have features.
+- `untriaged ❓` - Needs review and prioritization.
+
+**CopyTree-Specific Guidelines:**
+- **Priority-1**: Test flakiness, missing E2E tests, user docs showing removed features, CI/CD reliability issues
+- **Priority-2**: Performance infrastructure, transformer additions, profile system improvements, secrets detection
+- **Priority-3**: CLI help parity, release workflow polish, UI formatting improvements
+- **Always Priority-1**: Issues that block expanding test coverage or undermine existing tests
+
+**Before Assigning:**
+1. Consider impact on users vs developers
+2. Check if it blocks other work (test infrastructure blocks quality improvements)
+3. Identify relationships/dependencies between issues
+4. Prioritize fixing broken things over adding new things
+
 ## Prompting Patterns (For Users)
 
 Increase adherence by starting sessions with:
@@ -98,9 +135,17 @@ Increase adherence by starting sessions with:
 
 - **Pipeline**: Event-driven stages, streaming >10MB (`@src/pipeline/Pipeline.js`, `@docs/technical/architecture.md`)
 - **Configuration**: Hierarchical (CLI > env > project > user > default) (`@src/config/ConfigManager.js`, `@config/schema.json`)
-- **Profiles**: YAML-based file selection + transformers (`@src/profiles/ProfileLoader.js`, `@profiles/default.yml`)
-- **Transformers**: Multiple file processors with traits system (`@src/transforms/transformers/`, `@docs/profiles/transformer-reference.md`)
-- **Commands**: 8 CLI commands (`@bin/copytree.js`): copy, profile:list, profile:validate, copy:docs, config:validate, config:inspect, cache:clear, install:copytree
+- **Profiles**: YAML-based file selection (`@src/config/FolderProfileLoader.js`)
+- **Transformers**: File processors with traits system (`@src/transforms/transformers/`)
+- **Commands**: Core CLI commands (`@bin/copytree.js`): copy, config:validate, config:inspect, cache:clear
+
+## Path Handling Rules
+
+- **`file.path` is always POSIX** — forward slashes (`src/utils/file.js`), never backslashes. Normalized at discovery time in `FileDiscoveryStage` via `toPosix()`.
+- **Use `toPosix()`** from `@src/utils/pathUtils.js` when converting any `path.relative()`, `path.join()`, or `path.normalize()` result that will be stored on a file object or used in glob matching.
+- **Split `file.path` on `'/'`**, never `path.sep`. The `path` module's separator is OS-dependent; `file.path` is always POSIX.
+- **`file.absolutePath` stays platform-native** — it is used for actual filesystem I/O where the OS needs native separators.
+- **Git paths**: `simple-git` returns forward-slash paths; use `toPosix()` before Set/Map lookups against `file.path` to guarantee consistent matching.
 
 ## Critical Files
 
@@ -108,25 +153,21 @@ Increase adherence by starting sessions with:
 - `src/pipeline/Pipeline.js` - Pipeline orchestration
 - `src/pipeline/Stage.js` - Stage base class
 - `src/config/ConfigManager.js` - Config system
-- `src/profiles/ProfileLoader.js` - Profile loading
+- `src/config/FolderProfileLoader.js` - Profile loading
 - `src/transforms/TransformerRegistry.js` - Transformer registry
 - `src/utils/errors.js` - Custom errors
+- `src/utils/pathUtils.js` - POSIX path normalization (used by walkers, stages, GitUtils)
 
 ## Error Handling Rules
 
 **Use Custom Errors** (`@src/utils/errors.js`):
-`CommandError`, `FileSystemError`, `ConfigurationError`, `ValidationError`, `PipelineError`, `AIProviderError`, `TransformError`, `GitError`, `ProfileError`
-
-**Retry Logic**:
-- Retryable: `RATE_LIMIT`, `TIMEOUT`, `SERVICE_UNAVAILABLE`, network errors (max 3 attempts, exponential backoff)
-- Non-retryable: `INVALID_API_KEY`, `SAFETY_FILTER`, `QUOTA_EXCEEDED`, validation errors
+`CommandError`, `FileSystemError`, `ConfigurationError`, `ValidationError`, `PipelineError`, `TransformError`, `GitError`, `ProfileError`
 
 ## Performance Constraints
 
 - Process 10,000 files in <30s
 - Memory usage <500MB for large projects
 - Stream files >10MB automatically
-- Heavy transformers (PDF, Image, AI) only when requested
 
 ## Module-Specific Context
 
@@ -142,5 +183,4 @@ When bug #2571 is fixed, these will load automatically.
 @README.md
 @docs/index.md
 @docs/technical/architecture.md
-@docs/profiles/transformer-reference.md
 @tests/README.md

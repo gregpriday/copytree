@@ -50,12 +50,13 @@ copytree --display
 ## 🎯 Why CopyTree?
 
 - **Smart File Discovery** - Intelligent selection with `.gitignore`, `.copytreeignore`, and `.copytreeinclude` support
-- **File Transformers** - PDF text extraction, image OCR, CSV formatting, and more
 - **Multiple Output Formats** - XML (default), Markdown, JSON, tree view
 - **Profile System** - Default profile with customizable overrides
 - **Git Integration** - Filter by modified files, branch diffs, staged changes
 - **External Sources** - Include files from GitHub repos or other directories
 - **Character Limiting** - Stay within AI context windows automatically
+- **Secrets Detection** - Prevent accidental exposure of API keys and credentials
+- **Electron Ready** - Works in Electron ≥28 main processes for desktop apps
 
 ## 🔧 Frequently Used Flags
 
@@ -91,9 +92,6 @@ copytree -f "*.js" -f "*.ts" --exclude "node_modules"
 # Copy GitHub folder to XML
 copytree https://github.com/user/repo/tree/main/src -o repo-src.xml
 
-# Include external source explicitly
-copytree --external https://github.com/user/repo -o repo.xml
-
 # Stream output (great for CI or large projects)
 copytree -S --format markdown > output.md
 copytree --stream --format json | jq .
@@ -121,43 +119,23 @@ Profiles control which files are included and how they're processed.
 name: my-profile
 include: ["src/**/*.js", "README.md"]
 exclude: ["**/*.test.js"]
-transformers:
-  file-loader: true
-  markdown: true
 output:
   format: markdown
 ```
 
 **Use your profile:**
 ```bash
-# Validate first
-copytree profile:validate my-profile
-
-# Then use it
+# Use a profile by name
 copytree -p my-profile -o summary.md
 copytree --profile my-profile
 
-# List all available profiles
-copytree profile:list
+# Auto-detect a folder profile as a reference
+copytree --as-reference
 ```
 
 ## ⚙️ Configuration
 
-### Environment Variables
-
-Create a `.env` file in your project or home directory:
-
-```bash
-# Performance Settings
-COPYTREE_MAX_FILE_SIZE=10485760      # 10MB
-COPYTREE_MAX_TOTAL_SIZE=104857600    # 100MB
-COPYTREE_MAX_FILE_COUNT=10000
-
-# Cache Settings
-CACHE_ENABLED=true
-CACHE_DEFAULT_TTL=86400              # Default TTL in seconds (24 hours)
-# Note: File cache maxAge is in milliseconds (set via config files)
-```
+CopyTree uses hard-coded defaults to keep things simple. Configuration is managed through:
 
 ### Configuration Files
 
@@ -191,7 +169,7 @@ Use `.copytreeinclude` to force-include specific files that would otherwise be e
 ```bash
 # .copytreeinclude
 .example/**
-.env.example
+.github/**
 config/**
 ```
 
@@ -200,9 +178,6 @@ config/**
 ## 🛠️ Requirements
 
 - **Node.js 20+** (required by engines in package.json)
-- **Optional dependencies:**
-  - [Pandoc](https://pandoc.org) - For Word/ODT document conversion
-  - [Tesseract](https://github.com/tesseract-ocr/tesseract) - For image OCR capabilities
 
 ## 📖 Documentation
 
@@ -210,24 +185,19 @@ For detailed guides, see the `docs/` directory:
 
 - **[Getting Started](docs/index.md)** - Introduction and quick start
 - **[CLI Reference](docs/cli/copytree-reference.md)** - Complete command options
-- **[Profile Overview](docs/profiles/profile-overview.md)** - Creating and using profiles
-- **[Transformer Reference](docs/profiles/transformer-reference.md)** - All 15+ transformers explained
 - **[Architecture](docs/technical/architecture.md)** - Pipeline and system design
 - **[Troubleshooting](docs/usage/troubleshooting.md)** - Common issues and solutions
-
-**Read in terminal:** `copytree copy:docs --display` - View all documentation interactively
+- **[Electron Integration](docs/installation/electron-integration.md)** - Using CopyTree in Electron apps
 
 ## 📚 Commands Reference
 
 ### Main Commands
 - `copytree [path]` - Copy directory structure
-- `copytree profile:list` - List available profiles
-- `copytree profile:validate <name>` - Validate a profile
 - `copytree cache:clear` - Clear caches
 - `copytree config:validate` - Validate configuration
 - `copytree config:inspect` - Inspect effective configuration with source provenance (redacts secrets by default)
-- `copytree copy:docs` - Copy built-in documentation
-- `copytree install:copytree` - Set up CopyTree environment and configuration
+
+> **Note:** CopyTree automatically creates required directories (e.g., `~/.copytree/cache/`, `~/.copytree/profiles/`) on first use. No manual setup is required.
 
 ## 🐛 Troubleshooting
 
@@ -243,7 +213,7 @@ For detailed guides, see the `docs/` directory:
 → Reduce `COPYTREE_MAX_TOTAL_SIZE` or enable streaming mode with `-S/--stream`
 
 **Slow performance**
-→ Enable caching, use lighter transformers, add more exclusion patterns
+→ Enable caching, add more exclusion patterns
 
 **Profile not found**
 → Check search paths: project `.copytree/` → user `~/.copytree/profiles/` → built-in `profiles/`
@@ -285,7 +255,7 @@ npm link  # Makes 'copytree' available globally
 
 ```bash
 npm test                   # Run all tests
-npm run test:watch         # Watch mode
+npm test -- --watch        # Watch mode
 npm run test:coverage      # Coverage report
 npm run lint               # Lint code
 npm run format             # Format code
@@ -313,45 +283,13 @@ CopyTree is optimized for large codebases:
 
 - **Streaming processing** - Memory efficient for large files (>10MB)
 - **Parallel file processing** - Faster for many files
-- **Smart caching** - Avoid redundant AI calls and transformations
+- **Smart caching** - Avoid redundant transformations
 - **Configurable limits** - Prevent resource exhaustion
 
 **Performance targets:**
 - Process 10,000 files in < 30 seconds
 - Memory usage < 500MB for large projects
 - Support projects up to 100MB total size
-
-## 🎯 Creating Profiles with AI
-
-You can create custom profiles using AI assistants like Claude Code:
-
-```bash
-# Create a profile interactively
-claude -p "Please create a CopyTree profile for this project.
-Start by running \`copytree copy:docs --topic all --display\` to read the docs,
-then create an optimal profile."
-
-# Or build a .copytreeignore file
-claude -p "Please create a .copytreeignore file for this project.
-Start by running \`copytree copy:docs --topic ignore-files --display\` to review ignore rules."
-```
-
-The `copytree copy:docs` command provides comprehensive documentation:
-
-```bash
-# Display all documentation (recommended for AI agents)
-copytree copy:docs --topic all --display
-
-# Display specific topics
-copytree copy:docs --topic ignore-files --display
-copytree copy:docs --topic profiles --display
-copytree copy:docs --topic transformers --display
-
-# List available topics
-copytree copy:docs
-```
-
-For detailed guidance: [Profile Creation Guide](docs/profiles/profile-creation-guide.md)
 
 ## 📄 License
 

@@ -2,19 +2,17 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import _ from 'lodash';
-import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
+import { fileURLToPath, pathToFileURL } from 'url';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { ConfigurationError } from '../utils/errors.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 class ConfigManager {
   constructor(options = {}) {
     this.config = {};
-    this.configPath = path.join(__dirname, '../../config');
+    this.configPath = path.join(moduleDir, '../../config');
     this.userConfigPath = path.join(os.homedir(), '.copytree');
 
     // Check if validation should be disabled via options or environment
@@ -42,11 +40,44 @@ class ConfigManager {
     this.userConfig = {};
     this.envOverrides = {};
 
-    // Load configuration asynchronously
-    this.loadConfiguration().catch(console.error);
+    // Flag to track if configuration has been loaded
+    this._initialized = false;
+  }
+
+  /**
+   * Static factory method to create and initialize a ConfigManager instance
+   * @param {Object} options - Configuration options
+   * @returns {Promise<ConfigManager>} Initialized ConfigManager instance
+   */
+  static async create(options = {}) {
+    const instance = new ConfigManager(options);
+    await instance.loadConfiguration();
+    return instance;
   }
 
   async loadConfiguration() {
+    // Prevent double initialization
+    if (this._initialized) {
+      return;
+    }
+
+    // If already initializing, wait for completion
+    if (this._initializing) {
+      return this._initPromise;
+    }
+
+    // Mark as initializing and create promise
+    this._initializing = true;
+    this._initPromise = this._doLoadConfiguration();
+
+    try {
+      await this._initPromise;
+    } finally {
+      this._initializing = false;
+    }
+  }
+
+  async _doLoadConfiguration() {
     // 1. Load schema for validation
     await this.loadSchema();
 
@@ -56,13 +87,12 @@ class ConfigManager {
     // 3. Load user configuration overrides
     await this.loadUserConfig();
 
-    // 4. Apply environment variable overrides
-    this.applyEnvironmentOverrides();
-
-    // 5. Validate final configuration if enabled
+    // 4. Validate final configuration if enabled
     if (this.validationEnabled) {
       this.validateConfig();
     }
+
+    this._initialized = true;
   }
 
   async loadDefaults() {
@@ -71,7 +101,9 @@ class ConfigManager {
     for (const file of configFiles) {
       const configName = path.basename(file, '.js');
       try {
-        const configModule = await import(path.join(this.configPath, file));
+        const filePath = path.join(this.configPath, file);
+        const moduleUrl = pathToFileURL(filePath).href;
+        const configModule = await import(moduleUrl);
         const configData = configModule.default || configModule;
         this.config[configName] = configData;
         this.defaultConfig[configName] = _.cloneDeep(configData);
@@ -100,7 +132,7 @@ class ConfigManager {
           userConfigData = fs.readJsonSync(filePath);
         } else {
           // Use dynamic import for ES modules
-          const moduleUrl = `file://${filePath}?t=${Date.now()}`; // Add timestamp to bypass cache
+          const moduleUrl = pathToFileURL(filePath).href + `?t=${Date.now()}`; // Add timestamp to bypass cache
           const configModule = await import(moduleUrl);
           userConfigData = configModule.default || configModule;
         }
@@ -116,37 +148,8 @@ class ConfigManager {
     }
   }
 
-  applyEnvironmentOverrides() {
-    // Apply environment variables using Laravel-like env() function
-    this.applyEnvOverrides(this.config);
-  }
-
-  applyEnvOverrides(obj, prefix = '') {
-    for (const [key, value] of Object.entries(obj)) {
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        this.applyEnvOverrides(value, prefix ? `${prefix}_${key}` : key);
-      } else {
-        const envKey = `${prefix ? prefix + '_' : ''}${key}`.toUpperCase();
-        const envValue = process.env[envKey];
-
-        if (envValue !== undefined) {
-          // Convert string values to appropriate types
-          let parsedValue = envValue;
-
-          if (envValue === 'true') parsedValue = true;
-          else if (envValue === 'false') parsedValue = false;
-          else if (envValue.match(/^\d+$/)) parsedValue = parseInt(envValue);
-          else if (envValue.match(/^\d+\.\d+$/)) parsedValue = parseFloat(envValue);
-
-          // Track environment override for provenance
-          const configPath = prefix ? `${prefix}.${key}` : key;
-          _.set(this.envOverrides, configPath, { envKey, value: parsedValue });
-
-          _.set(obj, key, parsedValue);
-        }
-      }
-    }
-  }
+  // Environment variable overrides have been removed for simplicity
+  // Configuration is now hard-coded in config files only
 
   /**
    * Get configuration value using dot notation
@@ -154,7 +157,7 @@ class ConfigManager {
    * @param {*} defaultValue - Default value if config not found
    * @returns {*} Configuration value
    */
-  get(path, defaultValue = null) {
+  get(path, defaultValue) {
     return _.get(this.config, path, defaultValue);
   }
 
@@ -178,33 +181,21 @@ class ConfigManager {
 
   /**
    * Get all configuration
-   * @returns {Object} All configuration
+   * @returns {Object} All configuration (deep copy)
    */
   all() {
-    return this.config;
+    return _.cloneDeep(this.config);
   }
 
   /**
-   * Laravel-compatible env() helper
-   * @param {string} key - Environment variable key
+   * env() helper - now always returns default value (env vars no longer supported)
+   * @param {string} key - Environment variable key (ignored)
    * @param {*} defaultValue - Default value
-   * @returns {*} Environment value or default
+   * @returns {*} Always returns defaultValue
    */
   env(key, defaultValue = null) {
-    const value = process.env[key];
-
-    if (value === undefined) {
-      return defaultValue;
-    }
-
-    // Type conversion
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    if (value === 'null') return null;
-    if (value.match(/^\d+$/)) return parseInt(value);
-    if (value.match(/^\d+\.\d+$/)) return parseFloat(value);
-
-    return value;
+    // Environment variables are no longer supported - always return default
+    return defaultValue;
   }
 
   /**
@@ -371,100 +362,13 @@ class ConfigManager {
    * @private
    */
   _getConfigSource(path, value) {
-    // Check if value came from environment variable override
-    if (_.has(this.envOverrides, path)) {
-      const envOverride = _.get(this.envOverrides, path);
-      return `environment:${envOverride.envKey}`;
-    }
-
     // Check if value exists in user config
     if (this._isFromUserConfig(path, value)) {
       return 'user-config';
     }
 
-    // Check if this value likely came from an environment variable via env() function
-    const envSource = this._detectEnvSource(path, value);
-    if (envSource) {
-      return envSource;
-    }
-
     // Default to default config
     return 'default';
-  }
-
-  /**
-   * Detect if a config value likely came from an environment variable via env() function
-   * @private
-   */
-  _detectEnvSource(path, value) {
-    // Common environment variable patterns for this project
-    const envPatterns = [
-      // Direct mapping patterns
-      { pattern: /^ai\.gemini\.apiKey$/, envVar: 'GEMINI_API_KEY' },
-      { pattern: /^ai\.gemini\.baseUrl$/, envVar: 'GEMINI_BASE_URL' },
-      { pattern: /^ai\.gemini\.timeout$/, envVar: 'GEMINI_TIMEOUT' },
-      { pattern: /^ai\.gemini\.model$/, envVar: 'GEMINI_MODEL' },
-      { pattern: /^ai\.defaults\.temperature$/, envVar: 'AI_DEFAULT_TEMPERATURE' },
-      { pattern: /^ai\.defaults\.maxTokens$/, envVar: 'AI_DEFAULT_MAX_TOKENS' },
-      { pattern: /^ai\.defaults\.topP$/, envVar: 'AI_DEFAULT_TOP_P' },
-      { pattern: /^ai\.defaults\.topK$/, envVar: 'AI_DEFAULT_TOP_K' },
-      { pattern: /^ai\.defaults\.stream$/, envVar: 'AI_DEFAULT_STREAM' },
-      {
-        pattern: /^ai\.tasks\.summarization\.temperature$/,
-        envVar: 'AI_SUMMARIZATION_TEMPERATURE',
-      },
-      { pattern: /^ai\.tasks\.summarization\.maxTokens$/, envVar: 'AI_SUMMARIZATION_MAX_TOKENS' },
-      {
-        pattern: /^ai\.tasks\.classification\.temperature$/,
-        envVar: 'AI_CLASSIFICATION_TEMPERATURE',
-      },
-      { pattern: /^ai\.tasks\.classification\.maxTokens$/, envVar: 'AI_CLASSIFICATION_MAX_TOKENS' },
-      {
-        pattern: /^ai\.tasks\.codeDescription\.temperature$/,
-        envVar: 'AI_CODE_DESCRIPTION_TEMPERATURE',
-      },
-      {
-        pattern: /^ai\.tasks\.codeDescription\.maxTokens$/,
-        envVar: 'AI_CODE_DESCRIPTION_MAX_TOKENS',
-      },
-      {
-        pattern: /^ai\.tasks\.imageDescription\.temperature$/,
-        envVar: 'AI_IMAGE_DESCRIPTION_TEMPERATURE',
-      },
-      {
-        pattern: /^ai\.tasks\.imageDescription\.maxTokens$/,
-        envVar: 'AI_IMAGE_DESCRIPTION_MAX_TOKENS',
-      },
-      { pattern: /^ai\.tasks\.profileCreation\.temperature$/, envVar: 'AI_PROFILE_TEMPERATURE' },
-      { pattern: /^ai\.tasks\.profileCreation\.maxTokens$/, envVar: 'AI_PROFILE_MAX_TOKENS' },
-      { pattern: /^ai\.cache\.enabled$/, envVar: 'AI_CACHE_ENABLED' },
-      { pattern: /^ai\.cache\.ttl$/, envVar: 'AI_CACHE_TTL' },
-      { pattern: /^ai\.retry\.maxAttempts$/, envVar: 'AI_RETRY_MAX_ATTEMPTS' },
-      { pattern: /^ai\.retry\.initialDelay$/, envVar: 'AI_RETRY_INITIAL_DELAY' },
-      { pattern: /^ai\.retry\.maxDelay$/, envVar: 'AI_RETRY_MAX_DELAY' },
-      { pattern: /^ai\.retry\.backoffMultiplier$/, envVar: 'AI_RETRY_BACKOFF' },
-      { pattern: /^ai\.promptsPath$/, envVar: 'AI_PROMPTS_PATH' },
-    ];
-
-    for (const { pattern, envVar } of envPatterns) {
-      if (pattern.test(path) && process.env[envVar] !== undefined) {
-        // Check if the environment value matches the current value
-        let envValue = process.env[envVar];
-
-        // Type conversion (same as in env() function)
-        if (envValue === 'true') envValue = true;
-        else if (envValue === 'false') envValue = false;
-        else if (envValue === 'null') envValue = null;
-        else if (envValue.match(/^\d+$/)) envValue = parseInt(envValue);
-        else if (envValue.match(/^\d+\.\d+$/)) envValue = parseFloat(envValue);
-
-        if (_.isEqual(envValue, value)) {
-          return `environment:${envVar}`;
-        }
-      }
-    }
-
-    return null;
   }
 
   /**
@@ -505,12 +409,39 @@ class ConfigManager {
 
 // Singleton instance
 let instance = null;
+let initPromise = null;
 
 export { ConfigManager };
 
+/**
+ * Get or create the singleton ConfigManager instance
+ *
+ * @deprecated Use `ConfigManager.create()` instead for new code. The singleton
+ * pattern prevents safe concurrent operations with different configurations.
+ * This function will be removed in the next major version.
+ *
+ * For synchronous usage (backward compatibility), creates instance without waiting
+ * Ensures initialization happens in background for first access
+ * @param {Object} options - Configuration options
+ * @returns {ConfigManager} ConfigManager instance (may not be fully initialized yet)
+ */
 export function config(options = {}) {
+  // Deprecation warning removed to prevent CLI noise until migration is complete
+  /*
+  // Emit deprecation warning (only once per process)
+  if (!config._deprecationWarned && process.env.NODE_ENV !== 'test') {
+    config._deprecationWarned = true;
+    console.warn(
+      '[CopyTree] config() singleton is deprecated. Use ConfigManager.create() for concurrent operations.',
+    );
+  }
+  */
+
   if (!instance) {
     instance = new ConfigManager(options);
+    // Initialize asynchronously in background (for backward compatibility)
+    // Consumers should await config().loadConfiguration() if they need to ensure initialization
+    initPromise = instance.loadConfiguration().catch(console.error);
   } else if (options.noValidate !== undefined) {
     // Allow runtime disabling of validation
     instance.setValidationEnabled(!options.noValidate);
@@ -518,9 +449,50 @@ export function config(options = {}) {
   return instance;
 }
 
-export function env(key, defaultValue) {
-  if (!instance) {
-    instance = new ConfigManager();
+/**
+ * Async version of config() that ensures full initialization
+ *
+ * @deprecated Use `ConfigManager.create()` instead for new code. The singleton
+ * pattern prevents safe concurrent operations with different configurations.
+ * This function will be removed in the next major version.
+ *
+ * @param {Object} options - Configuration options
+ * @returns {Promise<ConfigManager>} Fully initialized ConfigManager instance
+ */
+export async function configAsync(options = {}) {
+  // Deprecation warning removed to prevent CLI noise until migration is complete
+  /*
+  // Emit deprecation warning (only once per process)
+  if (!configAsync._deprecationWarned && process.env.NODE_ENV !== 'test') {
+    configAsync._deprecationWarned = true;
+    console.warn(
+      '[CopyTree] configAsync() singleton is deprecated. Use ConfigManager.create() for concurrent operations.',
+    );
   }
-  return instance.env(key, defaultValue);
+  */
+
+  if (!instance) {
+    instance = await ConfigManager.create(options);
+  } else {
+    // Await any in-flight initialization
+    if (initPromise) {
+      await initPromise;
+    }
+    if (options.noValidate !== undefined) {
+      instance.setValidationEnabled(!options.noValidate);
+    }
+  }
+  return instance;
+}
+
+/**
+ * Get environment variable with type conversion
+ * NOTE: Environment variables are no longer supported - this always returns defaultValue
+ * @param {string} key - Environment variable key (ignored)
+ * @param {*} defaultValue - Default value
+ * @returns {*} Always returns defaultValue
+ */
+export function env(key, defaultValue) {
+  // Environment variables are no longer supported - always return default
+  return defaultValue;
 }

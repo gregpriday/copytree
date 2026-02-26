@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
 import process from 'process';
 import url from 'url';
 import path from 'path';
@@ -27,9 +27,21 @@ class Clipboard {
   static async copyFileReference(filePath) {
     if (process.platform === 'win32') {
       try {
-        // Use PowerShell to copy the file reference on Windows
-        const command = `powershell -Command "Set-Clipboard -Path '${filePath.replace(/'/g, '\'\'')}'"`;
-        execSync(command, { stdio: 'pipe' });
+        // Use Windows Forms SetFileDropList via Base64-encoded PowerShell command.
+        // This bypasses all shell quoting (Base64 encoding) and path glob expansion
+        // (StringCollection is passed to SetFileDropList without any wildcard interpretation).
+        // Single quotes are doubled for the PS single-quoted string literal.
+        const psPath = filePath.replace(/'/g, "''");
+        const psCommand = [
+          'Add-Type -AssemblyName System.Windows.Forms',
+          '$fc = New-Object System.Collections.Specialized.StringCollection',
+          `[void]$fc.Add('${psPath}')`,
+          '[System.Windows.Forms.Clipboard]::SetFileDropList($fc)',
+        ].join('; ');
+        const encoded = Buffer.from(psCommand, 'utf16le').toString('base64');
+        execSync(`powershell -NoProfile -NonInteractive -EncodedCommand ${encoded}`, {
+          stdio: 'pipe',
+        });
       } catch (error) {
         logger.debug(
           'Failed to copy file reference using PowerShell, falling back to text:',
@@ -48,17 +60,13 @@ class Clipboard {
       }
     } else if (process.platform === 'darwin') {
       try {
-        // Use AppleScript to copy file reference
+        // Use AppleScript to copy file reference. spawnSync passes the script as a
+        // direct argument (no shell), so single quotes in filePath are safe.
         const escapedFilePath = filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        const script = `
-          set aFile to POSIX file "${escapedFilePath}"
-          tell app "Finder" to set the clipboard to aFile
-        `.trim();
+        const script = `set aFile to POSIX file "${escapedFilePath}"
+tell app "Finder" to set the clipboard to aFile`;
 
-        execSync(`osascript -e '${script}'`, {
-          encoding: 'utf8',
-          stdio: 'pipe',
-        });
+        spawnSync('osascript', ['-e', script], { encoding: 'utf8', stdio: 'pipe' });
       } catch (error) {
         logger.debug('Failed to copy file reference, falling back to text:', error.message);
         // Fallback to copying path as text
@@ -78,30 +86,28 @@ class Clipboard {
   static async revealInFinder(filePath) {
     if (process.platform === 'win32') {
       try {
-        execSync(`explorer /select,"${filePath}"`, { stdio: 'pipe' });
+        // Use spawnSync with array args to avoid cmd.exe interpreting &, |, <, >, ^ in paths
+        spawnSync('explorer', [`/select,${filePath}`], { stdio: 'pipe' });
       } catch (error) {
         logger.debug('Failed to reveal file in Explorer:', error.message);
       }
     } else if (process.platform === 'linux') {
       try {
-        // Use xdg-open to open the parent directory
+        // Use spawnSync with array args to avoid shell interpreting $, ", ` in paths
         const dir = path.dirname(filePath);
-        execSync(`xdg-open "${dir}"`, { stdio: 'pipe' });
+        spawnSync('xdg-open', [dir], { stdio: 'pipe' });
       } catch (error) {
         logger.debug('Failed to reveal file with xdg-open:', error.message);
       }
     } else if (process.platform === 'darwin') {
       try {
-        const escapedFilePath = filePath.replace(/"/g, '"');
-        const script = `
-          tell application "Finder" to reveal POSIX file "${escapedFilePath}"
-          tell application "Finder" to activate
-        `.trim();
+        // Use AppleScript to reveal file. spawnSync passes the script as a direct
+        // argument (no shell), so single quotes in filePath are safe.
+        const escapedFilePath = filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        const script = `tell application "Finder" to reveal POSIX file "${escapedFilePath}"
+tell application "Finder" to activate`;
 
-        execSync(`osascript -e '${script}'`, {
-          encoding: 'utf8',
-          stdio: 'pipe',
-        });
+        spawnSync('osascript', ['-e', script], { encoding: 'utf8', stdio: 'pipe' });
       } catch (error) {
         logger.debug('Failed to reveal file in Finder:', error.message);
       }

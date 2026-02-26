@@ -4,19 +4,11 @@
 
 // Note: Removed @babel/register for better performance
 
-// Suppress dotenv console output
-const originalLog = console.log;
-console.log = () => {};
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Load .env from the project directory (copytree root)
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
-console.log = originalLog;
 
 import React from 'react';
 // Use dynamic import for ESM-only ink
@@ -32,8 +24,25 @@ let App;
   render = undefined;
   App = undefined;
 });
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import { readFileSync } from 'fs';
+import { logger } from '../src/utils/logger.js';
+
+/**
+ * Apply logging options from parsed CLI options to the global logger singleton.
+ * Must be called before any logger usage in command handlers.
+ *
+ * @param {Object} options - Parsed commander options
+ */
+function applyLoggingOptions(options) {
+  const logOptions = {};
+  if (options.logLevel !== undefined) logOptions.level = options.logLevel;
+  if (options.logFormat !== undefined) logOptions.format = options.logFormat;
+  if (options.color === false) logOptions.colorize = 'never';
+  if (Object.keys(logOptions).length > 0) {
+    logger.configure(logOptions);
+  }
+}
 
 const pkg = JSON.parse(readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 
@@ -42,7 +51,7 @@ const program = new Command();
 program
   .name('copytree')
   .description(
-    'Copy directory structures and file contents into Markdown (default), XML, JSON, or tree formats',
+    'Copy directory structures and file contents into XML (default), Markdown, JSON, NDJSON, SARIF, or tree formats',
   )
   .version(pkg.version);
 
@@ -50,37 +59,121 @@ program
 program
   .command('copy [path]', { isDefault: true })
   .description(
-    'Copy directory structure to XML (default) or Markdown/JSON/tree with customizable profiles and filters',
+    'Copy directory structure to XML (default) or Markdown/JSON/NDJSON/SARIF/tree with customizable filters',
   )
-  .option('-p, --profile <name>', 'Use a predefined profile (default: default)')
+  .option('-p, --folder-profile <name>', 'Use folder profile by name (.copytree-<name>.*)')
+  .option('--profile <type>', 'Enable performance profiling: cpu, heap, all')
+  .option('--profile-dir <dir>', 'Profile output directory (default: .profiles)')
   .option('-f, --filter <pattern...>', 'Additional filter patterns')
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
   .option('-o, --output <file>', 'Save output to file')
-  .option('--format <format>', 'Output format: xml, markdown|md, json, tree (default: xml)')
+  .option(
+    '--format <format>',
+    'Output format: xml, markdown|md, json, ndjson, sarif, tree (default: xml)',
+  )
   .option('-i, --display', 'Display output to console')
   .option('-S, --stream', 'Stream output')
   .option('--dry-run', 'Show what would be copied without doing it')
   .option('-l, --head <n>', 'Limit to first N files')
   .option('-C, --char-limit <n>', 'Character limit for output')
   .option('--include-binary', 'Include binary files')
-  .option('--external <source...>', 'Include external sources')
   .option('--with-line-numbers', 'Add line numbers to file content')
   .option('-t, --only-tree', 'Include only the directory tree, not file contents')
   .option('--info', 'Show info table')
   .option('--show-size', 'Show file sizes')
   .option('--with-git-status', 'Include git status in output')
-  .option('-r, --as-reference', 'Generate reference documentation')
-  .option('--validate', 'Validate profile without executing')
+  .option('-r, --as-reference', 'Generate reference and auto-load folder profile if present')
   .option('--clipboard', 'Copy output to clipboard')
   .option('-s, --sort <by>', 'Sort files by: path, size, modified, name, extension')
   .option('--dedupe', 'Remove duplicate files')
   .option('--always <patterns...>', 'Always include these patterns')
+  .option('--no-tests', 'Exclude test files and directories (for compact AI context)')
   .option('--no-cache', 'Disable caching for AI operations')
   .option('--no-instructions', 'Disable including instructions in output')
   .option('--instructions <name>', 'Use custom instructions set (default: default)')
   .option('--no-validate', 'Disable configuration validation')
-  .action(async (path, options) => {
+  .option(
+    '--ext <extensions>',
+    'Filter by file extensions, comma-separated (e.g., .js,.ts,.tsx or js,ts)',
+  )
+  .option(
+    '--max-depth <n>',
+    'Maximum directory traversal depth (0 = root files only, 1 = one level deep, etc.)',
+    (val) => {
+      const n = parseInt(val, 10);
+      if (isNaN(n) || n < 0) {
+        throw new InvalidArgumentError(
+          `'${val}' is not a valid depth. Must be a non-negative integer.`,
+        );
+      }
+      return n;
+    },
+  )
+  .option('--min-size <size>', 'Exclude files smaller than this size (e.g., 1KB, 500B, 10MB)')
+  .option('--max-size <size>', 'Exclude files larger than this size (e.g., 10MB, 1GB)')
+  .option('--secrets-guard', 'Enable automatic secret detection and redaction (default: enabled)')
+  .option('--no-secrets-guard', 'Disable secret detection and redaction')
+  .option(
+    '--secrets-redact-mode <mode>',
+    'Redaction marker style: typed, generic, hash (default: typed)',
+  )
+  .option('--fail-on-secrets', 'Exit with error if secrets are found (CI mode)')
+  .option('--secrets-report <file>', 'Output secrets report to file (use - for stdout)')
+  .option('--fail-on-fs-errors', 'Exit with error if filesystem operations fail after retries')
+  .option(
+    '--log-level <level>',
+    'Set log verbosity: error, warn, info, debug (default: info)',
+    (val) => {
+      const valid = ['error', 'warn', 'info', 'debug'];
+      if (!valid.includes(val)) {
+        throw new InvalidArgumentError(`'${val}' is not valid. Choose from: ${valid.join(', ')}`);
+      }
+      return val;
+    },
+  )
+  .option(
+    '--log-format <format>',
+    'Log output format: text, json, silent (default: text)',
+    (val) => {
+      const valid = ['text', 'json', 'silent'];
+      if (!valid.includes(val)) {
+        throw new InvalidArgumentError(`'${val}' is not valid. Choose from: ${valid.join(', ')}`);
+      }
+      return val;
+    },
+  )
+  .option('--no-color', 'Disable ANSI color codes in log output')
+  .action(async (targetPath, options) => {
+    applyLoggingOptions(options);
+    // Auto-detect format from output file extension
+    if (!options.format && options.output) {
+      const formatByExt = {
+        '.json': 'json',
+        '.md': 'markdown',
+        '.markdown': 'markdown',
+        '.ndjson': 'ndjson',
+        '.sarif': 'sarif',
+      };
+      const inferred = formatByExt[path.extname(options.output).toLowerCase()];
+      if (inferred) {
+        options.format = inferred;
+      }
+    }
+
+    // When streaming or profiling, skip UI and run command directly
+    if (options.stream || options.profile) {
+      const copyCommand = (await import('../src/commands/copy.js')).default;
+      try {
+        await copyCommand(targetPath || '.', options);
+        process.exit(0);
+      } catch (error) {
+        console.error(error.message);
+        process.exit(1);
+      }
+      return;
+    }
+
     if (!render || !App) {
       const ink = await import('ink');
       render = ink.render;
@@ -90,78 +183,7 @@ program
     render(
       React.createElement(App, {
         command: 'copy',
-        path: path || '.',
-        options,
-      }),
-    );
-  });
-
-// 2. Profile list command
-program
-  .command('profile:list')
-  .description('List all available profiles')
-  .option('--json', 'Output as JSON')
-  .action(async (options) => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'profile:list',
-        path: null,
-        options,
-      }),
-    );
-  });
-
-// 7. Profile validate command
-program
-  .command('profile:validate [profile]')
-  .description('Validate profile syntax and structure')
-  .option('--all', 'Validate all profiles')
-  .action(async (profile, options) => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'profile:validate',
-        path: null,
-        options: { ...options, profile },
-      }),
-    );
-  });
-
-// 8. Copy docs command
-program
-  .command('copy:docs')
-  .description('Copy CopyTree documentation (use --display to read all docs)')
-  .option('--topic <name>', 'Legacy: documentation topic to copy')
-  .option('--section <id...>', 'Copy specific section(s) by ID')
-  .option('--group <id...>', 'Copy documentation group(s) by ID')
-  .option('--task <id>', 'Copy task bundle with intro and checklist')
-  .option('--list [kind]', 'List available items: all|sections|groups|tasks (default: all)')
-  .option('--meta <format>', 'Output metadata in json or yaml format')
-  .option('-o, --output <file>', 'Output file instead of clipboard')
-  .option('-i, --display', 'Display to console (recommended for AI agents)')
-  .option('--no-clipboard', 'Display to console instead of clipboard')
-  .action(async (options) => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'copy:docs',
-        path: null,
+        path: targetPath || '.',
         options,
       }),
     );
@@ -192,7 +214,7 @@ program
 program
   .command('config:inspect')
   .description('Inspect effective configuration with provenance')
-  .option('--section <name>', 'Show only specific config section (ai, app, cache, copytree, state)')
+  .option('--section <name>', 'Show only specific config section (app, cache, copytree)')
   .option('--redact', 'Redact sensitive values (default: true)')
   .option('--no-redact', 'Show all values including sensitive ones')
   .option('--format <type>', 'Output format: table, json (default: table)', 'table')
@@ -217,9 +239,7 @@ program
   .command('cache:clear')
   .description('Clear all caches')
   .option('--transformations', 'Clear only transformation cache')
-  .option('--ai', 'Clear only AI cache')
   .option('--git', 'Clear only git cache')
-  .option('--profiles', 'Clear only profile detection cache')
   .option('--gc', 'Run garbage collection on expired entries')
   .option('--status', 'Show cache status after clearing')
   .option('-v, --verbose', 'Show verbose output')
@@ -239,24 +259,7 @@ program
     );
   });
 
-// 12. Install copytree command
-program
-  .command('install:copytree')
-  .description('Set up CopyTree environment and configuration')
-  .action(async () => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'install:copytree',
-        path: null,
-        options: {},
-      }),
-    );
-  });
+// 12. Install copytree command - REMOVED
+// This command has been removed as all directories are auto-created on first use.
 
 program.parse(process.argv);

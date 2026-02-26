@@ -1,19 +1,48 @@
-import { config } from '../config/ConfigManager.js';
+import { logger as defaultLogger } from '../utils/logger.js';
 
 /**
  * Base class for pipeline stages
  * All pipeline stages should extend this class
  */
 class Stage {
+  /**
+   * Create a new Stage instance
+   * @param {Object} options - Stage options
+   * @param {Object} [options.pipeline] - Reference to parent pipeline for event emission
+   * @param {Object} [options.config] - ConfigManager instance (optional, will be set via onInit context)
+   */
   constructor(options = {}) {
     this.options = options;
-    this.config = config();
+    // Config is now provided via the pipeline context in onInit()
+    // For backward compatibility, accept config in options, but prefer context
+    this._config = options.config || null;
     this.name = this.constructor.name;
     this.pipeline = options.pipeline; // Reference to parent pipeline for event emission
 
     // Performance optimization: throttle file events
     this.fileEventCount = 0;
     this.lastFileEventTime = 0;
+  }
+
+  /**
+   * Get the config instance
+   * Prefers config from pipeline context (set during onInit), falls back to options
+   * Returns a safe proxy if no config is available yet (allows stages to access config
+   * in constructors with defaults)
+   * @returns {Object} ConfigManager instance or safe proxy
+   */
+  get config() {
+    if (this._config) {
+      return this._config;
+    }
+    // Return a safe proxy that returns defaults when config isn't available yet
+    // This allows stages to access config in constructors before onInit is called
+    return {
+      get: (_path, defaultValue) => defaultValue,
+      set: () => {},
+      has: () => false,
+      all: () => ({}),
+    };
   }
 
   /**
@@ -59,15 +88,23 @@ class Stage {
    * Called once when pipeline is created, before any processing
    * This hook allows stages to set up resources, warm caches, or prepare for processing
    *
+   * This method also receives the config instance from the pipeline context,
+   * enabling stages to use isolated configuration for concurrent operations.
+   *
    * @param {Object} context - Pipeline context with shared resources
    * @param {Object} context.logger - Logger instance
    * @param {Object} context.options - Pipeline options
    * @param {Object} context.stats - Pipeline statistics
-   * @param {Object} context.config - Configuration manager
+   * @param {Object} context.config - Configuration manager instance
+   * @param {Object} context.pipeline - Reference to parent pipeline
    * @returns {Promise<void>}
    */
-  async onInit(_context) {
-    // Default implementation - no operation
+  async onInit(context) {
+    // Set config from pipeline context if not already set
+    if (context?.config && !this._config) {
+      this._config = context.config;
+    }
+    // Default implementation - subclasses can override for custom initialization
   }
 
   /**
@@ -113,7 +150,11 @@ class Stage {
   }
 
   /**
-   * Log a message and emit stage events for UI
+   * Log a message and emit stage events for UI.
+   * Routes output through the central logger so that log-level filtering,
+   * format (text/json/silent), and destination (stderr/stdout) are all
+   * respected uniformly across the pipeline.
+   *
    * @param {string} message - Message to log
    * @param {string} level - Log level (info, warn, error, debug)
    */
@@ -128,25 +169,26 @@ class Stage {
       });
     }
 
-    // Original logging behavior for debug mode or errors
-    if (this.config.get('app.debug') || level === 'error') {
-      const prefix = `[${this.name}]`;
+    // Route all terminal output through the central logger so that
+    // --log-level, --log-format, --no-color, and COPYTREE_LOG_LEVEL are obeyed.
+    const prefixedMessage = `[${this.name}] ${message}`;
 
-      switch (level) {
+    switch (level) {
       case 'error':
-        console.error(prefix, message);
+        defaultLogger.error(prefixedMessage);
         break;
       case 'warn':
-        console.warn(prefix, message);
+        defaultLogger.warn(prefixedMessage);
         break;
-      case 'debug':
-        if (this.config.get('app.debug')) {
-          console.log(prefix, '[DEBUG]', message);
-        }
+      // Stage 'info' messages are internal pipeline progress/timing info.
+      // They were previously only visible in debug mode (app.debug=true), so
+      // we map them to debug level to preserve that backward-compatible behavior.
+      // Use --log-level debug (or COPYTREE_LOG_LEVEL=debug) to see them.
+      case 'info':
+        defaultLogger.debug(prefixedMessage);
         break;
-      default:
-        console.log(prefix, message);
-      }
+      default: // 'debug'
+        defaultLogger.debug(prefixedMessage);
     }
   }
 

@@ -1,0 +1,74 @@
+---
+format: copytree-md@1
+tool: copytree
+generated: "<TIMESTAMP>"
+base_path: "<PROJECT_ROOT>"
+profile: "default"
+file_count: 3
+total_size_bytes: 94
+char_limit_applied: false
+only_tree: false
+include_git_status: true
+include_line_numbers: true
+instructions:
+  name: "default"
+  included: true
+---
+
+# CopyTree Export — copytree-md-combined-<UUID>
+
+## Directory Tree
+```text
+├── src/
+│   └── test.js (40 B)
+├── index.js (39 B)
+└── README.md (15 B)
+```
+
+## Instructions
+
+<!-- copytree:instructions-begin name="default" -->
+```text
+This XML document represents the directory structure and contents of a project, which you will analyze to answer user questions. Reference files using @ followed by the relative path from the project root (e.g., @README.md, @src/app.js). The @ notation must not be enclosed in backticks. For example, always write "...in the file @app/page.tsx..." and never "...in the file `@app/page.tsx`...". You can also reference directories with @directory/path to instruct the agent to examine multiple files.
+```
+
+<!-- copytree:instructions-end name="default" -->
+
+## Files
+
+<!-- copytree:file-begin path="@index.js" size=39 modified="<TIMESTAMP>" hash="sha256:743dbcff629be3ed2d9431d6873e090c0417632c75c19bd1edf3345054ac10b9" binary=false encoding="utf8" truncated=false -->
+
+### @index.js
+
+```js
+   1: console.log('Hello');
+   2:
+   3: // modified line
+```
+
+<!-- copytree:file-end path="@index.js" -->
+
+<!-- copytree:file-begin path="@README.md" size=15 modified="<TIMESTAMP>" hash="sha256:d4ad9c87725fe5e63d14298b274307d6723233b916d065a005d96dbfe4f44f17" binary=false encoding="utf8" truncated=false -->
+
+### @README.md
+
+```markdown
+   1: # Test Project
+   2:
+```
+
+<!-- copytree:file-end path="@README.md" -->
+
+<!-- copytree:file-begin path="@src/test.js" size=40 modified="<TIMESTAMP>" hash="sha256:f5c226999c18c0561a682d753a38652568e934baa38aefadad63b8cd7e8e0c95" binary=false encoding="utf8" truncated=false -->
+
+### @src/test.js
+
+```js
+   1: export function test() {
+   2:   return 42;
+   3: }
+   4:
+```
+
+<!-- copytree:file-end path="@src/test.js" -->
+🖥️ 3 files [<MEMORY>] displayed to terminal

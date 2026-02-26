@@ -12,23 +12,33 @@ import os from 'os';
  * Normalize absolute paths to relative, OS-agnostic format
  */
 export function normalizePaths(content, options = {}) {
-  const {
-    basePath = process.cwd(),
-    placeholder = '<PROJECT_ROOT>'
-  } = options;
+  const { basePath = process.cwd(), placeholder = '<PROJECT_ROOT>' } = options;
 
   let normalized = content;
 
+  // Normalize basePath to use forward slashes for consistent matching
+  const normalizedBasePath = basePath.replace(/\\/g, '/');
+
+  // Create pattern that matches both with and without Windows drive letter
+  // This handles cases where basePath might be "/a/path" but content has "D:/a/path", "D:\a\path", or "D:\\a\\path" (JSON)
+  const pathWithoutDrive = normalizedBasePath.replace(/^[A-Z]:/, '');
+  // Match forward slash, single backslash (XML), or double backslash (JSON escaped)
+  // In regex: / OR \\ OR \\\\
+  const pathPattern = normalizedBasePath.startsWith('/')
+    ? `(?:[A-Z]:)?${pathWithoutDrive.replace(/\//g, '(?:/|\\\\\\\\|\\\\)')}`
+    : normalizedBasePath.replace(/\//g, '(?:/|\\\\\\\\|\\\\)');
+
   // Replace absolute paths with placeholder
-  const absolutePattern = new RegExp(basePath.replace(/[/\\]/g, '[/\\\\]'), 'g');
+  const absolutePattern = new RegExp(pathPattern, 'g');
   normalized = normalized.replace(absolutePattern, placeholder);
 
-  // Normalize Windows paths to Unix style
-  normalized = normalized.replace(/\\/g, '/');
-
   // Normalize home directory
-  const homeDir = os.homedir();
-  normalized = normalized.replace(new RegExp(homeDir.replace(/[/\\]/g, '[/\\\\]'), 'g'), '<HOME>');
+  const homeDir = os.homedir().replace(/\\/g, '/');
+  const homeDirWithoutDrive = homeDir.replace(/^[A-Z]:/, '');
+  const homePattern = homeDir.startsWith('/')
+    ? `(?:[A-Z]:)?${homeDirWithoutDrive.replace(/\//g, '(?:/|\\\\\\\\|\\\\)')}`
+    : homeDir.replace(/\//g, '(?:/|\\\\\\\\|\\\\)');
+  normalized = normalized.replace(new RegExp(homePattern, 'g'), '<HOME>');
 
   return normalized;
 }
@@ -37,18 +47,12 @@ export function normalizePaths(content, options = {}) {
  * Normalize timestamps to stable format
  */
 export function normalizeTimestamps(content, options = {}) {
-  const {
-    placeholder = '<TIMESTAMP>',
-    includeMillis = false
-  } = options;
+  const { placeholder = '<TIMESTAMP>', includeMillis = false } = options;
 
   let normalized = content;
 
   // ISO 8601 timestamps
-  normalized = normalized.replace(
-    /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?/g,
-    placeholder
-  );
+  normalized = normalized.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?/g, placeholder);
 
   // Unix timestamps (milliseconds)
   if (includeMillis) {
@@ -68,23 +72,20 @@ export function normalizeTimestamps(content, options = {}) {
  * Normalize UUIDs and request IDs
  */
 export function normalizeIds(content, options = {}) {
-  const {
-    uuidPlaceholder = '<UUID>',
-    requestIdPlaceholder = '<REQUEST_ID>'
-  } = options;
+  const { uuidPlaceholder = '<UUID>', requestIdPlaceholder = '<REQUEST_ID>' } = options;
 
   let normalized = content;
 
   // UUIDs (v4)
   normalized = normalized.replace(
     /[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/gi,
-    uuidPlaceholder
+    uuidPlaceholder,
   );
 
   // Request IDs (various formats)
   normalized = normalized.replace(
     /"requestId"\s*:\s*"[^"]+"/g,
-    `"requestId": "${requestIdPlaceholder}"`
+    `"requestId": "${requestIdPlaceholder}"`,
   );
 
   // Generic hash-like IDs (40 hex chars)
@@ -100,7 +101,7 @@ export function normalizeMetrics(content, options = {}) {
   const {
     durationPlaceholder = '<DURATION>',
     memoryPlaceholder = '<MEMORY>',
-    sizePlaceholder = '<SIZE>'
+    sizePlaceholder = '<SIZE>',
   } = options;
 
   let normalized = content;
@@ -108,28 +109,26 @@ export function normalizeMetrics(content, options = {}) {
   // Duration values (ms, s, etc.)
   normalized = normalized.replace(
     /"(duration|latency|time)":\s*\d+(\.\d+)?/g,
-    `"$1": ${durationPlaceholder}`
+    `"$1": ${durationPlaceholder}`,
   );
   normalized = normalized.replace(
     /\d+(\.\d+)?\s*(ms|milliseconds?|s|seconds?)/gi,
-    durationPlaceholder
+    durationPlaceholder,
   );
 
   // Memory values (bytes, MB, etc.)
   normalized = normalized.replace(
     /"(memory|memoryUsage|heapUsed)":\s*\d+(\.\d+)?/g,
-    `"$1": ${memoryPlaceholder}`
+    `"$1": ${memoryPlaceholder}`,
   );
-  normalized = normalized.replace(
-    /\d+(\.\d+)?\s*(bytes?|KB|MB|GB)/gi,
-    memoryPlaceholder
-  );
+  normalized = normalized.replace(/\d+(\.\d+)?\s*(bytes?|KB|MB|GB)/gi, memoryPlaceholder);
 
   // File sizes
-  normalized = normalized.replace(
-    /"(size|fileSize)":\s*\d+(\.\d+)?/g,
-    `"$1": ${sizePlaceholder}`
-  );
+  normalized = normalized.replace(/"(size|fileSize)":\s*\d+(\.\d+)?/g, `"$1": ${sizePlaceholder}`);
+
+  // Byte counts in square brackets (e.g., "[160 B]" in tree output)
+  // These vary by platform due to line ending differences
+  normalized = normalized.replace(/\[\d+\s*B\]/g, '[<BYTES>]');
 
   return normalized;
 }
@@ -145,7 +144,7 @@ export function normalizeTokens(content, options = {}) {
   // Token counts
   normalized = normalized.replace(
     /"(tokensUsed|inputTokens|outputTokens|totalTokens)":\s*\d+/g,
-    `"$1": ${placeholder}`
+    `"$1": ${placeholder}`,
   );
 
   return normalized;
@@ -155,10 +154,7 @@ export function normalizeTokens(content, options = {}) {
  * Comprehensive normalization for golden file comparisons
  */
 export function normalizeForGolden(content, options = {}) {
-  const {
-    basePath = process.cwd(),
-    normalizeAll = true
-  } = options;
+  const { basePath = process.cwd(), normalizeAll = true } = options;
 
   let normalized = content;
 
@@ -191,8 +187,9 @@ export function normalizeForGolden(content, options = {}) {
   normalized = normalized.replace(/\r\n/g, '\n');
 
   // Trim trailing whitespace on each line
-  normalized = normalized.split('\n')
-    .map(line => line.trimEnd())
+  normalized = normalized
+    .split('\n')
+    .map((line) => line.trimEnd())
     .join('\n');
 
   return normalized;
@@ -204,7 +201,7 @@ export function normalizeForGolden(content, options = {}) {
 export function seedRandom(seed = 12345) {
   // Simple seeded random implementation for tests
   let state = seed;
-  return function() {
+  return function () {
     state = (state * 1103515245 + 12345) & 0x7fffffff;
     return state / 0x7fffffff;
   };

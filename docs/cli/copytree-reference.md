@@ -84,25 +84,20 @@ Explicitly copy to clipboard (default behavior).
 copytree --clipboard
 ```
 
-#### `--no-clipboard`
-Prevent copying to clipboard.
-
-```bash
-copytree --no-clipboard --display
-```
-
 ### Format Options
 
 #### `--format=<type>`
-Output format: `markdown|md`, `xml`, `json`, or `tree`.
+Output format: `xml`, `markdown|md`, `json`, `ndjson`, `sarif`, or `tree`.
 
-**Default:** `markdown`
+**Default:** `xml`
 
 ```bash
 copytree --format json
+copytree --format ndjson
+copytree --format sarif
 copytree --format tree
-copytree --format markdown  # default
-copytree --format xml
+copytree --format xml  # default
+copytree --format markdown
 ```
 
 ### Display Control Options
@@ -153,7 +148,7 @@ copytree --with-git-status
 Always include these patterns (force-include), even if excluded by profile.
 
 ```bash
-copytree --always "*.config.js" --always ".env.example"
+copytree --always "*.config.js" --always "config.example.js"
 ```
 
 ### Content Options
@@ -210,7 +205,7 @@ copytree --external https://github.com/user/repo
 
 ### Transformation Options
 
-**Note:** Transformers are configured in profiles, not via CLI flags. See the [Transformer Reference](../profiles/transformer-reference.md) for details on enabling and configuring transformers in your profile.
+**Note:** Transformers are configured in profiles, not via CLI flags. Built-in transformers include file-loader, binary, and streaming-file-loader.
 
 ### Debug & Optimization Options
 
@@ -226,13 +221,6 @@ Validate profile syntax without processing files.
 
 ```bash
 copytree --validate --profile myprofile
-```
-
-#### `--debug`
-Enable debug logging.
-
-```bash
-copytree --debug
 ```
 
 #### `--no-cache`
@@ -266,21 +254,12 @@ copytree --instructions custom
 copytree --instructions default
 ```
 
-#### `--verbose`, `-v`
-Show detailed progress information.
-
-```bash
-copytree --verbose
-copytree -v
-```
-
 ## Exit Codes
 
 - `0` - Success
 - `1` - Profile validation or loading errors
 - `2` - Invalid option combination
 - `3` - File system or Git errors
-- `4` - AI service errors
 
 ## Examples
 
@@ -304,8 +283,8 @@ copytree
 # Use custom profile
 copytree --profile mycustom
 
-# List available profiles
-copytree profile:list
+# Preview profile selection
+copytree --profile mycustom --dry-run
 ```
 
 ### Filtering Files
@@ -339,8 +318,8 @@ copytree --format tree
 # Combine multiple options
 copytree --profile myproject --modified --output snapshot.md
 
-# Debug mode with dry run
-copytree --debug --dry-run
+# Dry run with validation
+copytree --dry-run --validate
 
 # Limit output
 copytree --head 50 --char-limit 100000

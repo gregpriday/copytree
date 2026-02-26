@@ -1,6 +1,5 @@
 import Stage from '../Stage.js';
 import InstructionsLoader from '../../services/InstructionsLoader.js';
-import { config } from '../../config/ConfigManager.js';
 
 /**
  * Instructions Stage - Loads and adds instructions to pipeline input
@@ -29,7 +28,7 @@ class InstructionsStage extends Stage {
 
       // If instructions is true but not a string, use default
       if (instructionsName === true || !instructionsName) {
-        instructionsName = config().get('app.defaultInstructions', 'default');
+        instructionsName = this.config.get('app.defaultInstructions', 'default');
       }
 
       this.log(`Loading instructions: ${instructionsName}`, 'debug');
@@ -98,7 +97,7 @@ class InstructionsStage extends Stage {
 
     // If instructions is true but not a string, use default
     if (instructionsName === true || !instructionsName) {
-      instructionsName = config().get('app.defaultInstructions', 'default');
+      instructionsName = this.config.get('app.defaultInstructions', 'default');
     }
 
     // Check if instructions exist

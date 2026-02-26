@@ -134,9 +134,15 @@ export async function detect(filePath, opts = {}) {
   const ext = path.extname(filePath);
   let category = categorizeByExt(ext);
 
-  let buf;
+  // Allocate buffer only for the sample size to avoid loading large files into memory
+  const buf = Buffer.alloc(sampleBytes);
+  let bytesRead = 0;
+  let fd = null;
+
   try {
-    buf = await fs.readFile(filePath);
+    fd = await fs.open(filePath, 'r');
+    const result = await fs.read(fd, buf, 0, sampleBytes, 0);
+    bytesRead = result.bytesRead;
   } catch (error) {
     // File doesn't exist or can't be read
     return {
@@ -146,9 +152,13 @@ export async function detect(filePath, opts = {}) {
       ext,
       error: error.message,
     };
+  } finally {
+    if (fd !== null) {
+      await fs.close(fd);
+    }
   }
 
-  const sample = buf.subarray(0, Math.min(sampleBytes, buf.length));
+  const sample = buf.subarray(0, bytesRead);
 
   // Magic number match
   for (const m of MAGIC) {
@@ -211,21 +221,4 @@ export function isConvertibleDocument(category, ext) {
   return ['.pdf', '.doc', '.docx', '.odt', '.rtf', '.epub', '.html', '.htm'].includes(
     (ext || '').toLowerCase(),
   );
-}
-
-/**
- * Get all file categories
- * @returns {Object} Categories object
- */
-export function getCategories() {
-  return CATEGORIES;
-}
-
-/**
- * Get a category's extensions
- * @param {string} category - Category name
- * @returns {Array<string>} List of extensions
- */
-export function getCategoryExtensions(category) {
-  return CATEGORIES[category] || [];
 }

@@ -21,7 +21,7 @@ class MockConfigManager {
       user: {},
       project: {},
       env: {},
-      cli: {}
+      cli: {},
     };
     this.provenance = {};
   }
@@ -68,7 +68,7 @@ class MockConfigManager {
       this.configs.user,
       this.configs.project,
       this.configs.env,
-      this.configs.cli
+      this.configs.cli,
     );
     return merged;
   }
@@ -167,9 +167,9 @@ describe('Configuration Hierarchy', () => {
           gemini: {
             model: 'gemini-1.5-flash',
             temperature: 0.7,
-            apiKey: 'default-key'
-          }
-        }
+            apiKey: 'default-key',
+          },
+        },
       });
 
       configManager.loadUser({
@@ -177,16 +177,16 @@ describe('Configuration Hierarchy', () => {
           gemini: {
             model: 'gemini-2.5-flash',
             // temperature inherited from default
-          }
-        }
+          },
+        },
       });
 
       configManager.loadCLI({
         ai: {
           gemini: {
-            apiKey: 'cli-key'
-          }
-        }
+            apiKey: 'cli-key',
+          },
+        },
       });
 
       expect(configManager.get('ai.gemini.model')).toBe('gemini-2.5-flash'); // user
@@ -196,11 +196,11 @@ describe('Configuration Hierarchy', () => {
 
     it('handles deep nesting', () => {
       configManager.loadDefault({
-        a: { b: { c: { d: 'default' } } }
+        a: { b: { c: { d: 'default' } } },
       });
 
       configManager.loadProject({
-        a: { b: { c: { d: 'project' } } }
+        a: { b: { c: { d: 'project' } } },
       });
 
       expect(configManager.get('a.b.c.d')).toBe('project');
@@ -210,96 +210,19 @@ describe('Configuration Hierarchy', () => {
       configManager.loadDefault({
         ai: {
           gemini: { model: 'default-model' },
-          cache: { enabled: true }
-        }
+          cache: { enabled: true },
+        },
       });
 
       configManager.loadUser({
         ai: {
-          gemini: { model: 'user-model' }
+          gemini: { model: 'user-model' },
           // cache should be preserved
-        }
+        },
       });
 
       expect(configManager.get('ai.gemini.model')).toBe('user-model');
       expect(configManager.get('ai.cache.enabled')).toBe(true);
-    });
-  });
-
-  describe('Environment Variable Mapping', () => {
-    it('maps GEMINI_API_KEY to ai.gemini.apiKey', () => {
-      configManager.loadDefault({
-        ai: { gemini: { apiKey: '' } }
-      });
-
-      // Set a test env var
-      process.env.TEST_GEMINI_API_KEY = 'env-key';
-
-      // Simulate env var mapping
-      const envConfig = {
-        ai: { gemini: { apiKey: process.env.TEST_GEMINI_API_KEY } }
-      };
-      configManager.loadEnv(envConfig);
-
-      expect(configManager.get('ai.gemini.apiKey')).toBe('env-key');
-
-      delete process.env.TEST_GEMINI_API_KEY;
-    });
-
-    it('maps GEMINI_MODEL to ai.gemini.model', () => {
-      configManager.loadDefault({
-        ai: { gemini: { model: 'default-model' } }
-      });
-
-      process.env.GEMINI_MODEL = 'env-model';
-      const envConfig = {
-        ai: { gemini: { model: process.env.GEMINI_MODEL } }
-      };
-      configManager.loadEnv(envConfig);
-
-      expect(configManager.get('ai.gemini.model')).toBe('env-model');
-    });
-
-    it('maps COPYTREE_MAX_FILE_SIZE to copytree.maxFileSize', () => {
-      configManager.loadDefault({
-        copytree: { maxFileSize: 10485760 }
-      });
-
-      process.env.COPYTREE_MAX_FILE_SIZE = '20971520';
-      const envConfig = {
-        copytree: { maxFileSize: parseInt(process.env.COPYTREE_MAX_FILE_SIZE) }
-      };
-      configManager.loadEnv(envConfig);
-
-      expect(configManager.get('copytree.maxFileSize')).toBe(20971520);
-    });
-
-    it('maps AI_CACHE_ENABLED to ai.cache.enabled', () => {
-      configManager.loadDefault({
-        ai: { cache: { enabled: false } }
-      });
-
-      process.env.AI_CACHE_ENABLED = 'true';
-      const envConfig = {
-        ai: { cache: { enabled: process.env.AI_CACHE_ENABLED === 'true' } }
-      };
-      configManager.loadEnv(envConfig);
-
-      expect(configManager.get('ai.cache.enabled')).toBe(true);
-    });
-
-    it('CLI options override environment variables', () => {
-      process.env.GEMINI_MODEL = 'env-model';
-      const envConfig = {
-        ai: { gemini: { model: process.env.GEMINI_MODEL } }
-      };
-      configManager.loadEnv(envConfig);
-
-      configManager.loadCLI({
-        ai: { gemini: { model: 'cli-model' } }
-      });
-
-      expect(configManager.get('ai.gemini.model')).toBe('cli-model');
     });
   });
 
@@ -316,11 +239,11 @@ describe('Configuration Hierarchy', () => {
 
     it('tracks provenance for nested values', () => {
       configManager.loadDefault({
-        ai: { gemini: { model: 'default' } }
+        ai: { gemini: { model: 'default' } },
       });
 
       configManager.loadUser({
-        ai: { gemini: { apiKey: 'user-key' } }
+        ai: { gemini: { apiKey: 'user-key' } },
       });
 
       expect(configManager.getProvenance('ai.gemini.model')).toBe('default');
@@ -342,8 +265,8 @@ describe('Configuration Hierarchy', () => {
       // Simulate finding configs in different locations
       const searchPaths = [
         path.join(process.cwd(), '.copytree', 'config.js'), // project
-        path.join(os.homedir(), '.copytree', 'config.js'),  // user
-        path.join(process.cwd(), 'config', 'app.js')        // default
+        path.join(os.homedir(), '.copytree', 'config.js'), // user
+        path.join(process.cwd(), 'config', 'app.js'), // default
       ];
 
       const loadOrder = [];
@@ -352,7 +275,7 @@ describe('Configuration Hierarchy', () => {
       const configs = {
         [searchPaths[0]]: { source: 'project' },
         [searchPaths[1]]: { source: 'user' },
-        [searchPaths[2]]: { source: 'default' }
+        [searchPaths[2]]: { source: 'default' },
       };
 
       // Load in priority order
@@ -393,73 +316,30 @@ describe('Configuration Hierarchy', () => {
     });
   });
 
-  describe('env() Function Behavior', () => {
-    it('reads environment variables with defaults', () => {
-      process.env.TEST_VAR = 'test-value';
-
-      const envFunc = (key, defaultValue = null) => {
-        return process.env[key] || defaultValue;
-      };
-
-      expect(envFunc('TEST_VAR', 'default')).toBe('test-value');
-      expect(envFunc('MISSING_VAR', 'default')).toBe('default');
-    });
-
-    it('handles empty string vs undefined', () => {
-      process.env.EMPTY_VAR = '';
-
-      const envFunc = (key, defaultValue = null) => {
-        const value = process.env[key];
-        return value !== undefined ? value : defaultValue;
-      };
-
-      expect(envFunc('EMPTY_VAR', 'default')).toBe('');
-      expect(envFunc('MISSING_VAR', 'default')).toBe('default');
-    });
-
-    it('supports type coercion for env values', () => {
-      process.env.NUMBER_VAR = '42';
-      process.env.BOOL_VAR = 'true';
-
-      const envInt = (key, defaultValue = 0) => {
-        const value = process.env[key];
-        return value !== undefined ? parseInt(value, 10) : defaultValue;
-      };
-
-      const envBool = (key, defaultValue = false) => {
-        const value = process.env[key];
-        return value !== undefined ? value === 'true' : defaultValue;
-      };
-
-      expect(envInt('NUMBER_VAR', 0)).toBe(42);
-      expect(envBool('BOOL_VAR', false)).toBe(true);
-    });
-  });
-
   describe('Complex Scenarios', () => {
     it('handles partial overrides across all levels', () => {
       configManager.loadDefault({
         ai: {
           gemini: { model: 'default-model', temperature: 0.7, apiKey: 'default-key' },
-          cache: { enabled: false, ttl: 604800 }
-        }
+          cache: { enabled: false, ttl: 604800 },
+        },
       });
 
       configManager.loadUser({
         ai: {
-          gemini: { model: 'user-model' }
-        }
+          gemini: { model: 'user-model' },
+        },
       });
 
       configManager.loadProject({
         ai: {
-          cache: { enabled: true }
-        }
+          cache: { enabled: true },
+        },
       });
 
       process.env.GEMINI_API_KEY = 'env-key';
       configManager.loadEnv({
-        ai: { gemini: { apiKey: process.env.GEMINI_API_KEY } }
+        ai: { gemini: { apiKey: process.env.GEMINI_API_KEY } },
       });
 
       const merged = configManager.merge();
@@ -473,11 +353,11 @@ describe('Configuration Hierarchy', () => {
 
     it('preserves arrays without merging', () => {
       configManager.loadDefault({
-        exclude: ['node_modules', 'dist']
+        exclude: ['node_modules', 'dist'],
       });
 
       configManager.loadUser({
-        exclude: ['build']
+        exclude: ['build'],
       });
 
       // Arrays should replace, not merge
@@ -489,11 +369,11 @@ describe('Configuration Hierarchy', () => {
       configManager.loadDefault({
         key1: 'default',
         key2: 'default',
-        key3: 'default'
+        key3: 'default',
       });
 
       configManager.loadUser({
-        key1: null
+        key1: null,
         // key2 with undefined and key3 intentionally not set
       });
 
@@ -506,11 +386,11 @@ describe('Configuration Hierarchy', () => {
 
     it('validates merged configuration', () => {
       configManager.loadDefault({
-        ai: { gemini: { model: 'gemini-1.5-flash' } }
+        ai: { gemini: { model: 'gemini-1.5-flash' } },
       });
 
       configManager.loadCLI({
-        ai: { gemini: { model: 'invalid-model' } }
+        ai: { gemini: { model: 'invalid-model' } },
       });
 
       const merged = configManager.merge();
@@ -524,7 +404,7 @@ describe('Configuration Hierarchy', () => {
   describe('Dot Notation Access', () => {
     it('supports dot notation for nested access', () => {
       configManager.loadDefault({
-        a: { b: { c: { d: 'value' } } }
+        a: { b: { c: { d: 'value' } } },
       });
 
       expect(configManager.get('a.b.c.d')).toBe('value');
@@ -539,7 +419,7 @@ describe('Configuration Hierarchy', () => {
 
     it('handles paths through null values', () => {
       configManager.loadDefault({
-        a: { b: null }
+        a: { b: null },
       });
 
       expect(configManager.get('a.b.c', 'default')).toBe('default');

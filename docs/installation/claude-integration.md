@@ -51,14 +51,14 @@ Then you can reference this file in Claude Code conversations.
 Create and use custom profiles for your project needs:
 
 ```bash
-# List available profiles
-copytree profile:list
-
 # Use default profile (automatic)
 copytree
 
 # Use custom profile
 copytree --profile myproject
+
+# Preview profile selection
+copytree --profile myproject --dry-run
 ```
 
 ### 2. Filter for Relevance
@@ -76,19 +76,7 @@ copytree --changed main
 copytree --filter "src/**/*.js"
 ```
 
-### 3. Enable Transformations
-
-Configure transformers in your profile for better context:
-
-**Note:** Transformers are configured in profiles, not via CLI flags. See the [Transformer Reference](../profiles/transformer-reference.md) for details.
-
-Transformers include:
-- PDF to text conversion
-- Image OCR and descriptions
-- Code summaries for large files
-- Test file summaries
-
-### 4. Manage Output Size
+### 3. Manage Output Size
 
 For large projects, control the output size:
 
@@ -176,7 +164,7 @@ If important files are missing:
 
 ```bash
 # Force include specific files
-copytree --always "config/*" --always ".env.example"
+copytree --always "config/*" --always "config.example.js"
 
 # Check what profile is being used
 copytree --dry-run
@@ -185,5 +173,5 @@ copytree --dry-run
 ## Related Documentation
 
 - [Basic Usage](../usage/basic-usage.md) - General usage guide
-- [Profile Overview](../profiles/profile-overview.md) - Understanding profiles
+- [Your First Custom Profile](../getting-started/first-profile.md) - Creating profiles
 - [CLI Reference](../cli/copytree-reference.md) - Complete command reference

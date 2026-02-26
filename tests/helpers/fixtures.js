@@ -4,14 +4,32 @@
  * Utilities for creating, managing, and cleaning up test fixtures.
  */
 
-import fs from 'fs-extra';
 import path from 'path';
-import os from 'os';
 import { execSync } from 'child_process';
+import { createTestTempDir } from './tempfs.js';
+
+// For E2E tests and golden files, we need the REAL fs-extra, not the mocked version
+// We'll get the actual implementation directly from the module
+let fsExtra;
+try {
+  // In Jest context, use requireActual to bypass mocks
+  fsExtra = typeof jest !== 'undefined' ? jest.requireActual('fs-extra') : null;
+} catch (e) {
+  fsExtra = null;
+}
+
+// Create our fs object with the functions we need
+const fs = {
+  ensureDirSync: fsExtra?.ensureDirSync || fsExtra?.default?.ensureDirSync,
+  writeFileSync: fsExtra?.writeFileSync || fsExtra?.default?.writeFileSync,
+  readFileSync: fsExtra?.readFileSync || fsExtra?.default?.readFileSync,
+  existsSync: fsExtra?.existsSync || fsExtra?.default?.existsSync,
+  removeSync: fsExtra?.removeSync || fsExtra?.default?.removeSync,
+  copySync: fsExtra?.copySync || fsExtra?.default?.copySync,
+};
 
 // Jest-compatible directory resolution
 const FIXTURES_DIR = path.join(process.cwd(), 'tests', 'fixtures');
-const TMP_DIR = path.join(os.tmpdir(), 'copytree-test');
 
 /**
  * Get path to a fixture
@@ -29,32 +47,40 @@ export function goldenPath(name) {
 
 /**
  * Get path in temp directory
+ * @deprecated Use withTempDir from tempfs.js instead for deterministic cleanup
  */
 export function tmpPath(name = '') {
-  return path.join(TMP_DIR, name);
+  // Legacy function - delegates to tempfs for proper cleanup
+  console.warn('tmpPath is deprecated - use withTempDir from tempfs.js instead');
+  const tempDir = createTestTempDir(name || 'legacy');
+  return tempDir.path;
 }
 
 /**
  * Create temp directory
+ * @deprecated Use createTestTempDir or withTempDir from tempfs.js instead
  */
-export function createTmpDir() {
-  fs.ensureDirSync(TMP_DIR);
-  return TMP_DIR;
+export async function createTmpDir() {
+  console.warn('createTmpDir is deprecated - use createTestTempDir from tempfs.js instead');
+  const tempDir = await createTestTempDir('fixtures');
+  return tempDir.path;
 }
 
 /**
  * Clean temp directory
+ * @deprecated Cleanup is automatic with withTempDir from tempfs.js
  */
 export function cleanTmpDir() {
-  if (fs.existsSync(TMP_DIR)) {
-    fs.removeSync(TMP_DIR);
-  }
+  console.warn('cleanTmpDir is deprecated - cleanup is automatic with withTempDir from tempfs.js');
+  // No-op: cleanup should be handled by withTempDir or explicit cleanup() calls
 }
 
 /**
  * Copy fixture to temp directory
+ * @deprecated Use withTempDir and copy files manually for better control
  */
 export function copyFixture(name, tmpName = name) {
+  console.warn('copyFixture is deprecated - use withTempDir and copy manually instead');
   const src = fixturePath(name);
   const dest = tmpPath(tmpName);
   fs.copySync(src, dest);
@@ -69,7 +95,8 @@ export function readGolden(name) {
   if (!fs.existsSync(goldenFile)) {
     throw new Error(`Golden file not found: ${goldenFile}`);
   }
-  return fs.readFileSync(goldenFile, 'utf8');
+  // Normalize line endings to \n for cross-platform consistency
+  return fs.readFileSync(goldenFile, 'utf8').replace(/\r\n/g, '\n');
 }
 
 /**
@@ -98,9 +125,16 @@ export function matchGolden(content, name, options = {}) {
 
 /**
  * Create a local git repository fixture
+ *
+ * NOTE: This function still uses legacy tmpPath. Consider using withTempDir instead:
+ * await withTempDir('repo-name', async (tempDir) => {
+ *   const repo = await createLocalGitRepoInDir(tempDir, files);
+ *   // use repo
+ * });
  */
 export function createLocalGitRepo(name, files = {}) {
-  const repoPath = tmpPath(name);
+  const tempDir = createTestTempDir(name);
+  const repoPath = tempDir.path;
   fs.ensureDirSync(repoPath);
 
   // Initialize git repo
@@ -143,30 +177,41 @@ export function createLocalGitRepo(name, files = {}) {
     },
     getCommitHash(ref = 'HEAD') {
       return execSync(`git rev-parse ${ref}`, { cwd: repoPath, encoding: 'utf8' }).trim();
-    }
+    },
   };
 }
 
 /**
  * Create a simple project fixture programmatically
+ *
+ * NOTE: This function uses temp directory creation. Consider using withTempDir instead:
+ * await withTempDir('test-project', async (tempDir) => {
+ *   await createSimpleProjectInDir(tempDir, options);
+ *   // use project
+ * });
  */
 export function createSimpleProject(name = 'test-project', options = {}) {
   const {
     withGit = false,
     files = {
       'README.md': '# Test Project\n\nThis is a test project.',
-      'package.json': JSON.stringify({
-        name: 'test-project',
-        version: '1.0.0',
-        description: 'Test project',
-        main: 'index.js'
-      }, null, 2),
+      'package.json': JSON.stringify(
+        {
+          name: 'test-project',
+          version: '1.0.0',
+          description: 'Test project',
+          main: 'index.js',
+        },
+        null,
+        2,
+      ),
       'src/index.js': 'console.log("Hello, world!");',
-      'src/utils.js': 'export function add(a, b) { return a + b; }'
-    }
+      'src/utils.js': 'export function add(a, b) { return a + b; }',
+    },
   } = options;
 
-  const projectPath = tmpPath(name);
+  const tempDir = createTestTempDir(name);
+  const projectPath = tempDir.path;
   fs.ensureDirSync(projectPath);
 
   // Create files
@@ -190,14 +235,14 @@ export function createSimpleProject(name = 'test-project', options = {}) {
 
 /**
  * Create a large project for performance testing
+ *
+ * NOTE: This function uses temp directory creation. Consider using withTempDir instead.
  */
 export function createLargeProject(name, fileCount = 100, options = {}) {
-  const {
-    avgFileSize = 1024,
-    withVariety = true
-  } = options;
+  const { avgFileSize = 1024, withVariety = true } = options;
 
-  const projectPath = tmpPath(name);
+  const tempDir = createTestTempDir(name);
+  const projectPath = tempDir.path;
   fs.ensureDirSync(projectPath);
 
   const extensions = withVariety
@@ -228,9 +273,12 @@ export function createLargeProject(name, fileCount = 100, options = {}) {
 
 /**
  * Create malformed/edge-case files for robustness testing
+ *
+ * NOTE: This function uses temp directory creation. Consider using withTempDir instead.
  */
 export function createRobustnessFixtures(name = 'robustness') {
-  const projectPath = tmpPath(name);
+  const tempDir = createTestTempDir(name);
+  const projectPath = tempDir.path;
   fs.ensureDirSync(projectPath);
 
   const fixtures = {
@@ -241,7 +289,7 @@ export function createRobustnessFixtures(name = 'robustness') {
     'long-line.txt': 'x'.repeat(100000),
 
     // Non-UTF8 content (binary disguised as text)
-    'fake-text.txt': Buffer.from([0xFF, 0xFE, 0x00, 0x01]),
+    'fake-text.txt': Buffer.from([0xff, 0xfe, 0x00, 0x01]),
 
     // Path with spaces and special chars
     'path with spaces/file (1).txt': 'content',
@@ -257,7 +305,7 @@ export function createRobustnessFixtures(name = 'robustness') {
     'zero-byte.bin': Buffer.alloc(0),
 
     // Large file marker (will be created separately)
-    'LARGE_FILE_PLACEHOLDER': '# This will be replaced with actual large file'
+    LARGE_FILE_PLACEHOLDER: '# This will be replaced with actual large file',
   };
 
   for (const [filePath, content] of Object.entries(fixtures)) {
@@ -291,7 +339,7 @@ export function createRobustnessFixtures(name = 'robustness') {
       fs.ensureDirSync(path.dirname(linkPath));
       fs.symlinkSync(targetPath, linkPath);
       return linkPath;
-    }
+    },
   };
 }
 
@@ -299,21 +347,57 @@ export function createRobustnessFixtures(name = 'robustness') {
  * Jest custom matcher for golden files
  */
 export function toMatchGolden(received, goldenName, options = {}) {
-  const pass = matchGolden(received, goldenName, options);
+  const update = process.env.UPDATE_GOLDEN === 'true' || options.update;
 
-  if (pass) {
+  if (update) {
+    // Update mode: write golden and pass
+    writeGolden(goldenName, received);
     return {
       pass: true,
-      message: () => `Expected content not to match golden file ${goldenName}`
+      message: () => `Golden file ${goldenName} updated`,
     };
-  } else {
+  }
+
+  // Comparison mode: read and compare
+  try {
     const golden = readGolden(goldenName);
+    const pass = received === golden;
+
+    if (pass) {
+      return {
+        pass: true,
+        message: () => `Expected content not to match golden file ${goldenName}`,
+      };
+    } else {
+      // Get jest-diff - handle both CommonJS and ESM
+      let jestDiff;
+      try {
+        const jestDiffModule = typeof jest !== 'undefined' ? jest.requireActual('jest-diff') : null;
+        // Handle different export shapes: { diff }, { default }, or direct callable
+        jestDiff = jestDiffModule?.diff || jestDiffModule?.default || jestDiffModule;
+        // Ensure it's actually a function
+        if (typeof jestDiff !== 'function') {
+          jestDiff = null;
+        }
+      } catch {
+        // Fallback: just show a simple message without diff
+        jestDiff = null;
+      }
+
+      const diffOutput = jestDiff
+        ? jestDiff(golden, received)
+        : `Expected:\n${golden}\n\nReceived:\n${received}`;
+
+      return {
+        pass: false,
+        message: () => `Expected content to match golden file ${goldenName}\n\n${diffOutput}`,
+      };
+    }
+  } catch (error) {
     return {
       pass: false,
-      message: () => {
-        const diff = require('jest-diff').default(golden, received);
-        return `Expected content to match golden file ${goldenName}\n\n${diff}`;
-      }
+      message: () =>
+        `Golden file ${goldenName} not found. Run with UPDATE_GOLDEN=true to create it.\nError: ${error.message}`,
     };
   }
 }

@@ -93,12 +93,15 @@ class MarkdownFormatter {
       for (const file of files) {
         const relPath = `@${file.path}`;
         const binaryAction = this.stage.config.get('copytree.binaryFileAction', 'placeholder');
-        const policy = this.stage.config.get('copytree.binaryPolicy', {})[file.binaryCategory] || binaryAction;
+        const policy =
+          this.stage.config.get('copytree.binaryPolicy', {})[file.binaryCategory] || binaryAction;
 
         // Check if file should be rendered as a comment
         if (file.excluded || (file.isBinary && policy === 'comment')) {
-          const tpl = this.stage.config.get('copytree.binaryCommentTemplates.markdown',
-            '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->');
+          const tpl = this.stage.config.get(
+            'copytree.binaryCommentTemplates.markdown',
+            '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
+          );
           const categoryName = (file.binaryCategory || 'Binary').toUpperCase();
           const msg = tpl
             .replace('{TYPE}', sanitizeForComment(categoryName))
@@ -169,9 +172,9 @@ class MarkdownFormatter {
               typeof content === 'string'
                 ? content
                 : this.stage.config.get(
-                  'copytree.binaryPlaceholderText',
-                  '[Binary file not included]',
-                ) || '',
+                    'copytree.binaryPlaceholderText',
+                    '[Binary file not included]',
+                  ) || '',
             );
           } else {
             // skip mode: emit empty block

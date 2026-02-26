@@ -7,7 +7,12 @@ import { logger } from '../utils/logger.js';
  * Includes traits-based validation and optimization
  */
 class TransformerRegistry {
-  constructor() {
+  /**
+   * Create a new TransformerRegistry
+   * @param {Object} [options] - Options for registry creation
+   * @param {ConfigManager} [options.config] - ConfigManager instance for isolated configuration.
+   */
+  constructor(options = {}) {
     this.transformers = new Map();
     this.extensionMap = new Map();
     this.mimeTypeMap = new Map();
@@ -17,6 +22,9 @@ class TransformerRegistry {
     // Traits system
     this.traits = new Map(); // transformer name -> traits
     this.validationEnabled = true;
+
+    // Store config for potential use by transformers
+    this.config = options.config || null;
   }
 
   /**
@@ -193,10 +201,7 @@ class TransformerRegistry {
 
       if (mark === VISITING) {
         const cycle = [...stack, name].join(' -> ');
-        throw new TransformError(
-          `Circular dependency detected: ${cycle}`,
-          'CIRCULAR_DEPENDENCY',
-        );
+        throw new TransformError(`Circular dependency detected: ${cycle}`, 'CIRCULAR_DEPENDENCY');
       }
 
       if (mark === DONE) {
@@ -205,17 +210,14 @@ class TransformerRegistry {
 
       // Check if transformer exists
       if (!this.transformers.has(name)) {
-        throw new TransformError(
-          `Missing transformer dependency: ${name}`,
-          'MISSING_DEPENDENCY',
-        );
+        throw new TransformError(`Missing transformer dependency: ${name}`, 'MISSING_DEPENDENCY');
       }
 
       state.set(name, VISITING);
       stack.push(name);
 
       for (const dep of getDeps(name)) {
-        // Dependencies can be external resources (like 'tesseract', 'network')
+        // Dependencies can be external resources (like 'network')
         // Only validate dependencies that are registered transformers
         if (this.transformers.has(dep)) {
           visit(dep, stack);
@@ -530,11 +532,7 @@ class TransformerRegistry {
       }
 
       // Check specific requirements
-      if (
-        traits.requirements.apiKey &&
-        !process.env.GEMINI_API_KEY &&
-        !process.env.OPENAI_API_KEY
-      ) {
+      if (traits.requirements.apiKey) {
         issues.push({
           type: 'missing_resource',
           severity: 'error',
@@ -613,19 +611,23 @@ class TransformerRegistry {
   /**
    * Create default registry with standard transformers and their traits
    * @static
+   * @param {Object} [options] - Options for registry creation
+   * @param {ConfigManager} [options.config] - ConfigManager instance for isolated configuration.
+   *   If not provided, transformers will use their default configuration.
+   *   This enables concurrent registry operations with different configurations.
+   * @returns {Promise<TransformerRegistry>} Configured TransformerRegistry instance
    */
-  static async createDefault() {
+  static async createDefault(options = {}) {
     const registry = new TransformerRegistry();
+    // Store config for potential use by transformers
+    registry.config = options.config || null;
 
     // Register default transformers - using dynamic imports for better ESM compatibility
-    const { default: FileLoaderTransformer } = await import(
-      './transformers/FileLoaderTransformer.js'
-    );
-    const { default: MarkdownTransformer } = await import('./transformers/MarkdownTransformer.js');
-    const { default: CSVTransformer } = await import('./transformers/CSVTransformer.js');
+    const { default: FileLoaderTransformer } =
+      await import('./transformers/FileLoaderTransformer.js');
+    const { default: StreamingFileLoaderTransformer } =
+      await import('./transformers/StreamingFileLoaderTransformer.js');
     const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
-    const { default: PDFTransformer } = await import('./transformers/PDFTransformer.js');
-    const { default: ImageTransformer } = await import('./transformers/ImageTransformer.js');
 
     // File Loader - default transformer
     registry.register(
@@ -649,17 +651,16 @@ class TransformerRegistry {
       },
     );
 
-    // Markdown transformer
+    // Streaming File Loader - for large files
     registry.register(
-      'markdown',
-      new MarkdownTransformer(),
+      'streaming-file-loader',
+      new StreamingFileLoaderTransformer(),
       {
-        extensions: [], // Must be explicitly enabled - not applied automatically
-        priority: 10,
+        priority: 0,
       },
       {
-        inputTypes: ['text'],
-        outputTypes: ['text'],
+        inputTypes: ['any'],
+        outputTypes: ['text', 'binary'],
         idempotent: true,
         orderSensitive: false,
         heavy: false,
@@ -667,87 +668,7 @@ class TransformerRegistry {
         dependencies: [],
         conflictsWith: [],
         requirements: {},
-        tags: ['text-processing', 'markdown'],
-      },
-    );
-
-    // CSV transformer
-    registry.register(
-      'csv',
-      new CSVTransformer(),
-      {
-        extensions: [], // Must be explicitly enabled - not applied automatically
-        mimeTypes: [], // Must be explicitly enabled - not applied automatically
-        priority: 10,
-      },
-      {
-        inputTypes: ['text'],
-        outputTypes: ['text'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: false,
-        stateful: false,
-        dependencies: [],
-        conflictsWith: [],
-        requirements: {},
-        tags: ['data-processing', 'csv', 'formatting'],
-      },
-    );
-
-    // PDF transformer
-    registry.register(
-      'pdf',
-      new PDFTransformer(),
-      {
-        extensions: ['.pdf'],
-        mimeTypes: ['application/pdf'],
-        priority: 15,
-      },
-      {
-        inputTypes: ['binary'],
-        outputTypes: ['text'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: true,
-        stateful: false,
-        dependencies: [],
-        conflictsWith: [],
-        requirements: {
-          memory: '50MB',
-        },
-        tags: ['text-extraction', 'document', 'pdf'],
-      },
-    );
-
-    // Image transformer (OCR)
-    registry.register(
-      'image',
-      new ImageTransformer(),
-      {
-        extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp'],
-        mimeTypes: [
-          'image/jpeg',
-          'image/png',
-          'image/gif',
-          'image/bmp',
-          'image/tiff',
-          'image/webp',
-        ],
-        priority: 15,
-      },
-      {
-        inputTypes: ['binary'],
-        outputTypes: ['text'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: true,
-        stateful: false,
-        dependencies: ['tesseract'],
-        conflictsWith: ['image-description'],
-        requirements: {
-          memory: '100MB',
-        },
-        tags: ['text-extraction', 'image', 'ocr'],
+        tags: ['loader', 'streaming'],
       },
     );
 

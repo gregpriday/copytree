@@ -19,11 +19,7 @@ export function createTestPipeline(stages = null, options = {}) {
 
   if (stages === null) {
     // Default minimal stages
-    stages = [
-      new FileDiscoveryStage(),
-      new FileLoadingStage(),
-      new OutputFormattingStage()
-    ];
+    stages = [new FileDiscoveryStage(), new FileLoadingStage(), new OutputFormattingStage()];
   }
 
   // Use .through() to add stages (Pipeline API)
@@ -36,48 +32,39 @@ export function createTestPipeline(stages = null, options = {}) {
  * Create a full pipeline with all stages
  */
 export async function createFullPipeline(options = {}) {
-  const { ConfigManager } = await import('../../src/config/ConfigManager.js');
-  const config = await ConfigManager.getInstance();
-
-  const { ProfileLoader } = await import('../../src/profiles/ProfileLoader.js');
-  const profileLoader = new ProfileLoader(config);
-
-  const profile = options.profile || await profileLoader.load('default');
-
   // Import all stages
   const GitFilterStage = (await import('../../src/pipeline/stages/GitFilterStage.js')).default;
-  const ProfileFilterStage = (await import('../../src/pipeline/stages/ProfileFilterStage.js')).default;
-  const AlwaysIncludeStage = (await import('../../src/pipeline/stages/AlwaysIncludeStage.js')).default;
-  const ExternalSourceStage = (await import('../../src/pipeline/stages/ExternalSourceStage.js')).default;
+  const ProfileFilterStage = (await import('../../src/pipeline/stages/ProfileFilterStage.js'))
+    .default;
+  const AlwaysIncludeStage = (await import('../../src/pipeline/stages/AlwaysIncludeStage.js'))
+    .default;
   const LimitStage = (await import('../../src/pipeline/stages/LimitStage.js')).default;
   const CharLimitStage = (await import('../../src/pipeline/stages/CharLimitStage.js')).default;
-  const InstructionsStage = (await import('../../src/pipeline/stages/InstructionsStage.js')).default;
-  const NPMStage = (await import('../../src/pipeline/stages/NPMStage.js')).default;
-  const ComposerStage = (await import('../../src/pipeline/stages/ComposerStage.js')).default;
-  const DeduplicateFilesStage = (await import('../../src/pipeline/stages/DeduplicateFilesStage.js')).default;
+  const InstructionsStage = (await import('../../src/pipeline/stages/InstructionsStage.js'))
+    .default;
+  const DeduplicateFilesStage = (await import('../../src/pipeline/stages/DeduplicateFilesStage.js'))
+    .default;
   const SortFilesStage = (await import('../../src/pipeline/stages/SortFilesStage.js')).default;
-  const StreamingOutputStage = (await import('../../src/pipeline/stages/StreamingOutputStage.js')).default;
+  const StreamingOutputStage = (await import('../../src/pipeline/stages/StreamingOutputStage.js'))
+    .default;
 
   const pipeline = new Pipeline();
 
-  // Add all 16 stages in order using .through()
+  // Add full stage set in order using .through()
   pipeline.through([
     new FileDiscoveryStage(),
     new GitFilterStage(),
     new ProfileFilterStage(),
     new AlwaysIncludeStage(),
-    new ExternalSourceStage(),
     new LimitStage(),
     new FileLoadingStage(),
     new TransformStage(),
     new CharLimitStage(),
     new InstructionsStage(),
-    new NPMStage(),
-    new ComposerStage(),
     new DeduplicateFilesStage(),
     new SortFilesStage(),
     new OutputFormattingStage(),
-    new StreamingOutputStage()
+    new StreamingOutputStage(),
   ]);
 
   return pipeline;
@@ -102,7 +89,7 @@ export class PipelineEventCollector extends EventEmitter {
       'stage:error',
       'stage:recover',
       'file:batch',
-      'progress'
+      'progress',
     ];
 
     for (const eventName of eventNames) {
@@ -110,7 +97,7 @@ export class PipelineEventCollector extends EventEmitter {
         this.events.push({
           name: eventName,
           timestamp: Date.now(),
-          data
+          data,
         });
         this.emit(eventName, data);
       });
@@ -121,7 +108,7 @@ export class PipelineEventCollector extends EventEmitter {
    * Get all events of a specific type
    */
   getEvents(name) {
-    return this.events.filter(e => e.name === name);
+    return this.events.filter((e) => e.name === name);
   }
 
   /**
@@ -160,11 +147,11 @@ export class PipelineEventCollector extends EventEmitter {
    * Get stage completion events in order
    */
   getStageCompletions() {
-    return this.getEvents('stage:complete').map(e => ({
+    return this.getEvents('stage:complete').map((e) => ({
       stage: typeof e.data.stage === 'string' ? e.data.stage : e.data.stage.name,
       duration: e.data.duration,
       memoryUsage: e.data.memoryUsage,
-      timestamp: e.timestamp
+      timestamp: e.timestamp,
     }));
   }
 
@@ -172,11 +159,11 @@ export class PipelineEventCollector extends EventEmitter {
    * Get file batch events
    */
   getFileBatches() {
-    return this.getEvents('file:batch').map(e => ({
+    return this.getEvents('file:batch').map((e) => ({
       stage: e.data.stage,
       action: e.data.action,
       count: e.data.count,
-      lastFile: e.data.lastFile
+      lastFile: e.data.lastFile,
     }));
   }
 
@@ -202,7 +189,9 @@ export class PipelineEventCollector extends EventEmitter {
     const stageCompletes = this.getEvents('stage:complete');
 
     if (stageStarts.length !== stageCompletes.length) {
-      errors.push(`Stage start/complete mismatch: ${stageStarts.length} starts, ${stageCompletes.length} completes`);
+      errors.push(
+        `Stage start/complete mismatch: ${stageStarts.length} starts, ${stageCompletes.length} completes`,
+      );
     }
 
     // Stage events should have required fields
@@ -215,7 +204,7 @@ export class PipelineEventCollector extends EventEmitter {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 }
@@ -224,12 +213,7 @@ export class PipelineEventCollector extends EventEmitter {
  * Create mock files for testing
  */
 export function createMockFiles(count = 10, options = {}) {
-  const {
-    prefix = 'file',
-    extension = '.js',
-    withContent = true,
-    withGitStatus = false
-  } = options;
+  const { prefix = 'file', extension = '.js', withContent = true, withGitStatus = false } = options;
 
   const files = [];
 
@@ -241,7 +225,7 @@ export function createMockFiles(count = 10, options = {}) {
       size: 100 + i * 10,
       modified: new Date('2025-01-01T00:00:00.000Z'),
       mtime: new Date('2025-01-01T00:00:00.000Z'),
-      isDirectory: false
+      isDirectory: false,
     };
 
     if (withContent) {
@@ -280,7 +264,7 @@ export class MockStage {
     this.calls.push({ input, timestamp: Date.now() });
 
     if (this.delay > 0) {
-      await new Promise(resolve => setTimeout(resolve, this.delay));
+      await new Promise((resolve) => setTimeout(resolve, this.delay));
     }
 
     if (this.shouldError) {
@@ -309,28 +293,28 @@ export function assertStageContract(stage, input, output) {
   const contracts = {
     FileDiscoveryStage: {
       input: () => true,
-      output: (o) => Array.isArray(o.files) && o.files.length >= 0
+      output: (o) => Array.isArray(o.files) && o.files.length >= 0,
     },
     ProfileFilterStage: {
       input: (i) => Array.isArray(i.files),
-      output: (o) => Array.isArray(o.files) && o.files.length <= input.files.length
+      output: (o) => Array.isArray(o.files) && o.files.length <= input.files.length,
     },
     TransformStage: {
-      input: (i) => Array.isArray(i.files) && i.files.every(f => f.content !== undefined),
-      output: (o) => Array.isArray(o.files)
+      input: (i) => Array.isArray(i.files) && i.files.every((f) => f.content !== undefined),
+      output: (o) => Array.isArray(o.files),
     },
     LimitStage: {
       input: (i) => Array.isArray(i.files),
-      output: (o) => Array.isArray(o.files) && o.files.length <= input.files.length
+      output: (o) => Array.isArray(o.files) && o.files.length <= input.files.length,
     },
     DeduplicateFilesStage: {
       input: (i) => Array.isArray(i.files),
-      output: (o) => Array.isArray(o.files) && o.files.length <= input.files.length
+      output: (o) => Array.isArray(o.files) && o.files.length <= input.files.length,
     },
     SortFilesStage: {
       input: (i) => Array.isArray(i.files),
-      output: (o) => Array.isArray(o.files) && o.files.length === input.files.length
-    }
+      output: (o) => Array.isArray(o.files) && o.files.length === input.files.length,
+    },
   };
 
   const contract = contracts[stage.constructor.name];
@@ -348,8 +332,8 @@ export function assertStageContract(stage, input, output) {
     message: !inputValid
       ? 'Input contract violated'
       : !outputValid
-      ? 'Output contract violated'
-      : 'Contract satisfied'
+        ? 'Output contract violated'
+        : 'Contract satisfied',
   };
 }
 
@@ -364,13 +348,13 @@ export async function runPipelineWithEvents(pipeline, input) {
     return {
       output,
       events: collector.events,
-      collector
+      collector,
     };
   } catch (error) {
     return {
       error,
       events: collector.events,
-      collector
+      collector,
     };
   }
 }
@@ -388,12 +372,12 @@ export function capturePerformanceSnapshot() {
       heapUsed: memoryUsage.heapUsed,
       heapTotal: memoryUsage.heapTotal,
       external: memoryUsage.external,
-      rss: memoryUsage.rss
+      rss: memoryUsage.rss,
     },
     cpu: {
       user: cpuUsage.user,
-      system: cpuUsage.system
-    }
+      system: cpuUsage.system,
+    },
   };
 }
 
@@ -407,11 +391,11 @@ export function calculatePerformanceDelta(before, after) {
       heapUsed: after.memory.heapUsed - before.memory.heapUsed,
       heapTotal: after.memory.heapTotal - before.memory.heapTotal,
       external: after.memory.external - before.memory.external,
-      rss: after.memory.rss - before.memory.rss
+      rss: after.memory.rss - before.memory.rss,
     },
     cpuDelta: {
       user: after.cpu.user - before.cpu.user,
-      system: after.cpu.system - before.cpu.system
-    }
+      system: after.cpu.system - before.cpu.system,
+    },
   };
 }

@@ -28,7 +28,7 @@ const traits = {
   stateful: false,                    // Maintains state between runs
   
   // Dependencies and Conflicts
-  dependencies: ['network', 'tesseract'], // External dependencies required
+  dependencies: ['network'], // External dependencies required
   conflictsWith: ['other-transformer'],   // Incompatible transformers
   
   // Resource Requirements
@@ -68,21 +68,20 @@ import TransformerRegistry from './TransformerRegistry.js';
 const registry = new TransformerRegistry();
 
 // Register transformer with traits
-registry.register('ai-summary', new AISummaryTransformer(), {
-  extensions: ['.js', '.py'],
+registry.register('binary', new BinaryTransformer(), {
+  extensions: ['.zip'],
   priority: 20
 }, {
   // Traits object
-  inputTypes: ['text'],
-  outputTypes: ['text'],
+  inputTypes: ['any'],
+  outputTypes: ['binary'],
   idempotent: true,
   orderSensitive: false,
-  heavy: true,
+  heavy: false,
   requirements: {
-    apiKey: true,
-    network: true
+    memory: '100MB'
   },
-  tags: ['ai', 'summary', 'expensive']
+  tags: ['binary']
 });
 ```
 
@@ -100,29 +99,22 @@ The system includes predefined traits for built-in transformers:
   tags: ['loader', 'default']
 }
 
-// PDF Transformer
+// Binary Transformer
 {
   inputTypes: ['binary'],
   outputTypes: ['text'],
   idempotent: true,
-  heavy: true,
-  requirements: { memory: '50MB' },
-  tags: ['text-extraction', 'document', 'pdf']
+  heavy: false,
+  tags: ['binary', 'placeholder']
 }
 
-// AI Summary
+// Streaming File Loader
 {
-  inputTypes: ['text'],
-  outputTypes: ['text'],
+  inputTypes: ['any'],
+  outputTypes: ['text', 'binary'],
   idempotent: true,
-  heavy: true,
-  conflictsWith: ['file-summary'],
-  requirements: {
-    apiKey: true,
-    network: true,
-    memory: '200MB'
-  },
-  tags: ['ai', 'summary', 'expensive']
+  heavy: false,
+  tags: ['loader', 'streaming', 'large-files']
 }
 ```
 
@@ -131,7 +123,7 @@ The system includes predefined traits for built-in transformers:
 ### Basic Validation
 
 ```javascript
-const plan = ['pdf', 'ai-summary', 'markdown'];
+const plan = ['pdf', 'first-lines', 'markdown'];
 const result = registry.validatePlan(plan);
 
 console.log(result.valid);    // true/false
@@ -226,9 +218,9 @@ registry.setValidationEnabled(true);
 
 ```javascript
 // Get traits for specific transformer
-const traits = registry.getTraits('ai-summary');
+const traits = registry.getTraits('pdf');
 console.log(traits.heavy);        // true
-console.log(traits.requirements); // { apiKey: true, network: true }
+console.log(traits.requirements); // { memory: '100MB' }
 
 // List all transformers with traits
 const transformers = registry.list();
@@ -368,7 +360,7 @@ try {
 
 ```javascript
 // Check for missing resources before execution
-const validation = registry.validatePlan(['ai-summary']);
+const validation = registry.validatePlan(['pdf']);
 const resourceIssues = validation.issues.filter(issue => 
   issue.type === 'missing_resource'
 );
@@ -434,8 +426,6 @@ The traits system is designed for extensibility:
 - **Runtime performance monitoring** integration
 - **Custom validation rules** for specific use cases
 
-## See Also
+## Related Documentation
 
-- [TransformerRegistry API Reference](./transformer-registry-api.md)
-- [Pipeline Architecture](./pipeline-architecture.md)
-- [Custom Transformer Development](./custom-transformers.md)
+- [Architecture Guide](../technical/architecture.md) - Pipeline and system design

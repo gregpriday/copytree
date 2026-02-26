@@ -24,14 +24,14 @@ export function restoreEnv() {
   }
 
   // Remove keys that were added during test
-  Object.keys(process.env).forEach(key => {
+  Object.keys(process.env).forEach((key) => {
     if (!(key in originalEnv)) {
       delete process.env[key];
     }
   });
 
   // Restore original values for keys that were modified
-  Object.keys(originalEnv).forEach(key => {
+  Object.keys(originalEnv).forEach((key) => {
     process.env[key] = originalEnv[key];
   });
 }

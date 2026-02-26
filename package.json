@@ -1,7 +1,17 @@
 {
   "name": "copytree",
-  "version": "0.13.1",
-  "description": "A Node.js CLI tool that copies directory structures and file contents into structured XML format",
+  "version": "0.14.0",
+  "description": "A Node.js CLI tool and library that copies directory structures and file contents into structured formats",
+  "main": "./src/index.js",
+  "types": "./types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
     "copytree": "./bin/copytree.js"
   },
@@ -13,19 +23,34 @@
     "test:unit": "jest tests/unit",
     "test:integration": "jest --config jest.integration.config.js",
     "test:e2e": "jest tests/e2e",
+    "test:electron": "cd tests/electron && npm install && npm test",
+    "typecheck": "tsc --noEmit -p tests/types/tsconfig.json",
+    "profile": "node scripts/profile.js",
+    "profile:cpu": "node scripts/profile.js --type cpu",
+    "profile:heap": "node scripts/profile.js --type heap",
+    "profile:compare": "node scripts/profile-compare.js",
     "benchmark": "node tests/performance/benchmark.js",
+    "benchmark:discovery": "node tests/performance/file-discovery.bench.js",
+    "test:performance": "jest --config jest.performance.config.js --runInBand",
     "lint": "eslint src/ bin/",
     "lint:fix": "eslint src/ bin/ --fix",
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
-    "prepublishOnly": "npm run lint && npm run test"
+    "prepublishOnly": "npm run lint && npm run test && npm run typecheck"
   },
   "keywords": [
     "cli",
     "directory",
     "xml",
     "copy",
-    "ai"
+    "ai",
+    "programmatic",
+    "api",
+    "library",
+    "electron",
+    "sdk",
+    "scan",
+    "format"
   ],
   "author": "Greg Priday <greg@siteorigin.com>",
   "license": "MIT",
@@ -41,45 +66,51 @@
     "node": ">=20.0.0"
   },
   "type": "module",
+  "sideEffects": false,
+  "files": [
+    "src/",
+    "bin/",
+    "types/",
+    "profiles/",
+    "config/"
+  ],
   "dependencies": {
-    "ajv": "^8.17.1",
+    "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
-    "axios": "^1.13.1",
-    "chalk": "^4.1.2",
-    "clipboardy": "^5.0.0",
-    "commander": "^14.0.2",
-    "dotenv": "^17.2.3",
+    "chalk": "^5.6.2",
+    "clipboardy": "^5.3.0",
+    "commander": "^14.0.3",
     "fast-glob": "^3.3.3",
-    "fs-extra": "^11.3.2",
-    "ink": "^4.0.0",
+    "fs-extra": "^11.3.3",
+    "ink": "^6.7.0",
     "ink-spinner": "^5.0.0",
-    "inquirer": "^12.2.0",
-    "joi": "^18.0.1",
-    "js-yaml": "^4.1.0",
-    "lodash": "^4.17.21",
-    "marked": "^16.4.1",
-    "minimatch": "^10.1.1",
-    "ora": "^5.4.1",
-    "p-limit": "^7.2.0",
-    "pdf-parse": "^2.4.5",
-    "react": "^18.2.0",
-    "simple-git": "^3.28.0",
-    "tesseract.js": "^6.0.1",
-    "xmlbuilder2": "^4.0.0"
+    "inquirer": "^13.2.4",
+    "js-yaml": "^4.1.1",
+    "lodash": "^4.17.23",
+    "minimatch": "^10.2.0",
+    "ora": "^9.3.0",
+    "p-limit": "^7.3.0",
+    "react": "^19.2.4",
+    "simple-git": "^3.31.1",
+    "xmlbuilder2": "^4.0.3"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.28.0",
+    "@babel/preset-env": "^7.29.0",
     "@babel/preset-react": "^7.27.1",
-    "@babel/register": "^7.27.1",
-    "@types/node": "^22.12.0",
-    "babel-jest": "^30.0.4",
-    "eslint": "^9.18.0",
-    "fast-xml-parser": "^5.3.0",
+    "@babel/register": "^7.28.6",
+    "@types/node": "^24.10.1",
+    "babel-jest": "^30.2.0",
+    "babel-plugin-transform-import-meta": "^2.3.3",
+    "eslint": "^9.39.1",
+    "fast-xml-parser": "^5.3.6",
     "ink-testing-library": "^4.0.0",
     "jest": "^30.0.4",
-    "jest-mock-fs": "^1.0.2",
-    "prettier": "^3.5.0",
-    "sharp": "^0.34.3",
+    "prettier": "^3.8.1",
+    "strip-ansi": "^7.1.0",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "test-exclude": "^7.0.1",
+    "glob": "^10.4.5"
   }
 }

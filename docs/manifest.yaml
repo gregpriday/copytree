@@ -1,58 +1,20 @@
 version: 1
 
 sections:
-  # Profile documentation
-  - id: profiles/overview
-    title: "Profile Overview"
-    summary: "Key concepts, structure, locations, inheritance"
+  # Getting started documentation
+  - id: getting-started/quickstart
+    title: "Quickstart Guide"
+    summary: "Install and run your first copy operation"
     files:
-      - "profiles/profile-overview.md"
-    tags: [profiles, concepts]
+      - "getting-started/quickstart.md"
+    tags: [getting-started, installation]
 
-  - id: profiles/authoring
-    title: "Profile Creation Guide"
-    summary: "Step-by-step authoring with examples and validation"
+  - id: getting-started/profiles
+    title: "Your First Custom Profile"
+    summary: "Learn to create profiles step-by-step"
     files:
-      - "profiles/profile-creation-guide.md"
-    tags: [profiles, authoring]
-
-  - id: profiles/examples
-    title: "Profile Examples"
-    summary: "Real-world patterns for monorepos, microservices, documentation"
-    files:
-      - "profiles/profile-examples.md"
-    tags: [profiles, examples]
-
-  - id: profiles/advanced
-    title: "Advanced Profile Features"
-    summary: "Inheritance, external sources, complex filtering rules"
-    files:
-      - "profiles/profile-advanced.md"
-      - "profiles/instructions.md"
-    tags: [profiles, advanced]
-
-  # Transformer documentation
-  - id: transformers/reference
-    title: "Transformer Reference"
-    summary: "Complete guide to all 15+ transformers and their options"
-    files:
-      - "profiles/transformer-reference.md"
-    tags: [transformers, reference]
-
-  # Ignore and include documentation
-  - id: ignore/guide
-    title: ".copytreeignore Guide"
-    summary: "Syntax, patterns, best practices for excluding files"
-    files:
-      - "profiles/copytreeignore.md"
-    tags: [ignore, include, precedence]
-
-  - id: include/guide
-    title: "Force-Include Guide"
-    summary: ".copytreeinclude usage, always rules, merging and precedence"
-    files:
-      - "profiles/force-include.md"
-    tags: [ignore, include, precedence]
+      - "getting-started/first-profile.md"
+    tags: [getting-started, profiles]
 
   # CLI documentation
   - id: cli/reference
@@ -60,7 +22,6 @@ sections:
     summary: "Complete command options and usage examples"
     files:
       - "cli/copytree-reference.md"
-      - "cli/profile-commands.md"
     tags: [cli, commands]
 
   # Usage documentation
@@ -78,6 +39,21 @@ sections:
       - "usage/troubleshooting.md"
     tags: [usage, troubleshooting, debugging]
 
+  - id: usage/secrets
+    title: "Secrets Guard"
+    summary: "Prevent accidental secret exposure"
+    files:
+      - "usage/secrets-guard.md"
+    tags: [usage, security]
+
+  # Reference documentation
+  - id: reference/configuration
+    title: "Configuration Reference"
+    summary: "Complete config system with precedence rules"
+    files:
+      - "reference/configuration.md"
+    tags: [reference, configuration]
+
   # Technical documentation
   - id: technical/architecture
     title: "Architecture"
@@ -87,30 +63,50 @@ sections:
     tags: [technical, architecture]
 
   - id: technical/testing
-    title: "Testing Guide"
-    summary: "Running tests, writing tests, coverage requirements"
+    title: "Testing Strategy"
+    summary: "Test infrastructure and patterns"
     files:
-      - "technical/testing.md"
+      - "technical/testing-strategy.md"
     tags: [technical, testing]
 
-groups:
-  - id: profiles
-    title: "Profiles Bundle"
-    sections:
-      - profiles/overview
-      - profiles/authoring
-      - profiles/examples
-      - profiles/advanced
-      - transformers/reference
-    description: "Everything needed to understand, author, and validate custom profiles"
+  # Development documentation
+  - id: development/transformers
+    title: "Transformer Traits System"
+    summary: "Validation and optimization for transformer execution"
+    files:
+      - "development/transformer-traits.md"
+    tags: [development, transformers]
 
-  - id: ignore-and-include
-    title: "Ignore & Force-Include Bundle"
+  # Installation documentation
+  - id: installation/guide
+    title: "Installation Guide"
+    summary: "Complete installation instructions"
+    files:
+      - "installation/installation-guide.md"
+    tags: [installation]
+
+  - id: installation/claude
+    title: "Claude Code Integration"
+    summary: "Use CopyTree with Claude Code"
+    files:
+      - "installation/claude-integration.md"
+    tags: [installation, integration]
+
+  - id: installation/electron
+    title: "Electron Integration"
+    summary: "Using CopyTree in Electron apps"
+    files:
+      - "installation/electron-integration.md"
+    tags: [installation, integration, electron]
+
+groups:
+  - id: getting-started
+    title: "Getting Started Bundle"
     sections:
-      - ignore/guide
-      - include/guide
-      - usage/troubleshooting
-    description: ".copytreeignore and .copytreeinclude with precedence rules, examples, and troubleshooting"
+      - getting-started/quickstart
+      - getting-started/profiles
+      - usage/basic
+    description: "Everything needed to get started with CopyTree"
 
   - id: cli-and-usage
     title: "CLI & Usage Bundle"
@@ -125,36 +121,21 @@ groups:
     sections:
       - technical/architecture
       - technical/testing
-      - profiles/advanced
-    description: "Architecture, testing, and advanced technical concepts"
+      - development/transformers
+    description: "Architecture, testing, and development concepts"
 
 tasks:
-  - id: make-copytreeignore
-    title: "Create .copytreeignore and/or .copytreeinclude"
-    groups: [ignore-and-include]
+  - id: setup-workflow
+    title: "Set up a complete CopyTree workflow"
+    groups: [getting-started, cli-and-usage]
     extra:
-      intro: "Use these rules and examples to generate project-appropriate patterns, then validate with --dry-run"
+      intro: "Configure CopyTree for your project with profiles and common commands"
       checklist:
-        - "Review common patterns for your project type"
-        - "Draft .copytreeignore with exclusion patterns"
-        - "Add .copytreeinclude for force-included files (hidden files, configs)"
-        - "Understand precedence: .copytreeinclude overrides everything"
-        - "Run: copytree --dry-run to preview"
-        - "Iterate based on preview results"
-
-  - id: author-custom-profile
-    title: "Author a custom profile for this project"
-    groups: [profiles]
-    extra:
-      intro: "Create, validate, and refine a custom profile using documentation and examples"
-      checklist:
-        - "Read profile-overview to understand structure"
-        - "Follow profile-creation-guide step-by-step"
-        - "Review profile-examples for patterns"
-        - "Configure transformers using transformer-reference"
-        - "Validate: copytree profile:validate <name>"
-        - "Test: copytree --profile <name> --dry-run"
-        - "Iterate and refine based on results"
+        - "Create .copytreeignore for project-specific exclusions"
+        - "Add .copytreeinclude for important hidden/config files"
+        - "Create a custom profile for your use case"
+        - "Learn common CLI commands and flags"
+        - "Test with --dry-run to preview"
 
   - id: understand-architecture
     title: "Understand CopyTree architecture and pipeline"
@@ -164,17 +145,4 @@ tasks:
       checklist:
         - "Review pipeline architecture and stage contracts"
         - "Understand event system and error handling"
-        - "Learn about advanced features and extensibility"
-        - "Review testing guide for contributing"
-
-  - id: setup-workflow
-    title: "Set up a complete CopyTree workflow"
-    groups: [cli-and-usage, ignore-and-include, profiles]
-    extra:
-      intro: "Configure CopyTree for your project with profiles, ignore rules, and common commands"
-      checklist:
-        - "Create .copytreeignore for project-specific exclusions"
-        - "Add .copytreeinclude for important hidden/config files"
-        - "Author a custom profile for your use case"
-        - "Learn common CLI commands and flags"
-        - "Set up validation in your workflow"
+        - "Learn about testing patterns"

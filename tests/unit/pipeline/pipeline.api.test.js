@@ -44,10 +44,7 @@ describe('Pipeline API Surface', () => {
     });
 
     it('.through() accepts array of stages', () => {
-      const mockStages = [
-        { process: async (input) => input },
-        { process: async (input) => input }
-      ];
+      const mockStages = [{ process: async (input) => input }, { process: async (input) => input }];
       expect(() => {
         pipeline.through(mockStages);
       }).not.toThrow();
@@ -80,7 +77,7 @@ describe('Pipeline API Surface', () => {
         endTime: null,
         stagesCompleted: 0,
         stagesFailed: 0,
-        errors: expect.any(Array)
+        errors: expect.any(Array),
       });
     });
   });
@@ -122,12 +119,15 @@ describe('Pipeline API Surface', () => {
       expect(p.options.maxConcurrency).toBe(10);
     });
 
-    it('has sensible defaults', () => {
+    it('has sensible defaults', async () => {
+      // Options are lazy-loaded in process(), so call a no-op process first
+      await pipeline.through([{ process: async (input) => input }]).process({});
+
       expect(pipeline.options).toMatchObject({
         continueOnError: expect.any(Boolean),
         emitProgress: expect.any(Boolean),
         parallel: expect.any(Boolean),
-        maxConcurrency: expect.any(Number)
+        maxConcurrency: expect.any(Number),
       });
 
       expect(pipeline.options.maxConcurrency).toBeGreaterThan(0);
@@ -137,7 +137,7 @@ describe('Pipeline API Surface', () => {
   describe('Method Signatures', () => {
     it('.process() is async and returns a promise', async () => {
       const mockStage = {
-        process: async (input) => ({ ...input, processed: true })
+        process: async (input) => ({ ...input, processed: true }),
       };
 
       pipeline.through(mockStage);
@@ -209,10 +209,7 @@ describe('Pipeline API Surface', () => {
       const stage3 = { process: async (i) => i };
 
       // Should allow chaining
-      const result = pipeline
-        .through(stage1)
-        .through(stage2)
-        .through(stage3);
+      const result = pipeline.through(stage1).through(stage2).through(stage3);
 
       expect(result).toBe(pipeline);
       expect(pipeline.stages).toHaveLength(3);
@@ -227,13 +224,13 @@ describe('Pipeline API Documentation Examples', () => {
     const stage1 = {
       process: async (input) => {
         return { ...input, step1: true };
-      }
+      },
     };
 
     const stage2 = {
       process: async (input) => {
         return { ...input, step2: true };
-      }
+      },
     };
 
     pipeline.through([stage1, stage2]);
@@ -243,7 +240,7 @@ describe('Pipeline API Documentation Examples', () => {
     expect(output).toEqual({
       start: true,
       step1: true,
-      step2: true
+      step2: true,
     });
   });
 

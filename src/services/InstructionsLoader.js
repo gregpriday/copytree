@@ -4,8 +4,23 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { logger } from '../utils/logger.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Get module directory path - works in both ESM and CommonJS (Jest) contexts
+const resolveEnv = () => {
+  try {
+    const metaUrl = import.meta.url;
+    return {
+      filename: fileURLToPath(metaUrl),
+      dirname: path.dirname(fileURLToPath(metaUrl)),
+    };
+  } catch {
+    return {
+      filename: typeof __filename !== 'undefined' ? __filename : '',
+      dirname: typeof __dirname !== 'undefined' ? __dirname : '',
+    };
+  }
+};
+
+const { filename: moduleFilename, dirname: moduleDir } = resolveEnv();
 
 /**
  * Instructions loader and manager
@@ -18,7 +33,7 @@ class InstructionsLoader {
 
     // Instructions directories (in order of priority)
     this.userDir = path.join(os.homedir(), '.copytree/instructions');
-    this.appDir = path.join(__dirname, '..', 'templates', 'instructions');
+    this.appDir = path.join(moduleDir, '..', 'templates', 'instructions');
 
     // Cache for loaded instructions
     this.instructionsCache = new Map();
@@ -56,9 +71,6 @@ class InstructionsLoader {
       else if (await fs.pathExists(appPath)) {
         content = await fs.readFile(appPath, 'utf8');
         foundPath = appPath;
-        if (this.logger?.debug) {
-          this.logger.debug(`Loading instructions from app directory: ${appPath}`);
-        }
       } else {
         const { InstructionsError, CopyTreeError } = await import('../utils/errors.js');
         const ErrorClass = InstructionsError || CopyTreeError;
@@ -72,9 +84,6 @@ class InstructionsLoader {
       // Cache the result
       this.instructionsCache.set(cacheKey, content);
 
-      if (this.logger?.debug) {
-        this.logger.debug(`Successfully loaded instructions '${name}' from ${foundPath}`);
-      }
       return content;
     } catch (error) {
       if (this.logger?.error) {

@@ -38,30 +38,30 @@ class SortFilesStage extends Stage {
       let compareValue = 0;
 
       switch (this.sortBy) {
-      case 'size':
-        compareValue = this.compareBySize(a, b);
-        break;
+        case 'size':
+          compareValue = this.compareBySize(a, b);
+          break;
 
-      case 'modified':
-        compareValue = this.compareByModified(a, b);
-        break;
+        case 'modified':
+          compareValue = this.compareByModified(a, b);
+          break;
 
-      case 'name':
-        compareValue = this.compareByName(a, b);
-        break;
+        case 'name':
+          compareValue = this.compareByName(a, b);
+          break;
 
-      case 'extension':
-        compareValue = this.compareByExtension(a, b);
-        break;
+        case 'extension':
+          compareValue = this.compareByExtension(a, b);
+          break;
 
-      case 'depth':
-        compareValue = this.compareByDepth(a, b);
-        break;
+        case 'depth':
+          compareValue = this.compareByDepth(a, b);
+          break;
 
-      case 'path':
-      default:
-        compareValue = this.compareByPath(a, b);
-        break;
+        case 'path':
+        default:
+          compareValue = this.compareByPath(a, b);
+          break;
       }
 
       // Apply sort order
@@ -132,8 +132,8 @@ class SortFilesStage extends Stage {
    * Compare by file name only (not full path)
    */
   compareByName(a, b) {
-    const nameA = path.basename(a.relativePath);
-    const nameB = path.basename(b.relativePath);
+    const nameA = path.basename(a.relativePath || a.path || '');
+    const nameB = path.basename(b.relativePath || b.path || '');
 
     return nameA.localeCompare(nameB, undefined, {
       numeric: true,
@@ -145,8 +145,8 @@ class SortFilesStage extends Stage {
    * Compare by file extension
    */
   compareByExtension(a, b) {
-    const extA = path.extname(a.relativePath).toLowerCase();
-    const extB = path.extname(b.relativePath).toLowerCase();
+    const extA = path.extname(a.relativePath || a.path || '').toLowerCase();
+    const extB = path.extname(b.relativePath || b.path || '').toLowerCase();
 
     if (extA === extB) {
       // Secondary sort by path if extensions are equal
@@ -160,8 +160,8 @@ class SortFilesStage extends Stage {
    * Compare by directory depth
    */
   compareByDepth(a, b) {
-    const depthA = a.relativePath.split(path.sep).length;
-    const depthB = b.relativePath.split(path.sep).length;
+    const depthA = (a.relativePath || a.path || '').split('/').length;
+    const depthB = (b.relativePath || b.path || '').split('/').length;
 
     if (depthA === depthB) {
       // Secondary sort by path if depths are equal

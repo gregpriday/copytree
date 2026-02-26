@@ -2,11 +2,13 @@ import Stage from '../Stage.js';
 import fs from 'fs-extra';
 import path from 'path';
 import { detect, isConvertibleDocument } from '../../utils/BinaryDetector.js';
+import { minimatch } from 'minimatch';
 
 class FileLoadingStage extends Stage {
   constructor(options = {}) {
     super(options);
     this.encoding = options.encoding || 'utf8';
+    // Config may not be available yet in constructor, but the proxy returns defaults
     this.binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
   }
 
@@ -28,7 +30,22 @@ class FileLoadingStage extends Stage {
 
   async loadFileContent(file) {
     try {
-      // Use centralized binary detector
+      // 1. Check for Structure Only patterns (Token saving)
+      const structureOnlyPatterns = this.config.get('copytree.structureOnlyPatterns', []);
+      const isStructureOnly = structureOnlyPatterns.some((pattern) =>
+        minimatch(file.path, pattern, { dot: true, nocase: process.platform === 'win32' }),
+      );
+
+      if (isStructureOnly) {
+        return {
+          ...file,
+          content: '[Content skipped for AI context optimization]', // Token-efficient placeholder
+          isBinary: true, // Treat as binary to skip line numbering/processing
+          binaryCategory: 'structure-only',
+        };
+      }
+
+      // 2. Use centralized binary detector
       const det = await detect(file.absolutePath, {
         sampleBytes: this.config.get('copytree.binaryDetect.sampleBytes', 8192),
         nonPrintableThreshold: this.config.get('copytree.binaryDetect.nonPrintableThreshold', 0.3),
@@ -57,7 +74,8 @@ class FileLoadingStage extends Stage {
       }
 
       // Regular text file
-      const content = await fs.readFile(file.absolutePath, this.encoding);
+      const raw = await fs.readFile(file.absolutePath, this.encoding);
+      const content = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
       return {
         ...file,
@@ -79,33 +97,33 @@ class FileLoadingStage extends Stage {
 
   handleBinaryFile(file, det, policy) {
     switch (policy) {
-    case 'skip':
-      return null;
+      case 'skip':
+        return null;
 
-    case 'comment':
-      // Return stub for formatters to emit comments
-      return {
-        ...file,
-        content: '',
-        isBinary: true,
-        excluded: true,
-        excludedReason: det.category || 'binary',
-        binaryCategory: det.category,
-        binaryName: det.name,
-      };
+      case 'comment':
+        // Return stub for formatters to emit comments
+        return {
+          ...file,
+          content: '',
+          isBinary: true,
+          excluded: true,
+          excludedReason: det.category || 'binary',
+          binaryCategory: det.category,
+          binaryName: det.name,
+        };
 
-    case 'base64':
-      return this.loadBinaryAsBase64(file, det);
+      case 'base64':
+        return this.loadBinaryAsBase64(file, det);
 
-    case 'placeholder':
-    default:
-      return {
-        ...file,
-        content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
-        isBinary: true,
-        binaryCategory: det.category,
-        binaryName: det.name,
-      };
+      case 'placeholder':
+      default:
+        return {
+          ...file,
+          content: this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]'),
+          isBinary: true,
+          binaryCategory: det.category,
+          binaryName: det.name,
+        };
     }
   }
 

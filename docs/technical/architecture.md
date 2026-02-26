@@ -341,7 +341,6 @@ class TransformStage extends Stage {
 
   _isRecoverableError(error) {
     const recoverableTypes = [
-      'AIProviderError',     // AI service failures
       'TransformError',      // Transformation failures
       'ENOTFOUND',           // Network connectivity issues
       'ETIMEDOUT',           // Request timeouts
@@ -691,7 +690,5 @@ This architecture supports CopyTree's performance targets while maintaining code
 ---
 
 **Related Documentation:**
-- [ESM/CommonJS Compatibility](./esm-commonjs-compatibility.md) - Module system architecture
 - [CLI Reference](../cli/copytree-reference.md) - Command-line interface
-- [Profile System](../profiles/profile-overview.md) - File filtering architecture
 - [Troubleshooting Guide](../usage/troubleshooting.md) - Common issues and solutions

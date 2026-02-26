@@ -27,14 +27,13 @@ import SummaryTable from './SummaryTable.js';
 import StaticLog from './StaticLog.js';
 
 import Pipeline from '../../pipeline/Pipeline.js';
-import ProfileLoader from '../../profiles/ProfileLoader.js';
 import GitHubUrlHandler from '../../services/GitHubUrlHandler.js';
 import { CommandError } from '../../utils/errors.js';
 import fs from 'fs-extra';
 import path from 'path';
 import Clipboard from '../../utils/clipboard.js';
 import os from 'os';
-import { globalTelemetry } from '../../utils/performanceBudgets.js';
+import { config } from '../../config/ConfigManager.js';
 
 const CopyView = () => {
   const {
@@ -84,11 +83,12 @@ const CopyView = () => {
 
       updateState({ isLoading: true, currentStage: 'Initializing' });
 
-      // 1. Load profile
-      const profileLoader = new ProfileLoader();
+      // Ensure configuration is loaded before proceeding
+      await config().loadConfiguration();
+
       const profileName = options.profile || 'default';
-      updateState({ currentStage: 'Loading profile' });
-      const profile = await loadProfile(profileLoader, profileName, options);
+      updateState({ currentStage: 'Preparing configuration' });
+      const profile = buildPipelineProfile(options);
 
       // 2. Validate and resolve path
       let basePath;
@@ -134,27 +134,13 @@ const CopyView = () => {
       const outputResult = await prepareOutput(result, options);
       setOutput(outputResult.content);
 
-      // Record performance telemetry if info mode is enabled
-      if (options.info && result.stats) {
-        const duration = Date.now() - startTime;
-        // Count only non-null files (nulls are placeholders for filtered binary files)
-        const fileCount = result.files ? result.files.filter((f) => f !== null).length :
-          (result.stats.filesProcessed || result.stats.totalFiles || 0);
-        globalTelemetry.recordSession(result.stats, duration, fileCount, {
-          profile: profileName,
-          hasTransformers: !options.noTransform,
-          format:
-            (options.format ? String(options.format).toLowerCase() : 'xml') === 'md'
-              ? 'markdown'
-              : options.format
-                ? String(options.format).toLowerCase()
-                : 'xml',
-          outputDestination: options.output ? 'file' : options.display ? 'terminal' : 'clipboard',
-        });
-      }
-
       // Handle output actions and create completion message
-      const completionMessage = await handleOutputAndCreateMessage(outputResult, options, result);
+      const completionMessage = await handleOutputAndCreateMessage(
+        outputResult,
+        options,
+        result,
+        basePath,
+      );
     } catch (err) {
       console.error(err.message);
       updateState({
@@ -166,65 +152,36 @@ const CopyView = () => {
     }
   };
 
-  const loadProfile = async (profileLoader, profileName, options) => {
-    const overrides = {};
-
-    if (options.filter) {
-      overrides.filter = Array.isArray(options.filter) ? options.filter : [options.filter];
-      overrides.include = Array.isArray(options.filter) ? options.filter : [options.filter];
-    }
-
-    if (options.includeHidden !== undefined) {
-      overrides.options = overrides.options || {};
-      overrides.options.includeHidden = options.includeHidden;
-    }
-
-    if (options.includeBinary !== undefined) {
-      overrides.transformers = overrides.transformers || {};
-      overrides.transformers.binary = {
-        enabled: true,
-        options: { action: 'include' },
-      };
-    }
-
-    try {
-      return await profileLoader.load(profileName, overrides);
-    } catch (error) {
-      return ProfileLoader.createDefault();
-    }
-  };
+  const buildPipelineProfile = (options) => ({
+    alwaysInclude: Array.isArray(options.alwaysInclude) ? options.alwaysInclude : [],
+    limits: {
+      files: options.maxFiles,
+      charLimit: options.charLimit,
+    },
+  });
 
   const setupPipelineStages = async (basePath, profile, options) => {
     const stages = [];
 
     // Import stage classes
-    const { default: FileDiscoveryStage } = await import(
-      '../../pipeline/stages/FileDiscoveryStage.js'
-    );
-    const { default: ProfileFilterStage } = await import(
-      '../../pipeline/stages/ProfileFilterStage.js'
-    );
+    const { default: FileDiscoveryStage } =
+      await import('../../pipeline/stages/FileDiscoveryStage.js');
+    const { default: ProfileFilterStage } =
+      await import('../../pipeline/stages/ProfileFilterStage.js');
     const { default: GitFilterStage } = await import('../../pipeline/stages/GitFilterStage.js');
-    const { default: ExternalSourceStage } = await import(
-      '../../pipeline/stages/ExternalSourceStage.js'
-    );
     const { default: LimitStage } = await import('../../pipeline/stages/LimitStage.js');
     const { default: SortFilesStage } = await import('../../pipeline/stages/SortFilesStage.js');
-    const { default: AlwaysIncludeStage } = await import(
-      '../../pipeline/stages/AlwaysIncludeStage.js'
-    );
+    const { default: AlwaysIncludeStage } =
+      await import('../../pipeline/stages/AlwaysIncludeStage.js');
     const { default: FileLoadingStage } = await import('../../pipeline/stages/FileLoadingStage.js');
     const { default: TransformStage } = await import('../../pipeline/stages/TransformStage.js');
     const { default: CharLimitStage } = await import('../../pipeline/stages/CharLimitStage.js');
-    const { default: DeduplicateFilesStage } = await import(
-      '../../pipeline/stages/DeduplicateFilesStage.js'
-    );
-    const { default: InstructionsStage } = await import(
-      '../../pipeline/stages/InstructionsStage.js'
-    );
-    const { default: OutputFormattingStage } = await import(
-      '../../pipeline/stages/OutputFormattingStage.js'
-    );
+    const { default: DeduplicateFilesStage } =
+      await import('../../pipeline/stages/DeduplicateFilesStage.js');
+    const { default: InstructionsStage } =
+      await import('../../pipeline/stages/InstructionsStage.js');
+    const { default: OutputFormattingStage } =
+      await import('../../pipeline/stages/OutputFormattingStage.js');
 
     // 1. File Discovery
     stages.push(FileDiscoveryStage);
@@ -233,42 +190,37 @@ const CopyView = () => {
     stages.push(ProfileFilterStage);
 
     // 3. Git Filtering (if enabled)
-    if (options.gitModified || options.gitBranch || options.gitStaged) {
+    if (options.modified || options.changed) {
       stages.push(GitFilterStage);
     }
 
-    // 4. External Sources
-    if (profile.externalSources && profile.externalSources.length > 0) {
-      stages.push(ExternalSourceStage);
-    }
-
-    // 5. Limits
+    // 4. Limits
     if (options.maxFiles || profile.limits?.files) {
       stages.push(LimitStage);
     }
 
-    // 6. Sort Files
+    // 5. Sort Files
     stages.push(SortFilesStage);
 
-    // 7. Always Include
+    // 6. Always Include
     if (profile.alwaysInclude && profile.alwaysInclude.length > 0) {
       stages.push(AlwaysIncludeStage);
     }
 
-    // 8. File Loading
+    // 7. File Loading
     stages.push(FileLoadingStage);
 
-    // 9. Transform
+    // 8. Transform
     if (!options.noTransform) {
       stages.push(TransformStage);
     }
 
-    // 10. Character Limit
+    // 9. Character Limit
     if (options.charLimit || profile.limits?.charLimit) {
       stages.push(CharLimitStage);
     }
 
-    // 11. Deduplicate
+    // 10. Deduplicate
     stages.push(DeduplicateFilesStage);
 
     // 12. Instructions Stage (load instructions unless disabled)
@@ -300,11 +252,12 @@ const CopyView = () => {
     };
   };
 
-  const handleOutputAndCreateMessage = async (outputResult, options, result) => {
+  const handleOutputAndCreateMessage = async (outputResult, options, result, basePath) => {
     const stats = result.stats || {};
     // Count only non-null files (nulls are placeholders for filtered binary files)
-    const fileCount = result.files ? result.files.filter((f) => f !== null).length :
-      (stats.totalFiles || stats.processedFiles || stats.fileCount || 0);
+    const fileCount = result.files
+      ? result.files.filter((f) => f !== null).length
+      : stats.totalFiles || stats.processedFiles || stats.fileCount || 0;
     const totalSize = outputResult.content ? outputResult.content.length : 0;
 
     // Helper function to format bytes
@@ -331,7 +284,10 @@ const CopyView = () => {
             : format === 'tree'
               ? 'txt'
               : 'xml';
-      const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
+      const dirName = basePath ? path.basename(basePath) : 'copytree';
+      const safeName = dirName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
+      const prefix = safeName || 'copytree';
+      const tempFile = path.join(os.tmpdir(), `${prefix}-${Date.now()}.${extension}`);
       await fs.writeFile(tempFile, outputResult.content, 'utf8');
 
       try {
@@ -446,7 +402,6 @@ const CopyView = () => {
           stats,
           duration: stats.duration,
           showDetailedTiming: options.info,
-          showPerformanceBudgets: options.info, // Enable performance budgets with --info flag
         }),
       ),
   );

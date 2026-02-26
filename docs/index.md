@@ -2,60 +2,67 @@
 
 CopyTree is a powerful Node.js CLI tool that intelligently copies directory structures and file contents into AI-friendly formats. Perfect for sharing codebases with AI assistants, documentation generation, and code analysis.
 
-## 🚀 Quick Start
+> **Requirements**: Node.js 20+ | ESM only | [View on GitHub](https://github.com/gregpriday/copytree)
 
-```bash
-# Install globally
-npm install -g copytree
+## 🚀 Start Here
 
-# Copy current directory to clipboard (uses default profile)
-copytree
+**New to CopyTree?** Follow this path to get productive in 10 minutes:
 
-# Copy with a custom profile
-copytree --profile myproject
-```
+1. **[Quickstart Guide](./getting-started/quickstart.md)** - Install and run your first copy
+2. **[Create Your First Profile](./getting-started/first-profile.md)** - Customize file selection for your needs
+3. **[Basic Usage](./usage/basic-usage.md)** - Master common workflows and patterns
 
-## 📚 Documentation Sections
+## 📚 Documentation by Section
 
-### [Installation Guide](./installation/installation-guide.md)
-Complete installation instructions including prerequisites, npm setup, and configuration.
+### Getting Started
 
-### [CLI Reference](./cli/copytree-reference.md)
-Comprehensive command-line reference for all CopyTree commands and options.
+Perfect for newcomers and quick reference:
 
-### [Profile System](./profiles/profile-overview.md)
-Learn about CopyTree's powerful profile system for project-specific file selection.
+- **[Quickstart Guide](./getting-started/quickstart.md)** - Get up and running in 10 minutes
+- **[Your First Custom Profile](./getting-started/first-profile.md)** - Learn to create profiles step-by-step
+- **[Installation Guide](./installation/installation-guide.md)** - Complete installation instructions
+- **[Claude Code Integration](./installation/claude-integration.md)** - Use with Claude Code
 
-### [AI Integration](./installation/claude-integration.md)
-Set up CopyTree with Claude Code and other AI assistants for enhanced productivity.
+### User Guides
 
-### [Technical Documentation](./technical/)
-In-depth technical documentation for developers and contributors:
-- [Architecture Guide](./technical/architecture.md) - Pipeline system, stages, and core contracts
+For day-to-day usage:
+
+- **[Basic Usage](./usage/basic-usage.md)** - Common commands and workflows
+- **[Troubleshooting](./usage/troubleshooting.md)** - Solve common problems
+- **[Secrets Guard](./usage/secrets-guard.md)** - Prevent accidental secret exposure
+
+### Reference
+
+Authoritative technical references:
+
+- **[Configuration Reference](./reference/configuration.md)** - Complete config system with precedence rules
+- **[CLI Reference](./cli/copytree-reference.md)** - All commands and options
+
+### Developer Documentation
+
+For contributors and extenders:
+
+- **[Architecture Guide](./technical/architecture.md)** - Pipeline, stages, and event system
+- **[Testing Strategy](./technical/testing-strategy.md)** - Test infrastructure and patterns
 
 
 ## ✨ Key Features
 
 ### 1. **Intelligent File Selection**
-- **Profile System**: Default profile included; create custom profiles for project-specific needs
+- **Profile System**: Default profile automatically used; create custom profiles for project-specific needs
 - **Git Integration**: Copy only modified or changed files
 - **Pattern Matching**: Flexible include/exclude rules
 
-### 2. **Advanced Transformations**
-- **PDF to Text**: Extract text from PDF documents
-- **Image OCR**: Extract text from images using Tesseract
-- **Code Summarization**: AI-powered summaries for large files
-- **Format Conversion**: Markdown processing, CSV formatting, and more
-
-### 3. **Multiple Output Options**
+### 2. **Multiple Output Options**
 - **Clipboard**: Default output for easy pasting
 - **File Output**: Save to file
 - **Streaming**: Real-time output for large projects
-- **Multiple Formats**: Markdown (default), XML, JSON, or tree view
+- **Multiple Formats**: XML (default), Markdown, JSON, NDJSON, SARIF, or tree view
 
-### 4. **Developer-Friendly**
+### 3. **Developer-Friendly**
 - **External Sources**: Include files from GitHub or other directories
 - **Editor Integration**: Works with VS Code, Cursor, and Claude Code
+- **Secrets Detection**: Prevent accidental exposure of API keys and credentials
 
 ## 🎯 Common Use Cases
 
@@ -70,11 +77,11 @@ copytree --profile myproject
 
 ### Document Generation
 ```bash
-# Generate project overview (Markdown by default)
+# Generate project overview as Markdown
 copytree --output project-overview.md
 
-# Generate as XML
-copytree --output project-overview.xml --format xml
+# Generate as XML (default format)
+copytree --output project-overview.xml
 ```
 
 ### Code Review
@@ -89,20 +96,18 @@ copytree --changed HEAD~5
 
 ## 🔧 Configuration
 
-CopyTree uses a hierarchical configuration system:
+CopyTree uses a two-level configuration system:
 
 1. **Default Configuration**: Built-in defaults
-2. **User Configuration**: `~/.copytree/` directory
-3. **Project Configuration**: `.copytree.yaml` in your project
-4. **Environment Variables**: Override any setting
+2. **User Configuration**: `~/.copytree/config/` directory (`.js` or `.json` files)
 
 ### Quick Configuration
 ```bash
-# Run interactive setup
-copytree install:copytree
-
 # Validate configuration
 copytree config:validate
+
+# Inspect configuration with provenance
+copytree config:inspect
 
 # Clear cache
 copytree cache:clear
@@ -112,19 +117,7 @@ copytree cache:clear
 
 - [Basic Usage Guide](./usage/basic-usage.md) - Complete usage documentation
 - [Troubleshooting Guide](./usage/troubleshooting.md) - Solve common issues
-- [Profile Examples](./profiles/profile-examples.md) - Example custom profiles
-- [Creating Custom Profiles](./profiles/profile-creation-guide.md) - Build your own profiles
-- [Transformer Reference](./profiles/transformer-reference.md) - File transformation options
-- [Advanced Features](./profiles/profile-advanced.md) - Power user features
-
-## 🤝 Integration Guides
-
 - [Claude Code Integration](./installation/claude-integration.md) - Use with Claude Code
-
-## 📘 Usage Guides
-
-- [Basic Usage](./usage/basic-usage.md) - Get started with CopyTree
-- [Troubleshooting](./usage/troubleshooting.md) - Solve common problems
 
 ## 🐛 Troubleshooting
 
@@ -132,7 +125,7 @@ Having issues? Check our comprehensive [Troubleshooting Guide](./usage/troublesh
 
 ```bash
 # Check system requirements
-copytree config:validate --verbose
+copytree config:validate
 
 # View debug information
 DEBUG=copytree:* copytree

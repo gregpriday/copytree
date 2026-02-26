@@ -1,108 +1,125 @@
-import { env } from '../src/config/ConfigManager.js';
-
 export default {
+  // 1. JUNK: Files that should never exist in output (complete noise)
   // Global excluded directories (always excluded regardless of location)
   globalExcludedDirectories: [
     // Version control
     '.git', '.svn', '.hg', '.bzr', 'CVS', '_darcs',
-    
-    // IDEs and editors
-    '.idea', '.vscode', '.vs', '.settings', 'nbproject', '.project',
-    '.buildpath', '.Rproj.user', '.spyderproject', '.spyproject',
-    '.ropeproject', '.venv', '.mypy_cache', '.dmypy.json',
-    
+
+    // IDE/Editor directories
+    '.idea', '.vscode', '.eclipse', '.settings',
+
     // Dependencies
-    'node_modules', 'bower_components', 'jspm_packages',
-    'venv', 'env', 'ENV', 'virtualenv', '.virtualenv',
-    'pipenv', '.pipenv', 'poetry', '.poetry',
-    'conda-meta', '.conda',
-    
-    // Build and cache
-    '__pycache__', '.pytest_cache', '.tox', '.nox',
-    '.coverage', 'htmlcov', '.nyc_output', 'coverage',
-    '.sass-cache', '.cache', '.parcel-cache', '.next',
-    '.nuxt', '.vuepress', '.docusaurus', '.serverless',
-    '.fusebox', '.dynamodb', '.temp', '.tmp', 'tmp', 'temp',
-    
-    // Mobile
-    '.gradle', '.idea/gradle.xml', '.idea/libraries',
-    'Pods', 'DerivedData', 'xcuserdata',
-    
-    // Other
-    '.vagrant', '.terraform', '.pulumi',
-    '.ipynb_checkpoints', '.jupyter',
-    'thumbs.db', '.DS_Store', 'desktop.ini',
+    'node_modules', 'bower_components', 'jspm_packages', 'vendor',
+
+    // Build artifacts
+    'dist', 'build', 'out', 'target', '.next', '.nuxt', '.output',
+
+    // Test coverage
+    'coverage', '.nyc_output',
+
+    // Python cache
+    '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache',
+
+    // Other caches
+    '.sass-cache', '.cache',
+
+    // Infrastructure temp
+    '.vagrant', '.serverless',
   ],
-  
+
   // Base path excluded directories (only excluded at project root)
-  basePathExcludedDirectories: [
-    'vendor',      // PHP Composer
-    'Pods',        // iOS CocoaPods  
-    '.github',     // GitHub config
-    '.gitlab',     // GitLab config
-    '.circleci',   // CircleCI config
-    '.travis',     // Travis CI
-    'dist',        // Distribution/build output
-    'build',       // Build output
-    'out',         // Output directory
-    'target',      // Maven/Gradle output
-    '.webpack',    // Webpack
-  ],
-  
+  // These are typically in .gitignore, but we exclude them as a safety net
+  // Can be overridden by .copytreeinclude if needed
+  basePathExcludedDirectories: [],
+
   // Global excluded files (excluded by name pattern)
   globalExcludedFiles: [
-    // Lock files
-    'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
-    'composer.lock', 'Gemfile.lock', 'Pipfile.lock',
-    'poetry.lock', 'Cargo.lock', 'pubspec.lock',
-    
-    // Environment files
-    '.env', '.env.local', '.env.*.local', '.env.example',
-    
-    // OS files
-    '.DS_Store', 'Thumbs.db', 'desktop.ini',
+    // Ignore/configuration files (CopyTree metadata)
+    '.copytreeignore',
+    '.gitignore',
+    '.copytreeinclude',
+
+    // Environment files with secrets
+    '.env', '.env.local', '.env.*.local',
+
+    // OS metadata (pure noise)
+    '.DS_Store', 'Thumbs.db', 'desktop.ini', '.directory',
     '$RECYCLE.BIN', 'ehthumbs.db', 'ehthumbs_vista.db',
-    
-    // Logs
-    '*.log', 'npm-debug.log*', 'yarn-debug.log*', 'yarn-error.log*',
+
+    // Logs and dumps (high token usage, low AI value)
+    '*.log', '*.pid', '*.seed', '*.pid.lock',
+    'npm-debug.log*', 'yarn-debug.log*', 'yarn-error.log*',
     'lerna-debug.log*', 'pnpm-debug.log*',
-    
-    // Editor files
-    '*.swp', '*.swo', '*~', '*.sublime-workspace', '*.sublime-project',
-    
-    // Compiled files
-    '*.pyc', '*.pyo', '*.pyd', '__pycache__',
+
+    // Map files (high token usage, AI can't read them)
+    '*.map', '*.css.map', '*.js.map',
+
+    // Minified code (AI can't read this effectively)
+    '*.min.js', '*.min.css',
+
+    // Editor backup/temp files
+    '*~', '*.swp', '*.swo', '*.bak', '*.tmp', '*.orig',
+    '*.sublime-workspace', '*.sublime-project',
+
+    // Compiled files (binary noise)
+    '*.pyc', '*.pyo', '*.pyd',
     '*.class', '*.jar', '*.war', '*.ear',
     '*.o', '*.obj', '*.exe', '*.dll', '*.so', '*.dylib',
     '*.ncb', '*.sdf', '*.suo', '*.pdb', '*.idb',
-    
-    // Archives
-    '*.7z', '*.dmg', '*.gz', '*.iso', '*.jar', '*.rar', '*.tar', '*.zip',
-    
-    // Media files (configurable)
-    ...(env('COPYTREE_EXCLUDE_MEDIA', true) ? [
-      '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.svg', '*.ico',
-      '*.mp3', '*.mp4', '*.avi', '*.mov', '*.wmv', '*.flv', '*.webm',
-      '*.wav', '*.flac', '*.aac', '*.ogg', '*.wma',
-    ] : []),
+
+    // Archives (binary data)
+    '*.7z', '*.dmg', '*.gz', '*.iso', '*.rar', '*.tar', '*.zip',
+
+    // Media files (binary, high token usage)
+    '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.ico',
+    '*.mp3', '*.mp4', '*.avi', '*.mov', '*.wmv', '*.flv', '*.webm',
+    '*.wav', '*.flac', '*.aac', '*.ogg', '*.wma',
   ],
-  
+
+  // 2. STRUCTURE ONLY: Files to include in tree but exclude content (token optimization)
+  // These files provide important structural context but waste tokens if read fully
+  structureOnlyPatterns: [
+    // Lock files (show dependency state exists, but hash content is useless)
+    'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'shrinkwrap.yaml',
+    'composer.lock', 'Gemfile.lock', 'Pipfile.lock', 'poetry.lock', 'uv.lock', 'pdm.lock', 'requirements.lock',
+    'Cargo.lock', 'go.sum', 'mix.lock', 'flake.lock',
+    'pubspec.lock', 'Podfile.lock', 'Cartfile.resolved', 'Package.resolved', 'deno.lock',
+
+    // SVG (often extremely verbose, low AI value)
+    '*.svg',
+  ],
+
+  // 3. ESSENTIAL DOTFILES: Force-include these even if includeHidden is false
+  // These provide high-value context about how to run/deploy the app
+  forceIncludeDotfiles: [
+    '.env.example',      // Safe environment template (no secrets)
+    '.editorconfig',     // Code style
+    '.eslintrc*',        // Linting rules
+    '.prettierrc*',      // Formatting rules
+    '.babelrc*',         // Transpilation config
+    '.dockerignore',     // Docker context
+    '.github/**',        // GitHub Actions/workflows (high value)
+    '.gitlab-ci.yml',    // GitLab CI
+    '.travis.yml',       // Travis CI
+    'circle.yml',        // CircleCI
+  ],
+
   // File size limits
-  maxFileSize: env('COPYTREE_MAX_FILE_SIZE', 10 * 1024 * 1024), // 10MB
-  maxTotalSize: env('COPYTREE_MAX_TOTAL_SIZE', 100 * 1024 * 1024), // 100MB
-  maxFileCount: env('COPYTREE_MAX_FILE_COUNT', 10000),
-  
+  maxFileSize: 10 * 1024 * 1024, // 10MB
+  maxTotalSize: 100 * 1024 * 1024, // 100MB
+  maxFileCount: 10000,
+
   // Output limits
-  maxOutputSize: env('COPYTREE_MAX_OUTPUT_SIZE', 50 * 1024 * 1024), // 50MB
-  maxCharacterLimit: env('COPYTREE_MAX_CHARS', 2000000), // 2M chars
-  
+  maxOutputSize: 50 * 1024 * 1024, // 50MB
+  maxCharacterLimit: 2000000, // 2M chars
+
   // Processing options
-  followSymlinks: env('COPYTREE_FOLLOW_SYMLINKS', false),
-  includeHidden: env('COPYTREE_INCLUDE_HIDDEN', false),
-  preserveEmptyDirs: env('COPYTREE_PRESERVE_EMPTY_DIRS', false),
-  
+  followSymlinks: false,
+  includeHidden: false,
+  preserveEmptyDirs: false,
+
   // Binary file handling
-  binaryFileAction: env('COPYTREE_BINARY_ACTION', 'placeholder'), // placeholder, skip, base64, comment (legacy)
+  binaryFileAction: 'placeholder', // placeholder, skip, base64, comment (legacy)
   binaryPlaceholderText: '[Binary file not included]',
 
   // Binary detection configuration
@@ -131,17 +148,46 @@ export default {
     xml: '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
     markdown: '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
   },
-  
+
   // Line number options
-  addLineNumbers: env('COPYTREE_LINE_NUMBERS', false),
-  lineNumberFormat: env('COPYTREE_LINE_NUMBER_FORMAT', '%4d: '), // printf-style format
-  
+  addLineNumbers: false,
+  lineNumberFormat: '%4d: ', // printf-style format
+
   // Tree view options
-  treeIndent: env('COPYTREE_TREE_INDENT', '  '),
+  treeIndent: '  ',
   treeConnectors: {
     middle: '├── ',
     last: '└── ',
     vertical: '│   ',
     empty: '    ',
+  },
+
+  // Filesystem retry configuration
+  fs: {
+    retryAttempts: 3, // Maximum number of retry attempts for transient errors
+    retryDelay: 100, // Initial delay in milliseconds
+    maxDelay: 2000, // Maximum delay cap in milliseconds
+  },
+
+  // File discovery configuration
+  discovery: {
+    // Enable parallel directory traversal (default: false for gradual rollout)
+    parallelEnabled: ['1', 'true', 'TRUE', 'True'].includes(
+      process.env.COPYTREE_DISCOVERY_PARALLEL
+    ),
+
+    // Maximum concurrent directory operations
+    // Falls back to app.maxConcurrency if not specified
+    maxConcurrency: (() => {
+      const val = parseInt(process.env.COPYTREE_DISCOVERY_CONCURRENCY, 10);
+      return Number.isInteger(val) && val > 0 ? val : undefined;
+    })(),
+
+    // Backpressure threshold (default: 2x concurrency)
+    // Pauses scheduling when buffered results exceed this
+    highWaterMark: (() => {
+      const val = parseInt(process.env.COPYTREE_DISCOVERY_HIGH_WATER_MARK, 10);
+      return Number.isInteger(val) && val > 0 ? val : undefined;
+    })(),
   },
 };

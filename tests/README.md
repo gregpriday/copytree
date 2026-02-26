@@ -38,8 +38,6 @@ tests/
 │   │   ├── events.contract.test.js  ✅ Event emission validation
 │   │   └── ...
 │   ├── services/          # Service layer tests
-│   │   ├── AIService.retry.test.js  ✅ Retry/fallback logic
-│   │   └── ...
 │   ├── transformers/      # Individual transformer tests
 │   ├── transforms/        # Transform system tests
 │   │   └── traits.enforcement.test.js  ✅ Trait-based scheduling
@@ -54,9 +52,7 @@ tests/
 │   └── pipeline.js        # Pipeline testing utilities
 ├── fixtures/              # Test data
 │   ├── goldens/           # 🆕 Expected outputs for regression tests
-│   ├── simple-project/    # Small test project
-│   ├── images/            # Image test files
-│   └── pdfs/              # PDF test files
+│   └── simple-project/    # Small test project
 └── mocks/                 # Mock implementations
 ```
 
@@ -148,8 +144,7 @@ import {
   normalizePaths,        // Paths (absolute → relative)
   normalizeTimestamps,   // Timestamps (ISO, Unix)
   normalizeIds,          // UUIDs, request IDs
-  normalizeMetrics,      // Durations, memory, sizes
-  normalizeTokens        // AI token counts
+  normalizeMetrics       // Durations, memory, sizes
 } from './helpers/determinism.js';
 
 // Comprehensive normalization for golden files
@@ -281,7 +276,6 @@ All metrics (branches, functions, lines, statements) must meet 80% coverage.
 - `src/pipeline/Stage.js`
 - `src/config/ConfigManager.js`
 - `src/transforms/TransformerRegistry.js`
-- `src/services/AIService.js`
 - `src/utils/GitUtils.js`
 
 ### Commands: 100%
@@ -289,6 +283,76 @@ All metrics (branches, functions, lines, statements) must meet 80% coverage.
 All CLI commands should have comprehensive test coverage.
 
 ## Recently Added Tests ✅
+
+### E2E Golden File Tests (NEW!)
+
+**Files:** `tests/e2e/*.test.js` (4 test files, 21 test cases)
+
+**Purpose:** Comprehensive regression testing for all CLI output formats using golden files.
+
+**Test Coverage:**
+- ✅ **Output Formats** (`output-formats.test.js`) - 4 tests
+  - XML (default), JSON, Markdown, Tree formats
+- ✅ **CLI Flags** (`flags-and-combos.test.js`) - 8 tests
+  - `--with-line-numbers`, `--only-tree`, `--info`, `--show-size`
+  - `--with-git-status` with actual Git repo
+  - Flag combinations (json + line numbers, markdown + info, etc.)
+- ✅ **Stream Mode** (`stream-mode.test.js`) - 4 tests
+  - Streaming output for all formats
+- ✅ **Error Handling** (`negative-cases.test.js`) - 5 tests
+  - Unknown formats, invalid paths, invalid profiles
+  - Conflicting flags, invalid filter patterns
+
+**Example Test:**
+```javascript
+import { runCli, normalize } from './_utils.js';
+
+test('XML (default format)', async () => {
+  const { code, stdout, stderr } = await runCli([PROJECT, '--display']);
+
+  expect(code).toBe(0);
+  expect(stderr).toBe('');
+
+  const normalized = normalize(stdout, { projectRoot: PROJECT });
+  expect(normalized).toMatchGolden('default/simple.xml.golden');
+});
+```
+
+**Running E2E Tests:**
+```bash
+# Run all E2E tests
+npm run test:e2e
+
+# Run specific E2E test file
+npm run test:e2e -- output-formats
+
+# Update golden files after intentional changes
+UPDATE_GOLDEN=true npm run test:e2e
+
+# Check which golden files changed
+git diff tests/fixtures/goldens/
+```
+
+**Golden Files Created:** 19 files in `tests/fixtures/goldens/`
+- `default/` - Base output formats (XML, JSON, Markdown, tree)
+- `flags/` - Various flag combinations
+- `stream/` - Streaming mode outputs
+- `negative/` - Error messages and edge cases
+
+**Normalization Applied:**
+- ANSI escape codes removed
+- Paths normalized (OS-agnostic)
+- Timestamps → `<TIMESTAMP>`
+- UUIDs → `<UUID>`
+- Git SHAs → `<SHA>`
+- Memory/duration metrics → `<MEMORY>`, `<DURATION>`
+- Tree output sorted for determinism
+
+**Key Features:**
+- Fully deterministic across platforms (Linux, macOS, Windows)
+- Detects unintended CLI output changes
+- Uses real file I/O (bypasses Jest mocks with `jest.requireActual`)
+- Comprehensive normalization via `tests/helpers/determinism.js`
 
 ### Pipeline Event Contract Tests
 
@@ -341,23 +405,6 @@ All CLI commands should have comprehensive test coverage.
 - Env vars map to config keys
 - Provenance tracks sources
 
-### AIService Retry & Fallback Tests
-
-**File:** `tests/unit/services/AIService.retry.test.js`
-
-**Coverage:**
-- ✅ Retryable error identification
-- ✅ Non-retryable immediate failure
-- ✅ Exponential backoff
-- ✅ Retry-after header respect
-- ✅ Provider fallback
-
-**Key Validations:**
-- Retries up to 3 times on retryable errors
-- Fails immediately on non-retryable errors
-- Backoff delays increase exponentially
-- Falls back to secondary providers
-
 ## Test Writing Guidelines
 
 ### 1. Use AAA Pattern
@@ -394,7 +441,7 @@ afterEach(() => {
 ### 4. Mock External Dependencies
 
 ```javascript
-jest.mock('../../../src/services/AIService.js');
+jest.mock('../../../src/services/CacheService.js');
 ```
 
 ### 5. Use Helpers

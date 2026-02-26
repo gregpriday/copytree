@@ -200,7 +200,7 @@ const ConfigInspectView = () => {
   }
 
   // Default table format
-  const sections = ['ai', 'app', 'cache', 'copytree', 'state'];
+  const sections = ['app', 'cache', 'copytree', 'state'];
   const specificSection = options.section;
 
   return React.createElement(
@@ -221,18 +221,18 @@ const ConfigInspectView = () => {
     // Show configurations by section or all if specific section requested
     specificSection
       ? React.createElement(ConfigSection, {
-        sectionName: specificSection,
-        configs: effectiveConfig,
-        showSectionHeader: false,
-      })
-      : sections.map((sectionName) =>
-        React.createElement(ConfigSection, {
-          key: sectionName,
-          sectionName,
+          sectionName: specificSection,
           configs: effectiveConfig,
-          showSectionHeader: true,
-        }),
-      ),
+          showSectionHeader: false,
+        })
+      : sections.map((sectionName) =>
+          React.createElement(ConfigSection, {
+            key: sectionName,
+            sectionName,
+            configs: effectiveConfig,
+            showSectionHeader: true,
+          }),
+        ),
 
     // Show legend
     React.createElement(Box, { marginTop: 1 }),

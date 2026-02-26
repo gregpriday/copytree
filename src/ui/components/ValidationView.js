@@ -169,8 +169,6 @@ const ValidationView = ({ successMessage, type }) => {
 
       if (validationSteps[i].name.includes('transformation')) {
         cleared = await cacheService.clear('copytree_transform_');
-      } else if (validationSteps[i].name.includes('AI')) {
-        cleared = await cacheService.clear('copytree_ai_');
       } else if (validationSteps[i].name.includes('git')) {
         cleared = await cacheService.clear('copytree_git_');
       } else if (validationSteps[i].name.includes('profile')) {
@@ -281,13 +279,13 @@ const ValidationView = ({ successMessage, type }) => {
       details:
         options.verbose || options.show
           ? {
-            name: loadedProfile.name,
-            description: loadedProfile.description || 'N/A',
-            version: loadedProfile.version || 'N/A',
-            source: loadedProfile._source,
-            includePatterns: loadedProfile.include?.join(', ') || 'None',
-            excludePatterns: loadedProfile.exclude?.join(', ') || 'None',
-          }
+              name: loadedProfile.name,
+              description: loadedProfile.description || 'N/A',
+              version: loadedProfile.version || 'N/A',
+              source: loadedProfile._source,
+              includePatterns: loadedProfile.include?.join(', ') || 'None',
+              excludePatterns: loadedProfile.exclude?.join(', ') || 'None',
+            }
           : null,
     });
     setIsCompleted(true);
@@ -336,7 +334,7 @@ const ValidationView = ({ successMessage, type }) => {
 
     // Step 2: Validate modules
     setCurrentStep(1);
-    const configModules = ['ai', 'app', 'cache', 'copytree', 'state'];
+    const configModules = ['app', 'cache', 'copytree', 'state'];
     let modulesOk = 0;
 
     for (const moduleName of configModules) {
@@ -395,7 +393,7 @@ const ValidationView = ({ successMessage, type }) => {
 
     // Step 4: Test configuration access
     setCurrentStep(3);
-    const testPaths = ['copytree.defaultExclusions', 'ai.provider', 'cache.enabled', 'app.name'];
+    const testPaths = ['copytree.defaultExclusions', 'cache.enabled', 'app.name'];
 
     let accessiblePaths = 0;
     for (const testPath of testPaths) {

@@ -1,7 +1,8 @@
 import Stage from '../Stage.js';
-import path from 'path';
 import XMLFormatter from '../formatters/XMLFormatter.js';
 import MarkdownFormatter from '../formatters/MarkdownFormatter.js';
+import NDJSONFormatter from '../formatters/NDJSONFormatter.js';
+import SARIFFormatter from '../formatters/SARIFFormatter.js';
 
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
@@ -37,32 +38,50 @@ class OutputFormattingStage extends Stage {
 
     let output;
     switch (this.format) {
-    case 'xml': {
-      const formatter = new XMLFormatter({
-        stage: this,
-        addLineNumbers: this.addLineNumbers,
-        onlyTree: this.onlyTree,
-      });
-      output = await formatter.format(input);
-      break;
-    }
-    case 'json':
-      output = this.formatAsJSON(input);
-      break;
-    case 'tree':
-      output = this.formatAsTree(input);
-      break;
-    case 'markdown': {
-      const formatter = new MarkdownFormatter({
-        stage: this,
-        addLineNumbers: this.addLineNumbers,
-        onlyTree: this.onlyTree,
-      });
-      output = await formatter.format(input);
-      break;
-    }
-    default:
-      throw new Error(`Unknown output format: ${this.format}`);
+      case 'xml': {
+        const formatter = new XMLFormatter({
+          stage: this,
+          addLineNumbers: this.addLineNumbers,
+          onlyTree: this.onlyTree,
+        });
+        output = await formatter.format(input);
+        break;
+      }
+      case 'json':
+        output = this.formatAsJSON(input);
+        break;
+      case 'tree':
+        output = this.formatAsTree(input);
+        break;
+      case 'markdown': {
+        const formatter = new MarkdownFormatter({
+          stage: this,
+          addLineNumbers: this.addLineNumbers,
+          onlyTree: this.onlyTree,
+        });
+        output = await formatter.format(input);
+        break;
+      }
+      case 'ndjson': {
+        const formatter = new NDJSONFormatter({
+          stage: this,
+          addLineNumbers: this.addLineNumbers,
+          onlyTree: this.onlyTree,
+        });
+        output = await formatter.format(input);
+        break;
+      }
+      case 'sarif': {
+        const formatter = new SARIFFormatter({
+          stage: this,
+          addLineNumbers: this.addLineNumbers,
+          onlyTree: this.onlyTree,
+        });
+        output = await formatter.format(input);
+        break;
+      }
+      default:
+        throw new Error(`Unknown output format: ${this.format}`);
     }
 
     this.log(`Formatted output in ${this.getElapsedTime(startTime)}`, 'info');
@@ -145,7 +164,7 @@ class OutputFormattingStage extends Stage {
     for (const file of files) {
       if (file === null) continue;
 
-      const parts = file.path.split(path.sep);
+      const parts = file.path.split('/');
       let current = tree;
 
       for (let i = 0; i < parts.length; i++) {

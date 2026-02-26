@@ -44,7 +44,15 @@ class CacheService {
 
     // Ensure cache directory exists
     if (this.enabled && this.driver === 'file') {
-      fs.ensureDirSync(this.cachePath);
+      try {
+        fs.ensureDirSync(this.cachePath);
+      } catch (error) {
+        this.logger.warn(`Failed to create cache directory at ${this.cachePath}: ${error.message}`);
+        this.logger.warn(
+          'Cache will be disabled. To fix: ensure HOME is writable or set COPYTREE_CACHE_PATH to a writable location.',
+        );
+        this.enabled = false;
+      }
     }
   }
 
@@ -362,13 +370,4 @@ class CacheService {
 }
 
 // Export singleton instance and class
-// Delay creation of defaultCache to avoid initialization order issues
-let defaultCache = null;
-
 export { CacheService };
-export function getCache() {
-  if (!defaultCache) {
-    defaultCache = new CacheService();
-  }
-  return defaultCache;
-}

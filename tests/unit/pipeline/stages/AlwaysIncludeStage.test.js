@@ -10,9 +10,8 @@ import { minimatch } from 'minimatch';
 let AlwaysIncludeStage;
 
 beforeAll(async () => {
-  const alwaysIncludeStageModule = await import(
-    '../../../../src/pipeline/stages/AlwaysIncludeStage.js'
-  );
+  const alwaysIncludeStageModule =
+    await import('../../../../src/pipeline/stages/AlwaysIncludeStage.js');
   AlwaysIncludeStage = alwaysIncludeStageModule.default;
 });
 

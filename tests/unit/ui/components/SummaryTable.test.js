@@ -119,9 +119,6 @@ describe('SummaryTable Component', () => {
     expect(output).toContain('Stage Timings:');
     expect(output).toContain('FileDiscovery');
     expect(output).toContain('100ms');
-    expect(output).toContain('Total stage time');
-    expect(output).toContain('350ms');
-    expect(output).toContain('Average stage time');
   });
 
   test('hides detailed timing when showDetailedTiming is false', () => {
@@ -145,88 +142,5 @@ describe('SummaryTable Component', () => {
     const output = lastFrame();
     expect(output).not.toContain('Stage Timings:');
     expect(output).not.toContain('FileDiscovery');
-    expect(output).not.toContain('Total stage time');
-  });
-
-  test('shows performance budgets when showPerformanceBudgets is true', () => {
-    const stats = {
-      filesProcessed: 100,
-      totalSize: 50 * 1024 * 1024, // 50MB
-      perStageTimings: {
-        FileDiscovery: 2000,
-        Transformation: 8000,
-      },
-    };
-
-    const { lastFrame } = render(
-      React.createElement(SummaryTable, {
-        stats,
-        duration: 12000, // 12 seconds
-        showPerformanceBudgets: true,
-      }),
-    );
-
-    const output = lastFrame();
-    expect(output).toContain('budget:');
-    expect(output).toContain('Performance Grade:');
-  });
-
-  test('hides performance budgets when showPerformanceBudgets is false', () => {
-    const stats = {
-      filesProcessed: 100,
-      totalSize: 50 * 1024 * 1024,
-    };
-
-    const { lastFrame } = render(
-      React.createElement(SummaryTable, {
-        stats,
-        duration: 12000,
-        showPerformanceBudgets: false,
-      }),
-    );
-
-    const output = lastFrame();
-    expect(output).not.toContain('budget:');
-    expect(output).not.toContain('Performance Grade:');
-  });
-
-  test('uses color coding based on performance budgets', () => {
-    const stats = {
-      filesProcessed: 1000, // Large project
-      totalSize: 120 * 1024 * 1024, // 120MB - exceeds budget
-      perStageTimings: {
-        FileDiscovery: 25000, // 25s - critical
-      },
-    };
-
-    const { lastFrame } = render(
-      React.createElement(SummaryTable, {
-        stats,
-        duration: 35000, // 35s - exceeds large project budget
-        showPerformanceBudgets: true,
-        showDetailedTiming: true,
-      }),
-    );
-
-    const output = lastFrame();
-    expect(output).toContain('Performance Grade:');
-    expect(output).toContain('CRITICAL'); // Should show critical stage warning
-  });
-
-  test('shows memory usage when performance budgets enabled', () => {
-    const stats = {
-      filesProcessed: 50,
-    };
-
-    const { lastFrame } = render(
-      React.createElement(SummaryTable, {
-        stats,
-        duration: 3000,
-        showPerformanceBudgets: true,
-      }),
-    );
-
-    const output = lastFrame();
-    expect(output).toContain('Memory usage');
   });
 });

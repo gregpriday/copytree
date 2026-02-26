@@ -1,6 +1,10 @@
 // Global mocks setup
 // This file sets up mocks that need to be available before any modules are loaded
 
+// Mock import.meta for ESM support in Jest
+// This allows import.meta.url to work in transformed code
+global.importMeta = { url: 'file://' + __dirname + '/test.js' };
+
 // Mock ConfigManager
 jest.mock('../src/config/ConfigManager.js', () => {
   const mockConfigData = {
@@ -33,7 +37,7 @@ jest.mock('../src/config/ConfigManager.js', () => {
       prefix: 'copytree_',
       defaultTtl: 3600,
       transformations: {
-        enabled: true,
+        enabled: false, // Default for non-AI transformers
         ttl: 86400,
       },
     },
@@ -167,25 +171,78 @@ jest.mock('clipboardy', () => ({
   readSync: jest.fn().mockReturnValue(''),
 }));
 
-// Mock fs-extra
-jest.mock('fs-extra', () => ({
-  pathExists: jest.fn().mockResolvedValue(true),
-  stat: jest.fn().mockResolvedValue({ isDirectory: () => true }),
-  writeFile: jest.fn().mockResolvedValue(undefined),
-  createWriteStream: jest.fn(() => ({
+// Mock fs-extra (comprehensive mock with all functions from centralized mock)
+// Note: Can't import external modules in jest.mock() factory, so we inline it
+jest.mock('fs-extra', () => {
+  const pathExists = jest.fn().mockResolvedValue(true);
+  const stat = jest.fn().mockResolvedValue({ isDirectory: () => true });
+  const writeFile = jest.fn().mockResolvedValue();
+  const createWriteStream = jest.fn(() => ({
     write: jest.fn(),
-    end: jest.fn((cb) => cb && cb()),
-  })),
-  ensureDir: jest.fn().mockResolvedValue(undefined),
-  ensureDirSync: jest.fn(),
-  readFile: jest.fn().mockResolvedValue(''),
-  readdir: jest.fn().mockResolvedValue([]),
-  remove: jest.fn().mockResolvedValue(undefined),
-  readFileSync: jest.fn().mockReturnValue(''),
-  writeFileSync: jest.fn(),
-  existsSync: jest.fn().mockReturnValue(false),
-  removeSync: jest.fn(),
-  mkdtempSync: jest.fn().mockReturnValue('/tmp/test-temp-dir'),
-  readdirSync: jest.fn().mockReturnValue([]),
-  rmSync: jest.fn(),
-}));
+    end: jest.fn((cb) => cb?.()),
+  }));
+  const ensureDir = jest.fn().mockResolvedValue();
+  const ensureDirSync = jest.fn();
+  const readFile = jest.fn().mockResolvedValue('');
+  const readdir = jest.fn().mockResolvedValue([]);
+  const remove = jest.fn().mockResolvedValue();
+  const readFileSync = jest.fn().mockReturnValue('');
+  const writeFileSync = jest.fn();
+  const existsSync = jest.fn().mockReturnValue(false);
+  const removeSync = jest.fn();
+  const mkdtempSync = jest.fn().mockReturnValue('/tmp/test-temp-dir');
+  const readdirSync = jest.fn().mockReturnValue([]);
+  const rmSync = jest.fn();
+  const readJson = jest.fn().mockResolvedValue({});
+  const readJsonSync = jest.fn().mockReturnValue({});
+  const writeJson = jest.fn().mockResolvedValue();
+  const writeJsonSync = jest.fn();
+  const copy = jest.fn().mockResolvedValue();
+  const copySync = jest.fn();
+  const move = jest.fn().mockResolvedValue();
+  const moveSync = jest.fn();
+  const emptyDir = jest.fn().mockResolvedValue();
+  const emptyDirSync = jest.fn();
+  const outputFile = jest.fn().mockResolvedValue();
+  const outputFileSync = jest.fn();
+  const outputJson = jest.fn().mockResolvedValue();
+  const outputJsonSync = jest.fn();
+  const unlink = jest.fn().mockResolvedValue();
+
+  const mock = {
+    pathExists,
+    stat,
+    writeFile,
+    createWriteStream,
+    ensureDir,
+    ensureDirSync,
+    readFile,
+    readdir,
+    remove,
+    readFileSync,
+    writeFileSync,
+    existsSync,
+    removeSync,
+    mkdtempSync,
+    readdirSync,
+    rmSync,
+    readJson,
+    readJsonSync,
+    writeJson,
+    writeJsonSync,
+    copy,
+    copySync,
+    move,
+    moveSync,
+    emptyDir,
+    emptyDirSync,
+    outputFile,
+    outputFileSync,
+    outputJson,
+    outputJsonSync,
+    unlink,
+  };
+
+  mock.default = mock;
+  return mock;
+});

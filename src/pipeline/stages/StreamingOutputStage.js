@@ -2,6 +2,7 @@ import Stage from '../Stage.js';
 import { Transform } from 'stream';
 // const { create } = require('xmlbuilder2'); // Currently unused
 import path from 'path';
+import { pathToFileURL } from 'url';
 import {
   detectFenceLanguage,
   chooseFence,
@@ -36,6 +37,18 @@ class StreamingOutputStage extends Stage {
     // Create transform stream
     const transformStream = this.createTransformStream(input);
 
+    // For file outputs, wait until the destination stream flushes to disk.
+    const shouldWaitForOutputStream =
+      this.outputStream &&
+      this.outputStream !== process.stdout &&
+      this.outputStream !== process.stderr;
+    const outputStreamFinished = shouldWaitForOutputStream
+      ? new Promise((resolve, reject) => {
+          this.outputStream.once('finish', resolve);
+          this.outputStream.once('error', reject);
+        })
+      : Promise.resolve();
+
     // Connect to output stream
     transformStream.pipe(this.outputStream);
 
@@ -47,6 +60,8 @@ class StreamingOutputStage extends Stage {
       transformStream.on('finish', resolve);
       transformStream.on('error', reject);
     });
+
+    await outputStreamFinished;
 
     this.log(`Streamed output in ${this.getElapsedTime(startTime)}`, 'info');
 
@@ -67,6 +82,10 @@ class StreamingOutputStage extends Stage {
       return this.createTreeStream(input);
     } else if (this.format === 'markdown') {
       return this.createMarkdownStream(input);
+    } else if (this.format === 'ndjson') {
+      return this.createNDJSONStream(input);
+    } else if (this.format === 'sarif') {
+      return this.createSARIFStream(input);
     }
 
     throw new Error(`Unknown streaming format: ${this.format}`);
@@ -217,12 +236,8 @@ class StreamingOutputStage extends Stage {
       callback(null, chunk);
     };
 
-    // End handler
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        stream.end();
-      });
-    });
+    // No closing content needed for Markdown format
+    // Files are self-contained with begin/end markers
 
     return stream;
   }
@@ -314,14 +329,12 @@ class StreamingOutputStage extends Stage {
       callback(null, xml);
     };
 
-    // Add end handler to close XML
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        stream.write('  </ct:files>\n');
-        stream.write('</ct:directory>\n');
-        stream.end();
-      });
-    });
+    // Add end handler to close XML when stream ends
+    stream._final = (callback) => {
+      stream.push('  </ct:files>\n');
+      stream.push('</ct:directory>\n');
+      callback();
+    };
 
     return stream;
   }
@@ -338,7 +351,7 @@ class StreamingOutputStage extends Stage {
 
     // Write JSON header
     stream.write('{\n');
-    stream.write(`  "directory": "${input.basePath}",\n`);
+    stream.write(`  "directory": ${JSON.stringify(input.basePath)},\n`);
     stream.write('  "metadata": {\n');
     stream.write(`    "generated": "${new Date().toISOString()}",\n`);
     stream.write(`    "fileCount": ${input.files.length},\n`);
@@ -346,7 +359,7 @@ class StreamingOutputStage extends Stage {
 
     if (input.profile) {
       stream.write(',\n');
-      stream.write(`    "profile": "${input.profile.name || 'default'}"`);
+      stream.write(`    "profile": ${JSON.stringify(input.profile.name || 'default')}`);
     }
 
     stream.write('\n  },\n');
@@ -387,14 +400,12 @@ class StreamingOutputStage extends Stage {
       callback(null, json);
     };
 
-    // Add end handler to close JSON
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        stream.write('\n  ]\n');
-        stream.write('}\n');
-        stream.end();
-      });
-    });
+    // Add _final handler to close JSON structure
+    stream._final = (callback) => {
+      stream.push('\n  ]\n');
+      stream.push('}\n');
+      callback();
+    };
 
     return stream;
   }
@@ -418,37 +429,319 @@ class StreamingOutputStage extends Stage {
       callback();
     };
 
-    stream.on('pipe', (src) => {
-      src.on('end', () => {
-        // Build and render tree
-        const lines = [];
-        lines.push(input.basePath);
-        lines.push('');
+    // Add _final handler to output the tree
+    stream._final = (callback) => {
+      // Build and render tree
+      const lines = [];
+      lines.push(input.basePath);
+      lines.push('');
 
-        const tree = this.buildTreeStructure(files);
-        this.renderTree(tree, lines, '', true);
+      const tree = this.buildTreeStructure(files);
+      this.renderTree(tree, lines, '', true);
 
-        lines.push('');
-        lines.push(`${files.length} files, ${this.formatBytes(this.calculateTotalSize(files))}`);
+      lines.push('');
+      lines.push(`${files.length} files, ${this.formatBytes(this.calculateTotalSize(files))}`);
 
-        stream.write(lines.join('\n') + '\n');
-        stream.end();
-      });
+      stream.push(lines.join('\n') + '\n');
+      callback();
+    };
+
+    return stream;
+  }
+
+  createNDJSONStream(input) {
+    const files = input.files || [];
+    const totalSize = this.calculateTotalSize(files);
+    const profileName = input.profile?.name || 'default';
+
+    let metadataWritten = false;
+
+    const stream = new Transform({
+      writableObjectMode: true,
+      transform: (chunk, _encoding, callback) => callback(null, chunk),
     });
+
+    stream._transform = (file, _encoding, callback) => {
+      // Write metadata as first line if not yet written
+      if (!metadataWritten) {
+        metadataWritten = true;
+        const metadata = {
+          type: 'metadata',
+          directory: input.basePath,
+          generated: new Date().toISOString(),
+          fileCount: files.length,
+          totalSize,
+          profile: profileName,
+        };
+
+        if (input.gitMetadata) {
+          metadata.git = {
+            branch: input.gitMetadata.branch || null,
+            lastCommit: input.gitMetadata.lastCommit
+              ? {
+                  hash: input.gitMetadata.lastCommit.hash,
+                  message: input.gitMetadata.lastCommit.message,
+                }
+              : null,
+            filterType: input.gitMetadata.filterType || null,
+            hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
+          };
+        }
+
+        if (input.instructions) {
+          metadata.instructions = {
+            name: input.instructionsName || 'default',
+            content: input.instructions,
+          };
+        }
+
+        stream.push(JSON.stringify(metadata) + '\n');
+      }
+
+      // Write file record
+      if (file && file !== null) {
+        const record = {
+          type: 'file',
+          path: file.path,
+          size: file.size,
+          modified: file.modified,
+          isBinary: !!file.isBinary,
+        };
+
+        if (file.encoding) record.encoding = file.encoding;
+        if (file.binaryCategory) record.binaryCategory = file.binaryCategory;
+        if (file.gitStatus) record.gitStatus = file.gitStatus;
+        if (file.truncated) {
+          record.truncated = true;
+          if (file.originalLength !== undefined) {
+            record.originalLength = file.originalLength;
+          }
+        }
+
+        if (typeof file.content === 'string') {
+          let content = file.content;
+          if (this.addLineNumbers && !file.isBinary) {
+            content = this.addLineNumbersToContent(content);
+          }
+          record.content = content;
+        }
+
+        stream.push(JSON.stringify(record) + '\n');
+      }
+      callback();
+    };
+
+    // Add _final handler to output summary line
+    stream._final = (callback) => {
+      // If no files were processed, still write metadata
+      if (!metadataWritten) {
+        metadataWritten = true;
+        const metadata = {
+          type: 'metadata',
+          directory: input.basePath,
+          generated: new Date().toISOString(),
+          fileCount: files.length,
+          totalSize,
+          profile: profileName,
+        };
+
+        if (input.gitMetadata) {
+          metadata.git = {
+            branch: input.gitMetadata.branch || null,
+            lastCommit: input.gitMetadata.lastCommit
+              ? {
+                  hash: input.gitMetadata.lastCommit.hash,
+                  message: input.gitMetadata.lastCommit.message,
+                }
+              : null,
+            filterType: input.gitMetadata.filterType || null,
+            hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
+          };
+        }
+
+        if (input.instructions) {
+          metadata.instructions = {
+            name: input.instructionsName || 'default',
+            content: input.instructions,
+          };
+        }
+
+        stream.push(JSON.stringify(metadata) + '\n');
+      }
+
+      const summary = {
+        type: 'summary',
+        fileCount: files.length,
+        totalSize,
+        processedAt: new Date().toISOString(),
+      };
+      stream.push(JSON.stringify(summary) + '\n');
+      callback();
+    };
+
+    return stream;
+  }
+
+  createSARIFStream(input) {
+    const stream = new Transform({
+      writableObjectMode: true,
+      transform: (chunk, _encoding, callback) => callback(null, chunk),
+    });
+
+    // SARIF requires all data before outputting, so we buffer files
+    const files = [];
+
+    stream._transform = (file, _encoding, callback) => {
+      if (file && file !== null) {
+        files.push(file);
+      }
+      callback();
+    };
+
+    // Add _final handler to output complete SARIF document
+    stream._final = (callback) => {
+      const toolName = 'CopyTree';
+      const toolVersion = input.version || '0.0.0';
+      const informationUri = 'https://copytree.dev';
+
+      const results = files.map((file) => {
+        const totalLines =
+          typeof file.content === 'string' && !file.isBinary ? file.content.split('\n').length : 0;
+
+        const result = {
+          ruleId: 'file-discovered',
+          level: 'note',
+          message: { text: `File discovered: ${file.path}` },
+          locations: [
+            {
+              physicalLocation: {
+                artifactLocation: {
+                  uri: file.path,
+                  uriBaseId: '%SRCROOT%',
+                },
+              },
+            },
+          ],
+          properties: {
+            size: file.size || 0,
+            modified: file.modified || null,
+            isBinary: !!file.isBinary,
+          },
+        };
+
+        if (totalLines > 0) {
+          result.locations[0].physicalLocation.region = {
+            startLine: 1,
+            endLine: Math.max(1, totalLines),
+          };
+        }
+
+        if (file.encoding) result.properties.encoding = file.encoding;
+        if (file.binaryCategory) result.properties.binaryCategory = file.binaryCategory;
+        if (file.gitStatus) result.properties.gitStatus = file.gitStatus;
+        if (file.truncated) {
+          result.properties.truncated = true;
+          if (file.originalLength !== undefined) {
+            result.properties.originalLength = file.originalLength;
+          }
+        }
+
+        return result;
+      });
+
+      const fileCount = files.length;
+      const skippedFiles = input.stats?.skippedFiles || 0;
+      const totalSize = this.calculateTotalSize(files);
+      const basePath = input.basePath || '';
+      const workingDirectoryUri =
+        basePath && path.isAbsolute(basePath) ? pathToFileURL(basePath).href : basePath;
+
+      const sarif = {
+        $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+        version: '2.1.0',
+        runs: [
+          {
+            tool: {
+              driver: {
+                name: toolName,
+                version: toolVersion,
+                informationUri,
+                rules: [
+                  {
+                    id: 'file-discovered',
+                    name: 'FileDiscovered',
+                    shortDescription: {
+                      text: 'A file was discovered by CopyTree.',
+                    },
+                    fullDescription: {
+                      text: 'CopyTree enumerated this file in the selected scope based on the configured profile and filters.',
+                    },
+                    helpUri: informationUri,
+                    defaultConfiguration: {
+                      level: 'note',
+                    },
+                    properties: {
+                      category: 'file-discovery',
+                      tags: ['discovery', 'enumeration'],
+                    },
+                  },
+                ],
+              },
+            },
+            results,
+            invocations: [
+              {
+                executionSuccessful: true,
+                endTimeUtc: new Date().toISOString(),
+                workingDirectory: {
+                  uri: workingDirectoryUri,
+                },
+              },
+            ],
+            properties: {
+              profile: input.profile?.name || 'default',
+              fileCount,
+              skippedFiles,
+              totalSize,
+              git: input.gitMetadata
+                ? {
+                    branch: input.gitMetadata.branch || null,
+                    lastCommit: input.gitMetadata.lastCommit
+                      ? {
+                          hash: input.gitMetadata.lastCommit.hash,
+                          message: input.gitMetadata.lastCommit.message,
+                        }
+                      : null,
+                    hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
+                  }
+                : null,
+            },
+          },
+        ],
+      };
+
+      const output = this.prettyPrint ? JSON.stringify(sarif, null, 2) : JSON.stringify(sarif);
+      stream.push(output);
+      callback();
+    };
 
     return stream;
   }
 
   async streamFiles(input, transformStream) {
     // Process files one at a time to manage memory
+    let processed = 0;
+
     for (const file of input.files) {
       if (file !== null) {
         transformStream.write(file);
 
         // Small delay to prevent overwhelming the stream
-        if (input.files.indexOf(file) % 100 === 0) {
+        if (processed % 100 === 0) {
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
+
+        processed++;
       }
     }
 
@@ -485,7 +778,7 @@ class StreamingOutputStage extends Stage {
     for (const file of files) {
       if (file === null) continue;
 
-      const parts = file.path.split(path.sep);
+      const parts = file.path.split('/');
       let current = tree;
 
       for (let i = 0; i < parts.length; i++) {

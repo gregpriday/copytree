@@ -65,9 +65,9 @@ node --version
 # Install Node Version Manager (nvm)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
-# Install Node.js 18+
-nvm install 18
-nvm use 18
+# Install Node.js 20+
+nvm install 20
+nvm use 20
 ```
 
 ## Configuration Problems
@@ -83,18 +83,7 @@ nvm use 18
    copytree config:validate
    ```
 
-2. **Re-run setup**:
-   ```bash
-   copytree install:copytree
-   ```
-
-3. **Check environment variables**:
-   ```bash
-   echo $COPYTREE_MAX_FILE_SIZE
-   echo $COPYTREE_MAX_TOTAL_SIZE
-   ```
-
-4. **Inspect effective configuration**:
+2. **Inspect effective configuration**:
    ```bash
    copytree config:inspect
    ```
@@ -105,19 +94,16 @@ nvm use 18
 
 **Solutions**:
 
-1. **Create config directory**:
-   ```bash
-   mkdir -p ~/.copytree
-   ```
-
-2. **Run interactive setup**:
-   ```bash
-   copytree install:copytree
-   ```
-
-3. **Check config location**:
+1. **Check config location**:
    ```bash
    ls -la ~/.copytree/
+   ```
+
+2. **Configuration is optional**:
+   ```bash
+   # CopyTree works with built-in defaults
+   # Configuration files are optional
+   copytree --version
    ```
 
 ## Output Issues
@@ -144,9 +130,9 @@ nvm use 18
    copytree --output test.xml
    ```
 
-4. **Check for errors**:
+4. **Use dry-run to check for errors**:
    ```bash
-   copytree --debug
+   copytree --dry-run
    ```
 
 ### Output Too Large
@@ -162,7 +148,7 @@ nvm use 18
 
 2. **Limit content**:
    ```bash
-   copytree --max-lines 100 --max-characters 5000
+   copytree --head 100 --char-limit 5000
    ```
 
 3. **Use specific profile**:
@@ -208,7 +194,7 @@ copytree --format tree
 
 3. **Debug file selection**:
    ```bash
-   copytree --dry-run --verbose
+   copytree --dry-run
    ```
 
 4. **Check .copytreeignore**:
@@ -269,22 +255,17 @@ copytree --format tree
 
 **Solutions**:
 
-1. **Limit directory depth**:
-   ```bash
-   copytree --depth 3
-   ```
-
-2. **Use specific profile**:
+1. **Use specific profile**:
    ```bash
    copytree --profile api  # Instead of --profile full
    ```
 
-3. **Skip transformations**:
+2. **Use filters to limit scope**:
    ```bash
-   copytree --no-transform
+   copytree --filter "src/**/*.js"
    ```
 
-4. **Exclude large directories**:
+3. **Exclude large directories**:
    ```bash
    echo "coverage/" >> .copytreeignore
    echo "build/" >> .copytreeignore
@@ -301,9 +282,9 @@ copytree --format tree
    copytree --stream > output.xml
    ```
 
-2. **Process in chunks**:
+2. **Limit files processed**:
    ```bash
-   copytree src/ --max-files 1000
+   copytree src/ --head 1000
    ```
 
 3. **Increase Node.js memory**:
@@ -370,7 +351,7 @@ node --version
 npm --version
 
 # Configuration check
-copytree config:validate --verbose
+copytree config:validate
 
 # Debug run
 DEBUG=copytree:* copytree --dry-run
@@ -379,8 +360,13 @@ DEBUG=copytree:* copytree --dry-run
 ### Logs and Cache
 
 ```bash
-# Clear cache
-copytree cache:clear --all
+# Clear cache (clears all caches by default)
+copytree cache:clear
+
+# Clear specific cache types
+copytree cache:clear --transformations
+copytree cache:clear --git
+copytree cache:clear --profiles
 
 # Check cache location
 ls -la ~/.copytree/cache/
@@ -396,8 +382,8 @@ ls -la ~/.copytree/cache/
 
 ### "Profile not found"
 - Check profile name spelling
-- Run `copytree profile:list` to see available profiles
 - Ensure profile file exists in `.copytree/` or `~/.copytree/profiles/`
+- Check with `ls .copytree/` or `ls ~/.copytree/profiles/`
 
 ### "No files found matching criteria"
 - Current directory might be empty

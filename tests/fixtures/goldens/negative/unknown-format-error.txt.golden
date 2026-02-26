@@ -1,0 +1,18 @@
+node:internal/modules/esm/resolve:274
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '<HOME>/Projects/CopyTree/copytree-issue-54/src/ui/components/ValidationView.js' imported from <HOME>/Projects/CopyTree/copytree-issue-54/src/ui/App.js
+    at finalizeResolution (node:internal/modules/esm/resolve:274:11)
+    at moduleResolve (node:internal/modules/esm/resolve:859:10)
+    at defaultResolve (node:internal/modules/esm/resolve:983:11)
+    at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:801:12)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:725:25)
+    at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:309:38)
+    at #link (node:internal/modules/esm/module_job:208:49) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file://<HOME>/Projects/CopyTree/copytree-issue-54/src/ui/components/ValidationView.js'
+}
+
+Node.js v24.4.1

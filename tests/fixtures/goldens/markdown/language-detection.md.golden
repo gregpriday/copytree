@@ -1,0 +1,144 @@
+---
+format: copytree-md@1
+tool: copytree
+generated: "<TIMESTAMP>"
+base_path: "<PROJECT_ROOT>"
+profile: "default"
+file_count: 10
+total_size_bytes: 147
+char_limit_applied: false
+only_tree: false
+include_git_status: false
+include_line_numbers: false
+instructions:
+  name: "default"
+  included: true
+---
+
+# CopyTree Export — copytree-md-lang-<UUID>
+
+## Directory Tree
+```text
+├── app.js (12 B)
+├── config.yml (10 B)
+├── data.json (16 B)
+├── lib.rs (12 B)
+├── main.go (12 B)
+├── notes.txt (16 B)
+├── run.sh (11 B)
+├── script.py (14 B)
+├── style.css (19 B)
+└── unknown.xyz (25 B)
+```
+
+## Instructions
+
+<!-- copytree:instructions-begin name="default" -->
+```text
+This XML document represents the directory structure and contents of a project, which you will analyze to answer user questions. Reference files using @ followed by the relative path from the project root (e.g., @README.md, @src/app.js). The @ notation must not be enclosed in backticks. For example, always write "...in the file @app/page.tsx..." and never "...in the file `@app/page.tsx`...". You can also reference directories with @directory/path to instruct the agent to examine multiple files.
+```
+
+<!-- copytree:instructions-end name="default" -->
+
+## Files
+
+<!-- copytree:file-begin path="@app.js" size=12 modified="<TIMESTAMP>" hash="sha256:3f41cbb303012f33212c92326b27f6cc604fd414e20315cb10f2be7f1f6bb83c" binary=false encoding="utf8" truncated=false -->
+
+### @app.js
+
+```js
+const x = 1;
+```
+
+<!-- copytree:file-end path="@app.js" -->
+
+<!-- copytree:file-begin path="@config.yml" size=10 modified="<TIMESTAMP>" hash="sha256:b701870861d6ff0565b7078ee799ae7362323298a814d7af4d2dce6cb8d8b674" binary=false encoding="utf8" truncated=false -->
+
+### @config.yml
+
+```yaml
+key: value
+```
+
+<!-- copytree:file-end path="@config.yml" -->
+
+<!-- copytree:file-begin path="@data.json" size=16 modified="<TIMESTAMP>" hash="sha256:9724c1e20e6e3e4d7f57ed25f9d4efb006e508590d528c90da597f6a775c13e5" binary=false encoding="utf8" truncated=false -->
+
+### @data.json
+
+```json
+{"key": "value"}
+```
+
+<!-- copytree:file-end path="@data.json" -->
+
+<!-- copytree:file-begin path="@lib.rs" size=12 modified="<TIMESTAMP>" hash="sha256:ef32637cb9c3ec2e3968c9cbdf26a5e9c172be94f88af533e14bd43f892d5297" binary=false encoding="utf8" truncated=false -->
+
+### @lib.rs
+
+```rust
+fn main() {}
+```
+
+<!-- copytree:file-end path="@lib.rs" -->
+
+<!-- copytree:file-begin path="@main.go" size=12 modified="<TIMESTAMP>" hash="sha256:512843855fcc92a51c810b1b58e0731c01eac9a6a23c157bfa02aad71edffbe7" binary=false encoding="utf8" truncated=false -->
+
+### @main.go
+
+```go
+package main
+```
+
+<!-- copytree:file-end path="@main.go" -->
+
+<!-- copytree:file-begin path="@notes.txt" size=16 modified="<TIMESTAMP>" hash="sha256:a6c26c6984578a61bc921c82272d051993f396e1676ad8e0e8754adfa98ff5fd" binary=false encoding="utf8" truncated=false -->
+
+### @notes.txt
+
+```text
+plain text notes
+```
+
+<!-- copytree:file-end path="@notes.txt" -->
+
+<!-- copytree:file-begin path="@run.sh" size=11 modified="<TIMESTAMP>" hash="sha256:3667bb6922c0f881f5357826a9130fcce94a7144915ea65dfa472e65ae3b2049" binary=false encoding="utf8" truncated=false -->
+
+### @run.sh
+
+```bash
+#!/bin/bash
+```
+
+<!-- copytree:file-end path="@run.sh" -->
+
+<!-- copytree:file-begin path="@script.py" size=14 modified="<TIMESTAMP>" hash="sha256:957e13c0732e48fd5496f935894dc93a9da7dcd5eb8ffea52646fdf178cda1d1" binary=false encoding="utf8" truncated=false -->
+
+### @script.py
+
+```python
+print("hello")
+```
+
+<!-- copytree:file-end path="@script.py" -->
+
+<!-- copytree:file-begin path="@style.css" size=19 modified="<TIMESTAMP>" hash="sha256:3e67b4a9505b24600272f1ce6b6776c4ae2ebde88f76559d4a2a51f602d800c4" binary=false encoding="utf8" truncated=false -->
+
+### @style.css
+
+```css
+body { margin: 0; }
+```
+
+<!-- copytree:file-end path="@style.css" -->
+
+<!-- copytree:file-begin path="@unknown.xyz" size=25 modified="<TIMESTAMP>" hash="sha256:9944414ecf62503b75ceda10c2b85b7e5195440f5ea33740767a461cc8fb0d8f" binary=false encoding="utf8" truncated=false -->
+
+### @unknown.xyz
+
+```
+unknown extension content
+```
+
+<!-- copytree:file-end path="@unknown.xyz" -->
+🖥️ 10 files [<MEMORY>] displayed to terminal

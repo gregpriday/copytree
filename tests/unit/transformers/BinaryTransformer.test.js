@@ -17,9 +17,8 @@ import fs from 'fs-extra';
 let BinaryTransformer;
 
 beforeAll(async () => {
-  const binaryTransformerModule = await import(
-    '../../../src/transforms/transformers/BinaryTransformer.js'
-  );
+  const binaryTransformerModule =
+    await import('../../../src/transforms/transformers/BinaryTransformer.js');
   BinaryTransformer = binaryTransformerModule.default;
 });
 

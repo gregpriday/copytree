@@ -1,5 +1,6 @@
 // Unmock fs-extra for integration tests
 jest.unmock('fs-extra');
+jest.unmock('fast-glob');
 
 // Static imports for Node.js modules
 import fs from 'fs-extra';
@@ -7,6 +8,7 @@ import path from 'path';
 import os from 'os';
 import { promisify } from 'util';
 import { utimes } from 'fs';
+import { randomUUID } from 'crypto';
 
 // Use dynamic imports for modules under test
 let Pipeline,
@@ -23,9 +25,8 @@ beforeAll(async () => {
   const fileDiscoveryStageModule = await import('../../src/pipeline/stages/FileDiscoveryStage.js');
   const profileFilterStageModule = await import('../../src/pipeline/stages/ProfileFilterStage.js');
   const fileLoadingStageModule = await import('../../src/pipeline/stages/FileLoadingStage.js');
-  const outputFormattingStageModule = await import(
-    '../../src/pipeline/stages/OutputFormattingStage.js'
-  );
+  const outputFormattingStageModule =
+    await import('../../src/pipeline/stages/OutputFormattingStage.js');
   const limitStageModule = await import('../../src/pipeline/stages/LimitStage.js');
   const charLimitStageModule = await import('../../src/pipeline/stages/CharLimitStage.js');
   const instructionsStageModule = await import('../../src/pipeline/stages/InstructionsStage.js');
@@ -50,11 +51,15 @@ describe('Pipeline Integration Tests', () => {
     process.env.COPYTREE_CACHE_ENABLED = 'false';
 
     // Create temporary test directory
-    tempDir = path.join(os.tmpdir(), `copytree-test-${Date.now()}`);
+    tempDir = path.join(os.tmpdir(), `copytree-test-${randomUUID()}`);
     await fs.ensureDir(tempDir);
 
     // Create test files
     await fs.writeFile(path.join(tempDir, 'index.js'), 'console.log("Hello");');
+    console.log(
+      'index.js content after creation:',
+      await fs.readFile(path.join(tempDir, 'index.js'), 'utf8'),
+    );
     await fs.writeFile(path.join(tempDir, 'utils.js'), 'export const util = () => {};');
     await fs.writeFile(path.join(tempDir, 'test.spec.js'), 'describe("test", () => {});');
     await fs.writeFile(path.join(tempDir, 'README.md'), '# Test Project');
@@ -146,6 +151,11 @@ describe('Pipeline Integration Tests', () => {
         options: {},
       });
 
+      console.log(
+        'index.js content from pipeline:',
+        result.files.find((f) => f.path === 'index.js').content,
+      );
+
       expect(result.output).toContain('<ct:directory');
       expect(result.output).toContain('<ct:file path="@index.js"');
       expect(result.output).toContain('console.log("Hello");');
@@ -206,6 +216,31 @@ describe('Pipeline Integration Tests', () => {
       expect(filePaths).not.toContain('debug.log');
       expect(filePaths).not.toContain('node_modules/package.js');
       expect(filePaths).toContain('index.js'); // Should include non-ignored files
+    });
+
+    it('should respect .copytreeignore in subdirectories', async () => {
+      // Create nested directory with its own .copytreeignore
+      await fs.ensureDir(path.join(tempDir, 'src/internal'));
+      await fs.writeFile(path.join(tempDir, 'src/internal/secret.js'), 'top secret');
+      await fs.writeFile(path.join(tempDir, 'src/.copytreeignore'), 'internal/');
+
+      pipeline.through([
+        new FileDiscoveryStage({
+          basePath: tempDir,
+          patterns: ['**/*.js'],
+          respectGitignore: true,
+        }),
+      ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: {},
+      });
+
+      const paths = result.files.map((f) => f.path);
+      expect(paths).toContain('src/app.js');
+      expect(paths).not.toContain('src/internal/secret.js');
     });
   });
 
