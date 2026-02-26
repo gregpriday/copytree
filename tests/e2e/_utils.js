@@ -6,9 +6,14 @@
  */
 
 import path from 'path';
+import { readFileSync } from 'fs';
 import { spawn } from 'child_process';
 import stripAnsi from 'strip-ansi';
 import { normalizeForGolden } from '../helpers/determinism.js';
+
+const { version: COPYTREE_VERSION } = JSON.parse(
+  readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8'),
+);
 
 /**
  * Run the CopyTree CLI with given arguments
@@ -139,7 +144,13 @@ export function normalize(text, options = {}) {
     normalizeAll: true,
   });
 
-  // 7. Normalize Windows backslashes in file paths
+  // 7. Normalize CopyTree version (prevents golden file breakage on version bumps)
+  const escapedVersion = COPYTREE_VERSION.replace(/\./g, '\\.');
+  output = output.replace(new RegExp(`"${escapedVersion}"`, 'g'), '"<VERSION>"');
+  // Also normalize the "0.0.0" fallback version used when package.json version is unresolvable
+  output = output.replace(/"version":\s*"0\.0\.0"/g, '"version": "<VERSION>"');
+
+  // 8. Normalize Windows backslashes in file paths
   // Matches patterns like path="@src\test.js" and converts to path="@src/test.js"
   output = output.replace(/(path=["']@[^"']*?)\\+([^"']*?["'])/g, '$1/$2');
   // Also handle Windows paths in JSON "path": "src\test.js" and "directory": "D:\a\b"
@@ -155,15 +166,15 @@ export function normalize(text, options = {}) {
   // SARIF workingDirectory: "file:///<PROJECT_ROOT>" → "file://<PROJECT_ROOT>"
   output = output.replace(/"uri":\s*"file:\/\/\/(<PROJECT_ROOT>)"/g, '"uri": "file://$1"');
 
-  // 8. Normalize Git-specific data
+  // 9. Normalize Git-specific data
   output = normalizeGitData(output);
 
-  // 8. Sort tree lines if requested (for cross-OS determinism)
+  // 10. Sort tree lines if requested (for cross-OS determinism)
   if (options.sortTreeLines) {
     output = sortTreeOutput(output);
   }
 
-  // 9. Final cleanup: trim trailing whitespace, normalize final newline
+  // 11. Final cleanup: trim trailing whitespace, normalize final newline
   output = output
     .split('\n')
     .map((line) => line.trimEnd())

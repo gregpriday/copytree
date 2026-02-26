@@ -6,7 +6,7 @@
       "tool": {
         "driver": {
           "name": "CopyTree",
-          "version": "0.0.0",
+          "version": "<VERSION>",
           "informationUri": "https://copytree.dev",
           "rules": [
             {
