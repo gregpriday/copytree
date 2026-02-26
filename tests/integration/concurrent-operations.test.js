@@ -66,13 +66,13 @@ describe('Concurrent Operations Integration', () => {
       const operationCount = 5;
 
       // Create configs and run concurrent operations
-      const configs = [];
+      const configs = new Array(operationCount);
       const operations = Array(operationCount)
         .fill(null)
         .map(async (_, i) => {
           const config = await ConfigManager.create();
           config.set('operation.id', `op-${i}`);
-          configs.push(config);
+          configs[i] = config;
           return copy(testDir, { config, format: 'json' });
         });
 

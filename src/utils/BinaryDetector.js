@@ -141,7 +141,7 @@ export async function detect(filePath, opts = {}) {
 
   try {
     fd = await fs.open(filePath, 'r');
-    const result = await fs.read(buf, 0, sampleBytes, 0);
+    const result = await fs.read(fd, buf, 0, sampleBytes, 0);
     bytesRead = result.bytesRead;
   } catch (error) {
     // File doesn't exist or can't be read

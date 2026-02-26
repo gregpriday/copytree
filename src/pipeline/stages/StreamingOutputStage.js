@@ -37,6 +37,18 @@ class StreamingOutputStage extends Stage {
     // Create transform stream
     const transformStream = this.createTransformStream(input);
 
+    // For file outputs, wait until the destination stream flushes to disk.
+    const shouldWaitForOutputStream =
+      this.outputStream &&
+      this.outputStream !== process.stdout &&
+      this.outputStream !== process.stderr;
+    const outputStreamFinished = shouldWaitForOutputStream
+      ? new Promise((resolve, reject) => {
+          this.outputStream.once('finish', resolve);
+          this.outputStream.once('error', reject);
+        })
+      : Promise.resolve();
+
     // Connect to output stream
     transformStream.pipe(this.outputStream);
 
@@ -48,6 +60,8 @@ class StreamingOutputStage extends Stage {
       transformStream.on('finish', resolve);
       transformStream.on('error', reject);
     });
+
+    await outputStreamFinished;
 
     this.log(`Streamed output in ${this.getElapsedTime(startTime)}`, 'info');
 

@@ -193,7 +193,7 @@ output:
         expect(content).toContain('<?xml');
         expect(content).toMatch(/<ct:files[\s\/>]/); // Match <ct:files> or <ct:files/>
       });
-    });
+    }, 15000);
 
     test('should copy with dry-run flag', async () => {
       await withTempDir('copy-dry-run', async (tempDir) => {

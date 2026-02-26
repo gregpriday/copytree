@@ -9,7 +9,6 @@ const baseConfig = {
   testEnvironment: 'node',
 
   // Coverage configuration
-  collectCoverage: false, // Set to true when running coverage
   collectCoverageFrom: [
     'src/**/*.js',
     'src/**/*.jsx',
@@ -17,7 +16,7 @@ const baseConfig = {
     '!src/**/*.spec.js',
     '!src/**/*.test.jsx',
     '!src/**/*.spec.jsx',
-    '!src/index.js' // CLI entry point
+    '!src/index.js', // CLI entry point
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
@@ -30,29 +29,22 @@ const baseConfig = {
 
   // Transform files for ESM
   transform: {
-    '^.+\\.(js|jsx)$': 'babel-jest'
+    '^.+\\.(js|jsx)$': 'babel-jest',
   },
 
   // Transform all node_modules ESM packages for Jest compatibility
   transformIgnorePatterns: [],
 
   // Ignore patterns
-  testPathIgnorePatterns: [
-    '/node_modules/',
-    '/dist/',
-    '/coverage/'
-  ],
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', '/coverage/'],
 
   // Timeouts
   testTimeout: 10000, // 10 seconds for async operations
 
-  // Verbose output
-  verbose: true,
-
   // Clear mocks between tests
   clearMocks: true,
   resetMocks: true,
-  restoreMocks: true
+  restoreMocks: true,
 };
 
 // Mocked project - uses global mocks (default for most tests)
@@ -70,6 +62,7 @@ const mockedProject = {
     '!**/tests/real/**/*.test.js', // Exclude real tests
     '!**/tests/integration/fileDiscoveryStage.parallel.test.js', // Requires real fs-extra and ConfigManager
     '!**/tests/integration/concurrent-operations.test.js', // Requires real ConfigManager
+    '!**/tests/integration/folderProfile.test.js', // Requires real fs-extra for streamed output files
     '!**/tests/unit/utils/parallelWalker.test.js', // Requires real fs-extra
     '!**/tests/unit/config/config.isolation.test.js', // Requires real ConfigManager
   ],
@@ -82,7 +75,7 @@ const mockedProject = {
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
     '^.*/services/InstructionsLoader\\.js$': '<rootDir>/tests/mocks/InstructionsLoader.js',
     '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
-    '^ink$': '<rootDir>/tests/mocks/ink.js'
+    '^ink$': '<rootDir>/tests/mocks/ink.js',
   },
   setupFiles: ['<rootDir>/tests/setup-env.js', '<rootDir>/tests/setup-global-mocks.js'],
 };
@@ -96,6 +89,7 @@ const realProject = {
     '**/tests/real/**/*.spec.js',
     '**/tests/integration/fileDiscoveryStage.parallel.test.js', // Requires real fs-extra and ConfigManager
     '**/tests/integration/concurrent-operations.test.js', // Requires real ConfigManager
+    '**/tests/integration/folderProfile.test.js', // Requires real fs-extra for streamed output files
     '**/tests/unit/utils/parallelWalker.test.js', // Requires real fs-extra
     '**/tests/unit/config/config.isolation.test.js', // Requires real ConfigManager
   ],
@@ -107,12 +101,15 @@ const realProject = {
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
     '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
-    '^ink$': '<rootDir>/tests/mocks/ink.js'
+    '^ink$': '<rootDir>/tests/mocks/ink.js',
     // Note: ConfigManager and InstructionsLoader are NOT mocked here
   },
   setupFiles: ['<rootDir>/tests/setup-env.js'], // Only environment setup, no global mocks
 };
 
 export default {
-  projects: [mockedProject, realProject]
+  // Global-only Jest options (not valid inside per-project config in Jest 30)
+  collectCoverage: false,
+  verbose: true,
+  projects: [mockedProject, realProject],
 };

@@ -34,7 +34,7 @@ const BASIC_PATTERNS = [
     regex: /aws(.{0,20})?(secret|access)[^\s]{0,5}['"`]?[A-Za-z0-9/+=]{32,40}['"`]?/gi,
   },
   { id: 'PRIVATE_KEY', regex: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/gi },
-  { id: 'GENERIC_TOKEN', regex: /(api|secret|token|password)[\\s:=]{1,4}[A-Za-z0-9._-]{12,}/gi },
+  { id: 'GENERIC_TOKEN', regex: /(api|secret|token|password)[\s:=]{1,4}[A-Za-z0-9._-]{12,}/gi },
 ];
 
 class SecretsGuardStage extends Stage {
