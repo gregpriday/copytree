@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.14.0] - 2026-02-26
+
+### Major Changes
+- **Programmatic Node.js API** - New `copy()` and `scan()` functions for library usage, with `onProgress` callbacks and `manifest` field on results
+- **Streaming Copy API** - `copyStream()` for memory-efficient processing of large outputs
+- **Electron Integration** - CopyTree now works in Electron ≥28 main processes for desktop apps
+- **Folder-Level Profiles** - New `.copytree.yml`/`.copytree.json` profile configuration system replacing legacy profiles
+- **NDJSON & SARIF Output Formats** - Two new output formats for CI integration and static analysis tooling
+- **Built-in Secret Detection** - Multi-engine secret detection and redaction with comprehensive pattern coverage
+- **Structured Logging** - Configurable log levels and formats for better debugging and observability
+- **Convenience Filter Flags** - New `--ext`, `--max-depth`, `--min-size`, `--max-size` CLI flags for quick filtering
+
+### Added
+- **Parallel File Discovery** - Bounded concurrency for faster file discovery on large codebases
+- **Resilient Filesystem I/O** - Automatic retry logic for transient filesystem errors
+- **CPU/Heap Profiling Harness** - Built-in `--profile` flag for performance diagnostics
+- **Performance Budget Enforcement** - Nightly CI benchmarks with regression detection
+- **Layered `.copytreeignore`** - Gitignore-semantics ignore files with directory-level scoping
+- **Token Optimization** - Config lazy-loading and reduced overhead for faster startup
+- **Improved Temp File Naming** - Project directory context in temporary file names for easier debugging
+
+### Breaking Changes
+- **Removed environment variable support** - `.env` files and `COPYTREE_*` env vars are no longer read for configuration
+- **Removed legacy profile system** - Framework-specific profiles and auto-detection removed; use folder-level `.copytree.yml` instead
+- **Removed singleton ConfigManager** - ConfigManager is now instantiated per-operation for safe concurrent usage
+- **Removed `install:copytree` command** - Deprecated command has been removed
+- **Removed remaining AI feature remnants** - All AI provider infrastructure fully purged from codebase
+
+### Fixed
+- **Security: ReDoS vulnerability** - Updated minimatch to 10.2.4 to resolve Regular Expression Denial of Service
+- **Security: Shell injection** - Fixed clipboard operations on macOS/Linux that were vulnerable to shell injection
+- **Windows Compatibility** - Case-insensitive glob matching, CRLF normalization, proper `SIGKILL` handling, JSON streaming path escaping
+- **POSIX Path Normalization** - All `file.path` values now consistently use forward slashes across the entire pipeline
+- **Stale Ignore Rule Cache** - Fixed default rule cache that caused stale rules in long-running processes
+- **XML Control Characters** - Sanitize invalid control characters in XML output
+- **Clipboard Windows Escaping** - Fixed clipboard copy failures on Windows due to improper escaping
+
+### Infrastructure
+- **OIDC Trusted Publishing** - NPM publishing now uses OIDC tokens via `publish.yml` workflow (no secrets)
+- **Comprehensive E2E Golden File Tests** - 21 test cases covering all output formats, flags, streaming, and error handling
+- **Major Dependency Upgrades** - React 19, Ink 6, Chalk 5, Ora 9, Inquirer 13, actions/checkout v6
+
+### Technical Improvements
+- **1105 passing tests** across 74 test suites with cross-platform determinism
+- **Documentation overhaul** - Comprehensive docs rewrite for accuracy and consistency
+- **Memory optimization** - Reduced memory usage in formatters and utilities
+- **Simplified codebase** - Removed advanced/unused features for maintainability
+
 ## [0.13.1] - 2025-10-29
 
 ### Fixed
