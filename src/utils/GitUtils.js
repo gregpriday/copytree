@@ -1,8 +1,8 @@
 import simpleGit from 'simple-git';
-import path from 'path';
 import { GitError } from './errors.js';
 import { logger } from './logger.js';
 import { createCache } from './helpers.js';
+import { toPosix } from './pathUtils.js';
 
 /**
  * Git utilities for file filtering and status
@@ -70,7 +70,7 @@ class GitUtils {
       ];
 
       // Remove duplicates and normalize paths
-      const uniqueFiles = [...new Set(modifiedFiles)].map((file) => path.normalize(file));
+      const uniqueFiles = [...new Set(modifiedFiles)].map((file) => toPosix(file));
 
       this.cache.set(cacheKey, uniqueFiles);
       this.logger.logDebug(`Found ${uniqueFiles.length} modified files`);
@@ -111,7 +111,7 @@ class GitUtils {
 
       const changedFiles = diffSummary.files
         .filter((file) => file.file && !file.binary)
-        .map((file) => path.normalize(file.file));
+        .map((file) => toPosix(file.file));
 
       this.cache.set(cacheKey, changedFiles);
       this.logger.logDebug(
@@ -146,22 +146,25 @@ class GitUtils {
       const status = await this.git.status();
       const statusMap = {};
 
-      // Build status map
+      // Build status map — simple-git returns renamed as {from, to} objects,
+      // so flatten those into their destination paths (strings) for matching.
+      const renamedPaths = (status.renamed || []).map((r) => r.to || r);
       const allStatuses = {
         modified: status.modified,
         staged: status.staged,
         not_added: status.not_added,
         created: status.created,
         deleted: status.deleted,
-        renamed: status.renamed,
+        renamed: renamedPaths,
         conflicted: status.conflicted,
       };
 
       files.forEach((file) => {
-        const normalizedPath = path.normalize(file);
+        const posixPath = toPosix(file);
 
         for (const [statusType, fileList] of Object.entries(allStatuses)) {
-          if (fileList.includes(file) || fileList.includes(normalizedPath)) {
+          const posixList = fileList.map((f) => toPosix(String(f)));
+          if (posixList.includes(posixPath) || fileList.includes(file)) {
             statusMap[file] = statusType;
             break;
           }

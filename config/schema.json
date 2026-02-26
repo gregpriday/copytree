@@ -21,6 +21,36 @@
     "copytree": {
       "type": "object",
       "additionalProperties": true
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["error", "warn", "info", "debug"],
+          "description": "Minimum log level to output"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["text", "json", "silent"],
+          "description": "Log output format"
+        },
+        "colorize": {
+          "type": "string",
+          "enum": ["auto", "always", "never"],
+          "description": "Color output mode"
+        },
+        "timestamp": {
+          "type": "boolean",
+          "description": "Include ISO timestamp in JSON log entries"
+        },
+        "destination": {
+          "type": "string",
+          "enum": ["stderr", "stdout"],
+          "description": "Log output destination stream"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": true

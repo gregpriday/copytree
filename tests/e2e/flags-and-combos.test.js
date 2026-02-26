@@ -7,6 +7,7 @@
 
 import path from 'path';
 import os from 'os';
+import { randomUUID } from 'crypto';
 import { execSync } from 'child_process';
 import { mkdirSync, cpSync, rmSync, appendFileSync, writeFileSync } from 'fs';
 import { runCli, normalize, getGitEnv } from './_utils.js';
@@ -55,7 +56,7 @@ describe('Flags and combinations', () => {
 
   test('--with-git-status (git status integration)', async () => {
     // Create a temporary Git repository with the simple-project files
-    const tmpDir = path.join(os.tmpdir(), `copytree-git-test-${Date.now()}`);
+    const tmpDir = path.join(os.tmpdir(), `copytree-git-test-${randomUUID()}`);
     mkdirSync(tmpDir, { recursive: true });
 
     try {

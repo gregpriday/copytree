@@ -65,6 +65,7 @@ const mockedProject = {
     '!**/tests/integration/folderProfile.test.js', // Requires real fs-extra for streamed output files
     '!**/tests/unit/utils/parallelWalker.test.js', // Requires real fs-extra
     '!**/tests/unit/config/config.isolation.test.js', // Requires real ConfigManager
+    '!**/tests/unit/utils/logger.test.js', // Tests the real Logger class, uses loggerUnit project
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
@@ -107,9 +108,34 @@ const realProject = {
   setupFiles: ['<rootDir>/tests/setup-env.js'], // Only environment setup, no global mocks
 };
 
+// Logger unit project — tests the real Logger class without mocking logger.js.
+// ConfigManager is still mocked to avoid disk I/O, but logger.js is real.
+const loggerUnitProject = {
+  ...baseConfig,
+  displayName: 'logger',
+  testMatch: ['**/tests/unit/utils/logger.test.js'],
+  // Do NOT reset mocks between tests: the chalk mock uses jest.fn() and
+  // resetMocks would clear the implementations, making chalk.red() return
+  // undefined instead of the input string.
+  clearMocks: false,
+  resetMocks: false,
+  restoreMocks: false,
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1.js',
+    '^chalk$': '<rootDir>/tests/mocks/chalk.js',
+    '^ora$': '<rootDir>/tests/mocks/ora.js',
+    // logger.js is intentionally NOT mocked here
+    '^.*/config/ConfigManager\\.js$': '<rootDir>/tests/mocks/ConfigManager.js',
+    '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
+    '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
+    '^ink$': '<rootDir>/tests/mocks/ink.js',
+  },
+  setupFiles: ['<rootDir>/tests/setup-env.js'],
+};
+
 export default {
   // Global-only Jest options (not valid inside per-project config in Jest 30)
   collectCoverage: false,
   verbose: true,
-  projects: [mockedProject, realProject],
+  projects: [mockedProject, realProject, loggerUnitProject],
 };

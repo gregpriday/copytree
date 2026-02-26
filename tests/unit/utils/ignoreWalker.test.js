@@ -1,7 +1,7 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 import { withTempDir, settleFs } from '../../helpers/tempfs.js';
-import { getAllFiles } from '../../../src/utils/ignoreWalker.js';
+import { getAllFiles, clearRuleCache, testPath } from '../../../src/utils/ignoreWalker.js';
 
 describe('ignoreWalker', () => {
   const createProject = async (tempDir, files) => {
@@ -141,6 +141,166 @@ describe('ignoreWalker', () => {
       ].sort();
 
       expect(ignored.sort()).toEqual(expected);
+    });
+  });
+
+  describe('cache behavior', () => {
+    afterEach(() => {
+      clearRuleCache();
+    });
+
+    it('returns fresh rules after .copytreeignore is modified on disk (no cache)', async () => {
+      await withTempDir('cache-freshness', async (tempDir) => {
+        // Initial ignore file excludes a.txt
+        await createProject(tempDir, {
+          '.copytreeignore': 'a.txt',
+          'a.txt': 'a',
+          'b.txt': 'b',
+        });
+        await settleFs(50);
+
+        const firstResult = await getAllFiles(tempDir);
+        const firstPaths = firstResult.map((f) => path.basename(f.path)).sort();
+        expect(firstPaths).toEqual(['b.txt']);
+
+        // Modify ignore file to exclude b.txt instead
+        await fs.writeFile(path.join(tempDir, '.copytreeignore'), 'b.txt');
+        await settleFs(50);
+
+        const secondResult = await getAllFiles(tempDir);
+        const secondPaths = secondResult.map((f) => path.basename(f.path)).sort();
+        expect(secondPaths).toEqual(['a.txt']);
+      });
+    });
+
+    it('returns stale rules when cache is enabled without clearing', async () => {
+      await withTempDir('cache-stale', async (tempDir) => {
+        await createProject(tempDir, {
+          '.copytreeignore': 'a.txt',
+          'a.txt': 'a',
+          'b.txt': 'b',
+        });
+        await settleFs(50);
+
+        const firstResult = await getAllFiles(tempDir, { cache: true });
+        const firstPaths = firstResult.map((f) => path.basename(f.path)).sort();
+        expect(firstPaths).toEqual(['b.txt']);
+
+        // Modify ignore file — cached result should still exclude a.txt
+        await fs.writeFile(path.join(tempDir, '.copytreeignore'), 'b.txt');
+        await settleFs(50);
+
+        const secondResult = await getAllFiles(tempDir, { cache: true });
+        const secondPaths = secondResult.map((f) => path.basename(f.path)).sort();
+        // Still returns stale result because cache was not cleared
+        expect(secondPaths).toEqual(['b.txt']);
+      });
+    });
+
+    it('returns fresh rules after clearRuleCache() when cache is enabled', async () => {
+      await withTempDir('cache-clear', async (tempDir) => {
+        await createProject(tempDir, {
+          '.copytreeignore': 'a.txt',
+          'a.txt': 'a',
+          'b.txt': 'b',
+        });
+        await settleFs(50);
+
+        const firstResult = await getAllFiles(tempDir, { cache: true });
+        const firstPaths = firstResult.map((f) => path.basename(f.path)).sort();
+        expect(firstPaths).toEqual(['b.txt']);
+
+        // Modify ignore file and clear cache
+        await fs.writeFile(path.join(tempDir, '.copytreeignore'), 'b.txt');
+        await settleFs(50);
+        clearRuleCache();
+
+        const secondResult = await getAllFiles(tempDir, { cache: true });
+        const secondPaths = secondResult.map((f) => path.basename(f.path)).sort();
+        // After clearing, returns fresh result
+        expect(secondPaths).toEqual(['a.txt']);
+      });
+    });
+
+    it('picks up newly created ignore files without cache', async () => {
+      await withTempDir('cache-new-file', async (tempDir) => {
+        // Start with no ignore file
+        await createProject(tempDir, {
+          'a.txt': 'a',
+          'b.txt': 'b',
+        });
+        await settleFs(50);
+
+        const firstResult = await getAllFiles(tempDir);
+        const firstPaths = firstResult.map((f) => path.basename(f.path)).sort();
+        expect(firstPaths).toEqual(['a.txt', 'b.txt']);
+
+        // Create an ignore file that excludes a.txt
+        await fs.writeFile(path.join(tempDir, '.copytreeignore'), 'a.txt');
+        await settleFs(50);
+
+        const secondResult = await getAllFiles(tempDir);
+        const secondPaths = secondResult.map((f) => path.basename(f.path)).sort();
+        expect(secondPaths).toEqual(['b.txt']);
+      });
+    });
+
+    it('with cache enabled, does not pick up newly created ignore file until cache is cleared', async () => {
+      await withTempDir('cache-new-file-stale', async (tempDir) => {
+        await createProject(tempDir, {
+          'a.txt': 'a',
+          'b.txt': 'b',
+        });
+        await settleFs(50);
+
+        // First walk: no ignore file — caches [] (ENOENT) for the missing .copytreeignore
+        const firstResult = await getAllFiles(tempDir, { cache: true });
+        const firstPaths = firstResult.map((f) => path.basename(f.path)).sort();
+        expect(firstPaths).toEqual(['a.txt', 'b.txt']);
+
+        // Create an ignore file — but the cache still holds [] for that path
+        await fs.writeFile(path.join(tempDir, '.copytreeignore'), 'a.txt');
+        await settleFs(50);
+
+        const secondResult = await getAllFiles(tempDir, { cache: true });
+        const secondPaths = secondResult.map((f) => path.basename(f.path)).sort();
+        // Stale cache: a.txt is still returned
+        expect(secondPaths).toEqual(['a.txt', 'b.txt']);
+
+        // After clearing, the new ignore file is picked up
+        clearRuleCache();
+        const thirdResult = await getAllFiles(tempDir, { cache: true });
+        const thirdPaths = thirdResult.map((f) => path.basename(f.path)).sort();
+        expect(thirdPaths).toEqual(['b.txt']);
+      });
+    });
+
+    it('testPath respects cache option for freshness', async () => {
+      await withTempDir('cache-testpath', async (tempDir) => {
+        await createProject(tempDir, {
+          '.copytreeignore': 'a.txt',
+          'a.txt': 'a',
+          'b.txt': 'b',
+        });
+        await settleFs(50);
+
+        // First call caches rules with cache:true
+        const firstDecision = await testPath('a.txt', tempDir, { cache: true });
+        expect(firstDecision.ignored).toBe(true);
+
+        // Modify ignore file to no longer ignore a.txt
+        await fs.writeFile(path.join(tempDir, '.copytreeignore'), 'b.txt');
+        await settleFs(50);
+
+        // Without clearing cache, still returns stale result
+        const staleDecision = await testPath('a.txt', tempDir, { cache: true });
+        expect(staleDecision.ignored).toBe(true);
+
+        // After clearing cache, returns fresh result
+        clearRuleCache();
+        const freshDecision = await testPath('a.txt', tempDir, { cache: true });
+        expect(freshDecision.ignored).toBe(false);
+      });
     });
   });
 });

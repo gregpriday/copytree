@@ -21,7 +21,12 @@ function runCliWithStreamCapture(args) {
     const startTime = Date.now();
 
     const proc = spawn('node', [CLI_PATH, ...args], {
-      env: { ...process.env, FORCE_COLOR: '0' },
+      env: {
+        ...process.env,
+        FORCE_COLOR: '0',
+        // Suppress info/warn logs so stderr remains empty in stream-mode tests
+        COPYTREE_LOG_LEVEL: 'error',
+      },
     });
 
     proc.stdout.on('data', (data) => {

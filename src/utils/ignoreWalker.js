@@ -19,28 +19,36 @@ import {
   recordPermanent,
   recordSuccessAfterRetry,
 } from './fsErrorReport.js';
+import { toPosix } from './pathUtils.js';
+
+// Opt-in cache for parsed ignore rules per file path.
+// Disabled by default to prevent stale rules in long-running processes.
+// Callers who enable caching must call clearRuleCache() between operations.
+const ruleCache = new Map();
 
 /**
- * Normalize path to POSIX style (forward slashes)
- * @param {string} p - Path to normalize
- * @returns {string} POSIX-normalized path
+ * Clear all cached ignore rules.
+ *
+ * Only relevant when caching is enabled via `{ cache: true }`.
+ * Call this between operations in long-running processes to ensure
+ * ignore files are re-read from disk.
  */
-function toPosix(p) {
-  return p.split(path.sep).join('/');
+export function clearRuleCache() {
+  ruleCache.clear();
 }
-
-// Cache parsed ignore rules per file path to avoid repeated FS reads and parsing
-const ruleCache = new Map();
 
 /**
  * Read ignore rules from a file
  * @param {string} filePath - Absolute path to ignore file
+ * @param {boolean} [useCache=false] - Whether to use the in-memory rule cache
  * @returns {Promise<string[]>} Array of rule lines (or empty if file doesn't exist)
  */
-async function readRules(filePath) {
-  const cached = ruleCache.get(filePath);
-  if (cached) {
-    return cached;
+async function readRules(filePath, useCache = false) {
+  if (useCache) {
+    const cached = ruleCache.get(filePath);
+    if (cached) {
+      return cached;
+    }
   }
 
   try {
@@ -48,11 +56,16 @@ async function readRules(filePath) {
     // Strip UTF-8 BOM if present
     const cleaned = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
     const rules = cleaned.split('\n');
-    ruleCache.set(filePath, rules);
+    if (useCache) {
+      ruleCache.set(filePath, rules);
+    }
     return rules;
-  } catch {
-    // File doesn't exist or can't be read - treat as no rules
-    ruleCache.set(filePath, []);
+  } catch (error) {
+    // Only cache "file not found" — transient errors (EMFILE, EACCES) should not
+    // be cached because they may resolve on the next call.
+    if (useCache && error.code === 'ENOENT') {
+      ruleCache.set(filePath, []);
+    }
     return [];
   }
 }
@@ -120,6 +133,9 @@ function isIgnored(absPath, root, layers, isDirectory = false) {
  * @param {boolean} [options.explain=false] - Include explanation for each decision
  * @param {Array} [options.initialLayers=[]] - Pre-existing ignore layers (e.g., from .gitignore)
  * @param {Object} [options.config] - Configuration object for retry settings
+ * @param {boolean} [options.cache=false] - Enable in-memory caching of parsed ignore rules.
+ *   When true, ignore files are read once and cached for the lifetime of the process.
+ *   Callers must call clearRuleCache() between operations to avoid stale rules.
  * @yields {{path: string, stats: fs.Stats, explanation?: Object}} File information
  */
 export async function* walkWithIgnore(root, options = {}) {
@@ -130,6 +146,7 @@ export async function* walkWithIgnore(root, options = {}) {
     explain = false,
     initialLayers = [],
     config = {},
+    cache = false,
   } = options;
 
   // Extract retry configuration with defaults
@@ -150,7 +167,7 @@ export async function* walkWithIgnore(root, options = {}) {
 
     // Load ignore rules at this level
     const ignoreFilePath = path.join(dir, ignoreFileName);
-    const localRules = await readRules(ignoreFilePath);
+    const localRules = await readRules(ignoreFilePath, cache);
     const localIg = ignore().add(localRules);
     const nextLayers = [...layers, { base: dir, ig: localIg }];
 
@@ -303,10 +320,13 @@ export async function getAllFiles(root, options = {}) {
  * @param {string} testPath - Path to test (relative to root)
  * @param {string} root - Root directory
  * @param {Object} options - Walk options
- * @returns {Promise<{ignored: boolean, rule: string, layer: string}>} Decision with explanation
+ * @param {string} [options.ignoreFileName='.copytreeignore'] - Name of ignore files to process
+ * @param {Object} [options.config] - Configuration object for retry settings
+ * @param {boolean} [options.cache=false] - Enable in-memory caching of parsed ignore rules
+ * @returns {Promise<{ignored: boolean, rule: string|null, layer: string|null}>} Decision with explanation
  */
 export async function testPath(testPath, root, options = {}) {
-  const { ignoreFileName = '.copytreeignore', config = {} } = options;
+  const { ignoreFileName = '.copytreeignore', config = {}, cache = false } = options;
 
   // Build layers by walking up from root to the file's directory
   const absPath = path.resolve(root, testPath);
@@ -320,7 +340,7 @@ export async function testPath(testPath, root, options = {}) {
   const parts = relPath.split(path.sep);
   for (let i = 0; i < parts.length; i++) {
     const ignoreFilePath = path.join(currentDir, ignoreFileName);
-    const rules = await readRules(ignoreFilePath);
+    const rules = await readRules(ignoreFilePath, cache);
     if (rules.length > 0) {
       const ig = ignore().add(rules);
       layers.push({ base: currentDir, ig });

@@ -4,6 +4,7 @@ jest.unmock('fs-extra');
 import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
+import { randomUUID } from 'crypto';
 
 let FileDiscoveryStage;
 
@@ -19,7 +20,7 @@ describe('FileDiscoveryStage - .copytreeinclude Pattern Transformation', () => {
 
   beforeEach(async () => {
     // Create temporary test directory
-    tempDir = path.join(os.tmpdir(), `copytree-test-${Date.now()}`);
+    tempDir = path.join(os.tmpdir(), `copytree-test-${randomUUID()}`);
     await fs.ensureDir(tempDir);
 
     // Create test directory structure with hidden directories

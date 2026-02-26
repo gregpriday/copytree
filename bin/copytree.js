@@ -24,8 +24,25 @@ let App;
   render = undefined;
   App = undefined;
 });
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import { readFileSync } from 'fs';
+import { logger } from '../src/utils/logger.js';
+
+/**
+ * Apply logging options from parsed CLI options to the global logger singleton.
+ * Must be called before any logger usage in command handlers.
+ *
+ * @param {Object} options - Parsed commander options
+ */
+function applyLoggingOptions(options) {
+  const logOptions = {};
+  if (options.logLevel !== undefined) logOptions.level = options.logLevel;
+  if (options.logFormat !== undefined) logOptions.format = options.logFormat;
+  if (options.color === false) logOptions.colorize = 'never';
+  if (Object.keys(logOptions).length > 0) {
+    logger.configure(logOptions);
+  }
+}
 
 const pkg = JSON.parse(readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
 
@@ -85,7 +102,31 @@ program
   .option('--fail-on-secrets', 'Exit with error if secrets are found (CI mode)')
   .option('--secrets-report <file>', 'Output secrets report to file (use - for stdout)')
   .option('--fail-on-fs-errors', 'Exit with error if filesystem operations fail after retries')
+  .option(
+    '--log-level <level>',
+    'Set log verbosity: error, warn, info, debug (default: info)',
+    (val) => {
+      const valid = ['error', 'warn', 'info', 'debug'];
+      if (!valid.includes(val)) {
+        throw new InvalidArgumentError(`'${val}' is not valid. Choose from: ${valid.join(', ')}`);
+      }
+      return val;
+    },
+  )
+  .option(
+    '--log-format <format>',
+    'Log output format: text, json, silent (default: text)',
+    (val) => {
+      const valid = ['text', 'json', 'silent'];
+      if (!valid.includes(val)) {
+        throw new InvalidArgumentError(`'${val}' is not valid. Choose from: ${valid.join(', ')}`);
+      }
+      return val;
+    },
+  )
+  .option('--no-color', 'Disable ANSI color codes in log output')
   .action(async (targetPath, options) => {
+    applyLoggingOptions(options);
     // Auto-detect format from output file extension
     if (!options.format && options.output) {
       const formatByExt = {
