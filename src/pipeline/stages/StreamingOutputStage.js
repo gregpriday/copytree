@@ -778,7 +778,7 @@ class StreamingOutputStage extends Stage {
     for (const file of files) {
       if (file === null) continue;
 
-      const parts = file.path.split(path.sep);
+      const parts = file.path.split('/');
       let current = tree;
 
       for (let i = 0; i < parts.length; i++) {
