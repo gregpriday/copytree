@@ -1,3 +1,5 @@
+import { logger as defaultLogger } from '../utils/logger.js';
+
 /**
  * Base class for pipeline stages
  * All pipeline stages should extend this class
@@ -148,7 +150,11 @@ class Stage {
   }
 
   /**
-   * Log a message and emit stage events for UI
+   * Log a message and emit stage events for UI.
+   * Routes output through the central logger so that log-level filtering,
+   * format (text/json/silent), and destination (stderr/stdout) are all
+   * respected uniformly across the pipeline.
+   *
    * @param {string} message - Message to log
    * @param {string} level - Log level (info, warn, error, debug)
    */
@@ -163,27 +169,26 @@ class Stage {
       });
     }
 
-    // Original logging behavior for debug mode or errors
-    // Handle case where config might not be available yet
-    const isDebugMode = this._config?.get?.('app.debug') ?? false;
-    if (isDebugMode || level === 'error') {
-      const prefix = `[${this.name}]`;
+    // Route all terminal output through the central logger so that
+    // --log-level, --log-format, --no-color, and COPYTREE_LOG_LEVEL are obeyed.
+    const prefixedMessage = `[${this.name}] ${message}`;
 
-      switch (level) {
-        case 'error':
-          console.error(prefix, message);
-          break;
-        case 'warn':
-          console.warn(prefix, message);
-          break;
-        case 'debug':
-          if (isDebugMode) {
-            console.log(prefix, '[DEBUG]', message);
-          }
-          break;
-        default:
-          console.log(prefix, message);
-      }
+    switch (level) {
+      case 'error':
+        defaultLogger.error(prefixedMessage);
+        break;
+      case 'warn':
+        defaultLogger.warn(prefixedMessage);
+        break;
+      // Stage 'info' messages are internal pipeline progress/timing info.
+      // They were previously only visible in debug mode (app.debug=true), so
+      // we map them to debug level to preserve that backward-compatible behavior.
+      // Use --log-level debug (or COPYTREE_LOG_LEVEL=debug) to see them.
+      case 'info':
+        defaultLogger.debug(prefixedMessage);
+        break;
+      default: // 'debug'
+        defaultLogger.debug(prefixedMessage);
     }
   }
 

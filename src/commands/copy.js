@@ -36,9 +36,19 @@ async function copyCommand(targetPath = '.', options = {}) {
     // Reset filesystem error tracking at start
     resetFsErrors();
 
-    // When streaming, silence the logger to avoid polluting stdout
-    if (options.stream) {
-      logger.options.silent = true;
+    // Apply logging configuration from CLI options (level, format, color).
+    // This must run before any logger calls so the options take effect.
+    // In stream mode we force logs to stderr (standard Unix practice) so the
+    // output on stdout is never polluted by log lines regardless of config.
+    {
+      const logOptions = {};
+      if (options.logLevel !== undefined) logOptions.level = options.logLevel;
+      if (options.logFormat !== undefined) logOptions.format = options.logFormat;
+      if (options.color === false) logOptions.colorize = 'never';
+      if (options.stream) logOptions.destination = 'stderr';
+      if (Object.keys(logOptions).length > 0) {
+        logger.configure(logOptions);
+      }
     }
 
     // Start with initializing message
