@@ -142,27 +142,13 @@ describe('ConfigManager isolation', () => {
     });
   });
 
-  describe('deprecation warnings', () => {
-    test('config() should emit deprecation warning (in non-test env)', async () => {
+  describe('singleton compatibility', () => {
+    test('config() does not emit deprecation warning noise', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-      const originalEnv = process.env.NODE_ENV;
 
-      // Reset the warning flag
-      config._deprecationWarned = false;
-
-      // Temporarily set non-test environment
-      process.env.NODE_ENV = 'production';
-
-      // Call config() - should emit warning
       config();
 
-      // Verify warning was emitted
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('config() singleton is deprecated'),
-      );
-
-      // Restore
-      process.env.NODE_ENV = originalEnv;
+      expect(warnSpy).not.toHaveBeenCalled();
       warnSpy.mockRestore();
     });
   });

@@ -24,9 +24,8 @@ describe('FileDiscoveryStage - Parallel Mode', () => {
   });
 
   beforeEach(async () => {
-    // Create a unique test directory
-    testDir = path.join(os.tmpdir(), `copytree-test-${Date.now()}`);
-    await fs.ensureDir(testDir);
+    // Use mkdtemp to avoid collisions between tests running in the same millisecond.
+    testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'copytree-test-'));
   });
 
   afterEach(async () => {

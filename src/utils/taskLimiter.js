@@ -172,9 +172,8 @@ class TaskLimiter {
    */
   async waitForDomain(domain) {
     const limiter = this.limiters.get(domain);
-    if (limiter && (limiter.activeCount > 0 || limiter.pendingCount > 0)) {
-      await limiter.idle();
-    }
+    if (!limiter) return;
+    await this._waitUntilIdle(() => limiter.activeCount + limiter.pendingCount);
   }
 
   /**
@@ -182,13 +181,13 @@ class TaskLimiter {
    * @returns {Promise<void>}
    */
   async waitForAll() {
-    const promises = [];
-    for (const limiter of this.limiters.values()) {
-      if (limiter.activeCount > 0 || limiter.pendingCount > 0) {
-        promises.push(limiter.idle());
+    await this._waitUntilIdle(() => {
+      let inflight = 0;
+      for (const limiter of this.limiters.values()) {
+        inflight += limiter.activeCount + limiter.pendingCount;
       }
-    }
-    await Promise.all(promises);
+      return inflight;
+    });
   }
 
   /**
@@ -199,6 +198,18 @@ class TaskLimiter {
     this.limiters.clear();
     this.budgets.clear();
     this.initialized = false;
+  }
+
+  /**
+   * Wait for inflight work to drain.
+   * p-limit does not expose an idle() promise, so we poll counts briefly.
+   * @private
+   * @param {() => number} getInflight
+   */
+  async _waitUntilIdle(getInflight) {
+    while (getInflight() > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
   }
 }
 

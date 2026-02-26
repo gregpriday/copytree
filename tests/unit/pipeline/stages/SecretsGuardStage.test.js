@@ -10,8 +10,8 @@ jest.mock('../../../../src/config/ConfigManager.js', () => ({
   }),
 }));
 
-const buildInput = (content) => ({
-  files: [{ path: 'test.js', relativePath: 'test.js', content, size: Buffer.byteLength(content) }],
+const buildInput = (content, path = 'test.js') => ({
+  files: [{ path, relativePath: path, content, size: Buffer.byteLength(content) }],
   stats: {},
 });
 
@@ -46,32 +46,74 @@ describe('SecretsGuardStage', () => {
     const stage = new SecretsGuardStage({ enabled: true });
     await stage.onInit();
 
-    const input = buildInput('const token = "abc";');
-    await stage.process(input);
+    await stage.process(buildInput('const token = "abc";'));
 
     expect(mockGitleaks.scanString).toHaveBeenCalledWith(expect.any(String), 'test.js');
   });
 
-  test('falls back to basic regex when gitleaks unavailable', async () => {
+  test('falls back to basic regex scanning when gitleaks is unavailable', async () => {
     mockGitleaks.isAvailable.mockResolvedValue(false);
+
     const stage = new SecretsGuardStage({ enabled: true, redactionMode: 'generic' });
     await stage.onInit();
 
-    const input = buildInput('AKIA1234567890TEST');
-    const result = await stage.process(input);
+    const result = await stage.process(buildInput('password = supersecretvalue12345'));
 
     expect(result.findings.length).toBeGreaterThan(0);
-    expect(result.files[0].content).toContain('***REDACTED');
+    expect(result.findings.some((f) => f.RuleID === 'GENERIC_TOKEN')).toBe(true);
+    expect(result.files[0].content).toContain('***REDACTED***');
+  });
+
+  test('falls back to basic scan when gitleaks call errors', async () => {
+    mockGitleaks.scanString.mockRejectedValue(new Error('gitleaks timed out'));
+
+    const stage = new SecretsGuardStage({ enabled: true });
+    await stage.onInit();
+
+    const result = await stage.process(buildInput('token=abcdefghijklmno12345'));
+
+    expect(mockGitleaks.scanString).toHaveBeenCalledTimes(1);
+    expect(result.findings.length).toBeGreaterThan(0);
+    expect(result.files[0].redacted).toBe(true);
   });
 
   test('throws when failOnSecrets is enabled', async () => {
     mockGitleaks.isAvailable.mockResolvedValue(false);
+
     const stage = new SecretsGuardStage({ enabled: true, failOnSecrets: true });
     await stage.onInit();
 
-    await expect(stage.process(buildInput('password = secretvalue12345'))).rejects.toBeInstanceOf(
+    await expect(
+      stage.process(buildInput('password=supersecretvalue12345')),
+    ).rejects.toBeInstanceOf(SecretsDetectedError);
+  });
+
+  test('throws immediately when redaction is disabled and failOnSecrets is enabled', async () => {
+    mockGitleaks.isAvailable.mockResolvedValue(false);
+
+    const stage = new SecretsGuardStage({
+      enabled: true,
+      redactInline: false,
+      failOnSecrets: true,
+    });
+    await stage.onInit();
+
+    await expect(stage.process(buildInput('token=abcdefghijklmno12345'))).rejects.toBeInstanceOf(
       SecretsDetectedError,
     );
+  });
+
+  test('skips scanning files beyond maxFileBytes', async () => {
+    mockGitleaks.isAvailable.mockResolvedValue(false);
+
+    const stage = new SecretsGuardStage({ enabled: true, maxFileBytes: 10 });
+    await stage.onInit();
+
+    const input = buildInput('password=supersecretvalue12345');
+    const result = await stage.process(input);
+
+    expect(result.findings).toEqual([]);
+    expect(result.files[0].content).toBe('password=supersecretvalue12345');
   });
 
   test('excludes secret-prone files entirely', async () => {
@@ -88,7 +130,7 @@ describe('SecretsGuardStage', () => {
 
     const result = await stage.process(input);
 
-    expect(result.files[0]).toBeNull(); // excluded
+    expect(result.files[0]).toBeNull();
     expect(result.files[1].content).toBe('hello');
   });
 });
