@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.14.2] - 2026-02-27
+
+### Infrastructure
+- Add `ignore` package as explicit dependency
+- Remove website webhook notification from publish workflow
+
 ## [0.14.1] - 2026-02-26
 
 ### Fixed
