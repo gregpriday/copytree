@@ -99,7 +99,7 @@
     "@babel/preset-env": "^7.29.0",
     "@babel/preset-react": "^7.27.1",
     "@babel/register": "^7.28.6",
-    "@types/node": "^24.10.1",
+    "@types/node": "^25.3.3",
     "babel-jest": "^30.2.0",
     "babel-plugin-transform-import-meta": "^2.3.3",
     "eslint": "^9.39.1",
