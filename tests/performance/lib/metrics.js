@@ -196,9 +196,7 @@ export async function measure(fn, options = {}) {
     ...memory,
     ...gcStats,
     ...loopStats,
-    ...Object.fromEntries(
-      Object.entries(marks).map(([key, val]) => [key, Number(val.toFixed(3))]),
-    ),
+    ...Object.fromEntries(Object.entries(marks).map(([key, val]) => [key, Number(val.toFixed(3))])),
   };
 
   if (error) sample.error = error.message;

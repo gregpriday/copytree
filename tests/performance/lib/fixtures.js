@@ -164,7 +164,9 @@ function buildDirectories(rng, spec) {
     const parent = dirs[i % dirs.length];
     const depth = parent.split('/').length;
     if (depth < 5) {
-      dirs.push(`${parent}/${rng.pick(['core', 'utils', 'models', 'views', 'api'])}-${dirs.length}`);
+      dirs.push(
+        `${parent}/${rng.pick(['core', 'utils', 'models', 'views', 'api'])}-${dirs.length}`,
+      );
     }
     i++;
     if (i > targetDirs * 4) break;

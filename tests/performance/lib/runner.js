@@ -30,7 +30,11 @@ const MARKER = '<<<BENCH_RESULT>>>';
  */
 export function fingerprint(value) {
   const canonical = JSON.stringify(value, Object.keys(value ?? {}).sort());
-  return `sha256:${crypto.createHash('sha256').update(canonical ?? '').digest('hex').slice(0, 32)}`;
+  return `sha256:${crypto
+    .createHash('sha256')
+    .update(canonical ?? '')
+    .digest('hex')
+    .slice(0, 32)}`;
 }
 
 /**
@@ -315,7 +319,11 @@ export async function runAB(scenarios, options) {
 
   return {
     baseline: { ...shared, label: options.baselineLabel ?? 'baseline', results: baselineResults },
-    candidate: { ...shared, label: options.candidateLabel ?? 'candidate', results: candidateResults },
+    candidate: {
+      ...shared,
+      label: options.candidateLabel ?? 'candidate',
+      results: candidateResults,
+    },
   };
 }
 
