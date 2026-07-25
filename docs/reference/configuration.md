@@ -97,15 +97,86 @@ export default {
 
 | Config Key | CLI Flag | Type | Default | Description |
 |-----------|----------|------|---------|-------------|
-| `maxFileSize` | N/A | bytes | 10485760 | Maximum single file size |
-| `maxTotalSize` | N/A | bytes | 104857600 | Maximum total size of all files |
-| `maxFileCount` | `--limit` | number | 10000 | Maximum number of files |
+| `maxFileSize` | N/A | bytes | 10485760 | Memory-safety ceiling; nothing above it is ever read |
+| `sizeGate` | `--size-gate` | bytes \| false | 262144 | Per-file gate applied from `stat()`, before opening |
+| `maxTotalSize` | `--max-total-size` | bytes | 104857600 | Total size budget across all files |
+| `maxFileCount` | `--max-files` | number | 10000 | Maximum number of files |
+| `maxCharacterLimit` | `--char-limit` | chars | 2000000 | Character budget across all file content |
 | `defaultProfile` | `--profile` | string | `default` | Default profile to use |
-| `respectGitignore` | N/A | boolean | `true` | Respect .gitignore rules |
+| `respectGitignore` | N/A | boolean | `true` | Respect gitignore rules (see below) |
+| `gitignore.nested` | N/A | boolean | `true` | Read `.gitignore` at every depth, not just the root |
+| `gitignore.infoExclude` | N/A | boolean | `true` | Read `.git/info/exclude` |
+| `gitignore.globalExcludesFile` | N/A | boolean | `true` | Read the user's global gitignore (`core.excludesFile`) |
 | `includeHidden` | N/A | boolean | `false` | Include hidden files |
 | `followSymlinks` | `--follow-symlinks` | boolean | `false` | Follow symbolic links |
+| `binaryExtensions` | N/A | object | see below | Extension groups classified as binary without opening the file |
+| `exclusionReport.topN` | `--explain` | number | 50 | How many of the largest exclusions to detail |
 | `cache.enabled` | N/A | boolean | `true` | Enable caching |
 | `cache.ttl` | N/A | milliseconds | 3600000 | Cache time-to-live |
+
+### Size limits, and which one you want
+
+Three different things bound a run, and they are not interchangeable:
+
+- **`maxFileSize`** (10MB) is about **memory**. Nothing above it is ever read, and nothing lifts it.
+- **`sizeGate`** (256KB) is about **context**. No single 256KB+ file belongs in a model's context
+  window. It is decided from `stat()`, so an oversized file is never opened. Only `always` /
+  `.copytreeinclude` lifts it, and the override is reported.
+- **`charLimit`** truncates *after* reading, at a line boundary, and marks the cut.
+
+Set `sizeGate: false` (or pass `--no-size-gate`) to disable the gate.
+
+## Exclusion Precedence
+
+One documented order, lowest precedence to highest. Last match wins, as in git.
+
+1. Config `globalExcludedDirectories` / `globalExcludedFiles`
+2. Global gitignore (`core.excludesFile`)
+3. `.git/info/exclude`
+4. Root `.gitignore`
+5. Nested `.gitignore` (deepest last)
+6. Root `.copytreeignore`
+7. Nested `.copytreeignore` (deepest last)
+8. `--exclude` patterns
+9. `.copytreeinclude` / `--always` (highest: overrides everything above)
+
+All of this is plain filesystem reads. CopyTree never shells out to `git check-ignore` and never
+requires the target to be a git repository, so it works on a plain folder.
+
+Excluded directories are pruned, not descended into. A pruned directory therefore counts as a
+single entry in the exclusion report, representing its whole subtree.
+
+## Binary Classification
+
+`binaryExtensions` groups extensions by category (`video`, `audio`, `image`, `design`, `model3d`,
+`font`, `archive`, `diskImage`, `package`, `executable`, `debug`, `database`, `mlWeights`,
+`dataBlob`, `document`, `cert`, `other`).
+
+The extension is checked **first**: a file whose extension appears in any group is classified
+straight from the path, with no `open` and no `read`. A 3 GB `.mp4` costs the same as a 40 KB
+`.ts`. Content sniffing (magic numbers, null bytes, non-printable ratio) only runs for extensions
+that are not listed.
+
+Groups are replaced wholesale by user config, so a project can override one category without
+restating the rest:
+
+```javascript
+// ~/.copytree/copytree.js — treat .key as project text, not key material
+module.exports = {
+  binaryExtensions: {
+    cert: ['.pem', '.der', '.crt', '.cer', '.p12', '.pfx', '.jks', '.gpg'],
+  },
+};
+```
+
+Source-code extensions are protected regardless of configuration. `.ts` is TypeScript far more
+often than MPEG transport stream, and `.html` is source code in most repositories, so listing them
+in a group has no effect. The full protected list is in `config/copytree.js`; the failure mode is
+silent, which is why it is enforced in code rather than left to convention.
+
+Text formats that are usually small and occasionally enormous (`.json`, `.csv`, `.xml`, `.sql`,
+`.log`, `.txt`, `.snap`) are deliberately **not** classified by extension: a rule would be wrong in
+both directions. They are bounded by `sizeGate` instead.
 
 ## Profile Configuration
 
@@ -314,6 +385,39 @@ export default {
   includeHidden: true
 };
 ```
+
+## Hermetic Configuration (for embedders)
+
+`~/.copytree` is a feature for a CLI and a hazard for an application. If you ship CopyTree inside a
+product, the context an agent receives should not depend on a file outside the project, outside
+your control, invisible in your UI, and different on every teammate's machine — and a `.js` file
+there is arbitrary code executed in your process.
+
+```js
+import { ConfigManager } from 'copytree';
+
+const config = await ConfigManager.create({
+  userConfig: false,   // skip ~/.copytree entirely
+  strict: true,        // throw ERR_CONFIG_INVALID instead of continuing with a partial config
+});
+
+// A config that failed to load has no exclusion lists at all, which looks like
+// success and is not. Check rather than assume.
+if (!config.isDefaultsLoaded) {
+  throw new Error(config.getLoadErrors().map((e) => `${e.scope}: ${e.message}`).join('; '));
+}
+```
+
+`configSources: ['defaults']` is equivalent to `userConfig: false` and reads more explicitly when
+you want the source list spelled out.
+
+A loaded instance is safe to reuse across concurrent `copy()` / `scan()` calls. Create one per
+process or per project rather than one per call: loading parses every config file and compiles the
+JSON schema, which is measurable startup cost. Only `set()` and `reload()` mutate an instance.
+
+Nothing in the configuration or the pipeline consults `process.cwd()`. Everything resolves from the
+package directory and the `basePath` you pass, so a worker thread whose working directory is an app
+bundle gets the same answer as a shell in the repository.
 
 ## Configuration Files Format
 

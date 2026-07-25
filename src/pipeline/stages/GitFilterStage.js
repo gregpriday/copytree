@@ -1,6 +1,7 @@
 import Stage from '../Stage.js';
 import GitUtils from '../../utils/GitUtils.js';
 import { toPosix } from '../../utils/pathUtils.js';
+import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 
 /**
  * Git filter stage - filters files based on git status
@@ -62,6 +63,21 @@ class GitFilterStage extends Stage {
         const always = input.files.filter((f) => f.alwaysInclude);
         const byPath = new Map([...gitLimited, ...always].map((f) => [f.path, f]));
         filteredFiles = [...byPath.values()];
+
+        // "Why isn't my file here?" is a fair question when --modified drops
+        // hundreds of files, so the git filter accounts for its removals too.
+        if (input.exclusionReport) {
+          for (const file of input.files) {
+            if (!byPath.has(file.path)) {
+              input.exclusionReport.add({
+                path: file.path,
+                size: file.size || 0,
+                reason: EXCLUSION_REASONS.GIT_FILTER,
+                rule: this.modified ? 'modified' : `changed:${this.changed}`,
+              });
+            }
+          }
+        }
 
         this.log(
           `Filtered to ${filteredFiles.length} files (from ${input.files.length}, ${always.length} force-included) based on git status`,

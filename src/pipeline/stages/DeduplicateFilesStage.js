@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import Stage from '../Stage.js';
 import { logger } from '../../utils/logger.js';
+import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 
 /**
  * Deduplicate files stage - Remove duplicate files based on content hash
@@ -22,11 +23,24 @@ class DeduplicateFilesStage extends Stage {
   }
 
   /**
-   * Process files and remove duplicates
+   * Process files and remove duplicates.
+   *
+   * Accepts the pipeline contract (`process(input)` where `input.files` is the
+   * array, returning `{...input, files}`) and, for backwards compatibility, a
+   * bare array plus context. The bare-array form is deprecated.
+   *
+   * @param {Object|Array} input - Pipeline input, or a legacy file array
+   * @param {Object} [legacyContext] - Legacy event emitter context
+   * @returns {Promise<Object|Array>} Same shape as the input
    */
-  async process(files, context) {
+  async process(input, legacyContext) {
+    const isLegacyArray = Array.isArray(input);
+    const files = isLegacyArray ? input : input?.files;
+    const context = isLegacyArray ? legacyContext : input;
+    const wrap = (result) => (isLegacyArray ? result : { ...input, files: result });
+
     if (!files || files.length === 0) {
-      return files;
+      return isLegacyArray ? files : input;
     }
 
     const startTime = Date.now();
@@ -53,6 +67,13 @@ class DeduplicateFilesStage extends Stage {
           file: file.path || file.relativePath,
           duplicateOf: original.path || original.relativePath,
           size: file.size || file.stats?.size || 0,
+        });
+
+        input?.exclusionReport?.add({
+          path: file.path || file.relativePath,
+          size: file.size || file.stats?.size || 0,
+          reason: EXCLUSION_REASONS.DUPLICATE,
+          rule: `duplicateOf:${original.path || original.relativePath}`,
         });
 
         // Emit deduplication event
@@ -95,7 +116,7 @@ class DeduplicateFilesStage extends Stage {
       this.log(`No duplicates found in ${elapsed}`, 'info');
     }
 
-    return uniqueFiles;
+    return wrap(uniqueFiles);
   }
 
   /**
@@ -127,6 +148,10 @@ class DeduplicateFilesStage extends Stage {
    * Validate input
    */
   validate(input) {
+    if (Array.isArray(input)) {
+      return true; // legacy bare-array form
+    }
+
     if (!input || typeof input !== 'object') {
       throw new Error('Input must be an object');
     }

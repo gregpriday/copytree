@@ -51,6 +51,48 @@ copytree -c main
 copytree --changed v1.0.0
 ```
 
+#### `--exclude=<pattern>`, `-x <pattern>`
+Exclude files matching glob patterns. Can be used multiple times.
+
+```bash
+copytree --exclude "**/*.test.js" --exclude "fixtures/**"
+```
+
+### Scope Options
+
+#### `--scope <path...>`
+Copy only these paths. **Literal paths, not globs** — a directory named `src/[draft]` is just a
+path, and there is nothing to escape.
+
+Ignore rules still resolve from the project root: the root `.gitignore`, the root
+`.copytreeignore`, and every nested ignore file between the root and the selection all apply. A
+scoped run selects exactly the files a filtered full run would. Output paths stay relative to the
+project root, so `@`-references handed to an agent still resolve.
+
+Traversal starts at the selection rather than the root, so the cost scales with what you asked for
+instead of with the size of the repository.
+
+```bash
+# One folder, repository rules
+copytree --scope src/panels/file-browser
+
+# Several entries, files as well as directories
+copytree --scope src/panels package.json
+
+# Compose with a filter: TypeScript files under src
+copytree --scope src --filter "**/*.ts"
+```
+
+#### `--scope-include-ignored`
+Let `--scope` entries override the ignore rules that would otherwise exclude them. Off by default,
+so a scoped run keeps the "same set as a full run" guarantee. Use it for the deliberate gesture —
+you navigated into a gitignored folder and want it anyway. Config exclusions still apply, so
+`node_modules` stays out.
+
+```bash
+copytree --scope build/generated --scope-include-ignored
+```
+
 ### Output Options
 
 #### `--output[=<file>]`, `-o [<file>]`
@@ -111,12 +153,61 @@ copytree -l 100
 ```
 
 #### `--char-limit=<number>`, `-C <number>`
-Character limit for total output.
+Character budget across all file content.
+
+Truncation happens at a line boundary and is marked inline
+(`… [truncated 4,213 of 9,001 lines]`), so an agent cannot conclude the file simply ends there.
+When a single line is longer than the remaining budget — a minified bundle, say — the cut is
+mid-line and labelled as such rather than dropping the file. Chunks never end on an unpaired
+UTF-16 surrogate.
 
 ```bash
 copytree --char-limit 100000
 copytree -C 50000
 ```
+
+### Budget Options
+
+Budgets are applied **after sorting**, so which files survive follows `--sort`. Truncation is
+always reported, never silent: a silently truncated context is worse than an error, because the
+agent answers confidently from a partial repository.
+
+#### `--size-gate=<size>` / `--no-size-gate`
+Hard per-file size gate, applied from `stat()` before anything is opened. Default: **256KB**.
+
+This is not the same as `maxFileSize` (a 10MB memory-safety ceiling) or `--char-limit` (which
+truncates *after* reading). No single 256KB+ file belongs in an agent's context window, and the
+gate exists whether or not truncation is enabled.
+
+Only `--always` and `.copytreeinclude` lift the gate, and the override is reported.
+
+```bash
+copytree --size-gate 64KB
+copytree --no-size-gate            # include large files
+copytree --size-gate 64KB --always "docs/spec.md"
+```
+
+#### `--max-total-size=<size>`
+Total size budget across all selected files.
+
+```bash
+copytree --max-total-size 5MB
+```
+
+#### `--max-files=<number>`
+Maximum number of files to include.
+
+Budgets keep the head of the sorted list and drop the tail, and `--sort` is ascending by default.
+`--sort modified` therefore keeps the *oldest* files; pair it with `--sort-order desc` to keep the
+recently-touched ones.
+
+```bash
+copytree --max-files 500 --sort modified --sort-order desc   # keep the newest 500
+copytree --max-files 500 --sort size                         # keep the 500 smallest
+```
+
+#### `--sort-order <asc|desc>`
+Sort direction (default: `asc`). Decides which end of the list a budget keeps.
 
 #### `--only-tree`, `-t`
 Show only directory structure, no file contents.
@@ -210,11 +301,38 @@ copytree --external https://github.com/user/repo
 ### Debug & Optimization Options
 
 #### `--dry-run`
-Simulate execution without generating output.
+Plan the run without reading or formatting content.
+
+A dry run is a strict prefix of the real run: the same file set, in the same order, under the same
+budgets. It reports the file count, total size, an approximate token count, and what was excluded.
 
 ```bash
 copytree --dry-run
 ```
+
+```
+Dry run - nothing was read or written.
+Base path: /repo
+221 file(s), 1.42 MB, ~406k tokens
+25 excluded: 19 copytreeignore, 4 gitignore, 1 configExclude, 1 sizeGate
+```
+
+#### `--explain`
+Report which rule excluded each file, with the ignore file and line it came from. Turns "why isn't
+my file here?" from a bisect into a glance.
+
+```bash
+copytree --dry-run --explain
+```
+
+```
+Largest exclusions:
+  package-lock.json — 351.44 KB — sizeGate [sizeGate:262144]
+  CHANGELOG.md — 14.78 KB — copytreeignore [CHANGELOG.md] (/repo/.copytreeignore:20)
+  sub/nested.txt — 2 B — gitignore [nested.txt] (/repo/sub/.gitignore:1)
+```
+
+Aggregate counts are always collected and cost nothing extra. `--explain` adds the per-file detail.
 
 #### `--validate`
 Validate profile syntax without processing files.

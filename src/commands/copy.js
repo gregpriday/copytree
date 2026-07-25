@@ -13,6 +13,8 @@ import { summarize as getFsErrorSummary, reset as resetFsErrors } from '../utils
 import FolderProfileLoader from '../config/FolderProfileLoader.js';
 import { Profiler, writeProfilingReport } from '../utils/profiler.js';
 import { parseSize } from '../utils/helpers.js';
+import { resolveScope } from '../utils/scopeResolver.js';
+import { buildEstimates } from '../utils/estimate.js';
 
 // Lazy initialization for Jest compatibility
 let pkg;
@@ -69,10 +71,7 @@ async function copyCommand(targetPath = '.', options = {}) {
     // Ensure configuration is loaded before proceeding
     await config().loadConfiguration();
 
-    // 1. Build configuration from CLI options and defaults
-    const profileConfig = await buildProfileFromCliOptions(options);
-
-    // 2. Validate and resolve path
+    // 1. Validate and resolve path
     let basePath;
     if (GitHubUrlHandler.isGitHubUrl(targetPath)) {
       // For GitHub URLs, clone/update the repository and get the local path
@@ -86,6 +85,9 @@ async function copyCommand(targetPath = '.', options = {}) {
         throw new CommandError(`Path does not exist: ${basePath}`, 'copy');
       }
     }
+
+    // 2. Build configuration from CLI options and defaults, anchored at the target
+    const profileConfig = await buildProfileFromCliOptions(options, basePath);
 
     // 3. Update to processing
     logger.updateSpinner('Processing files');
@@ -174,11 +176,19 @@ async function copyCommand(targetPath = '.', options = {}) {
       await displayOutput(outputResult, options, basePath);
     } else if (options.dryRun) {
       logger.info('🔍 Dry run mode - no files were processed.');
-      const fileCount = result.files.filter((f) => f !== null).length;
-      const totalSize = result.files
-        .filter((f) => f !== null)
-        .reduce((sum, file) => sum + (file.size || 0), 0);
-      logger.info(`${fileCount} files [${logger.formatBytes(totalSize)}] would be processed`);
+      const included = result.files.filter((f) => f !== null);
+      const totalSize = included.reduce((sum, file) => sum + (file.size || 0), 0);
+      const { estimatedTokens } = buildEstimates(included, {
+        format: options.format,
+        onlyTree: options.onlyTree,
+        addLineNumbers: options.withLineNumbers,
+      });
+
+      logger.info(
+        `${included.length} files [${logger.formatBytes(totalSize)}, ~${formatCount(estimatedTokens)} tokens] would be processed`,
+      );
+
+      reportExclusions(result, options);
     }
 
     // 10. Show summary if requested
@@ -275,8 +285,13 @@ function parseSizeOption(sizeStr, flagName) {
 /**
  * Build profile configuration from CLI options, folder profiles, and config defaults
  * Integrates the new FolderProfileLoader system
+ *
+ * @param {Object} options - CLI options
+ * @param {string} [basePath] - Resolved target directory; folder profiles are
+ *   discovered relative to this, not to process.cwd()
+ * @returns {Promise<Object>} Profile configuration
  */
-async function buildProfileFromCliOptions(options) {
+async function buildProfileFromCliOptions(options, basePath) {
   const copytreeConfig = config().get('copytree', {});
 
   // Try to load folder profile if requested or if -r/--as-reference is used
@@ -284,7 +299,10 @@ async function buildProfileFromCliOptions(options) {
   //       options.profile is now reserved for performance profiling (cpu/heap/all).
   let folderProfile = null;
   if (options.folderProfile || options.asReference) {
-    const loader = new FolderProfileLoader({ cwd: process.cwd() });
+    // Folder profiles belong to the project being copied, not to whatever
+    // directory the process happens to be started from. An embedder's cwd is
+    // its own app bundle; a shell user may well be a level above the target.
+    const loader = new FolderProfileLoader({ cwd: basePath || process.cwd() });
     try {
       if (options.folderProfile) {
         // Load named profile: -p <name> / --folder-profile <name>
@@ -319,8 +337,11 @@ async function buildProfileFromCliOptions(options) {
         ? folderProfile.include
         : ['**/*'],
 
-    // Exclude patterns
-    // Merge CLI excludes with folder profile excludes, then config defaults
+    // Exclude patterns.
+    // Merge CLI excludes with folder profile excludes. Config-level exclusions
+    // (globalExcludedDirectories / globalExcludedFiles) are NOT merged here:
+    // FileDiscoveryStage applies them unconditionally so the CLI and the
+    // programmatic API cannot drift apart on what gets excluded.
     exclude: [
       ...(options.exclude
         ? Array.isArray(options.exclude)
@@ -328,7 +349,6 @@ async function buildProfileFromCliOptions(options) {
           : [options.exclude]
         : []),
       ...(folderProfile?.exclude || []),
-      ...(copytreeConfig.globalExcludedDirectories || []),
     ],
 
     // Filter patterns (same as include for compatibility)
@@ -351,13 +371,26 @@ async function buildProfileFromCliOptions(options) {
       includeHidden: options.includeHidden ?? copytreeConfig.includeHidden ?? false,
       followSymlinks: options.followSymlinks ?? copytreeConfig.followSymlinks ?? false,
       maxFileSize: options.maxFileSize ?? copytreeConfig.maxFileSize,
-      maxTotalSize: options.maxTotalSize ?? copytreeConfig.maxTotalSize,
-      maxFileCount: options.maxFileCount ?? copytreeConfig.maxFileCount,
+      maxTotalSize: options.maxTotalSize
+        ? parseSizeOption(options.maxTotalSize, 'max-total-size')
+        : copytreeConfig.maxTotalSize,
+      maxFileCount: options.maxFiles ?? options.maxFileCount ?? copytreeConfig.maxFileCount,
+      // `--no-size-gate` sets options.sizeGate to false, which disables the gate.
+      sizeGate:
+        options.sizeGate === false
+          ? false
+          : options.sizeGate
+            ? parseSizeOption(options.sizeGate, 'size-gate')
+            : copytreeConfig.sizeGate,
       // Convenience filter flags
       extFilter: options.ext ? parseExtensions(options.ext) : null,
       maxDepth: options.maxDepth !== undefined ? options.maxDepth : null,
       minSizeBytes: options.minSize ? parseSizeOption(options.minSize, 'min-size') : null,
       maxSizeBytes: options.maxSize ? parseSizeOption(options.maxSize, 'max-size') : null,
+      // Scoped copy (literal paths, root-anchored ignore semantics)
+      scope: options.scope ? (Array.isArray(options.scope) ? options.scope : [options.scope]) : [],
+      scopeIgnoresIgnoreFiles: options.scopeIncludeIgnored === true,
+      explain: options.explain === true,
     },
 
     // Transformer configuration
@@ -398,6 +431,17 @@ async function buildProfileFromCliOptions(options) {
 async function setupPipelineStages(basePath, profile, options) {
   const stages = [];
 
+  // Resolve --scope before the pipeline runs. The pipeline continues on stage
+  // errors by design, which would turn "that folder does not exist" into an
+  // empty result indistinguishable from "everything there is gitignored".
+  const scopeEntries =
+    profile.options?.scope?.length > 0
+      ? await resolveScope(basePath, profile.options.scope, {
+          followSymlinks: profile.options?.followSymlinks,
+        })
+      : [];
+  const scopePaths = scopeEntries.map((entry) => entry.absolutePath);
+
   // Merge force-include patterns from all sources (CLI, profile, .copytreeinclude)
   const mergedAlways = [
     ...(Array.isArray(options.always) ? options.always : options.always ? [options.always] : []),
@@ -411,18 +455,22 @@ async function setupPipelineStages(basePath, profile, options) {
     new FileDiscoveryStage({
       basePath,
       patterns: profile.include || ['**/*'],
+      excludes: profile.exclude || [],
       respectGitignore: profile.options?.respectGitignore ?? true,
       includeHidden: profile.options?.includeHidden ?? false,
       followSymlinks: profile.options?.followSymlinks ?? false,
       maxFileSize: profile.options?.maxFileSize,
-      maxTotalSize: profile.options?.maxTotalSize,
-      maxFileCount: profile.options?.maxFileCount,
+      sizeGate: profile.options?.sizeGate,
       forceInclude: mergedAlways,
       // Convenience filter flags
       extFilter: profile.options?.extFilter ?? null,
       maxDepth: profile.options?.maxDepth ?? null,
       minSizeBytes: profile.options?.minSizeBytes ?? null,
       maxSizeBytes: profile.options?.maxSizeBytes ?? null,
+      // Scoped copy
+      scope: scopePaths,
+      scopeIgnoresIgnoreFiles: profile.options?.scopeIgnoresIgnoreFiles === true,
+      explain: profile.options?.explain === true,
     }),
   );
 
@@ -455,7 +503,24 @@ async function setupPipelineStages(basePath, profile, options) {
     }),
   );
 
-  // 5. Limit Stage (if --head option is used)
+  // 5. Sort Stage — ALWAYS, not only when --sort is passed. Budgets truncate
+  //    from the tail, so "which files survive" is only meaningful once the
+  //    order is defined.
+  const { default: SortFilesStage } = await import('../pipeline/stages/SortFilesStage.js');
+  stages.push(
+    new SortFilesStage({ sortBy: options.sort || 'path', order: options.sortOrder || 'asc' }),
+  );
+
+  // 6. Budget Stage — maxFileCount and maxTotalSize, applied to the sorted list
+  const { default: BudgetStage } = await import('../pipeline/stages/BudgetStage.js');
+  stages.push(
+    new BudgetStage({
+      maxFileCount: profile.options?.maxFileCount,
+      maxTotalSize: profile.options?.maxTotalSize,
+    }),
+  );
+
+  // 7. Limit Stage (if --head option is used)
   if (options.head) {
     const { default: LimitStage } = await import('../pipeline/stages/LimitStage.js');
     stages.push(
@@ -465,7 +530,7 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 6. File Loading Stage (skip if --only-tree)
+  // 8. File Loading Stage (skip if --only-tree)
   if (!options.onlyTree) {
     const { default: FileLoadingStage } = await import('../pipeline/stages/FileLoadingStage.js');
     stages.push(
@@ -505,23 +570,35 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
-  // 9. Character Limit Stage (if --char-limit option is used)
+  // 9. Deduplicate Stage (if --dedupe) — after loading, because duplicates are
+  //    decided by content hash and there is no content before this point.
+  if (options.dedupe && !options.onlyTree) {
+    const { default: DeduplicateFilesStage } =
+      await import('../pipeline/stages/DeduplicateFilesStage.js');
+    stages.push(new DeduplicateFilesStage());
+  }
+
+  // 10. Character Limit Stage (if --char-limit option is used)
   if (options.charLimit) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(
       new CharLimitStage({
-        limit: parseInt(options.charLimit),
+        limit: parseInt(options.charLimit, 10),
       }),
     );
   }
 
-  // 10. Instructions Stage (load instructions unless disabled)
+  // 11. Instructions Stage (load instructions unless disabled)
   const { default: InstructionsStage } = await import('../pipeline/stages/InstructionsStage.js');
   stages.push(new InstructionsStage());
 
-  // 11. Output Formatting Stage
-  // Determine output format (default to tree if --only-tree is used)
-  const rawFormat = options.format || (options.onlyTree ? 'tree' : profile.output?.format || 'xml');
+  // 12. Output Formatting Stage
+  //
+  // `--only-tree` controls *content* (omit file bodies), not *format*. It used
+  // to imply `--format tree` here but not on the UI path, so the same flags
+  // produced different documents depending on whether you passed -S. Rendering
+  // as a tree is what `--format tree` is for.
+  const rawFormat = options.format || profile.output?.format || 'xml';
   const outputFormat =
     (rawFormat || 'xml').toString().toLowerCase() === 'md'
       ? 'markdown'
@@ -562,6 +639,61 @@ async function setupPipelineStages(basePath, profile, options) {
   }
 
   return stages;
+}
+
+/**
+ * Report what did not make it into the run, and why.
+ *
+ * "Why isn't my file here?" should be a glance, not a bisect of `.gitignore`.
+ * Aggregate counts are always available; `--explain` adds the individual rule
+ * and the ignore file and line it came from.
+ *
+ * @param {Object} result - Pipeline result
+ * @param {Object} options - CLI options
+ */
+function reportExclusions(result, options) {
+  // Read the live report, not `stats.excluded`. That field is serialized during
+  // discovery, before the budget, dedupe and character-limit stages have had a
+  // chance to drop anything, so it is a snapshot of an early moment rather than
+  // the final accounting.
+  const excluded = result.exclusionReport?.toJSON() ?? result.stats?.excluded;
+  if (!excluded || excluded.total === 0) return;
+
+  const counts = Object.entries(excluded.byReason)
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([reason, count]) => `${count} ${reason}`)
+    .join(', ');
+
+  logger.info(`${excluded.total} excluded: ${counts}`);
+
+  if (result.stats?.truncated) {
+    logger.warn(
+      `Truncated: ${result.stats.truncatedCount} file(s) dropped by ${result.stats.truncatedBy}`,
+    );
+  }
+
+  if (!options.explain || !excluded.largest?.length) return;
+
+  logger.info('\nLargest exclusions:');
+  for (const entry of excluded.largest) {
+    const source = entry.ruleSource ? ` (${entry.ruleSource})` : '';
+    const rule = entry.rule ? ` [${entry.rule}]` : '';
+    logger.info(
+      `  ${entry.path} — ${logger.formatBytes(entry.size)} — ${entry.reason}${rule}${source}`,
+    );
+  }
+}
+
+/**
+ * Format a count with thousands separators, abbreviating large values.
+ * @param {number} value - Count to format
+ * @returns {string} Human-readable count
+ */
+function formatCount(value) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
+  return String(value);
 }
 
 /**
@@ -738,5 +870,10 @@ function showSummary(result, startTime) {
     console.log(`  Errors: ${result.errors.length}`);
   }
 }
+
+// Exported so the Ink UI shares this exact profile builder and stage list.
+// Two implementations of "which files get selected" is the defect this whole
+// module is meant to eliminate; the UI must not grow its own.
+export { buildProfileFromCliOptions, setupPipelineStages };
 
 export default copyCommand;

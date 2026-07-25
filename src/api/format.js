@@ -1,4 +1,5 @@
-import { ValidationError } from '../utils/errors.js';
+import { ValidationError, ERROR_CODES } from '../utils/errors.js';
+import { OUTPUT_FORMAT_VERSIONS } from '../utils/outputVersion.js';
 import XMLFormatter from '../pipeline/formatters/XMLFormatter.js';
 import MarkdownFormatter from '../pipeline/formatters/MarkdownFormatter.js';
 import NDJSONFormatter from '../pipeline/formatters/NDJSONFormatter.js';
@@ -62,6 +63,7 @@ export async function format(files, options = {}) {
       `Invalid format: ${formatType}. Valid formats: ${validFormats.join(', ')}`,
       'format',
       formatType,
+      { code: ERROR_CODES.INVALID_FORMAT },
     );
   }
 
@@ -91,8 +93,13 @@ export async function format(files, options = {}) {
     (f) => f && typeof f === 'object' && f.path && f.absolutePath,
   );
 
-  if (validFiles.length === 0) {
-    throw new ValidationError('No valid files to format', 'format', files);
+  // An empty selection is a valid outcome (an empty folder, a fully-ignored
+  // scope), not a failure. Callers that want a document back rather than an
+  // exception pass `allowEmpty`.
+  if (validFiles.length === 0 && !options.allowEmpty) {
+    throw new ValidationError('No valid files to format', 'format', files, {
+      code: ERROR_CODES.NO_FILES_MATCHED,
+    });
   }
 
   // Build input object for formatters
@@ -207,6 +214,9 @@ function formatAsJSON(input, options) {
   const output = {
     directory: input.basePath,
     metadata: {
+      // Versioned so downstream prompts written against this shape can detect
+      // a change instead of silently regressing.
+      format: OUTPUT_FORMAT_VERSIONS.json,
       generated: new Date().toISOString(),
       fileCount: input.files.length,
       totalSize: calculateTotalSize(input.files),

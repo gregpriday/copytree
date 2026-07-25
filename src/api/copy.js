@@ -1,7 +1,10 @@
 import { scan } from './scan.js';
 import { format } from './format.js';
-import { ValidationError } from '../utils/errors.js';
+import { ValidationError, ERROR_CODES, isAbortError } from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
+import { buildManifest } from '../utils/manifest.js';
+import { buildEstimates } from '../utils/estimate.js';
+import { versionFor } from '../utils/outputVersion.js';
 import fs from 'fs-extra';
 import path from 'path';
 import Clipboard from '../utils/clipboard.js';
@@ -19,10 +22,15 @@ import Clipboard from '../utils/clipboard.js';
  * @property {boolean} [stream=false] - Stream output to stdout
  * @property {string} [secretsReport] - Path to write secrets report
  * @property {boolean} [info=false] - Include summary information
- * @property {boolean} [dryRun=false] - Preview without processing
+ * @property {boolean} [dryRun=false] - Plan the run without reading or formatting content.
+ *   Every stat-based budget (`sizeGate`, `maxFileSize`, `maxFileCount`, `maxTotalSize`) applies
+ *   exactly as in a real run, so the selection is identical. `charLimit` is planned from byte
+ *   size, which matches character length for ASCII but overestimates for multi-byte text, and
+ *   `dedupe` cannot run at all without content — with either option the preview is an estimate.
  * @property {boolean} [verbose=false] - Verbose error output
- * @property {number} [charLimit] - Character limit per file
+ * @property {number} [charLimit] - Character budget across all file content
  * @property {string} [instructions] - Instructions to include in output
+ * @property {boolean} [explain=false] - Collect per-file exclusion detail in `stats.excluded.largest`
  * @property {ConfigManager} [config] - ConfigManager instance for isolated configuration.
  *   If not provided, an isolated instance will be created. This enables concurrent
  *   copy operations with different configurations.
@@ -36,20 +44,41 @@ import Clipboard from '../utils/clipboard.js';
  * @typedef {Object} ManifestEntry
  * @property {string} path - Relative POSIX path to the file
  * @property {number} size - File size in bytes
+ * @property {string} [modified] - ISO timestamp of last modification
+ * @property {string} outcome - `included` | `structure-only` | `binary-placeholder` |
+ *   `truncated` | `excluded:<reason>`
+ */
+
+/**
+ * @typedef {Object} CopyStats
+ * @property {number} totalFiles - Total number of files processed
+ * @property {number} duration - Processing duration in milliseconds
+ * @property {number} totalSize - Total size of files in bytes
+ * @property {number} [outputSize] - Output size in bytes
+ * @property {number} estimatedOutputChars - Output characters (measured on a real run,
+ *   estimated on a dry run)
+ * @property {number} estimatedTokens - Rough token count, chars/4. Accurate to about ±20%;
+ *   no tokenizer dependency and no per-model accuracy claim.
+ * @property {boolean} noFilesMatched - True when nothing matched. A valid outcome, not an error.
+ * @property {Object} excluded - Exclusion accounting
+ * @property {number} excluded.total - How many entries were excluded
+ * @property {Object<string, number>} excluded.byReason - Counts keyed by stable reason
+ * @property {Array<Object>} [excluded.largest] - Largest exclusions, only under `explain: true`
+ * @property {boolean} [truncated] - Whether a budget dropped files
+ * @property {number} [truncatedCount] - How many files a budget dropped
+ * @property {string} [truncatedBy] - Which budget bit first
+ * @property {Object} [secretsGuard] - Secrets detection summary (if enabled)
  */
 
 /**
  * @typedef {Object} CopyResult
  * @property {string} output - Formatted output string
+ * @property {string|null} outputFormatVersion - Version of the emitted format, e.g. `copytree-xml@1`
  * @property {Array<FileResult>} files - Full file results (includes content). Use `manifest` when you only need paths and sizes.
- * @property {Array<ManifestEntry>} manifest - Lightweight list of included files with only `path` and `size`.
+ * @property {Array<ManifestEntry>} manifest - Lightweight list of included files.
  *   Safe to retain in long-lived processes (e.g. Electron) without holding megabytes of file content in memory.
  *   Consistent shape across normal runs and dry runs — entries never include `content`.
- * @property {Object} stats - Processing statistics
- * @property {number} stats.totalFiles - Total number of files processed
- * @property {number} stats.duration - Processing duration in milliseconds
- * @property {number} stats.totalSize - Total size of files in bytes
- * @property {Object} [stats.secretsGuard] - Secrets detection summary (if enabled)
+ * @property {CopyStats} stats - Processing statistics
  */
 
 /**
@@ -72,32 +101,31 @@ import Clipboard from '../utils/clipboard.js';
  * console.log(result.output);
  *
  * @example
- * // Copy with all options
- * const result = await copy('./src', {
- *   format: 'json',
- *   filter: ['**\/*.js'],
- *   exclude: ['**\/*.test.js'],
- *   modified: true,
- *   output: './output.json',
- *   clipboard: true,
- *   display: true
+ * // Scope to a folder the user right-clicked. Literal paths, no glob escaping;
+ * // ignore rules and output paths still resolve from the repository root.
+ * const result = await copy(repoRoot, {
+ *   scope: ['src/panels/file-browser'],
  * });
  *
  * @example
- * // Access the lightweight file manifest (no content retained in memory)
- * const result = await copy('./src');
- * result.manifest.forEach(({ path, size }) => {
- *   console.log(`${path}: ${size} bytes`);
+ * // Bound the context, and find out what that cost
+ * const result = await copy('./src', {
+ *   maxTotalSize: 2_000_000,
+ *   charLimit: 400_000,
+ *   explain: true,
  * });
+ * if (result.stats.truncated) {
+ *   console.log(`Dropped ${result.stats.truncatedCount} files (${result.stats.truncatedBy})`);
+ * }
+ * console.log(result.stats.excluded.byReason);
  *
  * @example
- * // Dry run to preview
- * const result = await copy('./src', {
- *   dryRun: true
- * });
- * console.log(`Would process ${result.stats.totalFiles} files`);
- * // manifest is also available in dry-run mode
- * result.manifest.forEach(({ path }) => console.log(path));
+ * // Dry run to preview. Selects the same files, in the same order, under the
+ * // same stat-based budgets as the real run. `charLimit` and `dedupe` are
+ * // planned rather than measured — see the dryRun option docs.
+ * const result = await copy('./src', { dryRun: true });
+ * console.log(`Would process ${result.stats.totalFiles} files (~${result.stats.estimatedTokens} tokens)`);
+ * result.manifest.forEach(({ path, outcome }) => console.log(outcome, path));
  */
 export async function copy(basePath, options = {}) {
   const startTime = Date.now();
@@ -107,12 +135,19 @@ export async function copy(basePath, options = {}) {
 
   // Validate basePath
   if (!basePath || typeof basePath !== 'string') {
-    throw new ValidationError('basePath must be a non-empty string', 'copy', basePath);
+    throw new ValidationError('basePath must be a non-empty string', 'copy', basePath, {
+      code: ERROR_CODES.INVALID_OPTION,
+    });
   }
 
   // Create isolated config instance for this operation if not provided
   // This enables concurrent copy operations with different configurations
   const configInstance = options.config || (await ConfigManager.create());
+
+  const manifestOptions = {
+    structureOnlyPatterns: configInstance.get('copytree.structureOnlyPatterns', []),
+    binaryExtensions: configInstance.get('copytree.binaryExtensions', undefined),
+  };
 
   // Build progress wrapper: scan gets 0-80%, format gets 80-100%
   const { onProgress, progressThrottleMs } = options;
@@ -143,9 +178,16 @@ export async function copy(basePath, options = {}) {
     };
   }
 
+  let summary = null;
+  const captureSummary = (value) => {
+    summary = value;
+  };
+
   // Handle dry run
   if (options.dryRun) {
-    // For dry run, collect file list without content
+    // Plan the run without reading content. Every stat-based budget
+    // (sizeGate, maxFileSize, maxFileCount, maxTotalSize) applies exactly as it
+    // would in the real run; charLimit is planned from byte size.
     const files = [];
     for await (const file of scan(basePath, {
       ...options,
@@ -154,12 +196,13 @@ export async function copy(basePath, options = {}) {
       transform: false,
       onProgress: scanProgress,
       progressThrottleMs,
+      onSummary: captureSummary,
     })) {
       files.push(file);
     }
 
     const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
-    const manifest = files.map((file) => ({ path: file.path, size: file.size || 0 }));
+    const manifest = buildManifest(files, manifestOptions);
 
     if (emitProgress) {
       emitProgress(100, 'Complete');
@@ -167,13 +210,20 @@ export async function copy(basePath, options = {}) {
 
     return {
       output: '',
-      files: files,
+      outputFormatVersion: versionFor(options.format || 'xml'),
+      files,
       manifest,
       stats: {
         totalFiles: files.length,
         duration: Date.now() - startTime,
-        totalSize: totalSize,
+        totalSize,
         dryRun: true,
+        ...buildEstimates(files, {
+          format: options.format,
+          onlyTree: options.onlyTree,
+          addLineNumbers: options.addLineNumbers || options.withLineNumbers,
+        }),
+        ...summaryStats(summary, files),
       },
     };
   }
@@ -188,10 +238,18 @@ export async function copy(basePath, options = {}) {
       config: configInstance,
       onProgress: scanProgress,
       progressThrottleMs,
+      onSummary: captureSummary,
     })) {
       files.push(file);
     }
   } catch (error) {
+    // A cancelled run never degrades into a partial success: the caller asked
+    // for it to stop, and a truncated context that looks complete is worse than
+    // no context at all.
+    if (isAbortError(error)) {
+      throw error;
+    }
+
     // Collect scan errors but continue if we have some files
     scanErrors.push(error);
     if (files.length === 0) {
@@ -206,7 +264,8 @@ export async function copy(basePath, options = {}) {
     emitProgress(80, 'Formatting output...');
   }
 
-  // Format output
+  // Format output. An empty selection produces an empty document rather than an
+  // exception: "nothing to copy here" is an outcome, not a failure.
   const output = await format(files, {
     format: options.format,
     onlyTree: options.onlyTree,
@@ -215,10 +274,10 @@ export async function copy(basePath, options = {}) {
     instructions: options.instructions,
     showSize: options.showSize,
     prettyPrint: options.prettyPrint,
+    allowEmpty: true,
   });
 
-  // Build lightweight manifest (path + size only — no content)
-  const manifest = files.map((file) => ({ path: file.path, size: file.size || 0 }));
+  const manifest = buildManifest(files, manifestOptions);
 
   if (emitProgress) {
     emitProgress(95, 'Finalizing...');
@@ -227,6 +286,7 @@ export async function copy(basePath, options = {}) {
   // Build result
   const result = {
     output,
+    outputFormatVersion: versionFor(options.format || 'xml'),
     files,
     manifest,
     stats: {
@@ -234,6 +294,8 @@ export async function copy(basePath, options = {}) {
       duration: Date.now() - startTime,
       totalSize,
       outputSize: Buffer.byteLength(output, 'utf8'),
+      ...buildEstimates(files, { actualChars: output.length }),
+      ...summaryStats(summary, files),
       ...(scanErrors.length > 0 && { scanErrors: scanErrors.map((e) => e.message) }),
     },
   };
@@ -273,6 +335,36 @@ export async function copy(basePath, options = {}) {
   }
 
   return result;
+}
+
+/**
+ * Fold the scan summary into the shape `result.stats` exposes.
+ *
+ * @param {Object|null} summary - Summary emitted by the scan, if any
+ * @param {Array<Object>} files - Selected files
+ * @returns {Object} Stats fragment
+ */
+function summaryStats(summary, files) {
+  if (!summary) {
+    return {
+      noFilesMatched: files.length === 0,
+      excluded: { total: 0, byReason: {} },
+    };
+  }
+
+  return {
+    noFilesMatched: summary.noFilesMatched,
+    excluded: summary.excluded,
+    ...(summary.truncated
+      ? {
+          truncated: true,
+          truncatedCount: summary.truncatedCount,
+          truncatedBy: summary.truncatedBy,
+        }
+      : { truncated: false }),
+    ...(summary.budgetExceeded ? { budgetExceeded: true } : {}),
+    ...(summary.scope ? { scope: summary.scope } : {}),
+  };
 }
 
 export default copy;

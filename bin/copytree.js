@@ -85,7 +85,13 @@ program
   .option('--with-git-status', 'Include git status in output')
   .option('-r, --as-reference', 'Generate reference and auto-load folder profile if present')
   .option('--clipboard', 'Copy output to clipboard')
-  .option('-s, --sort <by>', 'Sort files by: path, size, modified, name, extension')
+  .option('-s, --sort <by>', 'Sort files by: path, size, modified, name, extension, depth')
+  .option('--sort-order <order>', 'Sort direction: asc (default) or desc', (val) => {
+    if (!['asc', 'desc'].includes(val)) {
+      throw new InvalidArgumentError(`'${val}' is not valid. Choose from: asc, desc`);
+    }
+    return val;
+  })
   .option('--dedupe', 'Remove duplicate files')
   .option('--always <patterns...>', 'Always include these patterns')
   .option('--no-tests', 'Exclude test files and directories (for compact AI context)')
@@ -110,8 +116,35 @@ program
       return n;
     },
   )
+  .option('-x, --exclude <pattern...>', 'Exclude patterns (glob)')
+  .option(
+    '--scope <path...>',
+    'Copy only these paths (files or directories). Literal paths, not globs: ' +
+      'ignore rules still resolve from the project root and output paths stay root-relative',
+  )
+  .option(
+    '--scope-include-ignored',
+    'Let --scope entries override the ignore rules that would exclude them',
+  )
   .option('--min-size <size>', 'Exclude files smaller than this size (e.g., 1KB, 500B, 10MB)')
   .option('--max-size <size>', 'Exclude files larger than this size (e.g., 10MB, 1GB)')
+  .option(
+    '--size-gate <size>',
+    'Hard per-file size gate applied before opening anything (default: 256KB). ' +
+      'Only --always and .copytreeinclude override it',
+  )
+  .option('--no-size-gate', 'Disable the per-file size gate')
+  .option('--max-total-size <size>', 'Total size budget across all files (e.g., 5MB)')
+  .option('--max-files <n>', 'Maximum number of files to include', (val) => {
+    const n = parseInt(val, 10);
+    if (isNaN(n) || n <= 0) {
+      throw new InvalidArgumentError(
+        `'${val}' is not a valid file count. Must be a positive integer.`,
+      );
+    }
+    return n;
+  })
+  .option('--explain', 'Report which rule excluded each file (adds detail to --dry-run output)')
   .option('--secrets-guard', 'Enable automatic secret detection and redaction (default: enabled)')
   .option('--no-secrets-guard', 'Disable secret detection and redaction')
   .option(

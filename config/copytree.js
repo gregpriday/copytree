@@ -105,9 +105,17 @@ export default {
   ],
 
   // File size limits
+  // maxFileSize is a memory-safety ceiling: nothing above it is ever read.
   maxFileSize: 10 * 1024 * 1024, // 10MB
   maxTotalSize: 100 * 1024 * 1024, // 100MB
   maxFileCount: 10000,
+
+  // Hard size gate applied from stat(), independent of file type.
+  // Files above this are never opened; they appear in the tree with their size
+  // and are reported under stats.excluded.byReason.sizeGate.
+  // Only `always` / .copytreeinclude can override the gate.
+  // Set to 0 or false to disable.
+  sizeGate: 256 * 1024, // 256KB
 
   // Output limits
   maxOutputSize: 50 * 1024 * 1024, // 50MB
@@ -117,6 +125,35 @@ export default {
   followSymlinks: false,
   includeHidden: false,
   preserveEmptyDirs: false,
+
+  // Gitignore fidelity. CopyTree never shells out to `git check-ignore` and never
+  // requires a git repository; these are all plain filesystem reads.
+  //
+  // Precedence, lowest to highest (last match wins, as in git):
+  //   1. config globalExcludedDirectories / globalExcludedFiles
+  //   2. global gitignore (core.excludesFile)
+  //   3. .git/info/exclude
+  //   4. root .gitignore
+  //   5. nested .gitignore (deepest last)
+  //   6. root .copytreeignore
+  //   7. nested .copytreeignore (deepest last)
+  //   8. caller --exclude patterns
+  //   9. .copytreeinclude / always  (highest: overrides everything above)
+  gitignore: {
+    // Read .gitignore at every directory depth, not just the root.
+    nested: true,
+    // Read .git/info/exclude as a root-level layer.
+    infoExclude: true,
+    // Read the user's global gitignore (git config core.excludesFile).
+    globalExcludesFile: true,
+  },
+
+  // Exclusion accounting (stats.excluded). Aggregate counts are always collected
+  // and cost nothing extra; the per-file detail list requires `explain: true`.
+  exclusionReport: {
+    // How many of the largest exclusions to retain under `explain: true`.
+    topN: 50,
+  },
 
   // Binary file handling
   binaryFileAction: 'placeholder', // placeholder, skip, base64, comment (legacy)
@@ -128,16 +165,145 @@ export default {
     nonPrintableThreshold: 0.3,
   },
 
+  // Binary/media classification by extension, grouped by category.
+  //
+  // Extension comes first: if a file's extension appears in any group below, it is
+  // classified straight from the path with no open() and no read(). Content sniffing
+  // (magic numbers, null bytes, non-printable ratio) only runs for extensions that
+  // are NOT listed here. A 3 GB .mp4 costs one stat, same as a 40 KB .ts.
+  //
+  // Groups are replaced wholesale by user config, so a project can override one
+  // category without restating the rest. `--include-binary` overrides everything.
+  //
+  // !!! NEVER add these to any group below. The failure mode is silent and severe:
+  // source code would be dropped from every context generated against the project.
+  //   .ts   TypeScript, not MPEG transport stream
+  //   .m    Objective-C
+  //   .h .hh .hpp   C/C++ headers
+  //   .r .R  R
+  //   .d    D (and .d.ts)
+  //   .pl .pm   Perl
+  //   .cs .rs .go .swift .kt .scala .lua .sql
+  //   .sh .bash .zsh .fish .ps1 .bat .cmd
+  //   .vue .svelte .astro
+  //   .html .htm   markup, and source code in most repos
+  //   .svg  handled by structureOnlyPatterns, not here
+  //   .md .mdx .yml .yaml .toml .ini .env.example
+  //
+  // Text formats that are usually small and occasionally enormous (.json, .jsonl,
+  // .csv, .tsv, .xml, .sql, .log, .txt, .snap, .po, generated sources) are
+  // deliberately absent: an extension rule is wrong in both directions for those.
+  // They are bounded by `sizeGate` instead.
+  binaryExtensions: {
+    video: [
+      '.mp4', '.m4v', '.mov', '.avi', '.mkv', '.webm', '.wmv', '.flv', '.f4v',
+      '.mpg', '.mpeg', '.m2v', '.mts', '.m2ts', '.3gp', '.3g2', '.ogv', '.vob',
+      '.rm', '.rmvb', '.divx', '.asf', '.mxf', '.r3d', '.braw',
+    ],
+    audio: [
+      '.mp3', '.wav', '.flac', '.aac', '.ogg', '.oga', '.opus', '.m4a', '.m4b',
+      '.m4p', '.wma', '.aiff', '.aif', '.aifc', '.alac', '.amr', '.ape', '.dsf',
+      '.dff', '.mid', '.midi', '.caf', '.au', '.voc',
+    ],
+    image: [
+      '.png', '.jpg', '.jpeg', '.jpe', '.gif', '.bmp', '.dib', '.tif', '.tiff',
+      '.webp', '.avif', '.heic', '.heif', '.jxl', '.ico', '.icns', '.cur',
+      '.tga', '.exr', '.hdr', '.pbm', '.pgm', '.ppm', '.raw', '.cr2', '.cr3',
+      '.nef', '.arw', '.orf', '.rw2', '.raf', '.dng', '.sr2', '.pef',
+    ],
+    design: [
+      '.psd', '.psb', '.ai', '.indd', '.indt', '.xcf', '.sketch', '.fig',
+      '.afdesign', '.afphoto', '.afpub', '.cdr', '.clip', '.procreate',
+      '.swf', '.fla',
+    ],
+    model3d: [
+      '.blend', '.c4d', '.ma', '.mb', '.max', '.fbx', '.glb', '.gltf', '.usd',
+      '.usda', '.usdc', '.usdz', '.stl', '.3ds', '.dae', '.abc', '.ply',
+      '.prproj', '.aep', '.aet', '.fcpxml', '.drp', '.veg', '.als', '.flp',
+      '.logicx', '.band',
+    ],
+    font: [
+      '.ttf', '.otf', '.woff', '.woff2', '.eot', '.ttc', '.otc', '.pfb',
+      '.pfm', '.fon', '.dfont',
+    ],
+    archive: [
+      '.zip', '.zipx', '.tar', '.gz', '.tgz', '.bz2', '.tbz', '.tbz2', '.xz',
+      '.txz', '.zst', '.zstd', '.7z', '.rar', '.lz', '.lz4', '.lzma', '.lzo',
+      '.br', '.cab', '.arj', '.ace', '.z', '.cpio', '.pax',
+    ],
+    diskImage: [
+      '.dmg', '.iso', '.img', '.vhd', '.vhdx', '.vmdk', '.vdi', '.qcow2',
+      '.sparseimage', '.sparsebundle', '.toast',
+    ],
+    package: [
+      '.pkg', '.mpkg', '.deb', '.rpm', '.apk', '.aab', '.ipa', '.msi', '.msix',
+      '.msixbundle', '.appx', '.appxbundle', '.snap', '.flatpak', '.appimage',
+      '.crx', '.xpi', '.vsix', '.nupkg', '.whl', '.egg', '.gem', '.jar',
+      '.war', '.ear', '.aar', '.xcarchive',
+    ],
+    executable: [
+      '.exe', '.com', '.scr', '.dll', '.so', '.dylib', '.bundle', '.a', '.lib',
+      '.o', '.obj', '.node', '.wasm', '.class', '.pyc', '.pyo', '.pyd', '.elf',
+      '.ko', '.rlib', '.rmeta', '.beam', '.nexe',
+    ],
+    debug: [
+      '.pdb', '.dSYM', '.idb', '.ilk', '.exp', '.heapsnapshot', '.heapprofile',
+      '.cpuprofile', '.trace', '.etl', '.nettrace', '.dtps', '.dump', '.core',
+      '.mdmp', '.minidump',
+    ],
+    database: [
+      '.sqlite', '.sqlite3', '.sqlitedb', '.db', '.db3', '.mdb', '.accdb',
+      '.dbf', '.realm', '.ldb', '.sst', '.mdf', '.ldf', '.ibd', '.frm', '.myd',
+      '.myi', '.rdb', '.aof', '.pack', '.idx',
+    ],
+    mlWeights: [
+      '.pt', '.pth', '.ckpt', '.safetensors', '.gguf', '.ggml', '.onnx', '.pb',
+      '.tflite', '.mlmodel', '.mlpackage', '.h5', '.hdf5', '.caffemodel',
+      '.params', '.npz', '.npy', '.joblib', '.pkl', '.pickle',
+    ],
+    dataBlob: [
+      '.parquet', '.orc', '.avro', '.arrow', '.feather', '.msgpack', '.bson',
+      '.protobuf', '.mat', '.sav', '.rds', '.rdata', '.dta', '.por',
+      '.sas7bdat', '.fst',
+    ],
+    // Convertible documents. `.html`/`.htm` are deliberately NOT here: HTML is
+    // source code in most repos we touch and must be read as text.
+    document: [
+      '.pdf', '.doc', '.docx', '.dot', '.dotx', '.xls', '.xlsx', '.xlsm',
+      '.xlsb', '.ppt', '.pptx', '.pps', '.odt', '.ods', '.odp', '.odg', '.rtf',
+      '.pages', '.numbers', '.key', '.epub', '.mobi', '.azw', '.azw3', '.fb2',
+      '.djvu', '.chm', '.one', '.onepkg', '.vsd', '.vsdx',
+    ],
+    // Excluded for two reasons at once: binary, and key material.
+    // NOTE: `.key` also appears under `document` (Apple Keynote). Some projects
+    // use `.key` for non-secret text; those should override the `cert` group.
+    cert: [
+      '.pem', '.der', '.crt', '.cer', '.p7b', '.p7c', '.p12', '.pfx', '.jks',
+      '.keystore', '.kdbx', '.gpg', '.asc', '.kbx', '.ppk',
+    ],
+    other: ['.dat', '.bin', '.blob', '.cache', '.DS_Store', '.sublime-workspace'],
+  },
+
   // Binary policy per category (overrides binaryFileAction)
   // Options: comment | skip | placeholder | base64 | convert
   binaryPolicy: {
     image: 'comment', // Images: show comment placeholder
-    media: 'comment', // Audio/video: show comment placeholder
+    video: 'comment', // Video: show comment placeholder
+    audio: 'comment', // Audio: show comment placeholder
+    media: 'comment', // Legacy alias for audio/video
+    design: 'comment', // Design source files: show comment placeholder
+    model3d: 'comment', // 3D/NLE project files: show comment placeholder
     archive: 'comment', // ZIP/TAR/etc: show comment placeholder
-    exec: 'comment', // Executables: show comment placeholder
+    diskImage: 'comment', // Disk images: show comment placeholder
+    package: 'comment', // Installers/bundles: show comment placeholder
+    executable: 'comment', // Executables and objects: show comment placeholder
+    exec: 'comment', // Legacy alias for executable
+    debug: 'comment', // Debug/profiling artifacts: show comment placeholder
     font: 'comment', // Font files: show comment placeholder
     database: 'comment', // Database files: show comment placeholder
-    cert: 'comment', // Certificates: show comment placeholder
+    mlWeights: 'comment', // Model weights: show comment placeholder
+    dataBlob: 'comment', // Columnar/serialized data: show comment placeholder
+    cert: 'comment', // Certificates and key material: show comment placeholder
     document: 'convert', // PDF/DOC/etc: convert to text if possible
     other: 'comment', // Unknown binaries: show comment placeholder
     text: 'load', // Text files: load normally
@@ -173,7 +339,7 @@ export default {
   discovery: {
     // Enable parallel directory traversal (default: false for gradual rollout)
     parallelEnabled: ['1', 'true', 'TRUE', 'True'].includes(
-      process.env.COPYTREE_DISCOVERY_PARALLEL
+      process.env.COPYTREE_DISCOVERY_PARALLEL,
     ),
 
     // Maximum concurrent directory operations

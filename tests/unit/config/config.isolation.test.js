@@ -91,6 +91,31 @@ describe('ConfigManager isolation', () => {
       expect(singleton.get('instance.value')).toBeUndefined();
       expect(instance.get('singleton.value')).toBeUndefined();
     });
+
+    test('mutating a loaded default does not leak into other instances', async () => {
+      // The isolation tests above only ever set brand-new keys, which is why an
+      // aliasing bug survived: `loadDefaults()` assigned the imported module
+      // object directly, and the ES module cache hands every instance the same
+      // object. Overwriting an existing default is the case that exposes it.
+      const first = await ConfigManager.create();
+      const before = first.get('copytree.maxFileSize');
+      expect(before).toBeDefined();
+
+      first.set('copytree.maxFileSize', 1);
+      first.set('copytree.globalExcludedFiles', ['*.leaked']);
+
+      const second = await ConfigManager.create();
+      expect(second.get('copytree.maxFileSize')).toBe(before);
+      expect(second.get('copytree.globalExcludedFiles')).not.toEqual(['*.leaked']);
+    });
+
+    test('mutating a nested default does not leak into other instances', async () => {
+      const first = await ConfigManager.create();
+      first.set('copytree.gitignore.infoExclude', false);
+
+      const second = await ConfigManager.create();
+      expect(second.get('copytree.gitignore.infoExclude')).toBe(true);
+    });
   });
 
   describe('concurrent operations simulation', () => {

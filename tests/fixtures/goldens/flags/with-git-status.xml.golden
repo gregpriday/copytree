@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ct:directory xmlns:ct="urn:copytree" path="<PROJECT_ROOT>">
   <ct:metadata>
+    <ct:format>copytree-xml@1</ct:format>
     <ct:generated><TIMESTAMP></ct:generated>
     <ct:fileCount>3</ct:fileCount>
     <ct:totalSize>102</ct:totalSize>

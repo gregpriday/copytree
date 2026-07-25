@@ -53,22 +53,103 @@ class FileSystemError extends CopyTreeError {
  */
 class ConfigurationError extends CopyTreeError {
   constructor(message, configKey, details = {}) {
-    super(message, 'CONFIG_ERROR', { configKey, ...details });
+    super(message, details.code || 'CONFIG_ERROR', { configKey, ...details });
     this.name = 'ConfigurationError';
     this.configKey = configKey;
   }
 }
 
 /**
+ * Stable, machine-readable error codes.
+ *
+ * These are part of the public API. Consumers switch on `error.code` to pick a
+ * recovery action, so values never change once released; new codes are additive.
+ * Substring matching on `error.message` is not a supported integration.
+ *
+ * @readonly
+ * @enum {string}
+ */
+const ERROR_CODES = Object.freeze({
+  /** The requested path does not exist */
+  PATH_NOT_FOUND: 'ERR_PATH_NOT_FOUND',
+  /** The requested path exists but is not a directory */
+  NOT_A_DIRECTORY: 'ERR_NOT_A_DIRECTORY',
+  /** A `scope` entry resolved outside the base path */
+  SCOPE_OUTSIDE_ROOT: 'ERR_SCOPE_OUTSIDE_ROOT',
+  /** An option value was missing or malformed */
+  INVALID_OPTION: 'ERR_INVALID_OPTION',
+  /** An unsupported output format was requested */
+  INVALID_FORMAT: 'ERR_INVALID_FORMAT',
+  /** Configuration could not be loaded or failed validation */
+  CONFIG_INVALID: 'ERR_CONFIG_INVALID',
+  /** The operation was cancelled via an AbortSignal */
+  ABORTED: 'ERR_ABORTED',
+  /**
+   * No files matched.
+   *
+   * NOTE: this is NOT thrown by `copy()` / `scan()`. An empty selection is a
+   * valid, common outcome (an empty folder, a fully-ignored scope) and is
+   * reported as `result.stats.noFilesMatched === true`. The code exists so
+   * callers that do want to treat emptiness as fatal have a stable value to
+   * raise and match on.
+   */
+  NO_FILES_MATCHED: 'ERR_NO_FILES_MATCHED',
+});
+
+/**
  * Validation error
+ *
+ * Accepts an explicit `details.code` so callers can raise a specific
+ * {@link ERROR_CODES} value while keeping the `ValidationError` name.
  */
 class ValidationError extends CopyTreeError {
   constructor(message, field, value, details = {}) {
-    super(message, 'VALIDATION_ERROR', { field, value, ...details });
+    super(message, details.code || 'VALIDATION_ERROR', { field, value, ...details });
     this.name = 'ValidationError';
     this.field = field;
     this.value = value;
   }
+}
+
+/**
+ * Scope resolution error
+ *
+ * Raised when a `scope` entry cannot be used: it does not exist, or it resolves
+ * outside the base path. Both are caller mistakes worth surfacing loudly rather
+ * than degrading into an empty result.
+ */
+class ScopeError extends CopyTreeError {
+  constructor(message, code, scopePath, details = {}) {
+    super(message, code, { scopePath, ...details });
+    this.name = 'ScopeError';
+    this.scopePath = scopePath;
+  }
+}
+
+/**
+ * Create the canonical abort error.
+ *
+ * `name` is `AbortError` (what the DOM/`AbortSignal` ecosystem expects, and what
+ * callers special-case to treat a user cancel as silent) and `code` is
+ * `ERR_ABORTED` for consistency with every other typed error.
+ *
+ * @param {string} [message='Operation aborted'] - Error message
+ * @returns {Error} Abort error
+ */
+function createAbortError(message = 'Operation aborted') {
+  const error = new Error(message);
+  error.name = 'AbortError';
+  error.code = ERROR_CODES.ABORTED;
+  return error;
+}
+
+/**
+ * Check whether an error represents a cancellation.
+ * @param {Error} error - Error to test
+ * @returns {boolean} True when the error is an abort
+ */
+function isAbortError(error) {
+  return error?.name === 'AbortError' || error?.code === ERROR_CODES.ABORTED;
 }
 
 /**
@@ -255,11 +336,15 @@ export {
   FileSystemError,
   ConfigurationError,
   ValidationError,
+  ScopeError,
   PipelineError,
   TransformError,
   GitError,
   ProfileError,
   InstructionsError,
   SecretsDetectedError,
+  ERROR_CODES,
+  createAbortError,
+  isAbortError,
   handleError,
 };

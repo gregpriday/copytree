@@ -1,4 +1,5 @@
 import { sanitizeForComment, sanitizeForXml } from '../../utils/helpers.js';
+import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
 
 class XMLFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
@@ -33,6 +34,9 @@ class XMLFormatter {
 
     // Add metadata
     chunks.push('  <ct:metadata>\n');
+    // Versioned so downstream prompts written against this shape can detect a
+    // change instead of silently regressing.
+    chunks.push(`    <ct:format>${OUTPUT_FORMAT_VERSIONS.xml}</ct:format>\n`);
     chunks.push(`    <ct:generated>${generated}</ct:generated>\n`);
     chunks.push(`    <ct:fileCount>${fileCount}</ct:fileCount>\n`);
     chunks.push(`    <ct:totalSize>${totalSize}</ct:totalSize>\n`);

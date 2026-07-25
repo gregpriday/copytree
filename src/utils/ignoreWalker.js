@@ -1,18 +1,22 @@
 /**
  * Git-style ignore file traversal utility
  *
- * Implements layered .copytreeignore evaluation with full gitignore semantics:
+ * Implements layered ignore evaluation with full gitignore semantics:
+ * - Multiple ignore file names per directory, layered in declaration order
+ *   (`.gitignore` then `.copytreeignore`, so CopyTree rules win ties)
+ * - Nested ignore files at every depth, not just the root
  * - Anchored patterns (leading /) are relative to the containing directory
  * - Negations (!) can re-include previously excluded paths
  * - Last match wins across nested ignore files
  * - Directory pruning (don't descend into excluded directories)
+ * - Scoped traversal: start at a subtree but resolve rules from the root
  */
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import ignore from 'ignore';
 import { withFsRetry } from './retryableFs.js';
-import { isRetryableFsError } from './errors.js';
+import { isRetryableFsError, createAbortError } from './errors.js';
 import {
   recordRetry,
   recordGiveUp,
@@ -20,6 +24,7 @@ import {
   recordSuccessAfterRetry,
 } from './fsErrorReport.js';
 import { toPosix } from './pathUtils.js';
+import { reasonForLayerKind, EXCLUSION_REASONS } from './exclusionReport.js';
 
 // Opt-in cache for parsed ignore rules per file path.
 // Disabled by default to prevent stale rules in long-running processes.
@@ -71,24 +76,90 @@ async function readRules(filePath, useCache = false) {
 }
 
 /**
+ * Whether a relative path escapes its base.
+ *
+ * Segment-aware on purpose: `'..'` and `'../x'` escape, but a directory
+ * legitimately named `..draft` does not.
+ *
+ * @param {string} rel - Relative path, POSIX or native separators
+ * @returns {boolean} True when the path points outside its base
+ */
+function isOutside(rel) {
+  return rel === '..' || rel.startsWith('../') || rel.startsWith(`..${path.sep}`);
+}
+
+/**
+ * Derive an ignore layer's kind from the ignore file it was read from.
+ * @param {string} fileName - Ignore file base name
+ * @returns {string} Layer kind
+ */
+function kindForIgnoreFile(fileName) {
+  return fileName === '.gitignore' ? 'gitignore' : 'copytreeignore';
+}
+
+/**
+ * Find which individual rule in a layer produced the final verdict.
+ *
+ * Only called under `explain: true`, and only for paths that were actually
+ * excluded, so the per-rule compilation cost is bounded to the exclusions the
+ * caller asked to have explained.
+ *
+ * @param {Object} layer - Ignore layer with a `rules` array
+ * @param {string} testPath - Path relative to the layer base
+ * @returns {{rule: string, line: number}|null} The last matching rule
+ */
+function findMatchingRule(layer, testPath) {
+  if (!Array.isArray(layer.rules) || layer.rules.length === 0) return null;
+
+  if (!layer._compiled) {
+    layer._compiled = [];
+    layer.rules.forEach((raw, index) => {
+      // Only blanks and comments are skipped. The rule itself is compiled from
+      // the raw line: trailing spaces are significant in gitignore syntax
+      // unless escaped, and trimming here would make the explanation disagree
+      // with the verdict it is explaining.
+      if (!raw.trim() || raw.trimStart().startsWith('#')) return;
+      layer._compiled.push({
+        rule: raw.trim(),
+        line: index + 1,
+        ig: ignore().add(raw),
+      });
+    });
+  }
+
+  let match = null;
+  for (const entry of layer._compiled) {
+    if (entry.ig.ignores(testPath)) {
+      match = { rule: entry.rule, line: entry.line };
+    }
+  }
+  return match;
+}
+
+/**
  * Determine if a path should be ignored based on layered ignore rules
  * @param {string} absPath - Absolute path to test
  * @param {string} root - Root directory path
  * @param {Array<{base: string, ig: any}>} layers - Stack of ignore layers
  * @param {boolean} [isDirectory=false] - Whether the path is a directory
- * @returns {{ignored: boolean, rule?: string, layer?: string}} Ignore decision and explanation
+ * @param {boolean} [explain=false] - Resolve the matching rule and its source
+ * @returns {{ignored: boolean, rule?: string, layer?: string, reason?: string, ruleSource?: string}} Decision
  */
-function isIgnored(absPath, root, layers, isDirectory = false) {
-  const relToRoot = toPosix(path.relative(root, absPath));
+function isIgnored(absPath, root, layers, isDirectory = false, explain = false) {
   let ignored = false;
   let matchedRule = null;
   let matchedLayer = null;
+  let matchedLayerRef = null;
+  let matchedTestPath = null;
 
-  for (const { base, ig } of layers) {
+  for (const layer of layers) {
+    const { base, ig } = layer;
     const relToLayer = toPosix(path.relative(base, absPath));
 
     // Skip if path isn't under this layer's base
-    if (relToLayer.startsWith('..')) continue;
+    // `isOutside` compares segments: a directory named `..draft` is inside the
+    // layer even though its relative path starts with two dots.
+    if (relToLayer === '' || isOutside(relToLayer)) continue;
 
     // Test with directory trailing slash if it's a directory
     const testPath = isDirectory && !relToLayer.endsWith('/') ? relToLayer + '/' : relToLayer;
@@ -104,20 +175,202 @@ function isIgnored(absPath, root, layers, isDirectory = false) {
         ignored = true;
         matchedRule = 'exclude';
         matchedLayer = base;
+        matchedLayerRef = layer;
+        matchedTestPath = testPath;
       }
       if (result.unignored) {
         ignored = false;
         matchedRule = 'include (negation)';
         matchedLayer = base;
+        matchedLayerRef = layer;
+        matchedTestPath = testPath;
       }
     }
   }
 
-  return {
+  const decision = {
     ignored,
     rule: matchedRule,
     layer: matchedLayer,
   };
+
+  if (matchedLayerRef) {
+    decision.reason = reasonForLayerKind(matchedLayerRef.kind);
+    decision.kind = matchedLayerRef.kind;
+
+    if (explain) {
+      const found = findMatchingRule(matchedLayerRef, matchedTestPath);
+      if (found) {
+        decision.rule = found.rule;
+        decision.ruleSource = matchedLayerRef.source
+          ? `${matchedLayerRef.source}:${found.line}`
+          : `${matchedLayerRef.kind || 'config'}:${found.line}`;
+      } else if (matchedLayerRef.source) {
+        decision.ruleSource = matchedLayerRef.source;
+      }
+    }
+  }
+
+  return decision;
+}
+
+/**
+ * Load the ignore layers contributed by a single directory.
+ * @param {string} dir - Directory to read ignore files from
+ * @param {string[]} ignoreFileNames - Ordered ignore file names (later wins)
+ * @param {boolean} useCache - Whether to use the rule cache
+ * @returns {Promise<Array>} Layers for this directory
+ */
+async function layersForDirectory(dir, ignoreFileNames, useCache) {
+  const layers = [];
+
+  for (const fileName of ignoreFileNames) {
+    const ignoreFilePath = path.join(dir, fileName);
+    const rules = await readRules(ignoreFilePath, useCache);
+    if (rules.length === 0) continue;
+    layers.push({
+      base: dir,
+      ig: ignore().add(rules),
+      kind: kindForIgnoreFile(fileName),
+      source: ignoreFilePath,
+      rules,
+    });
+  }
+
+  return layers;
+}
+
+/**
+ * List the directories from `root` down to the parent of `absPath`, inclusive.
+ * @param {string} root - Root directory
+ * @param {string} absPath - Absolute path below the root
+ * @returns {string[]} Ordered directory chain
+ */
+function ancestorDirs(root, absPath) {
+  const parentDir = path.dirname(absPath);
+  const rel = path.relative(root, parentDir);
+  const dirs = [root];
+
+  if (rel === '' || isOutside(rel)) {
+    return dirs;
+  }
+
+  let current = root;
+  for (const part of rel.split(path.sep)) {
+    current = path.join(current, part);
+    dirs.push(current);
+  }
+  return dirs;
+}
+
+/**
+ * Build the ignore layers that apply along the path from the root to a target.
+ *
+ * This is what makes scoped traversal root-anchored without walking the whole
+ * tree: the intermediate rules come from reading a handful of ignore files, not
+ * from enumerating directories.
+ *
+ * @param {string} root - Root directory (ignore anchor)
+ * @param {string} absPath - Target path
+ * @param {string[]} ignoreFileNames - Ordered ignore file names
+ * @param {boolean} useCache - Whether to use the rule cache
+ * @returns {Promise<Array>} Ordered layers, outermost first
+ */
+async function buildAncestorLayers(root, absPath, ignoreFileNames, useCache) {
+  const { layers } = await buildScopeContext(root, absPath, ignoreFileNames, useCache, []);
+  return layers;
+}
+
+/**
+ * Rebuild a layer without the rules that exclude any path on a chain.
+ *
+ * Used by `scopeIgnoresIgnoreFiles`. Dropping a whole inherited layer would
+ * throw away rules that have nothing to do with the selection — a root
+ * `.gitignore` that excludes both `build/` and `*.secret` would stop excluding
+ * secrets the moment someone scoped into `build/`. Only the rules that actually
+ * stand between the caller and their selection are removed.
+ *
+ * Negations are never dropped: they do not exclude anything.
+ *
+ * @param {Object} layer - Ignore layer with a `rules` array
+ * @param {string[]} chain - Absolute paths from the first directory below the
+ *   root down to the scope entry itself
+ * @returns {Object} A layer with the blocking rules removed
+ */
+function withoutRulesBlocking(layer, chain) {
+  if (!Array.isArray(layer.rules) || layer.rules.length === 0) return layer;
+
+  const targets = chain
+    .map((absPath) => toPosix(path.relative(layer.base, absPath)))
+    .filter((rel) => rel !== '' && !isOutside(rel))
+    .map((rel) => (rel.endsWith('/') ? rel : `${rel}/`));
+
+  if (targets.length === 0) return layer;
+
+  const kept = layer.rules.filter((raw) => {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('!')) return true;
+    const single = ignore().add(raw);
+    return !targets.some((target) => single.ignores(target));
+  });
+
+  if (kept.length === layer.rules.length) return layer;
+
+  return { ...layer, ig: ignore().add(kept), rules: kept, _compiled: undefined };
+}
+
+/**
+ * Build the ignore context for a scope entry, simulating what a full walk does.
+ *
+ * A full walk loads a directory's ignore files and only then decides whether to
+ * descend into each child. Reading every ignore file along the chain
+ * unconditionally is not equivalent: it can surface rules a full walk would
+ * never have read. With `/.gitignore` excluding `parent/` and
+ * `/parent/.gitignore` containing `!*`, a full walk prunes `parent` and never
+ * sees the negation, while a naive scoped run reads it and re-includes the
+ * whole subtree. So each ancestor is evaluated before its rules are loaded, and
+ * traversal stops at the first ancestor a full walk would have pruned.
+ *
+ * @param {string} root - Root directory (ignore anchor)
+ * @param {string} absPath - Scope entry
+ * @param {string[]} ignoreFileNames - Ordered ignore file names
+ * @param {boolean} useCache - Whether to use the rule cache
+ * @param {Array} initialLayers - Config and caller layers, always applied
+ * @param {boolean} [bypass=false] - Neutralize the rules blocking this entry
+ * @returns {Promise<{layers: Array, prunedAt: string|null}>} Layers, and the
+ *   ancestor that a full walk would have pruned (null when reachable)
+ */
+async function buildScopeContext(
+  root,
+  absPath,
+  ignoreFileNames,
+  useCache,
+  initialLayers = [],
+  bypass = false,
+) {
+  const dirs = ancestorDirs(root, absPath);
+  // Everything between the root and the selection, inclusive: these are the
+  // paths whose exclusion the caller is explicitly overriding.
+  const chain = bypass ? [...dirs.slice(1), absPath] : [];
+
+  const layers = [...initialLayers];
+  let prunedAt = null;
+
+  for (let i = 0; i < dirs.length; i++) {
+    // The root is the anchor and is always entered. Every directory below it
+    // has to survive the rules accumulated above it, exactly as in a full walk.
+    if (i > 0 && isIgnored(dirs[i], root, layers, true).ignored) {
+      prunedAt = dirs[i];
+      break;
+    }
+
+    const dirLayers = await layersForDirectory(dirs[i], ignoreFileNames, useCache);
+    layers.push(
+      ...(bypass ? dirLayers.map((layer) => withoutRulesBlocking(layer, chain)) : dirLayers),
+    );
+  }
+
+  return { layers, prunedAt };
 }
 
 /**
@@ -125,22 +378,32 @@ function isIgnored(absPath, root, layers, isDirectory = false) {
  *
  * @async
  * @generator
- * @param {string} root - Root directory to walk
+ * @param {string} root - Root directory to walk (also the ignore anchor)
  * @param {Object} options - Walk options
- * @param {string} [options.ignoreFileName='.copytreeignore'] - Name of ignore files to process
+ * @param {string} [options.ignoreFileName='.copytreeignore'] - Legacy single ignore file name
+ * @param {string[]} [options.ignoreFileNames] - Ordered ignore file names; later layers win
  * @param {boolean} [options.includeDirectories=false] - Whether to yield directories
  * @param {boolean} [options.followSymlinks=false] - Whether to follow symbolic links
  * @param {boolean} [options.explain=false] - Include explanation for each decision
- * @param {Array} [options.initialLayers=[]] - Pre-existing ignore layers (e.g., from .gitignore)
+ * @param {Array} [options.initialLayers=[]] - Pre-existing ignore layers (e.g., config excludes)
  * @param {Object} [options.config] - Configuration object for retry settings
  * @param {boolean} [options.cache=false] - Enable in-memory caching of parsed ignore rules.
  *   When true, ignore files are read once and cached for the lifetime of the process.
  *   Callers must call clearRuleCache() between operations to avoid stale rules.
+ * @param {number} [options.maxDepth] - Maximum traversal depth
+ * @param {string[]} [options.scope] - Absolute paths (files or directories) to traverse instead
+ *   of the whole root. Ignore rules still resolve from `root`.
+ * @param {boolean} [options.scopeIgnoresIgnoreFiles=false] - Let scope entries override the
+ *   ignore rules that would otherwise exclude them
+ * @param {Function} [options.onExclude] - Called with `{path, size, reason, rule, ruleSource, isDirectory}`
+ *   for every excluded entry
+ * @param {AbortSignal} [options.signal] - Abort signal for cancellation
  * @yields {{path: string, stats: fs.Stats, explanation?: Object}} File information
  */
 export async function* walkWithIgnore(root, options = {}) {
   const {
     ignoreFileName = '.copytreeignore',
+    ignoreFileNames,
     includeDirectories = false,
     followSymlinks = false,
     explain = false,
@@ -148,7 +411,19 @@ export async function* walkWithIgnore(root, options = {}) {
     config = {},
     cache = false,
     maxDepth = undefined,
+    scope = null,
+    scopeIgnoresIgnoreFiles = false,
+    onExclude = null,
+    signal = null,
   } = options;
+
+  const ignoreNames =
+    Array.isArray(ignoreFileNames) && ignoreFileNames.length > 0
+      ? ignoreFileNames
+      : [ignoreFileName];
+
+  // Ignore files are metadata, not content: never emit them.
+  const suppressedNames = new Set([...ignoreNames, '.gitignore', '.copytreeignore']);
 
   // Extract retry configuration with defaults
   const retryConfig = {
@@ -157,20 +432,64 @@ export async function* walkWithIgnore(root, options = {}) {
     maxDelay: config?.copytree?.fs?.maxDelay ?? 2000,
   };
 
-  const stats = {};
-  stats.filesScanned = 0;
-  stats.directoriesScanned = 0;
-  stats.directoriesPruned = 0;
-  stats.filesExcluded = 0;
+  const stats = {
+    filesScanned: 0,
+    directoriesScanned: 0,
+    directoriesPruned: 0,
+    filesExcluded: 0,
+  };
+
+  function checkAborted() {
+    if (signal?.aborted) {
+      throw createAbortError('Traversal aborted');
+    }
+  }
+
+  function reportExclusion(absPath, decision, size, isDirectory) {
+    if (!onExclude) return;
+    onExclude({
+      path: toPosix(path.relative(root, absPath)),
+      size: size || 0,
+      reason: decision.reason || EXCLUSION_REASONS.CONFIG_EXCLUDE,
+      rule: decision.rule,
+      ruleSource: decision.ruleSource,
+      isDirectory: Boolean(isDirectory),
+    });
+  }
+
+  async function statWithRetry(absPath) {
+    try {
+      const stat = await withFsRetry(() => fs.stat(absPath), {
+        ...retryConfig,
+        onRetry: ({ code }) => recordRetry(absPath, code),
+      });
+      recordSuccessAfterRetry(absPath);
+      return stat;
+    } catch (error) {
+      if (isRetryableFsError(error)) {
+        recordGiveUp(absPath, error.code);
+      } else {
+        recordPermanent(absPath, error.code);
+      }
+      if (onExclude) {
+        onExclude({
+          path: toPosix(path.relative(root, absPath)),
+          size: 0,
+          reason: EXCLUSION_REASONS.UNREADABLE,
+          rule: error.code,
+          isDirectory: false,
+        });
+      }
+      return null;
+    }
+  }
 
   async function* walk(dir, layers, depth = 0) {
+    checkAborted();
     stats.directoriesScanned++;
 
-    // Load ignore rules at this level
-    const ignoreFilePath = path.join(dir, ignoreFileName);
-    const localRules = await readRules(ignoreFilePath, cache);
-    const localIg = ignore().add(localRules);
-    const nextLayers = [...layers, { base: dir, ig: localIg }];
+    // Load ignore rules contributed by this directory
+    const nextLayers = [...layers, ...(await layersForDirectory(dir, ignoreNames, cache))];
 
     let entries;
     try {
@@ -187,20 +506,28 @@ export async function* walkWithIgnore(root, options = {}) {
       } else {
         recordPermanent(dir, error.code);
       }
+      if (onExclude) {
+        onExclude({
+          path: toPosix(path.relative(root, dir)),
+          size: 0,
+          reason: EXCLUSION_REASONS.UNREADABLE,
+          rule: error.code,
+          isDirectory: true,
+        });
+      }
       // Can't read directory - skip it
       return;
     }
 
     // Filter out ignore files themselves to prevent them from appearing in output
-    entries = entries.filter(
-      (entry) => entry.name !== ignoreFileName && entry.name !== '.gitignore',
-    );
+    entries = entries.filter((entry) => !suppressedNames.has(entry.name));
 
     // Sort entries for deterministic order across platforms
     // fs.readdir order is not guaranteed and differs between Windows/Unix
     entries.sort((a, b) => a.name.localeCompare(b.name));
 
     for (const entry of entries) {
+      checkAborted();
       const absPath = path.join(dir, entry.name);
 
       // Handle symlinks
@@ -211,50 +538,26 @@ export async function* walkWithIgnore(root, options = {}) {
         if (!followSymlinks) {
           continue; // Skip symlinks by default
         }
-        try {
-          stat = await withFsRetry(() => fs.stat(absPath), {
-            ...retryConfig,
-            onRetry: ({ code }) => recordRetry(absPath, code),
-          });
-          recordSuccessAfterRetry(absPath);
-          isDir = stat.isDirectory();
-        } catch (error) {
-          // Record failure and skip broken symlink
-          if (isRetryableFsError(error)) {
-            recordGiveUp(absPath, error.code);
-          } else {
-            recordPermanent(absPath, error.code);
-          }
-          continue;
-        }
+        stat = await statWithRetry(absPath);
+        if (!stat) continue;
+        isDir = stat.isDirectory();
       }
 
       // Check if this path should be ignored
-      const decision = isIgnored(absPath, root, nextLayers, isDir);
+      const decision = isIgnored(absPath, root, nextLayers, isDir, explain);
 
       if (isDir) {
         if (decision.ignored) {
           stats.directoriesPruned++;
+          reportExclusion(absPath, decision, 0, true);
           continue; // Don't descend into ignored directories
         }
 
         // Yield directory if requested
         if (includeDirectories) {
           if (!stat) {
-            try {
-              stat = await withFsRetry(() => fs.stat(absPath), {
-                ...retryConfig,
-                onRetry: ({ code }) => recordRetry(absPath, code),
-              });
-              recordSuccessAfterRetry(absPath);
-            } catch (error) {
-              if (isRetryableFsError(error)) {
-                recordGiveUp(absPath, error.code);
-              } else {
-                recordPermanent(absPath, error.code);
-              }
-              continue; // Skip directory if we can't stat it
-            }
+            stat = await statWithRetry(absPath);
+            if (!stat) continue;
           }
           const result = { path: absPath, stats: stat };
           if (explain) {
@@ -272,25 +575,18 @@ export async function* walkWithIgnore(root, options = {}) {
 
         if (decision.ignored) {
           stats.filesExcluded++;
+          if (onExclude) {
+            // Size is only needed for the exclusion report's "largest" list.
+            const excludedStat = explain ? await statWithRetry(absPath) : null;
+            reportExclusion(absPath, decision, excludedStat?.size ?? 0, false);
+          }
           continue;
         }
 
         // Yield file
         if (!stat) {
-          try {
-            stat = await withFsRetry(() => fs.stat(absPath), {
-              ...retryConfig,
-              onRetry: ({ code }) => recordRetry(absPath, code),
-            });
-            recordSuccessAfterRetry(absPath);
-          } catch (error) {
-            if (isRetryableFsError(error)) {
-              recordGiveUp(absPath, error.code);
-            } else {
-              recordPermanent(absPath, error.code);
-            }
-            continue; // Skip file if we can't stat it
-          }
+          stat = await statWithRetry(absPath);
+          if (!stat) continue;
         }
         const result = { path: absPath, stats: stat };
         if (explain) {
@@ -301,7 +597,65 @@ export async function* walkWithIgnore(root, options = {}) {
     }
   }
 
-  yield* walk(root, initialLayers);
+  if (!scope || scope.length === 0) {
+    yield* walk(root, initialLayers);
+    return;
+  }
+
+  // Scoped traversal: rules resolve from `root`, traversal starts at the scope
+  // entries. Cost scales with the selection, not with the repository.
+  for (const entry of scope) {
+    checkAborted();
+
+    const absEntry = path.resolve(entry);
+
+    // `scopeIgnoresIgnoreFiles` is the deliberate "I know it's gitignored, copy
+    // it anyway" gesture. It neutralizes the specific rules standing between the
+    // root and the selection, and nothing else: `initialLayers` (config
+    // exclusions, caller excludes) still apply, unrelated inherited rules still
+    // apply, and ignore files INSIDE the selection still apply because they
+    // describe the subtree the caller asked for.
+    const { layers, prunedAt } = await buildScopeContext(
+      root,
+      absEntry,
+      ignoreNames,
+      cache,
+      initialLayers,
+      scopeIgnoresIgnoreFiles,
+    );
+
+    const entryStat = await statWithRetry(absEntry);
+    if (!entryStat) continue;
+
+    const isDir = entryStat.isDirectory();
+
+    // An ancestor a full walk would have pruned makes the whole selection
+    // unreachable, whatever the selection's own rules say.
+    const decision = prunedAt
+      ? {
+          ignored: true,
+          reason: EXCLUSION_REASONS.GITIGNORE,
+          rule: `ancestor excluded: ${toPosix(path.relative(root, prunedAt))}`,
+        }
+      : isIgnored(absEntry, root, layers, isDir, explain);
+
+    if (decision.ignored) {
+      if (isDir) stats.directoriesPruned++;
+      else stats.filesExcluded++;
+      reportExclusion(absEntry, decision, isDir ? 0 : entryStat.size, isDir);
+      continue;
+    }
+
+    if (isDir) {
+      if (includeDirectories) {
+        yield { path: absEntry, stats: entryStat };
+      }
+      yield* walk(absEntry, layers, 0);
+    } else {
+      stats.filesScanned++;
+      yield { path: absEntry, stats: entryStat };
+    }
+  }
 }
 
 /**
@@ -323,41 +677,34 @@ export async function getAllFiles(root, options = {}) {
  * @param {string} testPath - Path to test (relative to root)
  * @param {string} root - Root directory
  * @param {Object} options - Walk options
- * @param {string} [options.ignoreFileName='.copytreeignore'] - Name of ignore files to process
+ * @param {string} [options.ignoreFileName='.copytreeignore'] - Legacy single ignore file name
+ * @param {string[]} [options.ignoreFileNames] - Ordered ignore file names
+ * @param {Array} [options.initialLayers=[]] - Pre-existing ignore layers
  * @param {Object} [options.config] - Configuration object for retry settings
  * @param {boolean} [options.cache=false] - Enable in-memory caching of parsed ignore rules
+ * @param {boolean} [options.explain=false] - Resolve the matching rule and its source
  * @returns {Promise<{ignored: boolean, rule: string|null, layer: string|null}>} Decision with explanation
  */
 export async function testPath(testPath, root, options = {}) {
-  const { ignoreFileName = '.copytreeignore', config = {}, cache = false } = options;
+  const {
+    ignoreFileName = '.copytreeignore',
+    ignoreFileNames,
+    config = {},
+    cache = false,
+    initialLayers = [],
+    explain = false,
+  } = options;
 
-  // Build layers by walking up from root to the file's directory
+  const ignoreNames =
+    Array.isArray(ignoreFileNames) && ignoreFileNames.length > 0
+      ? ignoreFileNames
+      : [ignoreFileName];
+
   const absPath = path.resolve(root, testPath);
-  const relPath = path.relative(root, absPath);
-  const dirPath = path.dirname(absPath);
-
-  const layers = [];
-  let currentDir = root;
-
-  // Walk down the directory tree, collecting ignore rules
-  const parts = relPath.split(path.sep);
-  for (let i = 0; i < parts.length; i++) {
-    const ignoreFilePath = path.join(currentDir, ignoreFileName);
-    const rules = await readRules(ignoreFilePath, cache);
-    if (rules.length > 0) {
-      const ig = ignore().add(rules);
-      layers.push({ base: currentDir, ig });
-    }
-
-    if (i < parts.length - 1) {
-      currentDir = path.join(currentDir, parts[i]);
-    }
-  }
 
   // Determine if it's a directory
   let isDirectory = false;
   try {
-    // Use retry for stat in testPath with config
     const retryConfig = {
       maxAttempts: config?.copytree?.fs?.retryAttempts ?? 3,
       initialDelay: config?.copytree?.fs?.retryDelay ?? 100,
@@ -378,7 +725,21 @@ export async function testPath(testPath, root, options = {}) {
     }
   }
 
-  return isIgnored(absPath, root, layers, isDirectory);
+  // A directory's own ignore file cannot exclude the directory itself, so the
+  // layer chain stops at its parent for files and at itself for directories.
+  const layers = [
+    ...initialLayers,
+    ...(await buildAncestorLayers(root, absPath, ignoreNames, cache)),
+  ];
+
+  return isIgnored(absPath, root, layers, isDirectory, explain);
 }
 
+export {
+  buildAncestorLayers,
+  buildScopeContext,
+  layersForDirectory,
+  ancestorDirs,
+  isIgnored as evaluateIgnore,
+};
 export default walkWithIgnore;

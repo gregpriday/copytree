@@ -10,6 +10,7 @@ import {
 } from '../utils/markdown.js';
 import { hashContent } from '../utils/fileHash.js';
 import { sanitizeForComment, sanitizeForXml } from '../utils/helpers.js';
+import { OUTPUT_FORMAT_VERSIONS } from '../utils/outputVersion.js';
 
 /**
  * @typedef {import('./format.js').FormatOptions} FormatOptions
@@ -258,6 +259,9 @@ async function* streamXML(files, options, helpers) {
 
   // Metadata
   yield '  <ct:metadata>\n';
+  // Must match the buffered XML formatter: the version is a compatibility
+  // surface, and a stream that omits it is a different document.
+  yield `    <ct:format>${OUTPUT_FORMAT_VERSIONS.xml}</ct:format>\n`;
   yield `    <ct:generated>${generated}</ct:generated>\n`;
   yield `    <ct:fileCount>${fileCount}</ct:fileCount>\n`;
   yield `    <ct:totalSize>${totalSize}</ct:totalSize>\n`;
@@ -360,6 +364,8 @@ async function* streamJSON(files, options, helpers) {
   yield '{\n';
   yield `  "directory": ${JSON.stringify(basePath)},\n`;
   yield '  "metadata": {\n';
+  // Must match the buffered JSON formatter.
+  yield `    "format": ${JSON.stringify(OUTPUT_FORMAT_VERSIONS.json)},\n`;
   yield `    "generated": "${generated}",\n`;
   yield `    "fileCount": ${fileArray.length},\n`;
   yield `    "totalSize": ${totalSize},\n`;
@@ -434,7 +440,7 @@ async function* streamMarkdown(files, options, helpers) {
 
   // YAML front matter
   yield '---\n';
-  yield 'format: copytree-md@1\n';
+  yield `format: ${OUTPUT_FORMAT_VERSIONS.markdown}\n`;
   yield 'tool: copytree\n';
   yield `generated: ${escapeYamlScalar(generated)}\n`;
   yield `base_path: ${escapeYamlScalar(basePath)}\n`;
@@ -596,6 +602,7 @@ async function* streamNDJSON(files, options, helpers) {
   // Metadata record
   const metadata = {
     type: 'metadata',
+    format: OUTPUT_FORMAT_VERSIONS.ndjson,
     directory: basePath,
     generated: generated,
     fileCount: fileArray.length,
