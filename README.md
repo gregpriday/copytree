@@ -177,7 +177,7 @@ config/**
 
 ## 🛠️ Requirements
 
-- **Node.js 20+** (required by engines in package.json)
+- **Node.js 22.12+** (required by engines in package.json)
 
 ## 📖 Documentation
 

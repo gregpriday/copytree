@@ -11,7 +11,7 @@ This guide covers the complete installation process for CopyTree on your system.
 - **Git**: For repository operations and Git integration features
 - **Operating System**: macOS, Linux, or Windows with WSL
 
-> **Important**: CopyTree requires Node.js 20+ and uses ES Modules (ESM) only. CommonJS is not supported.
+> **Important**: CopyTree requires Node.js 22.12+ and uses ES Modules (ESM) only. CommonJS is not supported.
 
 ### Optional Dependencies
 
@@ -261,7 +261,7 @@ copytree config:validate
 # Install Node Version Manager (nvm)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
-# Install and use Node.js 20
+# Install and use Node.js 22
 nvm install 20
 nvm use 20
 ```
