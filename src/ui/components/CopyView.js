@@ -32,7 +32,7 @@ import { CommandError } from '../../utils/errors.js';
 import fs from 'fs-extra';
 import path from 'path';
 import Clipboard from '../../utils/clipboard.js';
-import os from 'os';
+import { resolveDestination, writeReferenceFile } from '../../utils/outputDestination.js';
 import { config } from '../../config/ConfigManager.js';
 import { buildProfileFromCliOptions, setupPipelineStages } from '../../commands/copy.js';
 
@@ -201,23 +201,13 @@ const CopyView = () => {
     let destination;
     let action;
 
-    // Handle --as-reference option
-    if (options.asReference) {
-      const f = options.format ? String(options.format).toLowerCase() : 'xml';
-      const format = f === 'md' ? 'markdown' : f;
-      const extension =
-        format === 'json'
-          ? 'json'
-          : format === 'markdown'
-            ? 'md'
-            : format === 'tree'
-              ? 'txt'
-              : 'xml';
-      const dirName = basePath ? path.basename(basePath) : 'copytree';
-      const safeName = dirName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
-      const prefix = safeName || 'copytree';
-      const tempFile = path.join(os.tmpdir(), `${prefix}-${Date.now()}.${extension}`);
-      await fs.writeFile(tempFile, outputResult.content, 'utf8');
+    // Same resolution the non-UI path uses, so the two cannot drift. They
+    // already had: this branch knew nothing about `ndjson` or `sarif`, so a
+    // reference to NDJSON output was written to a file named `.xml`.
+    const resolved = resolveDestination(options);
+
+    if (resolved === 'reference') {
+      const tempFile = await writeReferenceFile(outputResult.content, basePath, options.format);
 
       try {
         await Clipboard.copyFileReference(tempFile);
@@ -227,40 +217,24 @@ const CopyView = () => {
         destination = tempFile;
         action = 'saved';
       }
-    } else if (options.output) {
+    } else if (resolved === 'file') {
       await fs.writeFile(options.output, outputResult.content, 'utf8');
       destination = options.output;
       action = 'saved';
-    } else if (options.clipboard) {
-      await Clipboard.copyText(outputResult.content);
-      destination = 'clipboard';
-      action = 'copied';
-    } else if (options.display) {
+    } else if (resolved === 'display') {
       // Write output directly to stdout for --display option
       process.stdout.write(outputResult.content);
       destination = 'terminal';
       action = 'displayed';
     } else {
-      // Default: copy to clipboard
+      // --clipboard: the output text itself, not a reference to it.
       try {
         await Clipboard.copyText(outputResult.content);
         destination = 'clipboard';
         action = 'copied';
       } catch (error) {
         // If clipboard fails, save to temporary file
-        const f = options.format ? String(options.format).toLowerCase() : 'xml';
-        const format = f === 'md' ? 'markdown' : f;
-        const extension =
-          format === 'json'
-            ? 'json'
-            : format === 'markdown'
-              ? 'md'
-              : format === 'tree'
-                ? 'txt'
-                : 'xml';
-        const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
-        await fs.writeFile(tempFile, outputResult.content, 'utf8');
-        destination = tempFile;
+        destination = await writeReferenceFile(outputResult.content, basePath, options.format);
         action = 'saved';
       }
     }
@@ -283,6 +257,16 @@ const CopyView = () => {
       ? `${fileCount} files${sizeText} ${action} to ${destination}`
       : `${fileCount} files${sizeText} ${action}`;
 
+    // KNOWN BUG, pre-existing and not specific to this destination: when the
+    // run ends via `--clipboard`, Ink writes no frame at all and a successful
+    // copy reports nothing. The clipboard does receive the content. Every other
+    // destination happens to leave slow work pending (a file write, an
+    // osascript spawn) and renders normally.
+    //
+    // It reproduces on the commit before reference output became the default,
+    // where clipboard *was* the default. Not a render-throttle race: waiting
+    // 500ms after this update changes nothing, so the frame is never queued
+    // rather than never flushed.
     updateState({
       currentStage: `ICON:${icon}:${completionMessage}`,
       isLoading: false,

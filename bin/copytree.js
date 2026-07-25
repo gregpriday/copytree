@@ -111,8 +111,11 @@ program
   .option('--info', 'Show info table')
   .option('--show-size', 'Show file sizes')
   .option('--with-git-status', 'Include git status in output')
-  .option('-r, --as-reference', 'Generate reference and auto-load folder profile if present')
-  .option('--clipboard', 'Copy output to clipboard')
+  .option('-y, --clipboard', 'Copy the output text itself to the clipboard, not a file reference')
+  .option('--no-folder-profile', 'Skip auto-discovery of a .copytree.yml folder profile')
+  // Reference output is the default. Accepted so existing muscle memory and
+  // scripts keep working; it selects the behaviour they would get anyway.
+  .option('-r, --as-reference', 'No-op: writing a file reference is the default')
   .option('-s, --sort <by>', 'Sort files by: path, size, modified, name, extension, depth')
   .option('--sort-order <order>', 'Sort direction: asc (default) or desc', (val) => {
     if (!['asc', 'desc'].includes(val)) {

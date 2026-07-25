@@ -4,6 +4,7 @@ import { logger } from '../utils/logger.js';
 import { CommandError, handleError } from '../utils/errors.js';
 import { config } from '../config/ConfigManager.js';
 import Clipboard from '../utils/clipboard.js';
+import { resolveDestination, writeReferenceFile } from '../utils/outputDestination.js';
 import fs from 'fs-extra';
 import path from 'path';
 import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
@@ -294,33 +295,44 @@ function parseSizeOption(sizeStr, flagName) {
 async function buildProfileFromCliOptions(options, basePath) {
   const copytreeConfig = config().get('copytree', {});
 
-  // Try to load folder profile if requested or if -r/--as-reference is used
+  // Load a named folder profile, or auto-discover one from the project.
+  //
+  // Auto-discovery used to be tied to `-r`. Now that reference output is the
+  // default, keeping that coupling would have made discovery unconditional as
+  // a side effect of an unrelated change, so it is stated directly instead: a
+  // `.copytree/` profile in the project applies unless a named one overrides it.
+  //
   // Note: options.folderProfile is the renamed --folder-profile/-p flag;
   //       options.profile is now reserved for performance profiling (cpu/heap/all).
+  // Commander maps `--no-folder-profile` onto the same key, as `false`. So this
+  // one option carries three states: a string names a profile, `false` skips
+  // discovery entirely, and undefined means "discover if there is one".
+  const namedProfile = typeof options.folderProfile === 'string' ? options.folderProfile : null;
+  const profileDisabled = options.folderProfile === false;
+
   let folderProfile = null;
-  if (options.folderProfile || options.asReference) {
+  if (!profileDisabled) {
     // Folder profiles belong to the project being copied, not to whatever
     // directory the process happens to be started from. An embedder's cwd is
     // its own app bundle; a shell user may well be a level above the target.
     const loader = new FolderProfileLoader({ cwd: basePath || process.cwd() });
     try {
-      if (options.folderProfile) {
+      if (namedProfile) {
         // Load named profile: -p <name> / --folder-profile <name>
-        folderProfile = await loader.loadNamed(options.folderProfile);
-        logger.debug(`Loaded folder profile: ${options.folderProfile}`);
+        folderProfile = await loader.loadNamed(namedProfile);
+        logger.debug(`Loaded folder profile: ${namedProfile}`);
       } else {
-        // Auto-discover profile for -r/--as-reference
         folderProfile = await loader.discover();
         if (folderProfile) {
           logger.debug(`Auto-discovered folder profile: ${folderProfile.name}`);
         }
       }
     } catch (error) {
-      // If profile was explicitly requested but not found, throw error
-      if (options.folderProfile) {
+      // A profile the caller named by hand must exist; a discovered one is
+      // optional by definition.
+      if (namedProfile) {
         throw error;
       }
-      // For auto-discovery (-r), silently continue without profile
     }
   }
 
@@ -753,28 +765,13 @@ async function displayOutput(outputResult, options, basePath) {
     return;
   }
 
-  // Handle --as-reference option
-  if (options.asReference) {
-    const f = (options.format || 'xml').toString().toLowerCase();
-    const format = f === 'md' ? 'markdown' : f;
-    const extension =
-      format === 'json'
-        ? 'json'
-        : format === 'markdown'
-          ? 'md'
-          : format === 'tree'
-            ? 'txt'
-            : format === 'ndjson'
-              ? 'ndjson'
-              : format === 'sarif'
-                ? 'sarif'
-                : 'xml';
-    const os = await import('os');
-    const dirName = basePath ? path.basename(basePath) : 'copytree';
-    const safeName = dirName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
-    const prefix = safeName || 'copytree';
-    const tempFile = path.join(os.tmpdir(), `${prefix}-${Date.now()}.${extension}`);
-    await fs.writeFile(tempFile, output, 'utf8');
+  // Where the output goes. `reference` is the default: write a temp file and
+  // put its path on the clipboard, so pasting into an agent hands over a file
+  // to read rather than a few hundred kilobytes of inline context.
+  const destination = resolveDestination(options);
+
+  if (destination === 'reference') {
+    const tempFile = await writeReferenceFile(output, basePath, options.format);
 
     try {
       await Clipboard.copyFileReference(tempFile);
@@ -789,9 +786,7 @@ async function displayOutput(outputResult, options, basePath) {
     return;
   }
 
-  // Determine output destination
-  if (options.output) {
-    // Write to file
+  if (destination === 'file') {
     const outputPath = path.resolve(options.output);
     await fs.ensureDir(path.dirname(outputPath));
     await fs.writeFile(outputPath, output, 'utf8');
@@ -801,37 +796,21 @@ async function displayOutput(outputResult, options, basePath) {
 
     // Reveal in Finder on macOS
     await Clipboard.revealInFinder(outputPath);
-  } else if (options.display) {
+  } else if (destination === 'display') {
     // Display to console
     console.log(output);
     logger.success(`Displayed ${fileCount} files [${logger.formatBytes(outputSize)}]`);
-  } else if (options.stream) {
+  } else if (destination === 'stream') {
     // Stream to stdout (shouldn't reach here if streaming was properly used)
     process.stdout.write(output);
   } else {
-    // Default: copy to clipboard
+    // --clipboard: the output text itself, not a reference to it.
     try {
       await Clipboard.copyText(output);
       logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
     } catch (_error) {
       // If clipboard fails, save to temporary file
-      const f = (options.format || 'xml').toString().toLowerCase();
-      const format = f === 'md' ? 'markdown' : f;
-      const extension =
-        format === 'json'
-          ? 'json'
-          : format === 'markdown'
-            ? 'md'
-            : format === 'tree'
-              ? 'txt'
-              : format === 'ndjson'
-                ? 'ndjson'
-                : format === 'sarif'
-                  ? 'sarif'
-                  : 'xml';
-      const os = await import('os');
-      const tempFile = path.join(os.tmpdir(), `copytree-${Date.now()}.${extension}`);
-      await fs.writeFile(tempFile, output, 'utf8');
+      const tempFile = await writeReferenceFile(output, basePath, options.format);
       logger.warn(`Failed to copy to clipboard. Output saved to: ${tempFile}`);
       logger.info(`${fileCount} files [${logger.formatBytes(outputSize)}]`);
 

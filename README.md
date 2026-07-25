@@ -21,11 +21,11 @@ npm install -g copytree
 ## ⚡ Quick Start
 
 ```bash
-# Copy to clipboard (default: XML format)
+# Copy a file reference to the clipboard (default; XML format)
 copytree
 
-# Copy as file reference (useful for pasting into LLMs)
-copytree -r
+# Copy the output text itself to the clipboard instead
+copytree --clipboard
 
 # Save to file
 copytree -o project-structure.xml
@@ -41,7 +41,9 @@ copytree https://github.com/user/repo
 copytree --display
 
 # Note: Destination behavior
-# - default (no flags): copies to clipboard
+# - default (no flags): writes a temp file and copies its path to the clipboard,
+#   so pasting into an agent hands over a file to read rather than inline context
+# - -y/--clipboard: copies the output text itself
 # - --display: prints to terminal
 # - -o/--output: writes to a file
 # - -S/--stream: streams to stdout/file (best for large outputs or CI)
@@ -73,7 +75,7 @@ copytree --display
 - `--scope <path...>` – Copy only these paths (literal, not globs), with root-anchored ignore rules
 - `-t, --only-tree` – Tree structure only (no file contents)
 - `-i, --display` – Print to terminal instead of clipboard
-- `--clipboard` – Force copy to clipboard
+- `-y, --clipboard` – Copy the output text itself, instead of a file reference
 - `-S, --stream` – Stream output to stdout/file (ideal for large projects or CI)
 - `-x, --exclude <pattern...>` – Exclude glob patterns
 - `-C, --char-limit <n>` – Character budget across all file content
@@ -84,7 +86,7 @@ copytree --display
 - `--info` – Include file metadata (size, modified date)
 - `--show-size` – Show file sizes in output
 - `--with-git-status` – Include git status for each file
-- `-r, --as-reference` – Generate file and copy its reference (for LLMs)
+- `--no-folder-profile` – Skip auto-discovery of a `.copytree.yml` folder profile
 - `--always <pattern...>` – Force include specific patterns (the only thing that lifts the size gate)
 - `--dedupe` – Remove duplicate files
 - `--sort <path|size|modified|name|extension>` – Sort files (also decides which survive a budget)
@@ -152,10 +154,9 @@ output:
 ```bash
 # Use a profile by name
 copytree -p my-profile -o summary.md
-copytree --profile my-profile
 
-# Auto-detect a folder profile as a reference
-copytree --as-reference
+# A .copytree.yml in the project is auto-discovered; skip it with
+copytree --no-folder-profile
 ```
 
 ## ⚙️ Configuration

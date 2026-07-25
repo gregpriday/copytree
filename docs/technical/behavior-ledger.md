@@ -92,6 +92,25 @@ format might have omitted. Formatting failures now propagate.
 **An unknown `--format` exits non-zero.**
 Previously the CLI could accept an unrecognised format and produce output.
 
+### CLI defaults
+
+**Reference output is now the default; clipboard text is opt-in.**
+`copytree` with no flags used to copy the whole formatted document to the
+clipboard. It now writes a temp file and copies that path, which is what `-r`
+did. Pasting into an agent hands over a file to read rather than several hundred
+kilobytes of inline context.
+
+- `--clipboard` / `-y` restores the old behaviour of copying the text itself.
+- `-r` / `--as-reference` is accepted and does nothing, since it now selects the
+  default.
+- `-o`, `--display`, and `--stream` are unaffected and still take precedence.
+
+**Folder-profile discovery is no longer tied to `-r`.**
+Auto-discovery of a `.copytree.yml` used to happen only when `-r` was passed.
+Leaving that coupling in place would have made discovery unconditional as a side
+effect of the default change, so it is now stated directly: a project profile
+applies unless `--no-folder-profile` is passed, and `-p <name>` overrides it.
+
 ### Correctness
 
 **`ConfigManager.reload()` reloads.**
@@ -169,6 +188,14 @@ Documented accurately rather than implemented. True input streaming needs a
 two-phase design (plan, then load a bounded window), because sorting and exact
 budgets both need the full candidate set before any file can be declared a
 survivor.
+
+**`--clipboard` completes silently.**
+The copy succeeds and the clipboard receives the content, but Ink writes no
+frame, so nothing is printed. Pre-existing: it reproduces on the commit before
+reference output became the default, where clipboard *was* the default and the
+same silence applied. Not a render-throttle race — waiting 500ms after the state
+update changes nothing, so the frame is never queued rather than never flushed.
+Marked in `src/ui/components/CopyView.js`.
 
 **The benchmark suite is not a CI gate.**
 It runs on request and verifies fingerprints when it does. Nothing runs it

@@ -279,12 +279,32 @@ Remove duplicate files from output.
 copytree --dedupe
 ```
 
-#### `--as-reference`, `-r`
-Generate reference documentation format.
+#### `--clipboard`, `-y`
+Copy the output text itself to the clipboard, rather than a reference to a file
+containing it.
+
+The default is a file reference: CopyTree writes the output to a temp file and
+puts that path on the clipboard, so pasting into an agent hands over a file to
+read instead of a few hundred kilobytes of inline context. Use this when you want
+the text itself, for example to paste into a chat box directly.
 
 ```bash
-copytree --as-reference
-copytree -r
+copytree --clipboard
+copytree -y
+```
+
+#### `--as-reference`, `-r`
+No-op. Writing a file reference is the default, so this flag selects the
+behaviour you would get anyway. Accepted so existing scripts and habits keep
+working.
+
+#### `--no-folder-profile`
+Skip auto-discovery of a `.copytree.yml` (or `.copytree.yaml` / `.copytree.json`)
+profile in the project being copied. Discovery is on by default; a profile named
+explicitly with `-p` takes precedence over a discovered one.
+
+```bash
+copytree --no-folder-profile
 ```
 
 #### `--external=<source...>`
