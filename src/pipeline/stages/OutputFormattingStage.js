@@ -4,6 +4,9 @@ import MarkdownFormatter from '../formatters/MarkdownFormatter.js';
 import NDJSONFormatter from '../formatters/NDJSONFormatter.js';
 import SARIFFormatter from '../formatters/SARIFFormatter.js';
 
+/** Matches bare `localeCompare(other)`, built once instead of per comparison. */
+const NAME_COLLATOR = new Intl.Collator();
+
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
     super(options);
@@ -190,7 +193,27 @@ class OutputFormattingStage extends Stage {
     return tree;
   }
 
-  renderTree(node, lines, prefix, _isLast, showSizes = true) {
+  /**
+   * Resolve the tree drawing characters once per render.
+   *
+   * These were fetched from config at every node, so a 10,000-file tree with a
+   * few thousand directories performed tens of thousands of dotted-path config
+   * lookups to obtain four constants.
+   *
+   * @returns {{last: string, middle: string, empty: string, vertical: string}} Connectors
+   */
+  treeConnectors() {
+    return {
+      last: this.config.get('copytree.treeConnectors.last', '└── '),
+      middle: this.config.get('copytree.treeConnectors.middle', '├── '),
+      empty: this.config.get('copytree.treeConnectors.empty', '    '),
+      vertical: this.config.get('copytree.treeConnectors.vertical', '│   '),
+    };
+  }
+
+  renderTree(node, lines, prefix, _isLast, showSizes = true, connectors = null) {
+    const marks = connectors ?? this.treeConnectors();
+
     const entries = Object.entries(node).sort(([a], [b]) => {
       // Directories first, then files
       const aIsFile = node[a].isFile;
@@ -199,14 +222,12 @@ class OutputFormattingStage extends Stage {
       if (aIsFile && !bIsFile) return 1;
       if (!aIsFile && bIsFile) return -1;
 
-      return a.localeCompare(b);
+      return NAME_COLLATOR.compare(a, b);
     });
 
     entries.forEach(([name, value], index) => {
       const isLastEntry = index === entries.length - 1;
-      const connector = isLastEntry
-        ? this.config.get('copytree.treeConnectors.last', '└── ')
-        : this.config.get('copytree.treeConnectors.middle', '├── ');
+      const connector = isLastEntry ? marks.last : marks.middle;
 
       if (value.isFile) {
         const sizeStr = showSizes ? ` (${this.formatBytes(value.size)})` : '';
@@ -214,11 +235,9 @@ class OutputFormattingStage extends Stage {
       } else {
         lines.push(`${prefix}${connector}${name}/`);
 
-        const extension = isLastEntry
-          ? this.config.get('copytree.treeConnectors.empty', '    ')
-          : this.config.get('copytree.treeConnectors.vertical', '│   ');
+        const extension = isLastEntry ? marks.empty : marks.vertical;
 
-        this.renderTree(value, lines, prefix + extension, false, showSizes);
+        this.renderTree(value, lines, prefix + extension, false, showSizes, marks);
       }
     });
   }
@@ -226,16 +245,30 @@ class OutputFormattingStage extends Stage {
   addLineNumbersToContent(content) {
     if (!content) return content;
 
+    // The format string is fixed for the run, so which placeholder it uses is
+    // decided once rather than by running two substring replacements against
+    // every line of every file.
+    const format = this.lineNumberFormat;
+    const padIndex = format.indexOf('%4d');
+    const plainIndex = padIndex === -1 ? format.indexOf('%d') : -1;
+
     const lines = content.split('\n');
-    return lines
-      .map((line, index) => {
-        const lineNumber = (index + 1).toString();
-        const formatted = this.lineNumberFormat
-          .replace('%d', lineNumber)
-          .replace('%4d', lineNumber.padStart(4));
-        return formatted + line;
-      })
-      .join('\n');
+    const out = new Array(lines.length);
+
+    for (let i = 0; i < lines.length; i++) {
+      const lineNumber = (i + 1).toString();
+      let prefix;
+      if (padIndex !== -1) {
+        prefix = format.slice(0, padIndex) + lineNumber.padStart(4) + format.slice(padIndex + 3);
+      } else if (plainIndex !== -1) {
+        prefix = format.slice(0, plainIndex) + lineNumber + format.slice(plainIndex + 2);
+      } else {
+        prefix = format;
+      }
+      out[i] = prefix + lines[i];
+    }
+
+    return out.join('\n');
   }
 
   calculateTotalSize(files) {

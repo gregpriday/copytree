@@ -32,6 +32,17 @@ import { reasonForLayerKind, EXCLUSION_REASONS } from './exclusionReport.js';
 const ruleCache = new Map();
 
 /**
+ * Collator for directory entry ordering.
+ *
+ * `readdir` order is not stable across platforms, so entries are sorted to make
+ * output deterministic. `a.name.localeCompare(b.name)` constructs a collator on
+ * every comparison, which on a directory of 10,000 entries is 10,000-odd
+ * collator constructions for one sort. One shared instance produces exactly the
+ * same ordering.
+ */
+const ENTRY_COLLATOR = new Intl.Collator();
+
+/**
  * Clear all cached ignore rules.
  *
  * Only relevant when caching is enabled via `{ cache: true }`.
@@ -145,16 +156,37 @@ function findMatchingRule(layer, testPath) {
  * @param {boolean} [explain=false] - Resolve the matching rule and its source
  * @returns {{ignored: boolean, rule?: string, layer?: string, reason?: string, ruleSource?: string}} Decision
  */
-function isIgnored(absPath, root, layers, isDirectory = false, explain = false) {
+function isIgnored(
+  absPath,
+  root,
+  layers,
+  isDirectory = false,
+  explain = false,
+  dirPrefixes = null,
+  entryName = null,
+) {
   let ignored = false;
   let matchedRule = null;
   let matchedLayer = null;
   let matchedLayerRef = null;
   let matchedTestPath = null;
 
-  for (const layer of layers) {
+  for (let index = 0; index < layers.length; index++) {
+    const layer = layers[index];
     const { base, ig } = layer;
-    const relToLayer = toPosix(path.relative(base, absPath));
+
+    // Inside a walk, every layer base is an ancestor of the directory being
+    // read, so the relative path is the directory's own prefix plus the entry
+    // name. Recomputing `path.relative` per layer per entry is the same answer
+    // reached the expensive way, and on a deep tree the layer stack is long.
+    let relToLayer;
+    if (dirPrefixes !== null) {
+      const prefix = dirPrefixes[index];
+      if (prefix === null) continue;
+      relToLayer = prefix === '' ? entryName : `${prefix}/${entryName}`;
+    } else {
+      relToLayer = toPosix(path.relative(base, absPath));
+    }
 
     // Skip if path isn't under this layer's base
     // `isOutside` compares segments: a directory named `..draft` is inside the
@@ -215,16 +247,41 @@ function isIgnored(absPath, root, layers, isDirectory = false, explain = false) 
 }
 
 /**
+ * Relative path from each ignore layer's base down to a directory.
+ *
+ * Computed once per directory and then reused for every entry in it. `null`
+ * marks a layer the directory sits outside of, which is a permanent property of
+ * the pair and so is worth deciding once.
+ *
+ * @param {string} dir - Directory being read
+ * @param {Array} layers - Active ignore layers
+ * @returns {Array<string|null>} POSIX prefixes, parallel to `layers`
+ */
+function layerPrefixes(dir, layers) {
+  const prefixes = new Array(layers.length);
+  for (let i = 0; i < layers.length; i++) {
+    const rel = toPosix(path.relative(layers[i].base, dir));
+    prefixes[i] = isOutside(rel) ? null : rel;
+  }
+  return prefixes;
+}
+
+/**
  * Load the ignore layers contributed by a single directory.
+ *
  * @param {string} dir - Directory to read ignore files from
  * @param {string[]} ignoreFileNames - Ordered ignore file names (later wins)
  * @param {boolean} useCache - Whether to use the rule cache
+ * @param {Set<string>} [present] - Names known to exist in `dir`. When supplied
+ *   (the walker already has the directory listing), absent names are skipped
+ *   instead of being probed with a read that is going to fail.
  * @returns {Promise<Array>} Layers for this directory
  */
-async function layersForDirectory(dir, ignoreFileNames, useCache) {
+async function layersForDirectory(dir, ignoreFileNames, useCache, present = null) {
   const layers = [];
 
   for (const fileName of ignoreFileNames) {
+    if (present !== null && !present.has(fileName)) continue;
     const ignoreFilePath = path.join(dir, fileName);
     const rules = await readRules(ignoreFilePath, useCache);
     if (rules.length === 0) continue;
@@ -488,9 +545,11 @@ export async function* walkWithIgnore(root, options = {}) {
     checkAborted();
     stats.directoriesScanned++;
 
-    // Load ignore rules contributed by this directory
-    const nextLayers = [...layers, ...(await layersForDirectory(dir, ignoreNames, cache))];
-
+    // Read the directory before loading its ignore files. The listing says which
+    // ignore files actually exist, so absent ones are skipped rather than probed
+    // with an open that is guaranteed to fail. Most directories in a repository
+    // contain no ignore file at all, so this removes two failed syscalls per
+    // directory from every walk.
     let entries;
     try {
       entries = await withFsRetry(() => fs.readdir(dir, { withFileTypes: true }), {
@@ -519,12 +578,36 @@ export async function* walkWithIgnore(root, options = {}) {
       return;
     }
 
+    // Which ignore files this directory actually contains, taken from the
+    // listing we already have.
+    //
+    // Only consulted when the rule cache is off, which is the default. With the
+    // cache on, a missing ignore file is deliberately remembered as "no rules"
+    // until `clearRuleCache()` is called, and skipping the read here would
+    // quietly change that documented staleness contract.
+    const presentIgnoreFiles = cache ? null : new Set();
+    if (presentIgnoreFiles !== null) {
+      for (const entry of entries) {
+        if (ignoreNames.includes(entry.name)) presentIgnoreFiles.add(entry.name);
+      }
+    }
+
+    // Load ignore rules contributed by this directory
+    const nextLayers =
+      presentIgnoreFiles !== null && presentIgnoreFiles.size === 0
+        ? layers
+        : [...layers, ...(await layersForDirectory(dir, ignoreNames, cache, presentIgnoreFiles))];
+
     // Filter out ignore files themselves to prevent them from appearing in output
     entries = entries.filter((entry) => !suppressedNames.has(entry.name));
 
     // Sort entries for deterministic order across platforms
     // fs.readdir order is not guaranteed and differs between Windows/Unix
-    entries.sort((a, b) => a.name.localeCompare(b.name));
+    entries.sort((a, b) => ENTRY_COLLATOR.compare(a.name, b.name));
+
+    // One relative path per layer for this directory, reused by every entry in
+    // it instead of being recomputed per entry per layer.
+    const prefixes = layerPrefixes(dir, nextLayers);
 
     for (const entry of entries) {
       checkAborted();
@@ -544,7 +627,7 @@ export async function* walkWithIgnore(root, options = {}) {
       }
 
       // Check if this path should be ignored
-      const decision = isIgnored(absPath, root, nextLayers, isDir, explain);
+      const decision = isIgnored(absPath, root, nextLayers, isDir, explain, prefixes, entry.name);
 
       if (isDir) {
         if (decision.ignored) {

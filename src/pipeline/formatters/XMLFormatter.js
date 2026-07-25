@@ -82,6 +82,15 @@ class XMLFormatter {
     chunks.push('  </ct:metadata>\n');
     chunks.push('  <ct:files>\n');
 
+    // Resolved once for the whole document. These were fetched per file, and a
+    // config lookup walks a dotted path on every call.
+    const binaryPolicies = this.stage.config.get('copytree.binaryPolicy', {}) || {};
+    const binaryAction = this.stage.config.get('copytree.binaryFileAction', 'placeholder');
+    const commentTemplate = this.stage.config.get(
+      'copytree.binaryCommentTemplates.xml',
+      '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
+    );
+
     // Add files
     for (const file of input.files) {
       if (file === null) continue; // Skip files that were filtered out
@@ -115,18 +124,12 @@ class XMLFormatter {
       // Add content directly to file element (unless --only-tree is set)
       if (!this.onlyTree) {
         // Check if this file should be rendered as a comment
-        const policy =
-          this.stage.config.get('copytree.binaryPolicy', {})[file.binaryCategory] ||
-          this.stage.config.get('copytree.binaryFileAction', 'placeholder');
+        const policy = binaryPolicies[file.binaryCategory] || binaryAction;
 
         if (file.excluded || (file.isBinary && policy === 'comment')) {
           // Emit comment instead of CDATA
-          const tpl = this.stage.config.get(
-            'copytree.binaryCommentTemplates.xml',
-            '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
-          );
           const categoryName = (file.binaryCategory || 'Binary').toUpperCase();
-          const msg = tpl
+          const msg = commentTemplate
             .replace('{TYPE}', sanitizeForComment(categoryName))
             .replace('{PATH}', sanitizeForComment(`@${file.path}`))
             .replace('{SIZE}', this.stage.formatBytes(file.size || 0));

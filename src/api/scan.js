@@ -8,6 +8,9 @@ import { resolveScope } from '../utils/scopeResolver.js';
 import path from 'path';
 import fs from 'fs-extra';
 
+/** Matches bare `localeCompare(other)`, hoisted so it is built once. */
+const SCAN_COLLATOR = new Intl.Collator();
+
 /**
  * @typedef {Object} FileResult
  * @property {string} path - POSIX-style relative path
@@ -423,9 +426,11 @@ export async function* scan(basePath, options = {}) {
     const files = (result.files || []).filter((file) => file !== null);
 
     // The sort stage already ordered these; this keeps the historical tie-break
-    // for callers who did not request an explicit order.
+    // for callers who did not request an explicit order. The collator is hoisted
+    // because `localeCompare` builds one per call, and this runs O(n log n)
+    // times on top of a sort that already happened.
     if (!options.sort) {
-      files.sort((a, b) => a.path.localeCompare(b.path));
+      files.sort((a, b) => SCAN_COLLATOR.compare(a.path, b.path));
     }
 
     if (options.onSummary) {

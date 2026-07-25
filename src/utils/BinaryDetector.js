@@ -137,6 +137,14 @@ const MAGIC = [
 ];
 
 /**
+ * Magic signatures pre-materialized as Buffers.
+ *
+ * `Buffer.from(sig)` inside the match loop allocated one Buffer per signature
+ * per file sniffed. The signatures are constant, so they are built once.
+ */
+const MAGIC_BUFFERS = MAGIC.map((entry) => ({ ...entry, buf: Buffer.from(entry.sig) }));
+
+/**
  * Printable ASCII control characters
  */
 const PRINTABLE = new Set([0x09, 0x0a, 0x0d]); // tab, LF, CR
@@ -253,11 +261,56 @@ export async function detect(filePath, opts = {}) {
     }
   }
 
-  const sample = buf.subarray(0, bytesRead);
+  return classifySample(buf.subarray(0, bytesRead), ext, nonPrintableThreshold);
+}
 
+/**
+ * Classify content the caller already holds in memory.
+ *
+ * Reading a bounded prefix to decide "is this text?" and then reading the whole
+ * file to use it means every text file with an unrecognised extension is opened
+ * twice. A caller that is going to read the file anyway can read it once and
+ * hand the bytes here instead.
+ *
+ * The extension is still consulted first, so a known-binary extension is decided
+ * without the caller ever having to read anything.
+ *
+ * @param {string} filePath - Path the bytes came from (used for its extension)
+ * @param {Buffer} buffer - File content, or a prefix of it
+ * @param {Object} [opts] - Detection options
+ * @param {number} [opts.sampleBytes=8192] - Prefix length to examine
+ * @param {number} [opts.nonPrintableThreshold=0.3] - Non-printable ratio that means binary
+ * @param {Object} [opts.extensions] - Grouped extension config
+ * @returns {Object} Detection result, identical in shape to {@link detect}
+ */
+export function detectFromBuffer(filePath, buffer, opts = {}) {
+  const sampleBytes = opts.sampleBytes ?? 8192;
+  const nonPrintableThreshold = opts.nonPrintableThreshold ?? 0.3;
+  const groups = opts.extensions ?? DEFAULT_CATEGORIES;
+
+  const ext = path.extname(filePath);
+  const category = categorizeByExt(ext, groups);
+
+  if (category) {
+    return { isBinary: true, category, reason: 'extension', ext };
+  }
+
+  const sample = buffer.length > sampleBytes ? buffer.subarray(0, sampleBytes) : buffer;
+  return classifySample(sample, ext, nonPrintableThreshold);
+}
+
+/**
+ * Decide whether a byte sample is binary, by magic number then by content shape.
+ *
+ * @param {Buffer} sample - Bytes to examine
+ * @param {string} ext - Originating file extension
+ * @param {number} nonPrintableThreshold - Ratio above which content reads as binary
+ * @returns {Object} Detection result
+ */
+function classifySample(sample, ext, nonPrintableThreshold) {
   // Magic number match
-  for (const m of MAGIC) {
-    const sig = Buffer.from(m.sig);
+  for (const m of MAGIC_BUFFERS) {
+    const sig = m.buf;
     if (sample.length >= sig.length && sample.subarray(0, sig.length).equals(sig)) {
       return {
         isBinary: true,
@@ -269,23 +322,26 @@ export async function detect(filePath, opts = {}) {
     }
   }
 
-  // Fallback heuristics: null byte or many non-printables
-  if (sample.some((b) => b === 0)) {
-    return {
-      isBinary: true,
-      category: 'other',
-      reason: 'null-byte',
-      ext,
-    };
-  }
-
+  // Fallback heuristics: null byte or many non-printables. Both questions are
+  // answered in one pass; scanning the sample twice doubled the work for the
+  // common case, which is a text file that fails neither test.
   let nonPrintable = 0;
-  for (const b of sample) {
+  for (let i = 0; i < sample.length; i++) {
+    const b = sample[i];
+    if (b === 0) {
+      return {
+        isBinary: true,
+        category: 'other',
+        reason: 'null-byte',
+        ext,
+      };
+    }
     if (b >= 0x20 && b <= 0x7e) continue; // visible ASCII
     if (b >= 0x80) continue; // treat high bytes as possibly UTF-8
     if (PRINTABLE.has(b)) continue; // whitespace
     nonPrintable++;
   }
+
   const ratio = sample.length ? nonPrintable / sample.length : 0;
 
   if (ratio > nonPrintableThreshold) {

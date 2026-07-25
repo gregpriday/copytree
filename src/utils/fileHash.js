@@ -7,7 +7,24 @@ import fs from 'fs-extra';
  * @param {string} algorithm - Hash algorithm (default: 'sha256')
  * @returns {Promise<string>} Hash of the file content
  */
-async function hashFile(filePath, algorithm = 'sha256') {
+/**
+ * Files at or below this size are read in one call instead of streamed.
+ *
+ * A read stream sets up an event emitter, a file handle wrapper, and at least
+ * one chunk boundary per file. For a repository of small source files that
+ * scaffolding costs more than the bytes it moves; above this threshold the
+ * stream is the right tool and memory matters more than setup.
+ */
+const INLINE_HASH_CEILING = 128 * 1024;
+
+async function hashFile(filePath, algorithm = 'sha256', options = {}) {
+  const size = options.size;
+
+  if (typeof size === 'number' && size >= 0 && size <= INLINE_HASH_CEILING) {
+    const buffer = await fs.readFile(filePath);
+    return crypto.createHash(algorithm).update(buffer).digest('hex');
+  }
+
   const hash = crypto.createHash(algorithm);
   const stream = fs.createReadStream(filePath);
 
