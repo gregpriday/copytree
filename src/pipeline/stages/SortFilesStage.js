@@ -35,7 +35,7 @@ class SortFilesStage extends Stage {
 
     // Create a copy to avoid mutating the original array
     const sorted = [...files].sort((a, b) => {
-      let compareValue = 0;
+      let compareValue;
 
       switch (this.sortBy) {
         case 'size':

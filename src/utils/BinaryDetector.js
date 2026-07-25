@@ -136,7 +136,7 @@ export async function detect(filePath, opts = {}) {
 
   // Allocate buffer only for the sample size to avoid loading large files into memory
   const buf = Buffer.alloc(sampleBytes);
-  let bytesRead = 0;
+  let bytesRead;
   let fd = null;
 
   try {

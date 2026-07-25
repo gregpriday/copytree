@@ -15,15 +15,13 @@ import { Profiler, writeProfilingReport } from '../utils/profiler.js';
 import { parseSize } from '../utils/helpers.js';
 
 // Lazy initialization for Jest compatibility
-let __filename, __dirname, pkg;
+let pkg;
 try {
-  __filename = fileURLToPath(import.meta.url);
-  __dirname = path.dirname(__filename);
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
   pkg = JSON.parse(readFileSync(path.join(__dirname, '../../package.json'), 'utf8'));
 } catch (error) {
   // In test environment, these may not be available
-  __filename = '';
-  __dirname = '';
   pkg = { version: '0.0.0-test' };
 }
 
@@ -225,8 +223,6 @@ async function copyCommand(targetPath = '.', options = {}) {
         await profiler.stop();
       } catch (_stopErr) {
         // Ignore stop errors during error handling
-      } finally {
-        profiler = null;
       }
     }
     logger.stopSpinner();

@@ -269,8 +269,8 @@ const CopyView = () => {
       return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     };
 
-    let destination = '';
-    let action = '';
+    let destination;
+    let action;
 
     // Handle --as-reference option
     if (options.asReference) {
