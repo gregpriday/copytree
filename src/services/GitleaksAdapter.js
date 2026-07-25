@@ -130,7 +130,7 @@ class GitleaksAdapter {
       }
 
       // For other errors, rethrow
-      throw new Error(`Gitleaks execution failed: ${error.message}`);
+      throw new Error(`Gitleaks execution failed: ${error.message}`, { cause: error });
     }
   }
 

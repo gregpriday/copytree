@@ -4,7 +4,7 @@ CopyTree works seamlessly in Electron ≥28 main processes. This guide covers in
 
 ## Requirements
 
-- **Electron ≥28** (Node.js 20+)
+- **Electron ≥34** (Node.js 22+)
 - **ESM-enabled main process** (recommended) or dynamic imports for CommonJS
 
 ## Installation

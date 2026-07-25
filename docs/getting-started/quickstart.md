@@ -6,7 +6,7 @@ Get started with CopyTree in under 10 minutes. This guide takes you from install
 
 Before you begin, ensure you have:
 
-- **Node.js 20.0+** ([Download here](https://nodejs.org/))
+- **Node.js 22.12+** ([Download here](https://nodejs.org/))
 - **npm 10.0+** (comes with Node.js)
 - **Git** (for Git integration features)
 
@@ -17,7 +17,7 @@ node --version  # Should show v20.0.0 or higher
 npm --version   # Should show 10.0.0 or higher
 ```
 
-> **Important**: CopyTree requires Node.js 20+ and uses ES Modules (ESM) only.
+> **Important**: CopyTree requires Node.js 22.12+ and uses ES Modules (ESM) only.
 
 ## Step 1: Install CopyTree
 

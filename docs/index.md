@@ -2,7 +2,7 @@
 
 CopyTree is a powerful Node.js CLI tool that intelligently copies directory structures and file contents into AI-friendly formats. Perfect for sharing codebases with AI assistants, documentation generation, and code analysis.
 
-> **Requirements**: Node.js 20+ | ESM only | [View on GitHub](https://github.com/gregpriday/copytree)
+> **Requirements**: Node.js 22.12+ | ESM only | [View on GitHub](https://github.com/gregpriday/copytree)
 
 ## 🚀 Start Here
 
