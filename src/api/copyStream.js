@@ -5,6 +5,7 @@ import { ConfigManager } from '../config/ConfigManager.js';
 import { buildManifest } from '../utils/manifest.js';
 import { buildEstimates } from '../utils/estimate.js';
 import { versionFor } from '../utils/outputVersion.js';
+import { summaryStats } from './copy.js';
 
 /**
  * @typedef {import('./scan.js').ScanOptions} ScanOptions
@@ -146,16 +147,7 @@ export async function* copyStream(basePath, options = {}) {
             ...(options.dryRun ? {} : { actualChars: outputChars }),
           }),
           ...(options.dryRun ? { dryRun: true } : {}),
-          noFilesMatched: summary ? summary.noFilesMatched : seen.length === 0,
-          excluded: summary?.excluded ?? { total: 0, byReason: {} },
-          ...(summary?.truncated
-            ? {
-                truncated: true,
-                truncatedCount: summary.truncatedCount,
-                truncatedBy: summary.truncatedBy,
-              }
-            : { truncated: false }),
-          ...(summary?.scope ? { scope: summary.scope } : {}),
+          ...summaryStats(summary, seen),
         },
       });
     } catch {

@@ -282,7 +282,15 @@ describe('budgets actually bind', () => {
 
       expect(result.stats.totalFiles).toBe(1);
       expect(result.stats.budgetExceeded).toBe(true);
-      expect(result.stats.truncated).toBe(true);
+      expect(result.stats.oversizedFirstFileRetained).toBe(true);
+
+      // Not `truncated`. Nothing was dropped, and `truncated` means files were:
+      // it travels with `truncatedCount` and `truncatedBy`, neither of which has
+      // a meaningful value here. Reporting both said "files were dropped" and
+      // "no files were dropped" in the same stats object.
+      expect(result.stats.truncated).toBe(false);
+      expect(result.stats.truncatedCount).toBeUndefined();
+      expect(result.stats.truncatedBy).toBeUndefined();
     });
   });
 

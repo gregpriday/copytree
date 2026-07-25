@@ -150,6 +150,28 @@ const MAGIC_BUFFERS = MAGIC.map((entry) => ({ ...entry, buf: Buffer.from(entry.s
 const PRINTABLE = new Set([0x09, 0x0a, 0x0d]); // tab, LF, CR
 
 /**
+ * Control-character ratio above which a NEVER_BINARY extension is still called
+ * binary.
+ *
+ * Source code carrying a deliberate control character sits far below this: a
+ * file whose every line embeds a `\0` separator is around 1%. Binary data
+ * carrying one of these extensions sits far above it. The gap is wide enough
+ * that the exact value is not load-bearing.
+ */
+const TRUSTED_CONTROL_RATIO = 0.05;
+
+/**
+ * Minimum absolute control-byte count before the ratio above is consulted.
+ *
+ * A ratio alone reproduces the bug it was introduced to fix at small sizes:
+ * `x="\0";` is seven bytes with one control byte, which is 14% and would be
+ * called binary. Real binary content clears both the floor and the ratio within
+ * the first sample; a short source file with a deliberate delimiter clears
+ * neither.
+ */
+const TRUSTED_CONTROL_FLOOR = 8;
+
+/**
  * Cache of extension -> category lookup tables, keyed by the groups object
  * identity. Config objects are long-lived, so this collapses the per-file cost
  * to a single Map hit.
@@ -308,10 +330,21 @@ export function detectFromBuffer(filePath, buffer, opts = {}) {
  * @returns {Object} Detection result
  */
 function classifySample(sample, ext, nonPrintableThreshold) {
+  // `categorizeByExt` refuses to call these binary, but returning null just
+  // dropped the caller through to sniffing, where a single NUL was decisive.
+  // A literal `\0` in a template literal is valid source (a hash separator, a
+  // protocol delimiter), and the failure mode was a 2.8 KB TypeScript file
+  // replaced by a binary placeholder.
+  //
+  // These extensions are not exempted from sniffing, only judged on weight of
+  // evidence rather than on a single byte: see TRUSTED_CONTROL_RATIO.
+  const trusted = NEVER_BINARY.has((ext || '').toLowerCase());
+
   // Magic number match
   for (const m of MAGIC_BUFFERS) {
     const sig = m.buf;
     if (sample.length >= sig.length && sample.subarray(0, sig.length).equals(sig)) {
+      if (trusted) break;
       return {
         isBinary: true,
         category: m.cat,
@@ -329,12 +362,16 @@ function classifySample(sample, ext, nonPrintableThreshold) {
   for (let i = 0; i < sample.length; i++) {
     const b = sample[i];
     if (b === 0) {
-      return {
-        isBinary: true,
-        category: 'other',
-        reason: 'null-byte',
-        ext,
-      };
+      if (!trusted) {
+        return {
+          isBinary: true,
+          category: 'other',
+          reason: 'null-byte',
+          ext,
+        };
+      }
+      nonPrintable++;
+      continue;
     }
     if (b >= 0x20 && b <= 0x7e) continue; // visible ASCII
     if (b >= 0x80) continue; // treat high bytes as possibly UTF-8
@@ -343,6 +380,30 @@ function classifySample(sample, ext, nonPrintableThreshold) {
   }
 
   const ratio = sample.length ? nonPrintable / sample.length : 0;
+
+  // For a trusted extension the general threshold is the wrong instrument: it
+  // skips every byte above 0x7f as possible UTF-8, which is most of a binary
+  // file, so real binaries land well under it and the NUL check was carrying
+  // the decision alone. Control characters are the discriminating signal —
+  // essentially absent from source (a stray delimiter is a fraction of a
+  // percent) and pervasive in binary data.
+  if (trusted) {
+    if (nonPrintable >= TRUSTED_CONTROL_FLOOR && ratio > TRUSTED_CONTROL_RATIO) {
+      return {
+        isBinary: true,
+        category: 'other',
+        reason: 'ratio',
+        ext,
+      };
+    }
+
+    return {
+      isBinary: false,
+      category: 'text',
+      reason: 'textual',
+      ext,
+    };
+  }
 
   if (ratio > nonPrintableThreshold) {
     return {

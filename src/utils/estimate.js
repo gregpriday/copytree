@@ -65,6 +65,14 @@ export function estimateTokens(chars) {
  * When content IS available the real length is used, so a full run reports a
  * measured number rather than an estimate.
  *
+ * **The dry-run estimate runs high, and does so by design.** Three things push
+ * the same way: per-file overhead is rounded up from the formatters, `size` is
+ * bytes where the output is counted in characters (identical for ASCII, larger
+ * for anything multi-byte), and structure-only placeholders shrink files the
+ * plan counted in full. Around 10-15% over is normal on a real repository.
+ * Erring high is the useful direction for a budget check: a plan that fits is
+ * a run that fits.
+ *
  * @param {Array<Object>} files - File entries with `path`, `size`, optional `content`
  * @param {Object} [options={}] - Estimation options
  * @param {string} [options.format='xml'] - Output format

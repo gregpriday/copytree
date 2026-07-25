@@ -134,7 +134,15 @@ class SecretRedactor {
     const startLine = Math.max(0, (finding.StartLine ?? 1) - 1);
     const endLine = Math.max(startLine, (finding.EndLine ?? finding.StartLine ?? 1) - 1);
     const startCol = Math.max(0, (finding.StartColumn ?? 1) - 1);
-    const endCol = Math.max(startCol, (finding.EndColumn ?? finding.StartColumn ?? 1) - 1);
+
+    // The end column is only bounded below by the start column when both are on
+    // the same line. Clamping unconditionally meant a multi-line finding ending
+    // at an earlier column than it started — a PEM block beginning at column 17
+    // and ending at column 6 of a later line — deleted through column 17 of its
+    // final line, taking the closing quote, the semicolon, and whatever
+    // followed.
+    const rawEndCol = (finding.EndColumn ?? finding.StartColumn ?? 1) - 1;
+    const endCol = endLine === startLine ? Math.max(startCol, rawEndCol) : Math.max(0, rawEndCol);
 
     // Validate line indices
     if (startLine >= lines.length || endLine >= lines.length) {

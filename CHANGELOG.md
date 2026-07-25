@@ -1,5 +1,90 @@
 # Changelog
 
+## [Unreleased]
+
+Breaking changes are listed first. Every behaviour change here, including the
+ones too small to list, is recorded with its rationale in
+[docs/technical/behavior-ledger.md](docs/technical/behavior-ledger.md).
+
+### Breaking
+
+- **Node.js 22.12 or newer is required** (`engines.node`). An install-time break
+  for Node 20 hosts and for Electron builds on older runtimes.
+- **The CLI writes a file reference by default.** `copytree` with no flags used
+  to copy the whole formatted document to the clipboard; it now writes a temp
+  file and copies that path. Use `-y` / `--clipboard` for the old behaviour.
+  `-r` / `--as-reference` is accepted and now does nothing.
+- **Secret scanning runs on the programmatic API.** `scan()`, `copy()` and
+  `copyStream()` previously did no redaction at all. Callers that relied on raw
+  file content will see redacted spans; opt out with `secretsGuard: false`.
+- **Some pipeline stages are fatal.** Discovery, file loading, secret scanning
+  and output formatting now propagate errors instead of being skipped, so a run
+  that previously returned a successful-looking partial result now throws.
+- **Output formatting no longer downgrades on failure.** A failed XML format
+  used to return a JSON blob of raw files.
+- **The programmatic API no longer writes to the terminal.** Stage messages are
+  delivered as `stage:log` events via `onEvent`. Pass `quiet: false` to restore.
+- **`stats.secretsGuard` changed shape** and is now actually populated. It was
+  declared as `{ detected, redacted, report }` and never set.
+- **Deduplication uses SHA-256** rather than MD5, and no longer treats binary
+  placeholders as content, so `--dedupe` stops collapsing all binaries into one.
+- **Sort order is a total order under a pinned locale**, which changes which
+  files survive a budget for names differing only by case.
+
+### Added
+
+- `--scope-include-config-excluded` / `scopeIgnoresConfigExcludes`, to let a
+  `--scope` entry reach a config-excluded directory such as `node_modules`.
+  `.git` is excluded by a layer no option lifts.
+- `PROVIDER_TOKEN` detection for published credential prefixes (GitHub, Stripe,
+  GitLab, Slack, Google, Anthropic, OpenAI, SendGrid, npm).
+- `secretsGuard.oversizePolicy`, choosing between excluding, scanning, or
+  failing on a file too large to scan.
+- Exclusion accounting reasons `secretFile`, `secretUnscannable` and
+  `symlinkEscape`.
+
+### Fixed
+
+- **Secret redaction no longer destroys source code.** The generic rules matched
+  from the keyword onward, so `const token = payload.token.trim();` became
+  `const ***REDACTED***);`. Detection now reports the credential's own span, and
+  a match has to look like a credential rather than sit next to the word
+  "token".
+- **A `.ts` file containing a literal NUL byte is no longer treated as binary.**
+  `NEVER_BINARY` protected the extension lookup but not the content sniffer.
+- **A dry run selects exactly what the real run selects.** The secrets guard was
+  skipped without content, so its exclusions were missing from the preview.
+- `copy()` no longer drops `stage` from progress callbacks, and no longer
+  swallows a caller-supplied `onSummary`.
+- `--secrets-report` writes a report. It read a field nothing ever set.
+- `stage:log` events are emitted. The pipeline never set the back-reference
+  `Stage.log()` guards on, so the event had never fired.
+- Budget and character-limit detail reaches `CopyResult.stats`.
+- Symlinks are contained within the real repository root when following is
+  enabled, and directory cycles terminate.
+- `ConfigManager.reload()` reloads instead of emptying the instance.
+- XML attributes and text nodes are escaped, so a file named `a&b.js` no longer
+  produces a document a strict parser rejects.
+- `format()` honours the operation's own configuration rather than the
+  process-wide singleton.
+- The version reported by `--version` comes from CopyTree's own `package.json`
+  rather than the current working directory's.
+- `charLimit: 0` is honoured as a budget instead of being promoted to the 2M
+  default.
+- `npm run test:integration` runs integration tests rather than the whole suite.
+- `.git` is unreachable by any option, including a `!.git/` negation in an ignore
+  file and an `--always '.git/**'` force-include.
+- A private key's body is redacted, not just its `-----BEGIN-----` header.
+- Secret-prone filenames (`id_rsa`, `*.pem`, `.env`) are excluded at any depth,
+  not only at the repository root.
+- Credentials named `db_password`, `stripe_api_key` and similar are detected;
+  `_` is a word character, so the previous word-boundary anchoring missed them.
+- JWTs are no longer discarded as reference paths, and Stripe publishable keys
+  (`pk_live_*`) are no longer redacted.
+- A short source file containing a NUL byte is not misclassified as binary.
+- Non-text content is excluded rather than crashing the run with a `TypeError`.
+- `--dedupe` no longer drops files that differ only in their redacted secrets.
+
 ## [0.14.2] - 2026-02-27
 
 ### Infrastructure

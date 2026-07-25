@@ -157,6 +157,11 @@ program
     '--scope-include-ignored',
     'Let --scope entries override the ignore rules that would exclude them',
   )
+  .option(
+    '--scope-include-config-excluded',
+    'Let --scope entries override config exclusions (node_modules, globalExcluded*). ' +
+      '.git is never included',
+  )
   .option('--min-size <size>', 'Exclude files smaller than this size (e.g., 1KB, 500B, 10MB)')
   .option('--max-size <size>', 'Exclude files larger than this size (e.g., 10MB, 1GB)')
   .option(

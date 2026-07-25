@@ -17,6 +17,7 @@ import path from 'node:path';
 import ignore from 'ignore';
 import { withFsRetry } from './retryableFs.js';
 import { isRetryableFsError, createAbortError } from './errors.js';
+import { isHardExcluded } from './hardExclusions.js';
 import {
   recordRetry,
   recordGiveUp,
@@ -220,6 +221,24 @@ function isIgnored(
     }
   }
 
+  // Applied after the layer loop, and therefore outside last-match-wins. A
+  // negation in any layer can flip `ignored` back to false, so a hard exclusion
+  // expressed as a layer was not hard: `!.git/` in a `.copytreeignore` re-opened
+  // it. This is the final word.
+  if (!ignored) {
+    const relToRoot = toPosix(path.relative(root, absPath));
+    if (relToRoot && !isOutside(relToRoot) && isHardExcluded(relToRoot)) {
+      return {
+        ignored: true,
+        rule: 'builtin:always-excluded',
+        layer: root,
+        reason: EXCLUSION_REASONS.CONFIG_EXCLUDE,
+        kind: 'hard-exclude',
+        ...(explain ? { ruleSource: 'builtin:always-excluded' } : {}),
+      };
+    }
+  }
+
   const decision = {
     ignored,
     rule: matchedRule,
@@ -393,7 +412,8 @@ function withoutRulesBlocking(layer, chain) {
  * @param {string[]} ignoreFileNames - Ordered ignore file names
  * @param {boolean} useCache - Whether to use the rule cache
  * @param {Array} initialLayers - Config and caller layers, always applied
- * @param {boolean} [bypass=false] - Neutralize the rules blocking this entry
+ * @param {boolean} [bypass=false] - Neutralize the ignore-file rules blocking this entry
+ * @param {boolean} [bypassConfig=false] - Also neutralize the config-exclude rules blocking it
  * @returns {Promise<{layers: Array, prunedAt: string|null}>} Layers, and the
  *   ancestor that a full walk would have pruned (null when reachable)
  */
@@ -404,13 +424,23 @@ async function buildScopeContext(
   useCache,
   initialLayers = [],
   bypass = false,
+  bypassConfig = false,
 ) {
   const dirs = ancestorDirs(root, absPath);
   // Everything between the root and the selection, inclusive: these are the
   // paths whose exclusion the caller is explicitly overriding.
-  const chain = bypass ? [...dirs.slice(1), absPath] : [];
+  const chain = bypass || bypassConfig ? [...dirs.slice(1), absPath] : [];
 
-  const layers = [...initialLayers];
+  // Config exclusions are a default, not a safety rule: they exist so a normal
+  // run is not buried in `node_modules`. When the caller names a path inside
+  // one, the default has been answered. Only the rules standing between the
+  // root and that selection are dropped, and only from the `config-exclude`
+  // layer — `hard-exclude` is never touched.
+  const layers = bypassConfig
+    ? initialLayers.map((layer) =>
+        layer.kind === 'config-exclude' ? withoutRulesBlocking(layer, chain) : layer,
+      )
+    : [...initialLayers];
   let prunedAt = null;
 
   for (let i = 0; i < dirs.length; i++) {
@@ -452,6 +482,9 @@ async function buildScopeContext(
  *   of the whole root. Ignore rules still resolve from `root`.
  * @param {boolean} [options.scopeIgnoresIgnoreFiles=false] - Let scope entries override the
  *   ignore rules that would otherwise exclude them
+ * @param {boolean} [options.scopeIgnoresConfigExcludes=false] - Let scope entries override the
+ *   config-level exclusions (`node_modules`, `globalExcluded*`) blocking them. `.git` is
+ *   excluded by a separate layer and is never overridable.
  * @param {Function} [options.onExclude] - Called with `{path, size, reason, rule, ruleSource, isDirectory}`
  *   for every excluded entry
  * @param {AbortSignal} [options.signal] - Abort signal for cancellation
@@ -470,6 +503,7 @@ export async function* walkWithIgnore(root, options = {}) {
     maxDepth = undefined,
     scope = null,
     scopeIgnoresIgnoreFiles = false,
+    scopeIgnoresConfigExcludes = false,
     onExclude = null,
     signal = null,
   } = options;
@@ -797,6 +831,7 @@ export async function* walkWithIgnore(root, options = {}) {
       cache,
       initialLayers,
       scopeIgnoresIgnoreFiles,
+      scopeIgnoresConfigExcludes,
     );
 
     const entryStat = await statWithRetry(absEntry);

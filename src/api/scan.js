@@ -12,6 +12,43 @@ import fs from 'fs-extra';
 const SCAN_COLLATOR = new Intl.Collator();
 
 /**
+ * Stage-computed stats forwarded verbatim from the pipeline result, onto the
+ * scan summary, and from there onto `CopyResult.stats`.
+ *
+ * One list rather than one per hop: these were stranded in the pipeline result
+ * precisely because every hop had to name them, and a hop that forgot one lost
+ * it silently.
+ */
+export const FORWARDED_STAT_KEYS = Object.freeze([
+  'secretsGuard',
+  'oversizedFirstFileRetained',
+  'truncatedByCountBudget',
+  'truncatedBySizeBudget',
+  'totalCharacters',
+  'characterLimit',
+  'truncatedFiles',
+  'skippedFiles',
+]);
+
+/**
+ * Copy the {@link FORWARDED_STAT_KEYS} that are present from a source object.
+ *
+ * Absent keys stay absent rather than becoming `undefined`, so a consumer can
+ * use `in` or `??` without a stage's non-participation looking like a value.
+ *
+ * @param {Object} [source] - Source object
+ * @returns {Object} Object containing only the keys that were present
+ */
+export function pickForwardedStats(source) {
+  if (!source) return {};
+  const result = {};
+  for (const key of FORWARDED_STAT_KEYS) {
+    if (source[key] !== undefined) result[key] = source[key];
+  }
+  return result;
+}
+
+/**
  * @typedef {Object} FileResult
  * @property {string} path - POSIX-style relative path
  * @property {string} absolutePath - Platform-specific absolute path
@@ -46,6 +83,9 @@ const SCAN_COLLATOR = new Intl.Collator();
  * @property {boolean} [scopeIgnoresIgnoreFiles=false] - Let `scope` entries override the ignore
  *   rules that would otherwise exclude them. Off by default so a scoped run selects exactly the
  *   files a filtered full run would.
+ * @property {boolean} [scopeIgnoresConfigExcludes=false] - Let `scope` entries override the
+ *   config-level exclusions (`node_modules`, `copytree.globalExcluded*`) blocking them. For the
+ *   case where a user picked the folder deliberately. `.git` is never included.
  * @property {boolean} [respectGitignore=true] - Use .gitignore rules
  * @property {boolean} [modified=false] - Only git modified files
  * @property {string} [changed] - Files changed since git ref
@@ -264,6 +304,10 @@ export async function* scan(basePath, options = {}) {
     continueOnError: true,
     emitProgress: Boolean(options.onEvent || options.onProgress),
     config: configInstance,
+    // The SDK writes nothing to its host's terminal. Stage messages are still
+    // emitted as `stage:log` events for a caller that wants them, and
+    // `quiet: false` restores the old behaviour.
+    quiet: options.quiet !== false,
   });
 
   // Setup stages
@@ -288,6 +332,7 @@ export async function* scan(basePath, options = {}) {
       forceInclude: mergedAlways,
       scope: scopePaths,
       scopeIgnoresIgnoreFiles: options.scopeIgnoresIgnoreFiles === true,
+      scopeIgnoresConfigExcludes: options.scopeIgnoresConfigExcludes === true,
       explain: options.explain === true,
     }),
   );
@@ -338,6 +383,15 @@ export async function* scan(basePath, options = {}) {
     }),
   );
 
+  // Secret scanning needs content, but two of the exclusions it applies (the
+  // secret-prone glob list, the scan size ceiling) are decidable without it.
+  // Running the stage in plan mode keeps a dry run's selection identical to the
+  // real run's, which is the contract `dryRun` advertises.
+  const planOnly = options.includeContent === false;
+  const secretsGuardEnabled =
+    options.secretsGuard !== false &&
+    (options.secretsGuard === true || configInstance.get('secretsGuard.enabled', true));
+
   // 7. File Loading Stage (if includeContent is not explicitly false)
   if (options.includeContent !== false) {
     const { default: FileLoadingStage } = await import('../pipeline/stages/FileLoadingStage.js');
@@ -362,35 +416,42 @@ export async function* scan(basePath, options = {}) {
         }),
       );
     }
-
-    // 9. Secrets Guard Stage — same policy, same position, as the CLI. An
-    //    embedder should not have to know which entry point it reached for to
-    //    know whether credentials were redacted.
-    const secretsGuardEnabled =
-      options.secretsGuard !== false &&
-      (options.secretsGuard === true || configInstance.get('secretsGuard.enabled', true));
-
-    if (secretsGuardEnabled) {
-      const { default: SecretsGuardStage } =
-        await import('../pipeline/stages/SecretsGuardStage.js');
-      stages.push(
-        new SecretsGuardStage({
-          enabled: true,
-          redactionMode:
-            options.secretsRedactMode || configInstance.get('secretsGuard.redactionMode', 'typed'),
-          failOnSecrets:
-            options.failOnSecrets ?? configInstance.get('secretsGuard.failOnSecrets', false),
-        }),
-      );
-    }
   }
 
   // 9. Deduplicate Stage — after loading, because duplicates are decided by
   //    content hash and there is no content before this point.
+  //
+  //    Before the secrets guard, because redaction destroys the distinction it
+  //    hashes on: two config files differing only in their credentials become
+  //    byte-identical strings of the same marker, and one is then dropped as a
+  //    duplicate of the other.
   if (options.dedupe) {
     const { default: DeduplicateFilesStage } =
       await import('../pipeline/stages/DeduplicateFilesStage.js');
     stages.push(new DeduplicateFilesStage());
+  }
+
+  // 10. Secrets Guard Stage — same policy, same position, as the CLI. An
+  //     embedder should not have to know which entry point it reached for to
+  //     know whether credentials were redacted.
+  //
+  //     Outside the content block above, because it runs in plan mode too: the
+  //     secret-prone glob list and the scan size ceiling are both decidable
+  //     without content, and omitting them made a dry run's selection differ
+  //     from the real run's. It still lands after transformation, since that
+  //     branch adds no stages when there is no content.
+  if (secretsGuardEnabled) {
+    const { default: SecretsGuardStage } = await import('../pipeline/stages/SecretsGuardStage.js');
+    stages.push(
+      new SecretsGuardStage({
+        enabled: true,
+        planOnly,
+        redactionMode:
+          options.secretsRedactMode || configInstance.get('secretsGuard.redactionMode', 'typed'),
+        failOnSecrets:
+          options.failOnSecrets ?? configInstance.get('secretsGuard.failOnSecrets', false),
+      }),
+    );
   }
 
   // 10. Character Limit Stage
@@ -490,6 +551,11 @@ export async function* scan(basePath, options = {}) {
           : { truncated: false }),
         ...(result.stats?.budgetExceeded ? { budgetExceeded: true } : {}),
         ...(scope.length > 0 ? { scope } : {}),
+        // Stage-level detail that stages already compute. These were stranded
+        // in the pipeline result: a caller reading `stats` could see *that* a
+        // budget bit but not which one, and could not see the secrets summary
+        // at all even though the types promised it.
+        ...pickForwardedStats(result.stats),
       };
 
       try {

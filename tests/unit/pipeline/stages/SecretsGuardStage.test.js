@@ -265,5 +265,112 @@ describe('SecretsGuardStage', () => {
       expect(result.files[0].content).toBe('SECRET=123');
       expect(result.findings).toHaveLength(0);
     });
+
+    test('excludes secret-prone names at any depth', async () => {
+      // Bare names are meant at any depth. Anchoring them to the root meant
+      // `keys/id_rsa` was scanned rather than excluded, and the scanner's job on
+      // a private key is much harder than simply not emitting it.
+      const stage = new SecretsGuardStage({ enabled: true });
+      await stage.onInit();
+
+      const result = await stage.process({
+        files: [
+          { path: 'keys/id_rsa', relativePath: 'keys/id_rsa', content: 'key', size: 3 },
+          { path: 'certs/a.pem', relativePath: 'certs/a.pem', content: 'pem', size: 3 },
+          { path: 'deep/cfg/.env', relativePath: 'deep/cfg/.env', content: 'A=1', size: 3 },
+          { path: 'src/index.ts', relativePath: 'src/index.ts', content: 'export {};', size: 10 },
+        ],
+        stats: {},
+      });
+
+      expect(result.files.map((file) => file.path)).toEqual(['src/index.ts']);
+      expect(result.stats.secretsGuard.excludedSecretFiles).toBe(3);
+    });
+  });
+
+  describe('non-text content', () => {
+    test('excludes Buffer content instead of throwing', async () => {
+      // A document transformer can leave content as a Buffer. The scanner would
+      // coerce it to a string to match against, then the redactor would call
+      // `.split()` on the Buffer and throw — and this stage is fatal, so that
+      // TypeError took the whole run down.
+      const stage = new SecretsGuardStage({ enabled: true });
+      await stage.onInit();
+
+      const result = await stage.process({
+        files: [
+          {
+            path: 'doc.pdf',
+            relativePath: 'doc.pdf',
+            content: Buffer.from('AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYzRt9q2Lk'),
+            size: 60,
+          },
+          { path: 'src/a.ts', relativePath: 'src/a.ts', content: 'export {};', size: 10 },
+        ],
+        stats: {},
+      });
+
+      expect(result.files.map((file) => file.path)).toEqual(['src/a.ts']);
+      expect(result.stats.secretsGuard.excludedUnscannable).toBe(1);
+    });
+
+    test('passes through a file with no content at all', async () => {
+      const stage = new SecretsGuardStage({ enabled: true });
+      await stage.onInit();
+
+      const result = await stage.process({
+        files: [
+          { path: 'a.ts', relativePath: 'a.ts', size: 10 },
+          { path: 'b.ts', relativePath: 'b.ts', content: '', size: 0 },
+          { path: null },
+        ],
+        stats: {},
+      });
+
+      expect(result.files).toHaveLength(3);
+    });
+  });
+
+  describe('plan mode', () => {
+    test('applies glob exclusions without content and scans nothing', async () => {
+      const stage = new SecretsGuardStage({ enabled: true, planOnly: true });
+      await stage.onInit();
+
+      const result = await stage.process({
+        files: [
+          { path: '.env', relativePath: '.env', size: 20 },
+          { path: 'src/a.ts', relativePath: 'src/a.ts', size: 10 },
+        ],
+        stats: {},
+      });
+
+      expect(result.files.map((file) => file.path)).toEqual(['src/a.ts']);
+      expect(result.stats.secretsGuard).toMatchObject({
+        planOnly: true,
+        scanner: 'none',
+        findings: 0,
+        excludedSecretFiles: 1,
+      });
+    });
+
+    test('applies the scan size ceiling from stat size', async () => {
+      const stage = new SecretsGuardStage({
+        enabled: true,
+        planOnly: true,
+        maxFileBytes: 100,
+      });
+      await stage.onInit();
+
+      const result = await stage.process({
+        files: [
+          { path: 'big.ts', relativePath: 'big.ts', size: 5000 },
+          { path: 'small.ts', relativePath: 'small.ts', size: 10 },
+        ],
+        stats: {},
+      });
+
+      expect(result.files.map((file) => file.path)).toEqual(['small.ts']);
+      expect(result.stats.secretsGuard.excludedUnscannable).toBe(1);
+    });
   });
 });

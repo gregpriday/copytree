@@ -85,12 +85,26 @@ copytree --scope src --filter "**/*.ts"
 
 #### `--scope-include-ignored`
 Let `--scope` entries override the ignore rules that would otherwise exclude them. Off by default,
-so a scoped run keeps the "same set as a full run" guarantee. Use it for the deliberate gesture —
-you navigated into a gitignored folder and want it anyway. Config exclusions still apply, so
-`node_modules` stays out.
+so a scoped run keeps the "same set as a full run" guarantee. Use it for the deliberate gesture:
+you navigated into a gitignored folder and want it anyway.
 
 ```bash
 copytree --scope build/generated --scope-include-ignored
+```
+
+#### `--scope-include-config-excluded`
+Let `--scope` entries override the *config* exclusions blocking them (`node_modules`, and anything
+in `copytree.globalExcludedDirectories` / `globalExcludedFiles`).
+
+Separate from `--scope-include-ignored` because the two answer different questions: one is "yes, I
+know it's gitignored", the other is "yes, I really do mean `node_modules`". A path excluded by both
+layers needs both flags, which scoping into `node_modules` normally does, since most repositories
+also gitignore it.
+
+`.git` is excluded by a layer neither flag lifts.
+
+```bash
+copytree --scope node_modules/some-package --scope-include-ignored --scope-include-config-excluded
 ```
 
 ### Output Options
@@ -104,7 +118,7 @@ copytree -o output.xml
 ```
 
 #### `--display`, `-i`
-Display output in console instead of copying to clipboard.
+Print the output to the terminal instead of writing a file reference.
 
 ```bash
 copytree --display
@@ -119,12 +133,8 @@ copytree --stream | less
 copytree -S > project.xml
 ```
 
-#### `--clipboard`
-Explicitly copy to clipboard (default behavior).
-
-```bash
-copytree --clipboard
-```
+See `--clipboard` under Content Options for copying the output text itself. The default is a file
+reference: CopyTree writes the output to a temp file and puts that path on the clipboard.
 
 ### Format Options
 
@@ -403,8 +413,11 @@ copytree --instructions default
 
 ### Basic Usage
 ```bash
-# Copy current directory to clipboard
+# Copy current directory; the clipboard gets a path to the output file
 copytree
+
+# Copy the output text itself instead
+copytree --clipboard
 
 # Copy specific directory
 copytree /path/to/project

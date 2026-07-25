@@ -9,6 +9,202 @@ The rule this exists to enforce: **do not approve a changed golden file because
 
 ---
 
+## Unreleased (embedder feedback pass)
+
+Reported against the pre-release by the embedding application, running the SDK
+over a ~3,500 file repository. Everything here is a fix to something introduced
+or left standing by the release-readiness pass below.
+
+### Secret detection no longer corrupts source
+
+**The generic rules match the credential, not the statement around it.**
+`GENERIC_TOKEN` was `(api|secret|token|password)[\s:=]{1,4}[A-Za-z0-9._-]{12,}`,
+which matched from the *keyword* onward and redacted everything it swallowed.
+`const token = payload.token.trim();` became `const ***REDACTED***);`, and
+`Token classification:` became `***REDACTED***`. On the reporting repository
+this produced 130 detections across 72 files, every one a false positive, each
+destroying a span of working code.
+
+Each rule now names a capture group holding the credential, and only that span
+is redacted, so `const apiKey = "sk_live_..."` becomes
+`const apiKey = "***REDACTED:PROVIDER_TOKEN***"` and still parses. A match also
+has to look like a credential rather than merely sit next to the word "token":
+a quoted literal or an environment-style assignment, above a Shannon entropy
+floor, not a placeholder and not an identifier path.
+
+**New `PROVIDER_TOKEN` rule.** Published prefixes (GitHub, Stripe, GitLab,
+Slack, Google, Anthropic, OpenAI, SendGrid, npm) are distinctive enough to match
+with no surrounding context, which closes the case the keyword-anchored rules
+miss: a real key assigned to a neutrally-named variable.
+
+**`AWS_SECRET_KEY` no longer eats its own prefix.** `=` was in the value
+charset, so the match ran back over `KEY=` and redacted it too. Base64 padding
+only ever trails.
+
+Overlapping matches are now resolved first-rule-wins, because two rules hitting
+one credential meant two index-based replacements over the same span.
+
+### Correctness
+
+**`NEVER_BINARY` extensions survive content sniffing.**
+`categorizeByExt()` correctly refused to call `.ts` binary, but returning `null`
+only meant "no verdict" — the caller fell through to `classifySample()`, where a
+single NUL byte was decisive. A `\0` in a template literal is valid source, and
+a 2.8 KB TypeScript file was being replaced by a binary placeholder. These
+extensions are now judged on the control-character ratio instead, so real binary
+content carrying such an extension is still caught.
+
+**A dry run selects what the real run selects.**
+`SecretsGuardStage` was skipped entirely when `includeContent` was false, so its
+secret-prone glob exclusions were missing from the preview: 3524 files planned
+against 3522 actually copied. The stage now runs in plan mode for the exclusions
+decidable from the manifest, and reports `scanner: 'none'`, `planOnly: true`.
+
+**`stage:log` events are actually emitted.**
+`Stage.log()` guards on `this.pipeline`, which the pipeline never set: both entry
+points hand over already-constructed instances, so the constructor option never
+reached them. The event was listed in the contract and had never fired.
+
+### Programmatic API
+
+**`copy()` forwards the whole progress object.**
+The wrapper rebuilt it as `{ percent, message }`, discarding `stage` — so the
+stable ids that `PIPELINE_STAGES` exists to publish were invisible on the
+highest-level API.
+
+**`copy()` no longer swallows a caller's `onSummary`.**
+`...options` was spread into the scan options and then `onSummary` was
+overwritten with the internal capture, so a caller-supplied callback never
+fired. It is now chained. `copyStream()` was already correct.
+
+**`stats` carries what the stages computed.**
+`stats.secretsGuard` was declared in the types and never populated, and its
+declared shape did not match what the stage wrote. `BudgetStage` and
+`CharLimitStage` detail (`truncatedByCountBudget`, `truncatedBySizeBudget`,
+`oversizedFirstFileRetained`, `totalCharacters`, `characterLimit`,
+`truncatedFiles`, `skippedFiles`) was stranded in the pipeline result. All of it
+now reaches `CopyResult.stats`, through one helper shared with `copyStream()`.
+
+**`--secrets-report` writes a report.** It read
+`stats.secretsGuard.report`, which nothing ever set. The stage now populates it,
+carrying sanitized findings only.
+
+**The SDK writes nothing to the terminal.**
+Stage messages went through the central logger, so `SecretsGuardStage` printed a
+warning into the host application's stdout. Pipelines built by `scan()` now run
+`quiet`; `stage:log` still carries the message to any `onEvent` listener, and
+`quiet: false` restores the old behaviour.
+
+### Selection
+
+**`scope` can reach config-excluded directories.**
+Scoping into `node_modules` returned nothing with no way to override, because
+config exclusions are not ignore-file rules and `scopeIgnoresIgnoreFiles` does
+not touch them. The new `scopeIgnoresConfigExcludes` lifts the config-exclude
+rules standing between the root and the selection. A path excluded by both
+layers needs both flags, which scoping into `node_modules` usually does.
+
+`.git` moved to its own `hard-exclude` layer that no option lifts.
+
+**`always` no longer reaches into `.git`.**
+Force-includes run through `fast-glob` with `ignore: []`, deliberately, because
+`always` exists to override ignore rules. That made `--always '.git/**'` a route
+into git metadata, bypassing every layer. Pre-existing, and found while testing
+the claim above: adding a non-bypassable layer is worth nothing if one path
+never consults the layers. `always` now overrides ignore rules, the size gate,
+and config exclusions, but not the hard exclusions. Nested `.git` directories
+(submodules) are covered, since the check is per path segment.
+
+### Found by review of the above
+
+An adversarial pass over the fixes, most of which were wrong in the same
+direction: a guarantee stated in a comment but not enforced by the code.
+
+**`.git` is now genuinely unreachable.**
+Putting it in a `hard-exclude` layer was not enough, because the layer stack is
+last-match-wins: a `!.git/` negation in any `.copytreeignore` flipped the verdict
+back. The check now runs after the layer loop, outside that resolution, in
+`isHardExcluded()` (`src/utils/hardExclusions.js`), and is consulted by both
+walkers and by the force-include path. Names are compared case-insensitively,
+since `.GIT` reaches the same directory on macOS and Windows.
+
+**A private key's body is redacted, not just its header.**
+`PRIVATE_KEY` matched `-----BEGIN … PRIVATE KEY-----` alone, so redaction
+replaced the label and emitted the base64 body and footer verbatim. It now
+matches the whole PEM block, with the header-only rule kept as a fallback for a
+truncated file.
+
+**Secret-prone filenames are matched at any depth.**
+`id_rsa`, `*.pem` and `.env` were tested without `matchBase`, so they only
+matched at the repository root: `keys/id_rsa` was scanned rather than excluded.
+
+**Credential names are matched as they are actually written.**
+`\b` does not fall between `db_` and `password`, because `_` is a word
+character. `db_password`, `stripe_api_key` and `service_client_secret` were all
+invisible to the generic rules.
+
+**A JWT is no longer discarded as a reference path.**
+Three dot-separated runs of word characters is also the shape of
+`process.env.DB_PASSWORD`, so the reference rejection silently dropped real
+tokens. JWTs are now recognised first, and the reference pattern caps segment
+length, which is what actually distinguishes the two.
+
+**`pk_live_*` is no longer redacted.** The Stripe rule was `[sprk]k_`, which
+covers publishable keys, designed to ship in frontend code, and a nonexistent
+`kk_` prefix.
+
+**A short source file with a NUL is not binary.**
+The trusted-extension ratio reproduced the bug it was added to fix at small
+sizes: `x="\0";` is one control byte in seven, which is 14%. A minimum absolute
+control-byte count now applies before the ratio.
+
+**Non-text content is excluded rather than crashing the run.**
+A transformer that leaves content as a `Buffer` passed the truthy check, was
+coerced to a string to scan, and then reached `content.split('\n')` in the
+redactor. `SecretsGuardStage` is fatal, so that `TypeError` failed the whole run.
+
+**Deduplication runs before redaction.**
+Redaction destroys the distinction dedup hashes on: two config files differing
+only in their credentials become byte-identical strings of the same marker, and
+one was dropped as a duplicate of the other.
+
+**A multi-line finding no longer over-redacts.**
+`_findingToIndices` clamped the end column to the start column unconditionally,
+so a span starting at column 17 and ending at column 6 of a later line deleted
+through column 17 of that line — the closing quote, the semicolon, and whatever
+followed. The clamp now applies only within a single line. Latent until
+`PRIVATE_KEY` became multi-line.
+
+**An oversized first file is no longer reported as truncated.**
+`BudgetStage` set `truncated: true` alongside `budgetExceeded`, directly
+contradicting the comment above it: nothing was dropped, and neither
+`truncatedCount` nor `truncatedBy` had a meaningful value.
+
+**Two quadratic paths in the scanner are linear.**
+The environment rule put its keyword alternation between two unbounded
+`[A-Z0-9_]*`, which backtracks quadratically over a long uppercase line that
+never reaches an `=`; the key is now captured whole and tested in code. Overlap
+detection scanned every prior finding; claimed spans are now kept sorted and
+searched.
+
+**`quiet` covers the pipeline, not just its stages.** The pipeline's own recovery
+warnings went to the terminal regardless.
+
+### Documentation-only corrections
+
+- `FileResult.path` claimed it "may use platform-specific separators on
+  Windows". It is normalized to POSIX at discovery time.
+- `ScanOptions` was missing `secretsGuard`, `secretsRedactMode`,
+  `failOnSecrets`, `profile` and `quiet`, so a TypeScript consumer could not
+  reach the secrets escape hatch without a cast. `FormatOptions` was missing
+  `config` and `allowEmpty`.
+- The `ErrorCode` union omitted `ERR_SECRETS_DETECTED` and
+  `ERR_SYMLINK_OUTSIDE_ROOT`, both of which `ERROR_CODES` exports.
+- `estimatedOutputChars` on a dry run is biased high, by 10-15% in practice.
+  Now stated, along with why every contributing factor pushes the same way.
+
+---
+
 ## Unreleased (release-readiness pass)
 
 ### Security
@@ -137,7 +333,7 @@ now escape attributes and text nodes.
 **`userConfigLoaded` reflects whether anything loaded.**
 It was set as soon as `~/.copytree` existed, before reading any file.
 
-### Documentation-only corrections
+### Documentation-only corrections (release-readiness pass)
 
 These describe what the code already did; no behaviour changed.
 

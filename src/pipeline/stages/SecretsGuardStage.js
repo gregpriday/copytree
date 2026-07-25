@@ -3,6 +3,7 @@ import GitleaksAdapter from '../../services/GitleaksAdapter.js';
 import SecretRedactor from '../../utils/SecretRedactor.js';
 import { SecretsDetectedError } from '../../utils/errors.js';
 import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
+import { scanContent } from '../../utils/secretPatterns.js';
 import { minimatch } from 'minimatch';
 
 const SECRET_FILE_PATTERNS = [
@@ -26,16 +27,6 @@ const SECRET_FILE_PATTERNS = [
   '.aws/credentials',
   '.docker/config.json',
   '*.tfstate',
-];
-
-const BASIC_PATTERNS = [
-  { id: 'AWS_ACCESS_KEY', regex: /AKIA[0-9A-Z]{16}/gi },
-  {
-    id: 'AWS_SECRET_KEY',
-    regex: /aws(.{0,20})?(secret|access)[^\s]{0,5}['"`]?[A-Za-z0-9/+=]{32,40}['"`]?/gi,
-  },
-  { id: 'PRIVATE_KEY', regex: /-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/gi },
-  { id: 'GENERIC_TOKEN', regex: /(api|secret|token|password)[\s:=]{1,4}[A-Za-z0-9._-]{12,}/gi },
 ];
 
 class SecretsGuardStage extends Stage {
@@ -78,13 +69,21 @@ class SecretsGuardStage extends Stage {
     // default and has to be asked for by name.
     this.oversizePolicy =
       options.oversizePolicy || this.config.get('secretsGuard.oversizePolicy', 'exclude');
+
+    // Dry runs carry no content, so nothing can be *scanned*. The exclusions
+    // this stage applies are not all content-based, though: the secret-prone
+    // glob list and the size ceiling are both decidable from the manifest, and
+    // omitting the stage entirely made a dry run select files the real run
+    // would drop. A preview that overstates the selection is a preview a UI
+    // cannot build on.
+    this.planOnly = options.planOnly === true;
   }
 
   async onInit(context) {
     await super.onInit(context);
     this._resolveSettings();
 
-    if (!this.enabled) return;
+    if (!this.enabled || this.planOnly) return;
 
     this.useGitleaks = await this.gitleaks.isAvailable();
     if (this.useGitleaks) {
@@ -128,19 +127,48 @@ class SecretsGuardStage extends Stage {
         continue;
       }
 
-      if (!file.content) {
+      // Content that is not a string cannot be scanned or redacted: the scanner
+      // would coerce a Buffer to a string to match against, and the redactor
+      // would then call `.split()` on the Buffer and throw. This stage is fatal,
+      // so that TypeError took the whole run down. A document transformer that
+      // leaves its content as a Buffer is the way it happens.
+      const hasStringContent = typeof file.content === 'string';
+
+      if (file.content != null && !hasStringContent) {
+        this.log(`Excluding unscannable file: ${filePath} (content is not text)`, 'warn');
+        report?.add({
+          path: filePath,
+          size: file.size || 0,
+          reason: EXCLUSION_REASONS.SECRET_UNSCANNABLE,
+          rule: 'secretsGuard.nonTextContent',
+        });
+        unscannableCount++;
+        continue;
+      }
+
+      // Size is the one scan-limit input a dry run does have. Using it keeps
+      // the unscannable exclusions in the preview; the real run measures the
+      // loaded (and possibly transformed) content, so the two can disagree for
+      // a file sitting within a rounding error of the limit.
+      const scanBytes = hasStringContent
+        ? Buffer.byteLength(file.content, 'utf8')
+        : this.planOnly
+          ? file.size || 0
+          : null;
+
+      if (scanBytes === null) {
         processedFiles.push(file);
         continue;
       }
 
-      if (Buffer.byteLength(file.content, 'utf8') > this.maxFileBytes) {
+      if (scanBytes > this.maxFileBytes) {
         // Emitting a file the scanner could not read, while reporting that
         // secrets protection is on, is the least safe reading of "too large".
         if (this.oversizePolicy === 'scan') {
           this.log(`Scanning oversize file ${filePath} (oversizePolicy: scan)`, 'debug');
         } else if (this.oversizePolicy === 'fail') {
           throw new SecretsDetectedError(
-            `Cannot scan ${filePath} for secrets: ${file.content.length} characters exceeds the ${this.maxFileBytes}-byte scan limit`,
+            `Cannot scan ${filePath} for secrets: ${scanBytes} bytes exceeds the ${this.maxFileBytes}-byte scan limit`,
             [],
             { file: filePath, reason: 'unscannable' },
           );
@@ -155,6 +183,13 @@ class SecretsGuardStage extends Stage {
           unscannableCount++;
           continue;
         }
+      }
+
+      // Everything decidable from the manifest has now been applied. Scanning
+      // needs bytes, which a dry run does not have.
+      if (this.planOnly) {
+        processedFiles.push(file);
+        continue;
       }
 
       let fileFindings = [];
@@ -215,11 +250,22 @@ class SecretsGuardStage extends Stage {
         ...(input.stats || {}),
         secretsGuard: {
           enabled: true,
-          scanner: this.useGitleaks ? 'gitleaks' : 'builtin',
+          // Nothing was scanned in a plan, so naming a scanner would overstate
+          // what the numbers below mean.
+          scanner: this.planOnly ? 'none' : this.useGitleaks ? 'gitleaks' : 'builtin',
+          planOnly: this.planOnly,
           findings: findings.length,
           redacted: redactionCount,
           excludedSecretFiles: excludedCount,
           excludedUnscannable: unscannableCount,
+          // `--secrets-report` reads this. The findings are already stripped of
+          // the matched bytes, so the report is safe to write to a file or to
+          // stdout; it carries positions, rule ids and fingerprints only.
+          report: {
+            scanner: this.planOnly ? 'none' : this.useGitleaks ? 'gitleaks' : 'builtin',
+            redactionMode: this.redactionMode,
+            findings,
+          },
         },
       },
     };
@@ -227,37 +273,22 @@ class SecretsGuardStage extends Stage {
 
   _isExcluded(filePath) {
     return this.excludeGlobs.some((pattern) =>
-      minimatch(filePath, pattern, { dot: true, nocase: process.platform === 'win32' }),
+      minimatch(filePath, pattern, {
+        dot: true,
+        nocase: process.platform === 'win32',
+        // Bare names like `id_rsa` and `*.pem` are meant at any depth. Without
+        // this they only matched at the repository root, so `keys/id_rsa` and
+        // `certs/server.pem` were scanned rather than excluded — and the
+        // scanner's job on a private key is much harder than simply not
+        // emitting it. Ignored by minimatch for patterns containing a slash, so
+        // `.aws/credentials` keeps its path semantics.
+        matchBase: true,
+      }),
     );
   }
 
   _basicScan(file) {
-    const results = [];
-    for (const pattern of BASIC_PATTERNS) {
-      const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
-      let match;
-      while ((match = regex.exec(file.content)) !== null) {
-        const { line, column } = this._positionFromIndex(file.content, match.index);
-        results.push({
-          RuleID: pattern.id,
-          StartLine: line,
-          EndLine: line,
-          StartColumn: column,
-          EndColumn: column + match[0].length,
-          Match: match[0],
-          File: file.relativePath || file.path,
-        });
-      }
-    }
-    return results;
-  }
-
-  _positionFromIndex(content, index) {
-    const snippet = content.slice(0, index);
-    const lines = snippet.split('\n');
-    const line = lines.length;
-    const column = (lines[lines.length - 1] || '').length + 1;
-    return { line, column };
+    return scanContent(file.content, file.relativePath || file.path);
   }
 }
 

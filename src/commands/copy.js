@@ -402,6 +402,7 @@ async function buildProfileFromCliOptions(options, basePath) {
       // Scoped copy (literal paths, root-anchored ignore semantics)
       scope: options.scope ? (Array.isArray(options.scope) ? options.scope : [options.scope]) : [],
       scopeIgnoresIgnoreFiles: options.scopeIncludeIgnored === true,
+      scopeIgnoresConfigExcludes: options.scopeIncludeConfigExcluded === true,
       explain: options.explain === true,
     },
 
@@ -482,6 +483,7 @@ async function setupPipelineStages(basePath, profile, options) {
       // Scoped copy
       scope: scopePaths,
       scopeIgnoresIgnoreFiles: profile.options?.scopeIgnoresIgnoreFiles === true,
+      scopeIgnoresConfigExcludes: profile.options?.scopeIgnoresConfigExcludes === true,
       explain: profile.options?.explain === true,
     }),
   );
@@ -562,10 +564,23 @@ async function setupPipelineStages(basePath, profile, options) {
       }),
     );
 
-    // 9. Secrets Guard Stage — AFTER transformation, so what gets scanned is
-    //    what gets emitted. Scanning first left a gap: a transformer that
-    //    converts a document to text can surface a credential that was not
-    //    present in the bytes the scanner saw.
+    // 9. Deduplicate Stage (if --dedupe) — after loading, because duplicates
+    //    are decided by content hash and there is no content before this point.
+    //
+    //    Before the secrets guard, because redaction destroys the distinction it
+    //    hashes on: two config files differing only in their credentials become
+    //    byte-identical strings of the same marker, and one is then dropped as a
+    //    duplicate of the other.
+    if (options.dedupe) {
+      const { default: DeduplicateFilesStage } =
+        await import('../pipeline/stages/DeduplicateFilesStage.js');
+      stages.push(new DeduplicateFilesStage());
+    }
+
+    // 10. Secrets Guard Stage — AFTER transformation, so what gets scanned is
+    //     what gets emitted. Scanning first left a gap: a transformer that
+    //     converts a document to text can surface a credential that was not
+    //     present in the bytes the scanner saw.
     const secretsGuardEnabled =
       options.secretsGuard !== false &&
       (options.secretsGuard === true || config().get('secretsGuard.enabled', true));
@@ -582,14 +597,6 @@ async function setupPipelineStages(basePath, profile, options) {
         }),
       );
     }
-  }
-
-  // 9. Deduplicate Stage (if --dedupe) — after loading, because duplicates are
-  //    decided by content hash and there is no content before this point.
-  if (options.dedupe && !options.onlyTree) {
-    const { default: DeduplicateFilesStage } =
-      await import('../pipeline/stages/DeduplicateFilesStage.js');
-    stages.push(new DeduplicateFilesStage());
   }
 
   // 10. Character Limit Stage (if --char-limit option is used).

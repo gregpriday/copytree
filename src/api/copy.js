@@ -1,10 +1,11 @@
-import { scan } from './scan.js';
+import { scan, pickForwardedStats } from './scan.js';
 import { format } from './format.js';
 import { ValidationError, ERROR_CODES, isAbortError } from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
 import { buildManifest } from '../utils/manifest.js';
 import { buildEstimates } from '../utils/estimate.js';
 import { versionFor } from '../utils/outputVersion.js';
+import { PIPELINE_STAGES } from '../utils/ProgressTracker.js';
 import fs from 'fs-extra';
 import path from 'path';
 import Clipboard from '../utils/clipboard.js';
@@ -156,14 +157,24 @@ export async function copy(basePath, options = {}) {
 
   /**
    * Emit progress with a monotonic guard so percent never decreases.
+   *
+   * Every field the scan reported is carried through. Rebuilding the object
+   * from `percent` and `message` alone dropped `stage`, so the stable stage id
+   * that `PIPELINE_STAGES` exists to publish was invisible to exactly the
+   * callers most likely to render it.
+   *
    * Swallows exceptions so a buggy callback never breaks the operation.
+   *
+   * @param {number} percent - Progress 0-100
+   * @param {string} message - Human-readable status
+   * @param {Object} [source] - Underlying progress object to carry through
    */
   const emitProgress = onProgress
-    ? (percent, message) => {
+    ? (percent, message, source = {}) => {
         const clamped = Math.max(percent, lastEmittedPercent);
         lastEmittedPercent = clamped;
         try {
-          onProgress({ percent: clamped, message });
+          onProgress({ ...source, percent: clamped, message });
         } catch {
           // Swallow callback exceptions
         }
@@ -171,16 +182,27 @@ export async function copy(basePath, options = {}) {
     : null;
 
   if (emitProgress) {
-    emitProgress(0, 'Starting...');
+    emitProgress(0, 'Starting...', { stage: PIPELINE_STAGES.UNKNOWN });
     scanProgress = (progress) => {
       // Scale scan progress to 0-80%
-      emitProgress(Math.round(progress.percent * 0.8), progress.message);
+      emitProgress(Math.round(progress.percent * 0.8), progress.message, progress);
     };
   }
 
   let summary = null;
   const captureSummary = (value) => {
     summary = value;
+    // `...options` is spread into the scan options below, so assigning
+    // `onSummary` there replaces whatever the caller passed. Chain instead: a
+    // caller who asks for the summary and also reads `result.stats` should get
+    // both.
+    if (typeof options.onSummary === 'function') {
+      try {
+        options.onSummary(value);
+      } catch {
+        // A buggy summary callback must not fail the copy.
+      }
+    }
   };
 
   // Handle dry run
@@ -205,7 +227,7 @@ export async function copy(basePath, options = {}) {
     const manifest = buildManifest(files, manifestOptions);
 
     if (emitProgress) {
-      emitProgress(100, 'Complete');
+      emitProgress(100, 'Complete', { stage: PIPELINE_STAGES.UNKNOWN });
     }
 
     return {
@@ -261,7 +283,7 @@ export async function copy(basePath, options = {}) {
   const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
 
   if (emitProgress) {
-    emitProgress(80, 'Formatting output...');
+    emitProgress(80, 'Formatting output...', { stage: PIPELINE_STAGES.FORMAT });
   }
 
   // Format output. An empty selection produces an empty document rather than an
@@ -283,7 +305,7 @@ export async function copy(basePath, options = {}) {
   const manifest = buildManifest(files, manifestOptions);
 
   if (emitProgress) {
-    emitProgress(95, 'Finalizing...');
+    emitProgress(95, 'Finalizing...', { stage: PIPELINE_STAGES.FORMAT });
   }
 
   // Build result
@@ -334,7 +356,7 @@ export async function copy(basePath, options = {}) {
   }
 
   if (emitProgress) {
-    emitProgress(100, 'Complete');
+    emitProgress(100, 'Complete', { stage: PIPELINE_STAGES.UNKNOWN });
   }
 
   return result;
@@ -343,11 +365,14 @@ export async function copy(basePath, options = {}) {
 /**
  * Fold the scan summary into the shape `result.stats` exposes.
  *
+ * Shared with `copyStream()` so the two entry points cannot drift on which
+ * numbers they surface.
+ *
  * @param {Object|null} summary - Summary emitted by the scan, if any
  * @param {Array<Object>} files - Selected files
  * @returns {Object} Stats fragment
  */
-function summaryStats(summary, files) {
+export function summaryStats(summary, files) {
   if (!summary) {
     return {
       noFilesMatched: files.length === 0,
@@ -367,6 +392,7 @@ function summaryStats(summary, files) {
       : { truncated: false }),
     ...(summary.budgetExceeded ? { budgetExceeded: true } : {}),
     ...(summary.scope ? { scope: summary.scope } : {}),
+    ...pickForwardedStats(summary),
   };
 }
 

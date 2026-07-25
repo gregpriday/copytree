@@ -134,9 +134,12 @@ class BudgetStage extends Stage {
         // `truncated` because they mean opposite things: one says files were
         // dropped, the other says the budget was overshot to avoid returning
         // nothing at all.
-        ...(budgetExceeded
-          ? { budgetExceeded: true, oversizedFirstFileRetained: true, truncated: true }
-          : {}),
+        // ...and therefore this branch must not set `truncated`. It did, which
+        // contradicted the sentence above: a caller saw `truncated: true` with
+        // no `truncatedCount` and no `truncatedBy`, describing a run where
+        // nothing was dropped. When files were dropped as well, the branch below
+        // sets it.
+        ...(budgetExceeded ? { budgetExceeded: true, oversizedFirstFileRetained: true } : {}),
         ...(truncatedCount > 0
           ? {
               truncated: true,

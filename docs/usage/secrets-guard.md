@@ -160,7 +160,7 @@ See full list in `src/pipeline/stages/SecretsGuardStage.js`
 
 ## Detected Secret Types
 
-Gitleaks detects 200+ patterns including:
+When Gitleaks is installed it is used, and detects 200+ patterns including:
 
 - **AWS**: Access keys (AKIA*, ASIA*), Secret keys
 - **Google**: API keys (AIza*), Service account JSON
@@ -170,6 +170,41 @@ Gitleaks detects 200+ patterns including:
 - **Database URLs**: With embedded credentials
 - **JWT Tokens**: Bearer tokens
 - **Generic Secrets**: High-entropy strings
+
+Without it, a built-in scanner runs instead (`src/utils/secretPatterns.js`),
+covering AWS keys, private key headers, the published token prefixes above, and
+credential-shaped assignments.
+
+## What redaction replaces
+
+**Only the credential itself.** A detection reports the span of the secret, not
+the statement around it, so redacted code still parses:
+
+```javascript
+// before
+const apiKey = "sk_live_EXAMPLE_NOT_A_REAL_KEY";
+// after
+const apiKey = "***REDACTED:PROVIDER_TOKEN***";
+```
+
+This is what makes the built-in scanner safe to leave on by default. Its output
+is source handed to a model, and a rule that swallows the surrounding syntax
+produces a context that is wrong in a way nothing downstream can detect.
+
+The generic rules are correspondingly conservative. A value has to be a quoted
+literal or an environment-style assignment, clear an entropy floor, and not be a
+recognisable placeholder. So these are left alone:
+
+```javascript
+const token = payload.token.trim();          // a property read
+const bearer = extractBearerToken(header);   // a function call
+apiKey: "<YOUR_API_KEY_HERE>"                // a placeholder
+password: "process.env.DB_PASS"              // a reference
+```
+
+Findings never carry the matched bytes. They travel into `stats`, into events,
+and onto thrown errors, all of which an embedder is liable to log, so each one
+carries a rule id, a position, a length, and a truncated SHA-256 fingerprint.
 
 ## Handling False Positives
 

@@ -296,7 +296,13 @@ export interface ManifestEntry {
  * Represents a file discovered and processed by scan()
  */
 export interface FileResult {
-  /** Relative path (may use platform-specific separators on Windows) */
+  /**
+   * Relative path, always POSIX-separated on every platform.
+   *
+   * Normalized at discovery time, so it can be split on `/` and compared
+   * against glob patterns without consulting `path.sep`. Use `absolutePath`
+   * for filesystem calls, which need native separators.
+   */
   path: string;
   /** Platform-specific absolute path */
   absolutePath: string;
@@ -350,6 +356,19 @@ export interface ScanOptions {
    * Config exclusions still apply, so `node_modules` stays out.
    */
   scopeIgnoresIgnoreFiles?: boolean;
+  /**
+   * Let `scope` entries override the config-level exclusions blocking them
+   * (default: false).
+   *
+   * `scopeIgnoresIgnoreFiles` lifts `.gitignore` and `.copytreeignore` rules;
+   * this lifts `node_modules` and `copytree.globalExcluded*`. They are separate
+   * because they answer different questions, and a path excluded by both needs
+   * both flags — scoping into `node_modules` typically does, since most
+   * repositories also gitignore it.
+   *
+   * `.git` is excluded by a layer no option lifts.
+   */
+  scopeIgnoresConfigExcludes?: boolean;
   /**
    * Use gitignore rules (default: true).
    *
@@ -450,6 +469,93 @@ export interface ScanOptions {
    * truncation status without buffering the whole run.
    */
   onSummary?: (summary: ScanSummary) => void;
+  /**
+   * Detect and redact credentials (default: the `secretsGuard.enabled` config
+   * value, which is on).
+   *
+   * Applies identically here and on the CLI. Redaction replaces the credential
+   * itself and leaves the surrounding syntax intact, so redacted source still
+   * parses. Pass `false` to disable.
+   */
+  secretsGuard?: boolean;
+  /** How redacted spans are marked (default: 'typed') */
+  secretsRedactMode?: 'typed' | 'generic' | 'hash';
+  /** Throw `ERR_SECRETS_DETECTED` instead of redacting */
+  failOnSecrets?: boolean;
+  /**
+   * Name of a folder profile to load instead of auto-discovering one.
+   * A load failure throws, where a failed auto-discovery is ignored.
+   */
+  profile?: string;
+  /**
+   * Suppress pipeline terminal output (default: true).
+   *
+   * The programmatic API is silent by design: stage messages are delivered as
+   * `stage:log` events via `onEvent`, and a library has no claim on its host's
+   * stdout. Pass `false` to let the pipeline write to the terminal.
+   */
+  quiet?: boolean;
+}
+
+/**
+ * A single secret detection, stripped of the credential itself.
+ *
+ * Findings travel into `stats`, into events, and onto thrown errors, all of
+ * which an embedder is liable to log. They carry position and identity only.
+ */
+export interface SecretFinding {
+  /** Path the finding was found in */
+  file: string | null;
+  /** Rule that matched, e.g. `GENERIC_TOKEN`, `AWS_ACCESS_KEY` */
+  ruleId: string;
+  /** 1-based line where the credential starts */
+  startLine: number | null;
+  /** 1-based line where the credential ends */
+  endLine: number | null;
+  /** 1-based column where the credential starts */
+  startColumn: number | null;
+  /** 1-based inclusive column where the credential ends */
+  endColumn: number | null;
+  /** Length of the matched credential in characters */
+  matchLength: number;
+  /** The marker written in place of the credential */
+  preview: string;
+  /**
+   * Truncated SHA-256 of the matched bytes.
+   *
+   * Stable enough to correlate the same credential across runs, and not
+   * reversible for anything with real entropy.
+   */
+  fingerprint: string | null;
+}
+
+/** Secrets detection summary, exposed on `stats.secretsGuard`. */
+export interface SecretsGuardSummary {
+  /** Always true when present; the key is absent when the guard did not run */
+  enabled: boolean;
+  /**
+   * Which scanner produced the numbers.
+   *
+   * `none` means nothing was scanned: a dry run has no content, so only the
+   * exclusions decidable from the manifest were applied.
+   */
+  scanner: 'gitleaks' | 'builtin' | 'none';
+  /** True on a dry run, where nothing was scanned */
+  planOnly: boolean;
+  /** How many credentials were detected */
+  findings: number;
+  /** How many spans were replaced */
+  redacted: number;
+  /** Files dropped for matching the secret-prone glob list */
+  excludedSecretFiles: number;
+  /** Files dropped for being too large to scan */
+  excludedUnscannable: number;
+  /** Detail behind the counts. Written by `--secrets-report`. */
+  report: {
+    scanner: 'gitleaks' | 'builtin' | 'none';
+    redactionMode: 'typed' | 'generic' | 'hash';
+    findings: SecretFinding[];
+  };
 }
 
 /** Summary of a scan, delivered via `ScanOptions.onSummary`. */
@@ -477,6 +583,22 @@ export interface ScanSummary {
   budgetExceeded?: boolean;
   /** Resolved scope entries, when scoped */
   scope?: string[];
+  /** Set when the retained set is larger than `maxTotalSize` */
+  oversizedFirstFileRetained?: boolean;
+  /** Files dropped by `maxFileCount` */
+  truncatedByCountBudget?: number;
+  /** Files dropped by `maxTotalSize` */
+  truncatedBySizeBudget?: number;
+  /** Characters emitted, when `charLimit` was set */
+  totalCharacters?: number;
+  /** The character budget that was applied */
+  characterLimit?: number;
+  /** Files whose content `charLimit` cut short */
+  truncatedFiles?: number;
+  /** Files `charLimit` dropped entirely */
+  skippedFiles?: number;
+  /** Secrets detection summary, present when the guard ran */
+  secretsGuard?: SecretsGuardSummary;
 }
 
 /**
@@ -516,6 +638,21 @@ export interface FormatOptions {
   showSize?: boolean;
   /** Pretty print JSON output (default: true) */
   prettyPrint?: boolean;
+  /**
+   * ConfigManager instance for isolated configuration.
+   *
+   * Formatting reads configuration too, so passing the same instance the
+   * selection ran under is what keeps two concurrent operations from formatting
+   * each other's files under the wrong settings.
+   */
+  config?: ConfigManager;
+  /**
+   * Return an empty document instead of throwing when there are no files
+   * (default: false).
+   *
+   * `copy()` sets this: "nothing to copy here" is an outcome, not a failure.
+   */
+  allowEmpty?: boolean;
 }
 
 /**
@@ -678,6 +815,11 @@ export interface CopyResult {
      *
      * Bytes on disk are the wrong unit for deciding whether a context fits;
      * output characters are what the budget is actually spent on.
+     *
+     * On a dry run the estimate is biased **high**, typically by 10-15%:
+     * per-file overhead is rounded up, sizes are bytes where the output is
+     * counted in characters, and structure-only placeholders shrink files the
+     * plan counted in full. A plan that fits is a run that fits.
      */
     estimatedOutputChars: number;
     /**
@@ -713,12 +855,25 @@ export interface CopyResult {
     budgetExceeded?: boolean;
     /** Resolved scope entries, when scoped */
     scope?: string[];
-    /** Secrets detection summary (if enabled) */
-    secretsGuard?: {
-      detected: number;
-      redacted: number;
-      report?: object;
-    };
+    /** Secrets detection summary, present when the guard ran */
+    secretsGuard?: SecretsGuardSummary;
+    /**
+     * Set when the first file alone exceeded `maxTotalSize` and was kept
+     * anyway. Pairs with `budgetExceeded`.
+     */
+    oversizedFirstFileRetained?: boolean;
+    /** Files dropped by `maxFileCount` */
+    truncatedByCountBudget?: number;
+    /** Files dropped by `maxTotalSize` */
+    truncatedBySizeBudget?: number;
+    /** Characters emitted, when `charLimit` was set */
+    totalCharacters?: number;
+    /** The character budget that was applied */
+    characterLimit?: number;
+    /** Files whose content `charLimit` cut short */
+    truncatedFiles?: number;
+    /** Files `charLimit` dropped entirely */
+    skippedFiles?: number;
     /** Scan errors (if any occurred) */
     scanErrors?: string[];
     /** Clipboard error message (if clipboard copy failed) */
@@ -1694,7 +1849,9 @@ export type ErrorCode =
   | 'ERR_INVALID_FORMAT'
   | 'ERR_CONFIG_INVALID'
   | 'ERR_ABORTED'
-  | 'ERR_NO_FILES_MATCHED';
+  | 'ERR_NO_FILES_MATCHED'
+  | 'ERR_SECRETS_DETECTED'
+  | 'ERR_SYMLINK_OUTSIDE_ROOT';
 
 export const ERROR_CODES: Readonly<Record<string, ErrorCode>>;
 

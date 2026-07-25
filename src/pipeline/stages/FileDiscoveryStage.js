@@ -27,9 +27,14 @@ import { toPosix } from '../../utils/pathUtils.js';
 import { collectGitIgnoreSources } from '../../utils/gitignoreSources.js';
 import { ExclusionReport, EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 import { resolveScope } from '../../utils/scopeResolver.js';
+import { HARD_EXCLUDED_DIRECTORIES, isHardExcluded } from '../../utils/hardExclusions.js';
 
-/** Directories that are never worth traversing, whatever the config says. */
-const DANGEROUS_DIRECTORIES = ['.git', 'node_modules'];
+/**
+ * Directories excluded by default because including them buries the signal,
+ * not because they are dangerous to read. A `--scope` entry pointed inside one
+ * can opt back in via `scopeIgnoresConfigExcludes`.
+ */
+const BULK_DIRECTORIES = ['node_modules'];
 
 /** Test files and directories excluded by `--no-tests`. */
 const TEST_EXCLUSIONS = [
@@ -79,6 +84,7 @@ class FileDiscoveryStage extends Stage {
         ? [options.scope]
         : [];
     this.scopeIgnoresIgnoreFiles = options.scopeIgnoresIgnoreFiles === true;
+    this.scopeIgnoresConfigExcludes = options.scopeIgnoresConfigExcludes === true;
 
     // Budgets applied from stat(), before any file is opened
     this.maxFileSize = normalizeLimit(options.maxFileSize);
@@ -168,6 +174,7 @@ class FileDiscoveryStage extends Stage {
     if (scopePaths) {
       walkOptions.scope = scopePaths;
       walkOptions.scopeIgnoresIgnoreFiles = this.scopeIgnoresIgnoreFiles;
+      walkOptions.scopeIgnoresConfigExcludes = this.scopeIgnoresConfigExcludes;
     }
 
     // Add parallel-specific options if enabled
@@ -342,7 +349,7 @@ class FileDiscoveryStage extends Stage {
       ...basePathExcluded.map((dir) => `/${dir}/**`),
     ];
 
-    for (const dir of DANGEROUS_DIRECTORIES) {
+    for (const dir of BULK_DIRECTORIES) {
       configRules.push(dir, `${dir}/**`);
     }
 
@@ -352,6 +359,24 @@ class FileDiscoveryStage extends Stage {
       kind: 'config-exclude',
       source: 'config:copytree.globalExcluded*',
       rules: dedupe(configRules),
+    });
+
+    // Git metadata is its own layer because it is the one exclusion no option
+    // lifts. `--scope` with `scopeIgnoresConfigExcludes` is a deliberate "yes,
+    // I mean node_modules" gesture; there is no corresponding reason to want
+    // the contents of `.git`, and packed objects and refs are the last thing
+    // that should reach a model.
+    const hardRules = [];
+    for (const dir of HARD_EXCLUDED_DIRECTORIES) {
+      hardRules.push(dir, `${dir}/**`);
+    }
+
+    layers.push({
+      base: this.basePath,
+      ig: ignore().add(hardRules),
+      kind: 'hard-exclude',
+      source: 'builtin:always-excluded',
+      rules: hardRules,
     });
 
     // 2. --no-tests
@@ -481,6 +506,19 @@ class FileDiscoveryStage extends Stage {
     for (const entry of entries) {
       const entryPath = toPosix(entry.path || entry);
       const size = entry.stats?.size || 0;
+
+      // `always` overrides ignore rules; it does not override the hard
+      // exclusions. Packed objects and refs are not source, and are never what
+      // a pattern like `.git/**` or a broad `**/config*` actually meant.
+      if (isHardExcluded(entryPath)) {
+        report?.add({
+          path: entryPath,
+          size,
+          reason: EXCLUSION_REASONS.CONFIG_EXCLUDE,
+          rule: 'builtin:always-excluded',
+        });
+        continue;
+      }
 
       // A scoped run must not drag in force-included files from outside the
       // selection: the caller asked for a subtree.

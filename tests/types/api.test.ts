@@ -285,9 +285,13 @@ async function testCopyApi() {
 
   // Check optional stats
   if (result.stats.secretsGuard) {
-    const detected: number = result.stats.secretsGuard.detected;
+    const findings: number = result.stats.secretsGuard.findings;
     const redacted: number = result.stats.secretsGuard.redacted;
-    const report: object | undefined = result.stats.secretsGuard.report;
+    const excludedSecretFiles: number = result.stats.secretsGuard.excludedSecretFiles;
+    const planOnly: boolean = result.stats.secretsGuard.planOnly;
+    const scanner: 'gitleaks' | 'builtin' | 'none' = result.stats.secretsGuard.scanner;
+    // Findings never carry the matched credential, only its identity.
+    const fingerprint: string | null = result.stats.secretsGuard.report.findings[0]?.fingerprint;
   }
 
   if (result.stats.scanErrors) {

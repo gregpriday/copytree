@@ -31,6 +31,11 @@ class Stage {
     // recovery. See `handleError()` for stages that can degrade gracefully.
     this.fatal = options.fatal === true;
 
+    // Suppress terminal output, keeping the `stage:log` event. Set from the
+    // pipeline context in `onInit()`; also accepted directly for stages built
+    // outside a pipeline.
+    this.quiet = options.quiet === true;
+
     // Performance optimization: throttle file events
     this.fileEventCount = 0;
     this.lastFileEventTime = 0;
@@ -116,6 +121,11 @@ class Stage {
     if (context?.config && !this._config) {
       this._config = context.config;
     }
+    // A pipeline running behind the programmatic API writes nothing to the
+    // terminal; see `log()`.
+    if (context?.quiet === true) {
+      this.quiet = true;
+    }
     // Default implementation - subclasses can override for custom initialization
   }
 
@@ -167,6 +177,10 @@ class Stage {
    * format (text/json/silent), and destination (stderr/stdout) are all
    * respected uniformly across the pipeline.
    *
+   * Under `quiet` the `stage:log` event is still emitted and nothing is written
+   * to the terminal. A library has no business printing to its host's stdout,
+   * and an embedder that wants these messages has the event to subscribe to.
+   *
    * @param {string} message - Message to log
    * @param {string} level - Log level (info, warn, error, debug)
    */
@@ -180,6 +194,8 @@ class Stage {
         timestamp: Date.now(),
       });
     }
+
+    if (this.quiet) return;
 
     // Route all terminal output through the central logger so that
     // --log-level, --log-format, --no-color, and COPYTREE_LOG_LEVEL are obeyed.

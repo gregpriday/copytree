@@ -46,6 +46,8 @@ import { EXCLUSION_REASONS } from './exclusionReport.js';
  * @param {number} [options.highWaterMark] - Backpressure threshold (default: 2x concurrency)
  * @param {string[]} [options.scope] - Absolute paths to traverse instead of the whole root
  * @param {boolean} [options.scopeIgnoresIgnoreFiles=false] - Let scope entries override ignore rules
+ * @param {boolean} [options.scopeIgnoresConfigExcludes=false] - Let scope entries override the
+ *   config-level exclusions blocking them. `.git` is never overridable.
  * @param {Function} [options.onExclude] - Called for every excluded entry
  * @param {AbortSignal} [options.signal] - Abort signal for cancellation
  * @yields {{path: string, stats: fs.Stats, explanation?: Object}} File information
@@ -65,6 +67,7 @@ export async function* walkParallel(root, options = {}) {
     maxDepth = undefined,
     scope = null,
     scopeIgnoresIgnoreFiles = false,
+    scopeIgnoresConfigExcludes = false,
     onExclude = null,
   } = options;
 
@@ -437,6 +440,7 @@ export async function* walkParallel(root, options = {}) {
         false,
         initialLayers,
         scopeIgnoresIgnoreFiles,
+        scopeIgnoresConfigExcludes,
       );
 
       let entryStat;

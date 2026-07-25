@@ -46,18 +46,27 @@ class Pipeline extends EventEmitter {
 
     // Create pipeline context for stages
     // Note: config will be populated during initialization if not provided
+    // A quiet pipeline is quiet all the way through. Gating only `Stage.log()`
+    // left the pipeline's own recovery warnings writing to the host's terminal,
+    // which is the same problem one level up.
+    const silent = {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      success: () => {},
+      child: () => silent,
+    };
+
     this.context = {
-      logger: defaultLogger?.child?.('Pipeline') || {
-        debug: () => {},
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-        success: () => {},
-      },
+      logger: options.quiet === true ? silent : defaultLogger?.child?.('Pipeline') || { ...silent },
       options: this.options,
       stats: this.stats,
       config: this._configInstance, // May be null until _initializeStages runs
       pipeline: this, // Reference to pipeline for event emission
+      // Stages write nothing to the terminal when set. The programmatic API
+      // turns this on: an embedder's stdout belongs to the embedder.
+      quiet: this.options.quiet === true,
     };
   }
 
@@ -108,6 +117,15 @@ class Pipeline extends EventEmitter {
       } else {
         // It's a constructor, instantiate it with pipeline reference
         stageInstance = new Stage({ ...this.options, pipeline: this });
+      }
+
+      // Both entry points build their stages as instances and hand them over
+      // already constructed, so the constructor's `pipeline` option never
+      // reached them. `Stage.log()` guards on this reference, which meant
+      // `stage:log` was listed as part of the event contract and never fired
+      // for a single production run.
+      if (stageInstance && typeof stageInstance === 'object' && !stageInstance.pipeline) {
+        stageInstance.pipeline = this;
       }
 
       this.stageInstances.push(stageInstance);
