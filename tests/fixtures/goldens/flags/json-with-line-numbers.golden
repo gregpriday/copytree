@@ -1,6 +1,7 @@
 {
   "directory": "<PROJECT_ROOT>",
   "metadata": {
+    "format": "copytree-json@1",
     "generated": "<TIMESTAMP>",
     "fileCount": 3,
     "totalSize": 77,

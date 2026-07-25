@@ -60,8 +60,46 @@ describe('SecretsGuardStage', () => {
     const result = await stage.process(buildInput('password = supersecretvalue12345'));
 
     expect(result.findings.length).toBeGreaterThan(0);
-    expect(result.findings.some((f) => f.RuleID === 'GENERIC_TOKEN')).toBe(true);
+    expect(result.findings.some((f) => f.ruleId === 'GENERIC_TOKEN')).toBe(true);
     expect(result.files[0].content).toContain('***REDACTED***');
+  });
+
+  // Findings outlive the content they came from: they land in stats, in events,
+  // and on the thrown error. Anything carrying the matched bytes carries the
+  // secret to wherever the embedder logs those.
+  test('never exposes the matched secret on a finding', async () => {
+    mockGitleaks.isAvailable.mockResolvedValue(false);
+
+    const stage = new SecretsGuardStage({ enabled: true });
+    await stage.onInit();
+
+    const result = await stage.process(buildInput('password = supersecretvalue12345'));
+
+    expect(result.findings.length).toBeGreaterThan(0);
+    for (const finding of result.findings) {
+      expect(JSON.stringify(finding)).not.toContain('supersecretvalue12345');
+      expect(finding.Match).toBeUndefined();
+      expect(finding.fingerprint).toMatch(/^[0-9a-f]{16}$/);
+      expect(finding.matchLength).toBeGreaterThan(0);
+    }
+  });
+
+  test('keeps the secret out of the thrown error when failOnSecrets is set', async () => {
+    mockGitleaks.isAvailable.mockResolvedValue(false);
+
+    const stage = new SecretsGuardStage({ enabled: true, failOnSecrets: true });
+    await stage.onInit();
+
+    const error = await stage
+      .process(buildInput('password=supersecretvalue12345'))
+      .then(() => null)
+      .catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(SecretsDetectedError);
+    expect(error.code).toBe('ERR_SECRETS_DETECTED');
+    expect(error.secretsCount).toBeGreaterThan(0);
+    expect(JSON.stringify(error.details)).not.toContain('supersecretvalue12345');
+    expect(error.message).not.toContain('supersecretvalue12345');
   });
 
   test('falls back to basic scan when gitleaks call errors', async () => {
@@ -103,35 +141,75 @@ describe('SecretsGuardStage', () => {
     );
   });
 
-  test('skips scanning files beyond maxFileBytes', async () => {
-    mockGitleaks.isAvailable.mockResolvedValue(false);
+  // A file too large to scan used to pass through unscanned while the run still
+  // reported that secrets protection was on. Excluding it is the only default
+  // that does not overstate the protection.
+  describe('files too large to scan', () => {
+    test('excludes them by default rather than emitting them unscanned', async () => {
+      mockGitleaks.isAvailable.mockResolvedValue(false);
 
-    const stage = new SecretsGuardStage({ enabled: true, maxFileBytes: 10 });
-    await stage.onInit();
+      const stage = new SecretsGuardStage({ enabled: true, maxFileBytes: 10 });
+      await stage.onInit();
 
-    const input = buildInput('password=supersecretvalue12345');
-    const result = await stage.process(input);
+      const result = await stage.process(buildInput('password=supersecretvalue12345'));
 
-    expect(result.findings).toEqual([]);
-    expect(result.files[0].content).toBe('password=supersecretvalue12345');
+      expect(result.files).toHaveLength(0);
+      expect(result.stats.secretsGuard.excludedUnscannable).toBe(1);
+    });
+
+    test('scans them anyway under oversizePolicy: scan', async () => {
+      mockGitleaks.isAvailable.mockResolvedValue(false);
+
+      const stage = new SecretsGuardStage({
+        enabled: true,
+        maxFileBytes: 10,
+        oversizePolicy: 'scan',
+      });
+      await stage.onInit();
+
+      const result = await stage.process(buildInput('password=supersecretvalue12345'));
+
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0].content).toContain('***REDACTED');
+    });
+
+    test('fails the run under oversizePolicy: fail', async () => {
+      mockGitleaks.isAvailable.mockResolvedValue(false);
+
+      const stage = new SecretsGuardStage({
+        enabled: true,
+        maxFileBytes: 10,
+        oversizePolicy: 'fail',
+      });
+      await stage.onInit();
+
+      await expect(stage.process(buildInput('anything at all here'))).rejects.toBeInstanceOf(
+        SecretsDetectedError,
+      );
+    });
   });
 
-  test('excludes secret-prone files entirely', async () => {
+  test('drops secret-prone files and records why', async () => {
     const stage = new SecretsGuardStage({ enabled: true });
     await stage.onInit();
 
+    const recorded = [];
     const input = {
       files: [
         { path: '.env', relativePath: '.env', content: 'SECRET=123', size: 10 },
         { path: 'normal.txt', relativePath: 'normal.txt', content: 'hello', size: 5 },
       ],
+      exclusionReport: { add: (detail) => recorded.push(detail) },
       stats: {},
     };
 
     const result = await stage.process(input);
 
-    expect(result.files[0]).toBeNull();
-    expect(result.files[1].content).toBe('hello');
+    // Dropped, not left as a null tombstone for every later stage to skip past.
+    expect(result.files).toHaveLength(1);
+    expect(result.files[0].content).toBe('hello');
+    expect(recorded).toEqual([expect.objectContaining({ path: '.env', reason: 'secretFile' })]);
+    expect(result.stats.secretsGuard.excludedSecretFiles).toBe(1);
   });
 
   describe('case-insensitive exclusion on Windows', () => {
@@ -162,9 +240,7 @@ describe('SecretsGuardStage', () => {
 
       const result = await stage.process(input);
 
-      expect(result.files[0]).toBeNull();
-      expect(result.files[1]).toBeNull();
-      expect(result.files[2].content).toBe('hello');
+      expect(result.files.map((file) => file.path)).toEqual(['normal.txt']);
     });
 
     test('is case-sensitive on non-Windows platforms', async () => {
@@ -183,12 +259,11 @@ describe('SecretsGuardStage', () => {
 
       const result = await stage.process(input);
 
-      // .ENV should NOT be excluded on Linux (case-sensitive) — content must pass through unchanged
-      expect(result.files[0]).not.toBeNull();
+      // .ENV should NOT be excluded on Linux (case-sensitive) — content must pass
+      // through unchanged. .env should be the only one dropped.
+      expect(result.files.map((file) => file.path)).toEqual(['.ENV']);
       expect(result.files[0].content).toBe('SECRET=123');
       expect(result.findings).toHaveLength(0);
-      // .env should be excluded
-      expect(result.files[1]).toBeNull();
     });
   });
 });

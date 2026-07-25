@@ -182,18 +182,55 @@ export async function* walkParallel(root, options = {}) {
     return dataWaitPromise;
   }
 
-  /**
-   * Check if we should follow a symlink (and detect cycles)
-   * @param {fs.Stats} stat - File stats
-   * @param {string} absPath - Absolute path
-   * @returns {boolean} Whether to follow this symlink
-   */
-  function shouldFollowSymlink(stat, absPath) {
-    if (!followSymlinks) return false;
+  // Resolved once; every containment check needs it and it cannot change
+  // mid-walk.
+  let realRootPromise = null;
+  function realRoot() {
+    if (realRootPromise === null) {
+      realRootPromise = fs.realpath(root).catch(() => null);
+    }
+    return realRootPromise;
+  }
 
-    const key = `${stat.dev}:${stat.ino}`;
+  /**
+   * Whether a followed symlink target is still inside the repository.
+   *
+   * Compared against the *real* root so that a repository itself reached
+   * through a symlink does not fail containment on every one of its own files.
+   *
+   * @param {string} absPath - Path the link points at
+   * @returns {Promise<string|null>} The real path when contained, null otherwise
+   */
+  async function containedRealPath(absPath) {
+    let real;
+    try {
+      real = await fs.realpath(absPath);
+    } catch {
+      return null;
+    }
+
+    const realRootValue = await realRoot();
+    if (realRootValue === null) return null;
+    if (real === realRootValue) return real;
+    if (real.startsWith(realRootValue + path.sep)) return real;
+    return null;
+  }
+
+  /**
+   * Whether this directory has already been entered.
+   *
+   * Only directories are tracked. Tracking files here meant that two symlinks
+   * to the same file silently dropped the second one, which is deduplication
+   * wearing cycle detection's clothes.
+   *
+   * @param {fs.Stats} stat - Stats for the directory
+   * @param {string} real - Canonical path
+   * @returns {boolean} True when this directory is new
+   */
+  function claimDirectory(stat, real) {
+    // Windows reports ino 0 on some filesystems, so fall back to the real path.
+    const key = stat && stat.ino ? `${stat.dev}:${stat.ino}` : real;
     if (visited.has(key)) {
-      // Cycle detected - skip
       return false;
     }
     visited.add(key);
@@ -222,6 +259,21 @@ export async function* walkParallel(root, options = {}) {
       if (!followSymlinks) {
         return; // Skip symlinks by default
       }
+
+      // A link is only followed if it lands back inside the repository.
+      // Otherwise a link committed to a repository could pull in any file the
+      // running user can read.
+      const realPath = await containedRealPath(absPath);
+      if (realPath === null) {
+        reportExclusion(
+          absPath,
+          { reason: EXCLUSION_REASONS.SYMLINK_ESCAPE, rule: 'followSymlinks' },
+          0,
+          false,
+        );
+        return;
+      }
+
       try {
         stat = await withFsRetry(() => fs.stat(absPath), {
           ...retryConfig,
@@ -229,12 +281,14 @@ export async function* walkParallel(root, options = {}) {
         });
         recordSuccessAfterRetry(absPath);
 
-        // Check for cycles
-        if (!shouldFollowSymlink(stat, absPath)) {
-          return; // Cycle detected or already visited
-        }
-
         isDir = stat.isDirectory();
+
+        // Cycle detection applies to directories only: a link to an ancestor
+        // or a two-directory loop would otherwise recurse forever.
+        if (isDir && !claimDirectory(stat, realPath)) {
+          stats.directoriesPruned++;
+          return;
+        }
       } catch (error) {
         // Record failure and skip broken symlink
         if (isRetryableFsError(error)) {

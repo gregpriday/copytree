@@ -94,6 +94,10 @@ const ERROR_CODES = Object.freeze({
    * raise and match on.
    */
   NO_FILES_MATCHED: 'ERR_NO_FILES_MATCHED',
+  /** Secrets were found and `secretsGuard.failOnSecrets` is enabled */
+  SECRETS_DETECTED: 'ERR_SECRETS_DETECTED',
+  /** A symlink resolved outside the real repository root */
+  SYMLINK_OUTSIDE_ROOT: 'ERR_SYMLINK_OUTSIDE_ROOT',
 });
 
 /**
@@ -211,14 +215,23 @@ class InstructionsError extends CopyTreeError {
 /**
  * Secrets detected error
  * Thrown when secrets are found and failOnSecrets is enabled
+ *
+ * Message-first, like every other error here, because that is how both call
+ * sites already used it. `findings` must already be safe (see
+ * `SecretRedactor.toSafeFinding`): this error is thrown to callers who will log
+ * it, so a raw match on it would be a secret written to their log.
  */
 class SecretsDetectedError extends CopyTreeError {
-  constructor(secretsCount, findings = [], details = {}) {
-    const message = `Secrets detected: ${secretsCount} secret(s) found`;
-    super(message, 'SECRETS_DETECTED', { secretsCount, findings, ...details });
+  constructor(message, findings = [], details = {}) {
+    const safeFindings = Array.isArray(findings) ? findings : [];
+    super(message, ERROR_CODES.SECRETS_DETECTED, {
+      secretsCount: safeFindings.length,
+      findings: safeFindings,
+      ...details,
+    });
     this.name = 'SecretsDetectedError';
-    this.secretsCount = secretsCount;
-    this.findings = findings;
+    this.secretsCount = safeFindings.length;
+    this.findings = safeFindings;
   }
 }
 

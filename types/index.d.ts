@@ -5,7 +5,7 @@
  * Full IntelliSense support for TypeScript consumers including Canopy.
  *
  * @module copytree
- * @version 0.14.0
+ * @version 0.14.2
  */
 
 // ============================================================================
@@ -775,13 +775,30 @@ export interface CopyStreamOptions extends ScanOptions, FormatOptions {
 
 /**
  * Stream copy operation that yields formatted output chunks incrementally.
- * This prevents UI freezing in applications when processing large codebases
- * by yielding output as it's generated instead of buffering everything in memory.
  *
- * IMPORTANT: Unlike copy(), this function streams output incrementally.
- * - Memory efficient: Only one file's content in memory at a time
- * - Non-blocking: Yields chunks as they're ready
- * - Concatenated output equals copy() output for same inputs
+ * This is **chunked output**, not end-to-end streaming. Selection and file
+ * loading complete before the first chunk is yielded; what streams is the
+ * formatted document, not the pipeline feeding it.
+ *
+ * What that does buy you:
+ * - The full output document is never assembled as one string, so a large
+ *   export does not need a contiguous allocation the size of the result.
+ * - Chunks reach a writable stream or a PTY as they are produced, so the host
+ *   process is not blocked assembling output before anything is written.
+ * - Chunks never split a UTF-16 surrogate pair, so each one is valid text.
+ * - Concatenated output equals `copy()` output for the same inputs.
+ *
+ * What it does **not** currently guarantee, despite the name:
+ * - Peak memory is not proportional to a small window. Every selected file's
+ *   content is resident before the first chunk is emitted.
+ * - Time to first chunk is not lower than `copy()` by much; the selection and
+ *   loading work is the same and happens first.
+ * - Breaking out of the loop early does not cancel upstream work that has
+ *   already completed. Use an `AbortSignal` to cancel a run.
+ *
+ * Choose it for output delivery and responsiveness. If you need bounded memory
+ * over a repository larger than you can hold, that is not yet available from
+ * either entry point.
  *
  * @param basePath - Path to directory to copy
  * @param options - Combined options

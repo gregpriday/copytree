@@ -11,6 +11,7 @@ import {
   escapeYamlScalar,
 } from '../../utils/markdown.js';
 import { hashFile, hashContent } from '../../utils/fileHash.js';
+import { escapeXmlAttribute, escapeXmlText } from '../../utils/helpers.js';
 
 /**
  * Streaming output stage for handling large outputs
@@ -252,7 +253,7 @@ class StreamingOutputStage extends Stage {
 
     // Write XML header and metadata
     const header = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    const rootStart = `<ct:directory xmlns:ct="urn:copytree" path="${input.basePath}">\n`;
+    const rootStart = `<ct:directory xmlns:ct="urn:copytree" path="${escapeXmlAttribute(input.basePath)}">\n`;
 
     stream.write(header);
     stream.write(rootStart);
@@ -264,13 +265,15 @@ class StreamingOutputStage extends Stage {
     stream.write(`    <ct:totalSize>${this.calculateTotalSize(input.files)}</ct:totalSize>\n`);
 
     if (input.profile) {
-      stream.write(`    <ct:profile>${input.profile.name || 'default'}</ct:profile>\n`);
+      stream.write(
+        `    <ct:profile>${escapeXmlText(input.profile.name || 'default')}</ct:profile>\n`,
+      );
     }
 
     if (input.gitMetadata) {
       stream.write('    <ct:git>\n');
       if (input.gitMetadata.branch) {
-        stream.write(`      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`);
+        stream.write(`      <ct:branch>${escapeXmlText(input.gitMetadata.branch)}</ct:branch>\n`);
       }
       if (input.gitMetadata.lastCommit) {
         const msg = (input.gitMetadata.lastCommit.message || '')
@@ -278,7 +281,7 @@ class StreamingOutputStage extends Stage {
           .split(']]>')
           .join(']]]]><![CDATA[>');
         stream.write(
-          `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}"><![CDATA[${msg}]]></ct:lastCommit>\n`,
+          `      <ct:lastCommit hash="${escapeXmlAttribute(input.gitMetadata.lastCommit.hash)}"><![CDATA[${msg}]]></ct:lastCommit>\n`,
         );
       }
       stream.write('    </ct:git>\n');
@@ -294,7 +297,7 @@ class StreamingOutputStage extends Stage {
         return;
       }
 
-      let xml = `    <ct:file path="@${file.path}" size="${file.size}"`;
+      let xml = `    <ct:file path="@${escapeXmlAttribute(file.path)}" size="${escapeXmlAttribute(file.size)}"`;
 
       if (file.modified) {
         const modifiedDate =
@@ -305,12 +308,12 @@ class StreamingOutputStage extends Stage {
       if (file.isBinary) {
         xml += ' binary="true"';
         if (file.encoding) {
-          xml += ` encoding="${file.encoding}"`;
+          xml += ` encoding="${escapeXmlAttribute(file.encoding)}"`;
         }
       }
 
       if (file.gitStatus) {
-        xml += ` gitStatus="${file.gitStatus}"`;
+        xml += ` gitStatus="${escapeXmlAttribute(file.gitStatus)}"`;
       }
 
       xml += '>';

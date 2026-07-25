@@ -389,6 +389,48 @@ function sanitizeForXml(content) {
 }
 
 /**
+ * Escape a value for use inside an XML attribute.
+ *
+ * CDATA protects element content but does nothing for attributes, and every
+ * attribute CopyTree emits is built from data it does not control: file paths,
+ * git branch names, encodings, profile names. A single `&` or `"` in any of
+ * them produces a document no strict parser will accept, which for an embedding
+ * consumer is a hard parse failure rather than a cosmetic flaw.
+ *
+ * @param {*} value - Raw attribute value
+ * @returns {string} Escaped, control-character-free attribute text
+ */
+function escapeXmlAttribute(value) {
+  if (value === null || value === undefined) return '';
+
+  return sanitizeForXml(String(value))
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+/**
+ * Escape a value for use as an XML text node.
+ *
+ * `>` is escaped as well as `<` and `&`. It is only strictly required inside
+ * `]]>`, but escaping it unconditionally costs nothing and removes a case worth
+ * reasoning about.
+ *
+ * @param {*} value - Raw text value
+ * @returns {string} Escaped, control-character-free text
+ */
+function escapeXmlText(value) {
+  if (value === null || value === undefined) return '';
+
+  return sanitizeForXml(String(value))
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
+/**
  * Get current timestamp in ISO format
  */
 function timestamp() {
@@ -418,5 +460,7 @@ export {
   createCache,
   escapeXml,
   sanitizeForXml,
+  escapeXmlAttribute,
+  escapeXmlText,
   timestamp,
 };

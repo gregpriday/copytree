@@ -186,6 +186,50 @@ class SecretRedactor {
   }
 
   /**
+   * Strip the matched secret out of a finding, leaving only metadata.
+   *
+   * Findings travel further than the file content does: into `stats`, into
+   * thrown errors, into events an embedder may log or ship to a crash reporter.
+   * A finding that carries `Match` carries the secret to all of those places,
+   * which defeats the point of redacting the file.
+   *
+   * The fingerprint is a truncated SHA-256 of the matched bytes. It is stable
+   * enough to correlate the same secret across runs and not reversible for
+   * anything with real entropy.
+   *
+   * @param {GitleaksFinding|SecretFinding} finding - Finding in any format
+   * @returns {Object} Safe finding, free of raw secret material
+   */
+  static toSafeFinding(finding) {
+    const normalized = this._normalizeFinding(finding);
+    const match = typeof normalized.Match === 'string' ? normalized.Match : '';
+
+    return {
+      file: normalized.File ?? null,
+      ruleId: normalized.RuleID || 'UNKNOWN',
+      startLine: normalized.StartLine ?? null,
+      endLine: normalized.EndLine ?? normalized.StartLine ?? null,
+      startColumn: normalized.StartColumn ?? null,
+      endColumn: normalized.EndColumn ?? null,
+      matchLength: match.length,
+      preview: this.getMarker(normalized, 'typed'),
+      fingerprint: match
+        ? crypto.createHash('sha256').update(match).digest('hex').slice(0, 16)
+        : null,
+    };
+  }
+
+  /**
+   * Map a list of findings through {@link SecretRedactor.toSafeFinding}.
+   * @param {Array} findings - Findings in any supported format
+   * @returns {Object[]} Safe findings
+   */
+  static toSafeFindings(findings) {
+    if (!Array.isArray(findings)) return [];
+    return findings.map((finding) => this.toSafeFinding(finding));
+  }
+
+  /**
    * Apply redactions to a batch of files
    *
    * @param {Array<{content: string, findings: Array}>} files - Files with findings

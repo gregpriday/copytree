@@ -16,7 +16,7 @@ CopyTree is currently in **pre-release** (0.x versions). Security updates are pr
 
 ## Node.js Version Support
 
-CopyTree requires **Node.js 20.0.0 or higher**. We only support security issues on supported Node.js LTS versions.
+CopyTree requires **Node.js 22.12.0 or higher**, as declared by `engines` in `package.json`. We only support security issues on supported Node.js LTS versions.
 
 ## Reporting a Vulnerability
 
@@ -58,9 +58,28 @@ CopyTree can fetch files from external sources (GitHub repositories). Be aware:
 CopyTree reads files from your local system:
 
 - Respects `.gitignore` and `.copytreeignore` patterns
-- Follows symbolic links by default (can be disabled)
+- **Does not follow symbolic links by default.** Enable with `followSymlinks: true`
 - Binary files are handled according to configuration
 - No files are modified or deleted by CopyTree
+
+#### Symbolic links
+
+Symlinks are skipped unless you opt in, because a link is untrusted input: it is
+committed to a repository by whoever wrote the repository, and it can point
+anywhere the running user can read. A single `ln -s ~/.ssh keys` would otherwise
+place a private key into an AI context.
+
+When `followSymlinks` is enabled, traversal is still contained:
+
+- Every followed link is resolved with `realpath` and must land inside the real
+  repository root. A link pointing outside is skipped and recorded in the
+  exclusion report under `symlinkEscape`.
+- The root is compared after resolution, so a repository you reached *through*
+  a symlink still works normally.
+- Directories reached through a link are tracked by device and inode (falling
+  back to canonical path where inode is unavailable), so self-references,
+  parent links, and multi-directory cycles terminate instead of recursing.
+- Broken links are skipped rather than failing the run.
 
 ### Configuration Files
 
@@ -68,7 +87,21 @@ User configuration files are stored in:
 - `~/.copytree/` (global)
 - `.copytree/` (project-specific)
 
-These files are executed as JavaScript/JSON. Only use configuration files from trusted sources.
+**A `.js` file in these directories is executed in the host process.** For an
+application embedding CopyTree, that means arbitrary code from outside the
+application's control running with its privileges. Embedders should construct a
+hermetic configuration that never reads them:
+
+```js
+const config = await ConfigManager.create({
+  userConfig: false,  // skip ~/.copytree entirely
+  strict: true,       // fail loudly rather than continuing with a partial config
+});
+```
+
+`strict` matters here: without it, a configuration source that fails to load
+leaves the instance quietly empty, which means no exclusion lists at all. That
+looks like a successful run and is not.
 
 ## Security Best Practices
 
@@ -84,6 +117,12 @@ When using CopyTree:
 
 - CopyTree shells out to `git` for repository operations
 - External sources require network access
+- Secret scanning runs on file content after transformation. Files larger than
+  `secretsGuard.maxFileBytes` are excluded rather than emitted unscanned; set
+  `secretsGuard.oversizePolicy` to `scan` or `fail` to choose differently
+- Secret detection is best-effort. Gitleaks is used when available, with a
+  smaller built-in pattern set otherwise. Neither finds every credential, so
+  review output before sharing it
 
 ## Updates
 

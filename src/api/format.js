@@ -16,6 +16,9 @@ import { config } from '../config/ConfigManager.js';
  * @property {string} [instructions] - Instructions to include in output
  * @property {boolean} [showSize=false] - Show file sizes in tree
  * @property {boolean} [prettyPrint=true] - Pretty print JSON output
+ * @property {ConfigManager} [config] - ConfigManager instance for isolated configuration.
+ *   Pass the same instance used for selection so that one operation cannot format its files
+ *   under another operation's settings. Defaults to the process-wide configuration.
  */
 
 /**
@@ -51,6 +54,28 @@ export async function format(files, options = {}) {
   if (!files) {
     throw new ValidationError('files parameter is required', 'format', files);
   }
+
+  // The operation's configuration, not the process-wide singleton.
+  //
+  // Selecting files with one ConfigManager and formatting them with another is
+  // how two concurrent operations end up borrowing each other's binary policy
+  // or line-number format. Callers that pass no config keep the old global
+  // behaviour.
+  const activeConfig = options.config || config();
+
+  /**
+   * Bind the shared formatter helpers to this operation's configuration.
+   * @returns {Object} The `stage` shim every formatter expects
+   */
+  const formatterStage = () => ({
+    config: activeConfig,
+    calculateTotalSize,
+    generateDirectoryStructure,
+    addLineNumbersToContent: (content) => addLineNumbersToContent(content, activeConfig),
+    buildTreeStructure,
+    renderTree,
+    formatBytes,
+  });
 
   // Normalize format option
   const rawFormat = (options.format || 'xml').toString().toLowerCase();
@@ -121,15 +146,7 @@ export async function format(files, options = {}) {
   switch (formatType) {
     case 'xml': {
       const formatter = new XMLFormatter({
-        stage: {
-          config: config(),
-          calculateTotalSize,
-          generateDirectoryStructure,
-          addLineNumbersToContent,
-          buildTreeStructure,
-          renderTree,
-          formatBytes,
-        },
+        stage: formatterStage(),
         addLineNumbers: options.addLineNumbers ?? false,
         onlyTree: options.onlyTree ?? false,
       });
@@ -138,7 +155,7 @@ export async function format(files, options = {}) {
     }
 
     case 'json':
-      output = formatAsJSON(input, options);
+      output = formatAsJSON(input, options, activeConfig);
       break;
 
     case 'tree':
@@ -147,15 +164,7 @@ export async function format(files, options = {}) {
 
     case 'markdown': {
       const formatter = new MarkdownFormatter({
-        stage: {
-          config: config(),
-          calculateTotalSize,
-          generateDirectoryStructure,
-          addLineNumbersToContent,
-          buildTreeStructure,
-          renderTree,
-          formatBytes,
-        },
+        stage: formatterStage(),
         addLineNumbers: options.addLineNumbers ?? false,
         onlyTree: options.onlyTree ?? false,
       });
@@ -165,15 +174,7 @@ export async function format(files, options = {}) {
 
     case 'ndjson': {
       const formatter = new NDJSONFormatter({
-        stage: {
-          config: config(),
-          calculateTotalSize,
-          generateDirectoryStructure,
-          addLineNumbersToContent,
-          buildTreeStructure,
-          renderTree,
-          formatBytes,
-        },
+        stage: formatterStage(),
         addLineNumbers: options.addLineNumbers ?? false,
         onlyTree: options.onlyTree ?? false,
       });
@@ -183,15 +184,7 @@ export async function format(files, options = {}) {
 
     case 'sarif': {
       const formatter = new SARIFFormatter({
-        stage: {
-          config: config(),
-          calculateTotalSize,
-          generateDirectoryStructure,
-          addLineNumbersToContent,
-          buildTreeStructure,
-          renderTree,
-          formatBytes,
-        },
+        stage: formatterStage(),
         addLineNumbers: options.addLineNumbers ?? false,
         onlyTree: options.onlyTree ?? false,
       });
@@ -210,7 +203,7 @@ export async function format(files, options = {}) {
  * Format files as JSON
  * @private
  */
-function formatAsJSON(input, options) {
+function formatAsJSON(input, options, activeConfig = config()) {
   const output = {
     directory: input.basePath,
     metadata: {
@@ -243,7 +236,7 @@ function formatAsJSON(input, options) {
       if (!options.onlyTree && file.content !== undefined) {
         fileObj.content =
           options.addLineNumbers && !file.isBinary
-            ? addLineNumbersToContent(file.content)
+            ? addLineNumbersToContent(file.content, activeConfig)
             : file.content;
       }
 
@@ -251,7 +244,7 @@ function formatAsJSON(input, options) {
     }),
   };
 
-  const prettyPrint = options.prettyPrint ?? config().get('app.prettyPrint', true);
+  const prettyPrint = options.prettyPrint ?? activeConfig.get('app.prettyPrint', true);
   return JSON.stringify(output, null, prettyPrint ? 2 : 0);
 }
 
@@ -303,11 +296,11 @@ function generateDirectoryStructure(files) {
  * Add line numbers to content
  * @private
  */
-function addLineNumbersToContent(content) {
+function addLineNumbersToContent(content, activeConfig = config()) {
   if (!content) return content;
 
   const lines = content.split('\n');
-  const format = config().get('copytree.lineNumberFormat', '%4d: ');
+  const format = activeConfig.get('copytree.lineNumberFormat', '%4d: ');
 
   return lines
     .map((line, index) => {

@@ -54,6 +54,12 @@ export const EXCLUSION_REASONS = Object.freeze({
   DUPLICATE: 'duplicate',
   /** Could not be read (permissions, broken symlink, I/O error) */
   UNREADABLE: 'unreadable',
+  /** Matched a secret-prone filename pattern (`.env`, `*.pem`, ...) */
+  SECRET_FILE: 'secretFile',
+  /** Too large for the secret scanner to inspect, so not emitted unscanned */
+  SECRET_UNSCANNABLE: 'secretUnscannable',
+  /** A symlink resolved outside the real repository root, or could not be resolved */
+  SYMLINK_ESCAPE: 'symlinkEscape',
 });
 
 const ALL_REASONS = Object.values(EXCLUSION_REASONS);

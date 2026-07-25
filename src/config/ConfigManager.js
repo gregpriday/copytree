@@ -73,6 +73,10 @@ class ConfigManager {
     // looks like success and is not.
     this.strict = options.strict === true;
 
+    // Where non-fatal load warnings go. Defaults to stderr; an embedder passes
+    // its own sink so a desktop app is not writing to the host console.
+    this.onWarning = typeof options.onWarning === 'function' ? options.onWarning : null;
+
     // Load status, so callers can distinguish "loaded" from "loaded nothing".
     this.defaultsLoaded = false;
     this.userConfigLoaded = false;
@@ -189,13 +193,41 @@ class ConfigManager {
       );
     }
 
-    console.error(`Failed to load config ${scope}:`, error.message);
+    this._warn(`Failed to load config ${scope}: ${error.message}`);
+  }
+
+  /**
+   * Emit a non-fatal configuration warning.
+   *
+   * Routed through an injectable sink rather than the shared logger: `logger.js`
+   * imports this module, so reaching back for it here would close an import
+   * cycle. An embedder that wants these in its own log passes `onWarning`.
+   *
+   * @param {string} message - Warning text
+   * @private
+   */
+  _warn(message) {
+    if (this.onWarning) {
+      try {
+        this.onWarning(message);
+        return;
+      } catch {
+        // A broken warning sink must not take the configuration load down with it.
+      }
+    }
+    console.error(message);
   }
 
   async loadDefaults() {
     let configFiles;
     try {
-      configFiles = fs.readdirSync(this.configPath).filter((file) => file.endsWith('.js'));
+      // Sorted, because readdir order is filesystem-dependent and later files
+      // merge over earlier ones. Unsorted, two machines could resolve the same
+      // key differently.
+      configFiles = fs
+        .readdirSync(this.configPath)
+        .filter((file) => file.endsWith('.js'))
+        .sort();
     } catch (error) {
       this._recordLoadError('defaults', error);
       return;
@@ -230,11 +262,13 @@ class ConfigManager {
     if (!fs.existsSync(this.userConfigPath)) {
       return;
     }
-    this.userConfigLoaded = true;
 
     const userConfigFiles = fs
       .readdirSync(this.userConfigPath)
-      .filter((file) => file.endsWith('.js') || file.endsWith('.json'));
+      .filter((file) => file.endsWith('.js') || file.endsWith('.json'))
+      .sort();
+
+    let loaded = 0;
 
     for (const file of userConfigFiles) {
       const configName = path.basename(file).replace(/\.(js|json)$/, '');
@@ -256,10 +290,16 @@ class ConfigManager {
 
         // Deep merge with existing config
         this.config[configName] = _.merge({}, this.config[configName] || {}, userConfigData);
+        loaded++;
       } catch (error) {
         this._recordLoadError(`user:${configName}`, error);
       }
     }
+
+    // Set only once something actually loaded. The directory existing says
+    // nothing: an empty ~/.copytree, or one whose every file failed to parse,
+    // contributed no user configuration and should not report that it did.
+    this.userConfigLoaded = loaded > 0;
   }
 
   /**
@@ -450,10 +490,33 @@ class ConfigManager {
   }
 
   /**
-   * Reload configuration
+   * Reload configuration from disk.
+   *
+   * Every piece of state that `loadConfiguration()` guards on or accumulates into
+   * has to be reset here. Clearing `config` alone left `_initialized` true, so
+   * `loadConfiguration()` returned immediately and the instance was emptied
+   * rather than reloaded.
+   *
+   * @returns {Promise<void>} Resolves once the configuration has been re-read
    */
   async reload() {
     this.config = {};
+    this.configSources = {};
+    this.defaultConfig = {};
+    this.userConfig = {};
+    this.envOverrides = {};
+
+    this.defaultsLoaded = false;
+    this.userConfigLoaded = false;
+    this.loadErrors = [];
+
+    this.schema = null;
+    this.validate = null;
+
+    this._initialized = false;
+    this._initializing = false;
+    this._initPromise = null;
+
     await this.loadConfiguration();
   }
 

@@ -9,14 +9,39 @@ import path from 'path';
  * times. Hoisting it to one reusable `Intl.Collator` produces byte-identical
  * ordering for far less work: sorting 50,000 paths went from roughly 1.2 s to
  * under 60 ms.
+ *
+ * The locale is pinned rather than left to the host. Sort order decides which
+ * files survive a budget, so a run under `LANG=tr_TR` selecting a different set
+ * than the same run under `LANG=en_US` is a reproducibility bug, not a
+ * cosmetic one.
  */
-const PATH_COLLATOR = new Intl.Collator(undefined, {
+const SORT_LOCALE = 'en';
+
+const PATH_COLLATOR = new Intl.Collator(SORT_LOCALE, {
   numeric: true,
   sensitivity: 'base',
 });
 
 /** Collator matching bare `localeCompare(other)` for extension ordering. */
-const PLAIN_COLLATOR = new Intl.Collator();
+const PLAIN_COLLATOR = new Intl.Collator(SORT_LOCALE);
+
+/**
+ * Total, locale-independent ordering of two strings by UTF-16 code unit.
+ *
+ * Used only to break ties the collator reports as equal. `sensitivity: 'base'`
+ * calls `README.md` and `readme.md` equal, and a tie leaves the winner to
+ * whatever order the array already had — which traces back to filesystem
+ * enumeration. That is exactly the nondeterminism a pinned locale was meant to
+ * remove.
+ *
+ * @param {string} a - First string
+ * @param {string} b - Second string
+ * @returns {number} Negative, zero, or positive
+ */
+function compareCodeUnits(a, b) {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
 
 /**
  * Read a file's comparable path.
@@ -122,18 +147,28 @@ class SortFilesStage extends Stage {
   }
 
   /**
-   * Compare by file path (alphabetical)
+   * Compare by file path (alphabetical).
+   *
+   * This is the terminal comparator every other sort key falls back to, so it
+   * has to be a total order: anything it leaves tied is resolved by array
+   * position, which is filesystem order.
    */
   compareByPath(a, b) {
-    return PATH_COLLATOR.compare(pathOf(a), pathOf(b));
+    const pathA = pathOf(a);
+    const pathB = pathOf(b);
+    const collated = PATH_COLLATOR.compare(pathA, pathB);
+    return collated !== 0 ? collated : compareCodeUnits(pathA, pathB);
   }
 
   /**
    * Compare by file size
    */
   compareBySize(a, b) {
-    const sizeA = a.stats?.size || 0;
-    const sizeB = b.stats?.size || 0;
+    // `size` is the documented field on a file result; `stats` is the raw
+    // fs.Stats that only survives while a file is still inside the pipeline.
+    // Reading only the latter sorted every SDK-shaped file as size 0.
+    const sizeA = a.size ?? a.stats?.size ?? 0;
+    const sizeB = b.size ?? b.stats?.size ?? 0;
 
     if (sizeA === sizeB) {
       // Secondary sort by path if sizes are equal
@@ -147,8 +182,10 @@ class SortFilesStage extends Stage {
    * Compare by modification time
    */
   compareByModified(a, b) {
-    const timeA = a.stats?.mtime ? new Date(a.stats.mtime).getTime() : 0;
-    const timeB = b.stats?.mtime ? new Date(b.stats.mtime).getTime() : 0;
+    const rawA = a.modified ?? a.stats?.mtime;
+    const rawB = b.modified ?? b.stats?.mtime;
+    const timeA = rawA ? new Date(rawA).getTime() : 0;
+    const timeB = rawB ? new Date(rawB).getTime() : 0;
 
     if (timeA === timeB) {
       // Secondary sort by path if times are equal
@@ -162,7 +199,10 @@ class SortFilesStage extends Stage {
    * Compare by file name only (not full path)
    */
   compareByName(a, b) {
-    return PATH_COLLATOR.compare(path.basename(pathOf(a)), path.basename(pathOf(b)));
+    const nameCompare = PATH_COLLATOR.compare(path.basename(pathOf(a)), path.basename(pathOf(b)));
+    // Same basename in two directories is the common case here, not an edge
+    // case: without the fallback, every `index.js` in the tree ties.
+    return nameCompare !== 0 ? nameCompare : this.compareByPath(a, b);
   }
 
   /**

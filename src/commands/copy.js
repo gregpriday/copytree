@@ -539,8 +539,21 @@ async function setupPipelineStages(basePath, profile, options) {
       }),
     );
 
-    // 7. Secrets Guard Stage (automatic secret detection and redaction)
-    // Only add if explicitly enabled or not explicitly disabled
+    // 8. Transformer Stage
+    const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
+    const registry = await TransformerRegistry.createDefault();
+    stages.push(
+      new TransformStage({
+        registry,
+        transformers: profile.transformers || {},
+        noCache: options.noCache,
+      }),
+    );
+
+    // 9. Secrets Guard Stage — AFTER transformation, so what gets scanned is
+    //    what gets emitted. Scanning first left a gap: a transformer that
+    //    converts a document to text can surface a credential that was not
+    //    present in the bytes the scanner saw.
     const secretsGuardEnabled =
       options.secretsGuard !== false &&
       (options.secretsGuard === true || config().get('secretsGuard.enabled', true));
@@ -557,17 +570,6 @@ async function setupPipelineStages(basePath, profile, options) {
         }),
       );
     }
-
-    // 8. Transformer Stage
-    const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
-    const registry = await TransformerRegistry.createDefault();
-    stages.push(
-      new TransformStage({
-        registry,
-        transformers: profile.transformers || {},
-        noCache: options.noCache,
-      }),
-    );
   }
 
   // 9. Deduplicate Stage (if --dedupe) — after loading, because duplicates are
@@ -578,8 +580,9 @@ async function setupPipelineStages(basePath, profile, options) {
     stages.push(new DeduplicateFilesStage());
   }
 
-  // 10. Character Limit Stage (if --char-limit option is used)
-  if (options.charLimit) {
+  // 10. Character Limit Stage (if --char-limit option is used).
+  //     Nullish rather than truthy, so `--char-limit 0` is honoured as a budget.
+  if (options.charLimit != null) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(
       new CharLimitStage({

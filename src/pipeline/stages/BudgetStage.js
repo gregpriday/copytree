@@ -10,9 +10,19 @@ import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
  *
  * Precedence when several budgets bite at once: `maxFileCount` is applied first
  * (it is a hard cap on how many entries may appear), then `maxTotalSize` trims
- * from the tail of what survived. Truncation is always reported, never silent —
- * a silently truncated context is worse than an error, because the agent
- * confidently answers from a partial repository.
+ * what survived. Truncation is always reported, never silent — a silently
+ * truncated context is worse than an error, because the agent confidently
+ * answers from a partial repository.
+ *
+ * `maxTotalSize` uses a **greedy-fitting** policy, not a prefix cut: a file that
+ * does not fit is skipped and later, smaller files are still considered. Given
+ * sizes 6, 6, 1 under a 7-byte budget, the result is the first and third files,
+ * not just the first. The alternative (stop at the first file that does not fit)
+ * wastes budget whenever one large file sits in the middle of the sorted order.
+ *
+ * One exception: if the very first file alone exceeds the budget it is kept
+ * anyway, because returning nothing is a worse answer than overshooting. That
+ * case is reported as `stats.oversizedFirstFileRetained`.
  */
 class BudgetStage extends Stage {
   constructor(options = {}) {
@@ -120,8 +130,13 @@ class BudgetStage extends Stage {
         ...input.stats,
         budgetedSize: totalSize,
         // Set when the retained set is larger than maxTotalSize, which happens
-        // only when the very first file alone exceeds it.
-        ...(budgetExceeded ? { budgetExceeded: true, truncated: true } : {}),
+        // only when the very first file alone exceeds it. Named separately from
+        // `truncated` because they mean opposite things: one says files were
+        // dropped, the other says the budget was overshot to avoid returning
+        // nothing at all.
+        ...(budgetExceeded
+          ? { budgetExceeded: true, oversizedFirstFileRetained: true, truncated: true }
+          : {}),
         ...(truncatedCount > 0
           ? {
               truncated: true,

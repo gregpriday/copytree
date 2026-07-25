@@ -134,9 +134,82 @@ const loggerUnitProject = {
   setupFiles: ['<rootDir>/tests/setup-env.js'],
 };
 
+/**
+ * Coverage ratchet.
+ *
+ * These are set at the measured baseline, not at an aspirational number. The
+ * documentation claimed 80% was enforced while `coverageThreshold` was absent
+ * entirely, so nothing was enforced and the real figure was around 70%. A
+ * threshold nobody can meet gets deleted the first time it blocks a release;
+ * one set at today's number blocks the next regression instead.
+ *
+ * Ratchet these upward as coverage improves. Never lower one without saying why
+ * in the commit message.
+ *
+ * Per-file entries are stricter, and cover the modules where a gap is most
+ * expensive: configuration isolation, traversal containment, budget arithmetic,
+ * and anything that decides what leaves the process.
+ *
+ * Note that Jest removes any file matched by a path-specific key from the
+ * `global` pool, so the global numbers below are lower than the "All files"
+ * row in the report: they describe everything *except* the modules listed
+ * underneath.
+ */
+const coverageThreshold = {
+  global: {
+    statements: 67,
+    branches: 57,
+    functions: 65,
+    lines: 67,
+  },
+  './src/utils/scopeResolver.js': {
+    statements: 95,
+    branches: 95,
+    functions: 100,
+    lines: 95,
+  },
+  './src/pipeline/stages/BudgetStage.js': {
+    statements: 100,
+    branches: 90,
+    functions: 100,
+    lines: 100,
+  },
+  './src/pipeline/stages/FileLoadingStage.js': {
+    statements: 100,
+    branches: 93,
+    functions: 100,
+    lines: 100,
+  },
+  './src/pipeline/stages/SecretsGuardStage.js': {
+    statements: 94,
+    branches: 77,
+    functions: 100,
+    lines: 95,
+  },
+  './src/pipeline/stages/SortFilesStage.js': {
+    statements: 94,
+    branches: 89,
+    functions: 95,
+    lines: 93,
+  },
+  './src/utils/ignoreWalker.js': {
+    statements: 87,
+    branches: 79,
+    functions: 89,
+    lines: 90,
+  },
+  './src/utils/exclusionReport.js': {
+    statements: 89,
+    branches: 82,
+    functions: 90,
+    lines: 91,
+  },
+};
+
 export default {
   // Global-only Jest options (not valid inside per-project config in Jest 30)
   collectCoverage: false,
+  coverageThreshold,
   verbose: true,
   projects: [mockedProject, realProject, loggerUnitProject],
 };

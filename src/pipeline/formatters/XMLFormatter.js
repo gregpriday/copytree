@@ -1,4 +1,9 @@
-import { sanitizeForComment, sanitizeForXml } from '../../utils/helpers.js';
+import {
+  sanitizeForComment,
+  sanitizeForXml,
+  escapeXmlAttribute,
+  escapeXmlText,
+} from '../../utils/helpers.js';
 import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
 
 class XMLFormatter {
@@ -30,7 +35,9 @@ class XMLFormatter {
 
     // Manual XML construction to avoid any escaping
     chunks.push('<?xml version="1.0" encoding="UTF-8"?>\n');
-    chunks.push(`<ct:directory xmlns:ct="urn:copytree" path="${input.basePath}">\n`);
+    chunks.push(
+      `<ct:directory xmlns:ct="urn:copytree" path="${escapeXmlAttribute(input.basePath)}">\n`,
+    );
 
     // Add metadata
     chunks.push('  <ct:metadata>\n');
@@ -42,23 +49,27 @@ class XMLFormatter {
     chunks.push(`    <ct:totalSize>${totalSize}</ct:totalSize>\n`);
 
     if (input.profile) {
-      chunks.push(`    <ct:profile>${input.profile.name || 'default'}</ct:profile>\n`);
+      chunks.push(
+        `    <ct:profile>${escapeXmlText(input.profile.name || 'default')}</ct:profile>\n`,
+      );
     }
 
     // Add git metadata if present
     if (input.gitMetadata) {
       chunks.push('    <ct:git>\n');
       if (input.gitMetadata.branch) {
-        chunks.push(`      <ct:branch>${input.gitMetadata.branch}</ct:branch>\n`);
+        chunks.push(`      <ct:branch>${escapeXmlText(input.gitMetadata.branch)}</ct:branch>\n`);
       }
       if (input.gitMetadata.lastCommit) {
         const msg = this.escapeCdata(input.gitMetadata.lastCommit.message || '');
         chunks.push(
-          `      <ct:lastCommit hash="${input.gitMetadata.lastCommit.hash}"><![CDATA[${msg}]]></ct:lastCommit>\n`,
+          `      <ct:lastCommit hash="${escapeXmlAttribute(input.gitMetadata.lastCommit.hash)}"><![CDATA[${msg}]]></ct:lastCommit>\n`,
         );
       }
       if (input.gitMetadata.filterType) {
-        chunks.push(`      <ct:filterType>${input.gitMetadata.filterType}</ct:filterType>\n`);
+        chunks.push(
+          `      <ct:filterType>${escapeXmlText(input.gitMetadata.filterType)}</ct:filterType>\n`,
+        );
       }
       chunks.push(
         `      <ct:hasUncommittedChanges>${input.gitMetadata.hasUncommittedChanges ? 'true' : 'false'}</ct:hasUncommittedChanges>\n`,
@@ -69,12 +80,16 @@ class XMLFormatter {
     // Add directory structure to metadata
     const directoryStructure = this.stage.generateDirectoryStructure(input.files);
     if (directoryStructure) {
-      chunks.push(`    <ct:directoryStructure>${directoryStructure}</ct:directoryStructure>\n`);
+      chunks.push(
+        `    <ct:directoryStructure>${escapeXmlText(directoryStructure)}</ct:directoryStructure>\n`,
+      );
     }
 
     // Add instructions if present (loaded by InstructionsStage)
     if (input.instructions) {
-      const nameAttr = input.instructionsName ? ` name="${input.instructionsName}"` : '';
+      const nameAttr = input.instructionsName
+        ? ` name="${escapeXmlAttribute(input.instructionsName)}"`
+        : '';
       const instr = this.escapeCdata(input.instructions);
       chunks.push(`    <ct:instructions${nameAttr}><![CDATA[${instr}]]></ct:instructions>\n`);
     }
@@ -95,7 +110,7 @@ class XMLFormatter {
     for (const file of input.files) {
       if (file === null) continue; // Skip files that were filtered out
 
-      let fileHeader = `    <ct:file path="@${file.path}" size="${file.size}"`;
+      let fileHeader = `    <ct:file path="@${escapeXmlAttribute(file.path)}" size="${escapeXmlAttribute(file.size)}"`;
 
       if (file.modified) {
         const modifiedDate =
@@ -106,16 +121,16 @@ class XMLFormatter {
       if (file.isBinary) {
         fileHeader += ' binary="true"';
         if (file.encoding) {
-          fileHeader += ` encoding="${file.encoding}"`;
+          fileHeader += ` encoding="${escapeXmlAttribute(file.encoding)}"`;
         }
       }
 
       if (file.binaryCategory) {
-        fileHeader += ` binaryCategory="${file.binaryCategory}"`;
+        fileHeader += ` binaryCategory="${escapeXmlAttribute(file.binaryCategory)}"`;
       }
 
       if (file.gitStatus) {
-        fileHeader += ` gitStatus="${file.gitStatus}"`;
+        fileHeader += ` gitStatus="${escapeXmlAttribute(file.gitStatus)}"`;
       }
 
       fileHeader += '>';

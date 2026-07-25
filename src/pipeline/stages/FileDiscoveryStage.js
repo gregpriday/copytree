@@ -21,6 +21,7 @@ import micromatch from 'micromatch';
 import fastGlob from 'fast-glob';
 import ignore from 'ignore';
 import path from 'path';
+import { promises as fsp } from 'node:fs';
 import { getLimiterFor } from '../../utils/taskLimiter.js';
 import { toPosix } from '../../utils/pathUtils.js';
 import { collectGitIgnoreSources } from '../../utils/gitignoreSources.js';
@@ -62,6 +63,9 @@ const TEST_EXCLUSIONS = [
 class FileDiscoveryStage extends Stage {
   constructor(options = {}) {
     super(options);
+    // Nothing downstream can distinguish "discovery failed" from "the
+    // repository is empty", so a failure here has to stop the run.
+    this.fatal = true;
     this.basePath = options.basePath || process.cwd();
     this.patterns = options.patterns || ['**/*'];
     this.respectGitignore = options.respectGitignore !== false;
@@ -451,6 +455,8 @@ class FileDiscoveryStage extends Stage {
       100,
     );
 
+    const followSymlinks = this.options.followSymlinks === true;
+
     const entries = await fastGlob(this.forceInclude, {
       cwd: this.basePath,
       absolute: false,
@@ -459,6 +465,12 @@ class FileDiscoveryStage extends Stage {
       stats: true,
       ignore: [], // bypass all ignore patterns
       concurrency: globConcurrency,
+      // fast-glob follows symlinks by default, which made `always` the one path
+      // into the tree that ignored the traversal setting entirely: a force
+      // include would follow links even with `followSymlinks: false`, and even
+      // when following was on it skipped the root-containment check both
+      // walkers apply.
+      followSymbolicLinks: followSymlinks,
     });
 
     const scopePrefixes = scopePaths
@@ -489,9 +501,24 @@ class FileDiscoveryStage extends Stage {
         continue;
       }
 
+      const absolutePath = path.join(this.basePath, entryPath);
+
+      // A force include is still bounded by the repository. `always` overrides
+      // ignore rules and the size gate; it does not override the root boundary,
+      // which is a security limit rather than a convenience filter.
+      if (followSymlinks && !(await this.withinRealRoot(absolutePath))) {
+        report?.add({
+          path: entryPath,
+          size,
+          reason: EXCLUSION_REASONS.SYMLINK_ESCAPE,
+          rule: 'followSymlinks',
+        });
+        continue;
+      }
+
       forced.push({
         path: entryPath,
-        absolutePath: path.join(this.basePath, entryPath),
+        absolutePath,
         size,
         modified: entry.stats?.mtime || null,
         stats: entry.stats,
@@ -499,6 +526,31 @@ class FileDiscoveryStage extends Stage {
     }
 
     return forced;
+  }
+
+  /**
+   * Whether a path resolves inside the real base path.
+   *
+   * Compared after `realpath` on both sides so that a repository reached
+   * through a symlink does not fail containment on its own files.
+   *
+   * @param {string} absolutePath - Candidate path
+   * @returns {Promise<boolean>} True when contained
+   */
+  async withinRealRoot(absolutePath) {
+    if (this._realBasePath === undefined) {
+      this._realBasePath = await fsp.realpath(this.basePath).catch(() => null);
+    }
+    if (this._realBasePath === null) return false;
+
+    let real;
+    try {
+      real = await fsp.realpath(absolutePath);
+    } catch {
+      return false;
+    }
+
+    return real === this._realBasePath || real.startsWith(this._realBasePath + path.sep);
   }
 
   /**
@@ -510,7 +562,6 @@ class FileDiscoveryStage extends Stage {
    * @returns {Promise<{base: string, ig: any}|null>} Ignore layer or null
    */
   async loadGitignore() {
-    const { promises: fsp } = await import('node:fs');
     const gitignorePath = path.join(this.basePath, '.gitignore');
 
     try {
@@ -540,7 +591,6 @@ class FileDiscoveryStage extends Stage {
    * Load .copytreeinclude patterns for force-including files
    */
   async loadCopytreeInclude() {
-    const { promises: fsp } = await import('node:fs');
     const copytreeincludePath = path.join(this.basePath, '.copytreeinclude');
 
     let content;

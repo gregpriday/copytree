@@ -23,6 +23,9 @@ const SINGLE_READ_CEILING = 512 * 1024;
 class FileLoadingStage extends Stage {
   constructor(options = {}) {
     super(options);
+    // Skipping this stage yields a document with every file's content missing,
+    // which formats successfully and says nothing.
+    this.fatal = true;
     this.encoding = options.encoding || 'utf8';
     // Config may not be available yet in constructor, but the proxy returns defaults
     this.binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');

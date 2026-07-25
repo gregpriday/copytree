@@ -67,6 +67,11 @@ const SCAN_COLLATOR = new Intl.Collator();
  * @property {boolean} [includeContent=true] - Include file content in results
  * @property {boolean} [dedupe=false] - Remove duplicate files
  * @property {boolean} [explain=false] - Collect per-file exclusion detail
+ * @property {boolean} [secretsGuard] - Detect and redact credentials. Defaults to the
+ *   `secretsGuard.enabled` configuration value (on), and applies identically here and on the
+ *   CLI. Pass `false` to disable it explicitly.
+ * @property {'typed'|'generic'|'hash'} [secretsRedactMode] - How redacted spans are marked
+ * @property {boolean} [failOnSecrets] - Throw `ERR_SECRETS_DETECTED` instead of redacting
  * @property {string} [sort] - Sort order: 'path', 'size', 'modified', 'name', 'extension', 'depth'
  * @property {ConfigManager} [config] - ConfigManager instance for isolated configuration.
  *   If not provided, an isolated instance will be created. This enables concurrent
@@ -81,8 +86,17 @@ const SCAN_COLLATOR = new Intl.Collator();
 
 /**
  * Scan a directory and return an async iterable of FileResult objects.
- * Files are yielded as soon as they are discovered and processed, enabling
- * streaming processing with bounded memory usage.
+ *
+ * The async-iterable shape is for **consumption convenience**, not bounded
+ * memory. The pipeline runs to completion and the full selection is resident
+ * before the first file is yielded, because sorting and exact budget
+ * enforcement both need to see every candidate before any of them can be
+ * declared a survivor. Iterate it to process files one at a time without
+ * building your own array; do not rely on it to keep a repository larger than
+ * memory out of memory.
+ *
+ * `onSummary` is invoked once, before the first yield, so a consumer gets the
+ * counts and exclusion accounting without draining the iterator first.
  *
  * @param {string} basePath - Path to directory to scan
  * @param {ScanOptions} [options={}] - Scan options
@@ -348,6 +362,27 @@ export async function* scan(basePath, options = {}) {
         }),
       );
     }
+
+    // 9. Secrets Guard Stage — same policy, same position, as the CLI. An
+    //    embedder should not have to know which entry point it reached for to
+    //    know whether credentials were redacted.
+    const secretsGuardEnabled =
+      options.secretsGuard !== false &&
+      (options.secretsGuard === true || configInstance.get('secretsGuard.enabled', true));
+
+    if (secretsGuardEnabled) {
+      const { default: SecretsGuardStage } =
+        await import('../pipeline/stages/SecretsGuardStage.js');
+      stages.push(
+        new SecretsGuardStage({
+          enabled: true,
+          redactionMode:
+            options.secretsRedactMode || configInstance.get('secretsGuard.redactionMode', 'typed'),
+          failOnSecrets:
+            options.failOnSecrets ?? configInstance.get('secretsGuard.failOnSecrets', false),
+        }),
+      );
+    }
   }
 
   // 9. Deduplicate Stage — after loading, because duplicates are decided by
@@ -359,7 +394,9 @@ export async function* scan(basePath, options = {}) {
   }
 
   // 10. Character Limit Stage
-  if (profile.options.charLimit) {
+  // Nullish rather than truthy, so `charLimit: 0` reaches the stage as the
+  // budget it is instead of being read as "no budget requested".
+  if (profile.options.charLimit != null) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(
       new CharLimitStage({

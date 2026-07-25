@@ -1,20 +1,24 @@
 import { env } from '../src/config/ConfigManager.js';
 import fs from 'fs-extra';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Read version from package.json
-// Note: This assumes config/app.js is always one level deep from project root
-// which is true for the CopyTree project structure
-let version = '0.13.1'; // Fallback version
+// Read version from CopyTree's own package.json.
+//
+// Resolved from this module, not from process.cwd(). CopyTree is normally run
+// from inside someone else's project, and that project almost always has its
+// own package.json — so a cwd-relative lookup reported the *target* project's
+// version as CopyTree's, and fell back to a hard-coded string everywhere else.
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+const packageJsonPath = path.join(moduleDir, '..', 'package.json');
+
+let version = 'unknown';
 try {
-  const packageJsonPath = path.join(process.cwd(), 'package.json');
-  if (fs.existsSync(packageJsonPath)) {
-    const pkg = fs.readJsonSync(packageJsonPath);
-    version = pkg.version;
-  }
-} catch (error) {
-  // Use fallback version if reading fails
-  console.warn('Could not read version from package.json, using fallback');
+  version = fs.readJsonSync(packageJsonPath).version;
+} catch {
+  // A package without a readable package.json is broken in ways a stale
+  // hard-coded version would only disguise.
+  console.warn(`Could not read version from ${packageJsonPath}`);
 }
 
 export default {

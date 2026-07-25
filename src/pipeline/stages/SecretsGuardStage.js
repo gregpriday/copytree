@@ -2,6 +2,7 @@ import Stage from '../Stage.js';
 import GitleaksAdapter from '../../services/GitleaksAdapter.js';
 import SecretRedactor from '../../utils/SecretRedactor.js';
 import { SecretsDetectedError } from '../../utils/errors.js';
+import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 import { minimatch } from 'minimatch';
 
 const SECRET_FILE_PATTERNS = [
@@ -40,6 +41,27 @@ const BASIC_PATTERNS = [
 class SecretsGuardStage extends Stage {
   constructor(options = {}) {
     super(options);
+    // Skipping this stage emits unredacted credentials with a success exit code.
+    this.fatal = true;
+    this.gitleaks = new GitleaksAdapter(options.gitleaks || {});
+    this.useGitleaks = false;
+    this._resolveSettings();
+  }
+
+  /**
+   * Read every configurable value in one place.
+   *
+   * Called from the constructor and again from `onInit()`, because a stage
+   * constructed without an explicit `config` reads defaults through the base
+   * class's null-object proxy. The pipeline injects the real configuration
+   * during `onInit`, and until these are re-read the stage is running on
+   * defaults that may not be what the caller asked for.
+   *
+   * @private
+   */
+  _resolveSettings() {
+    const options = this.options || {};
+
     this.enabled = options.enabled ?? this.config.get('secretsGuard.enabled', true);
     this.excludeGlobs =
       options.excludeGlobs || this.config.get('secretsGuard.exclude', SECRET_FILE_PATTERNS);
@@ -50,11 +72,18 @@ class SecretsGuardStage extends Stage {
       options.maxFileBytes || this.config.get('secretsGuard.maxFileBytes', 5_000_000);
     this.failOnSecrets =
       options.failOnSecrets ?? this.config.get('secretsGuard.failOnSecrets', false);
-    this.gitleaks = new GitleaksAdapter(options.gitleaks || {});
-    this.useGitleaks = false;
+
+    // What to do with a file too large to scan. Including it unscanned is the
+    // one option that looks like protection and is not, so it is not the
+    // default and has to be asked for by name.
+    this.oversizePolicy =
+      options.oversizePolicy || this.config.get('secretsGuard.oversizePolicy', 'exclude');
   }
 
-  async onInit() {
+  async onInit(context) {
+    await super.onInit(context);
+    this._resolveSettings();
+
     if (!this.enabled) return;
 
     this.useGitleaks = await this.gitleaks.isAvailable();
@@ -72,9 +101,12 @@ class SecretsGuardStage extends Stage {
     }
 
     const files = input.files || [];
+    const report = input.exclusionReport;
     const processedFiles = [];
     const findings = [];
     let redactionCount = 0;
+    let excludedCount = 0;
+    let unscannableCount = 0;
 
     for (const file of files) {
       if (!file) {
@@ -86,7 +118,13 @@ class SecretsGuardStage extends Stage {
 
       if (this._isExcluded(filePath)) {
         this.log(`Excluding secret-prone file: ${filePath}`, 'debug');
-        processedFiles.push(null);
+        report?.add({
+          path: filePath,
+          size: file.size || 0,
+          reason: EXCLUSION_REASONS.SECRET_FILE,
+          rule: 'secretsGuard.exclude',
+        });
+        excludedCount++;
         continue;
       }
 
@@ -96,9 +134,27 @@ class SecretsGuardStage extends Stage {
       }
 
       if (Buffer.byteLength(file.content, 'utf8') > this.maxFileBytes) {
-        this.log(`Skipping secret scan for ${filePath} (too large)`, 'debug');
-        processedFiles.push(file);
-        continue;
+        // Emitting a file the scanner could not read, while reporting that
+        // secrets protection is on, is the least safe reading of "too large".
+        if (this.oversizePolicy === 'scan') {
+          this.log(`Scanning oversize file ${filePath} (oversizePolicy: scan)`, 'debug');
+        } else if (this.oversizePolicy === 'fail') {
+          throw new SecretsDetectedError(
+            `Cannot scan ${filePath} for secrets: ${file.content.length} characters exceeds the ${this.maxFileBytes}-byte scan limit`,
+            [],
+            { file: filePath, reason: 'unscannable' },
+          );
+        } else {
+          this.log(`Excluding unscannable file: ${filePath} (too large to scan)`, 'warn');
+          report?.add({
+            path: filePath,
+            size: file.size || 0,
+            reason: EXCLUSION_REASONS.SECRET_UNSCANNABLE,
+            rule: 'secretsGuard.maxFileBytes',
+          });
+          unscannableCount++;
+          continue;
+        }
       }
 
       let fileFindings = [];
@@ -116,7 +172,18 @@ class SecretsGuardStage extends Stage {
       }
 
       if (fileFindings.length > 0) {
-        findings.push(...fileFindings);
+        // Raw findings carry the matched bytes, which redaction needs to locate
+        // the span. Everything that leaves this stage gets the safe form: these
+        // end up in `stats`, in events, and in thrown errors, all of which an
+        // embedder is liable to log.
+        const safeFindings = SecretRedactor.toSafeFindings(fileFindings);
+        findings.push(...safeFindings);
+
+        if (this.failOnSecrets) {
+          throw new SecretsDetectedError(`Secrets detected in ${filePath}`, safeFindings, {
+            file: filePath,
+          });
+        }
 
         if (this.redactInline) {
           const { content, count } = SecretRedactor.redact(
@@ -128,17 +195,9 @@ class SecretsGuardStage extends Stage {
           processedFiles.push({ ...file, content, redacted: true });
           continue;
         }
-
-        if (this.failOnSecrets) {
-          throw new SecretsDetectedError(`Secrets detected in ${filePath}`, fileFindings);
-        }
       }
 
       processedFiles.push(file);
-    }
-
-    if (this.failOnSecrets && findings.length > 0) {
-      throw new SecretsDetectedError('Secrets detected in scanned files', findings);
     }
 
     if (findings.length > 0) {
@@ -152,6 +211,17 @@ class SecretsGuardStage extends Stage {
       ...input,
       files: processedFiles,
       findings: [...(input.findings || []), ...findings],
+      stats: {
+        ...(input.stats || {}),
+        secretsGuard: {
+          enabled: true,
+          scanner: this.useGitleaks ? 'gitleaks' : 'builtin',
+          findings: findings.length,
+          redacted: redactionCount,
+          excludedSecretFiles: excludedCount,
+          excludedUnscannable: unscannableCount,
+        },
+      },
     };
   }
 

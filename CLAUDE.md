@@ -4,7 +4,7 @@ Rules and constraints for working with CopyTree. Keep this file lean; detailed d
 
 ## Stack & Boundaries
 
-- **Node.js ≥20.0.0**, **ES Modules only** (no CommonJS)
+- **Node.js ≥22.12.0** (matches `engines` in `package.json`), **ES Modules only** (no CommonJS)
 - CopyTree: CLI for AI-ready project exports via event-driven pipeline
 - Tech: Commander.js, Ink (React for terminal), Jest+Babel
 

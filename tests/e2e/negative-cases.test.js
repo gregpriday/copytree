@@ -10,21 +10,23 @@ import { runCli, normalize } from './_utils.js';
 const PROJECT = path.resolve(process.cwd(), 'tests/fixtures/simple-project');
 
 describe('Negative cases', () => {
-  test('unknown format --format foo', async () => {
+  // An unrecognised format is a fatal input error, not something to recover
+  // from by picking a different one. A caller that asked for `foo` and received
+  // a zero exit with JSON has no way to tell that its request was ignored.
+  //
+  // This previously asserted either branch, so it passed whatever the CLI did,
+  // and its golden held a Node module-resolution crash captured from a broken
+  // checkout rather than any real CopyTree output.
+  test('unknown format --format foo exits non-zero with a stable message', async () => {
     const { code, stdout, stderr } = await runCli([PROJECT, '--format', 'foo']);
 
-    // If the CLI accepts any format or defaults, that's OK too
-    // Just document the actual behavior
+    expect(code).not.toBe(0);
+
     const errorOutput = stderr || stdout;
     const normalized = normalize(errorOutput, { projectRoot: PROJECT });
 
-    if (code !== 0) {
-      // CLI rejected the format - document the error
-      expect(normalized).toMatchGolden('negative/unknown-format-error.txt.golden');
-    } else {
-      // CLI accepted the format - document the output
-      expect(normalized).toMatchGolden('negative/unknown-format-success.txt.golden');
-    }
+    expect(normalized).toContain('Unknown output format: foo');
+    expect(normalized).toMatchGolden('negative/unknown-format-error.txt.golden');
   }, 30000);
 
   test('nonexistent input path', async () => {

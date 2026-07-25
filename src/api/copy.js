@@ -275,6 +275,9 @@ export async function copy(basePath, options = {}) {
     showSize: options.showSize,
     prettyPrint: options.prettyPrint,
     allowEmpty: true,
+    // Same instance the selection ran under, so a concurrent operation cannot
+    // format these files with its own settings.
+    config: configInstance,
   });
 
   const manifest = buildManifest(files, manifestOptions);

@@ -9,7 +9,12 @@ import {
   escapeYamlScalar,
 } from '../utils/markdown.js';
 import { hashContent } from '../utils/fileHash.js';
-import { sanitizeForComment, sanitizeForXml } from '../utils/helpers.js';
+import {
+  sanitizeForComment,
+  sanitizeForXml,
+  escapeXmlAttribute,
+  escapeXmlText,
+} from '../utils/helpers.js';
 import { OUTPUT_FORMAT_VERSIONS } from '../utils/outputVersion.js';
 
 /**
@@ -31,12 +36,16 @@ import { OUTPUT_FORMAT_VERSIONS } from '../utils/outputVersion.js';
 
 /**
  * Format a collection of files as a streaming async generator.
- * Yields formatted output chunks incrementally, enabling memory-efficient
- * processing of large file collections.
  *
- * IMPORTANT: For tree and SARIF formats, files must be buffered internally
- * before output can be generated (these formats require knowledge of all files).
- * For XML, JSON, Markdown, and NDJSON, output streams incrementally.
+ * This yields the *output* incrementally. The input is drained first: the
+ * generator collects the whole file collection before emitting a chunk, because
+ * the document header carries a file count and a total size. So peak memory is
+ * still proportional to the selection, and what streaming buys is that the
+ * formatted document is never assembled as one contiguous string.
+ *
+ * Tree and SARIF additionally need the complete file set to build their
+ * structure, so for those two formats the output is produced in one piece and
+ * then chunked.
  *
  * @param {Array<FileResult> | AsyncIterable<FileResult>} files - Files to format
  * @param {FormatStreamOptions} [options={}] - Format options
@@ -255,7 +264,7 @@ async function* streamXML(files, options, helpers) {
 
   // Header
   yield '<?xml version="1.0" encoding="UTF-8"?>\n';
-  yield `<ct:directory xmlns:ct="urn:copytree" path="${basePath}">\n`;
+  yield `<ct:directory xmlns:ct="urn:copytree" path="${escapeXmlAttribute(basePath)}">\n`;
 
   // Metadata
   yield '  <ct:metadata>\n';
@@ -275,7 +284,7 @@ async function* streamXML(files, options, helpers) {
   // Directory structure
   const dirStructure = helpers.generateDirectoryStructure(fileArray);
   if (dirStructure) {
-    yield `    <ct:directoryStructure>${dirStructure}</ct:directoryStructure>\n`;
+    yield `    <ct:directoryStructure>${escapeXmlText(dirStructure)}</ct:directoryStructure>\n`;
   }
 
   yield '  </ct:metadata>\n';
@@ -285,7 +294,7 @@ async function* streamXML(files, options, helpers) {
   for (const file of fileArray) {
     if (!file) continue;
 
-    let fileHeader = `    <ct:file path="@${file.path}" size="${file.size}"`;
+    let fileHeader = `    <ct:file path="@${escapeXmlAttribute(file.path)}" size="${escapeXmlAttribute(file.size)}"`;
 
     if (file.modified) {
       const modifiedDate = file.modified instanceof Date ? file.modified : new Date(file.modified);
@@ -295,16 +304,16 @@ async function* streamXML(files, options, helpers) {
     if (file.isBinary) {
       fileHeader += ' binary="true"';
       if (file.encoding) {
-        fileHeader += ` encoding="${file.encoding}"`;
+        fileHeader += ` encoding="${escapeXmlAttribute(file.encoding)}"`;
       }
     }
 
     if (file.binaryCategory) {
-      fileHeader += ` binaryCategory="${file.binaryCategory}"`;
+      fileHeader += ` binaryCategory="${escapeXmlAttribute(file.binaryCategory)}"`;
     }
 
     if (file.gitStatus) {
-      fileHeader += ` gitStatus="${file.gitStatus}"`;
+      fileHeader += ` gitStatus="${escapeXmlAttribute(file.gitStatus)}"`;
     }
 
     fileHeader += '>';

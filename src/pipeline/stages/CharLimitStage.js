@@ -15,7 +15,14 @@ import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 class CharLimitStage extends Stage {
   constructor(options = {}) {
     super(options);
-    this.limit = options.limit || 2000000; // 2M chars default
+    // Nullish, not falsy: `limit: 0` is a real budget ("no file content at
+    // all"), and `||` silently promoted it to the 2M default — the one value
+    // where the caller most clearly meant something specific.
+    //
+    // "Characters" here means UTF-16 code units, matching `String.length`.
+    // Truncation still never splits a surrogate pair, so a budget can land
+    // mid-pair without producing a lone surrogate.
+    this.limit = options.limit ?? 2000000; // 2M chars default
     // Planning mode: content has not been loaded (dry run), so byte size stands
     // in for character length. Near-exact for the UTF-8 text that gets included,
     // which is what keeps a dry run a strict prefix of the real run.

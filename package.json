@@ -75,7 +75,8 @@
     "bin/",
     "types/",
     "profiles/",
-    "config/"
+    "config/",
+    "!**/CLAUDE.md"
   ],
   "dependencies": {
     "ajv": "^8.20.0",

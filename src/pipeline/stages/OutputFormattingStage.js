@@ -3,6 +3,7 @@ import XMLFormatter from '../formatters/XMLFormatter.js';
 import MarkdownFormatter from '../formatters/MarkdownFormatter.js';
 import NDJSONFormatter from '../formatters/NDJSONFormatter.js';
 import SARIFFormatter from '../formatters/SARIFFormatter.js';
+import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
 
 /** Matches bare `localeCompare(other)`, built once instead of per comparison. */
 const NAME_COLLATOR = new Intl.Collator();
@@ -10,6 +11,8 @@ const NAME_COLLATOR = new Intl.Collator();
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
     super(options);
+    // A caller that asked for XML must not silently receive something else.
+    this.fatal = true;
     // Normalize and default format (xml is default)
     const raw = (options.format || 'xml').toString().toLowerCase();
     this.format = raw === 'md' ? 'markdown' : raw;
@@ -22,17 +25,22 @@ class OutputFormattingStage extends Stage {
   }
 
   /**
-   * Handle errors during output formatting - return raw input
+   * Formatting failures are fatal; there is no safe fallback.
+   *
+   * This used to answer a failed format request with a JSON blob containing the
+   * raw file array. Three things were wrong with that. The caller asked for XML
+   * and received JSON, so their parser fails on output that reported success.
+   * The raw array bypasses every formatter policy, so binary placeholders and
+   * comment templates do not apply. And it serialises file content that the
+   * chosen format may have been about to omit entirely.
+   *
+   * @param {Error} error - The formatting failure
+   * @param {*} _input - Unused
+   * @throws {Error} Always
    */
-  async handleError(error, input) {
-    this.log(`Output formatting failed: ${error.message}, returning raw data`, 'warn');
-    // Return a minimal valid output structure
-    return {
-      ...input,
-      output: JSON.stringify({ error: error.message, files: input.files || [] }),
-      outputFormat: 'json',
-      outputSize: 0,
-    };
+  async handleError(error, _input) {
+    this.log(`Output formatting failed: ${error.message}`, 'error');
+    throw error;
   }
 
   async process(input) {
@@ -101,6 +109,11 @@ class OutputFormattingStage extends Stage {
     const output = {
       directory: input.basePath,
       metadata: {
+        // Must match the SDK's `format()`. Without it the CLI's JSON was a
+        // different document from the SDK's: a consumer checking
+        // `metadata.format` to detect a schema change read `undefined` and
+        // concluded nothing had changed.
+        format: OUTPUT_FORMAT_VERSIONS.json,
         generated: new Date().toISOString(),
         fileCount: input.files.filter((f) => f !== null).length,
         totalSize: this.calculateTotalSize(input.files),

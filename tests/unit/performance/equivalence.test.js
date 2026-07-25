@@ -46,10 +46,24 @@ describe('sort ordering is unchanged by the collator hoist', () => {
 
     const result = await stage.process({ basePath: '/repo', files, stats: {} });
 
-    // The reference is the exact call the stage used to make per comparison.
-    const expected = [...files].sort((a, b) =>
-      a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }),
-    );
+    // The reference is the call the stage used to make per comparison, plus the
+    // code-unit tie-break added afterwards.
+    //
+    // The tie-break is a deliberate contract change, not a regression in the
+    // hoist. `sensitivity: 'base'` reports `Eclair.js` and `éclair.js` as equal,
+    // and a stable sort then leaves the winner to whatever order the array
+    // already had — which traces back to filesystem enumeration. Since sort
+    // order decides which files survive a budget, that had to become a total
+    // order. Only pairs the collator called equal are affected.
+    const expected = [...files].sort((a, b) => {
+      const collated = a.path.localeCompare(b.path, 'en', {
+        numeric: true,
+        sensitivity: 'base',
+      });
+      if (collated !== 0) return collated;
+      if (a.path === b.path) return 0;
+      return a.path < b.path ? -1 : 1;
+    });
 
     expect(result.files.map((f) => f.path)).toEqual(expected.map((f) => f.path));
   });

@@ -35,8 +35,8 @@ Both entry points — the CLI (`src/commands/copy.js`) and the programmatic API 
 | 6 | `BudgetStage` | yes | `maxFileCount`, then `maxTotalSize` |
 | 7 | `LimitStage` | with `--head` | Hard head limit |
 | 8 | `FileLoadingStage` | unless `--only-tree` | Reads content, classifies binaries |
-| 9 | `SecretsGuardStage` | when enabled | Detection and redaction |
-| 10 | `TransformStage` | when transformers apply | Document conversion, etc. |
+| 9 | `TransformStage` | when transformers apply | Document conversion, etc. |
+| 10 | `SecretsGuardStage` | when enabled | Detection and redaction |
 | 11 | `DeduplicateFilesStage` | with `--dedupe` | Content-hash dedup |
 | 12 | `CharLimitStage` | with `--char-limit` | Character budget, line-boundary truncation |
 | 13 | `InstructionsStage` | CLI only | Loads the instructions block |
@@ -46,6 +46,15 @@ Two ordering constraints are load-bearing:
 
 - **Sort precedes budget.** Budgets truncate from the tail, so "which files survive" is only meaningful once the order is defined. `--sort modified` means "keep the recently-touched files when the budget bites"; that is a promise the pipeline can only keep if sorting has already happened.
 - **Dedup follows loading.** Duplicates are decided by content hash, and there is no content before `FileLoadingStage`.
+- **Secret scanning follows transformation.** What gets scanned has to be what gets emitted. Scanning first left a gap: a transformer that converts a document to text can surface a credential that was not present in the bytes the scanner saw.
+
+### Fatal versus recoverable stages
+
+Both entry points run with `continueOnError: true`, so a stage that throws is normally logged, skipped, and the run still reports success. That is right for a stage whose absence costs only polish, and wrong for one whose absence changes what gets emitted.
+
+Stages set `this.fatal = true` to opt out of that recovery, and the pipeline rethrows for them regardless of `continueOnError`. Currently fatal: `FileDiscoveryStage`, `FileLoadingStage`, `SecretsGuardStage`, and `OutputFormattingStage`. Everything else may degrade gracefully via `handleError()` — `SortFilesStage` returns files unsorted, `BudgetStage` passes them through.
+
+`OutputFormattingStage` in particular no longer answers a formatting failure by emitting a different format. A caller who asked for XML and received JSON has a parse failure on output that reported success.
 
 ### Exclusion Accounting
 

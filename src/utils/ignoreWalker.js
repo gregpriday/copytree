@@ -502,6 +502,21 @@ export async function* walkWithIgnore(root, options = {}) {
     }
   }
 
+  // Directories already entered, so a symlink loop terminates instead of
+  // recursing until the stack gives out. Only populated when following links:
+  // without them the tree is acyclic and this is pure overhead.
+  const visitedDirectories = new Set();
+
+  // Resolved once. Every containment check needs it, and it cannot change
+  // mid-walk.
+  let realRootPromise = null;
+  function realRoot() {
+    if (realRootPromise === null) {
+      realRootPromise = fs.realpath(root).catch(() => null);
+    }
+    return realRootPromise;
+  }
+
   function reportExclusion(absPath, decision, size, isDirectory) {
     if (!onExclude) return;
     onExclude({
@@ -539,6 +554,49 @@ export async function* walkWithIgnore(root, options = {}) {
       }
       return null;
     }
+  }
+
+  /**
+   * Whether a followed symlink target is still inside the repository.
+   *
+   * Compared against the *real* root, because a repository reached through a
+   * symlink (`/tmp/link -> /Users/me/project`) would otherwise fail every
+   * containment check on its own files.
+   *
+   * @param {string} absPath - Path the link points at
+   * @returns {Promise<string|null>} The real path when contained, null otherwise
+   */
+  async function containedRealPath(absPath) {
+    let real;
+    try {
+      real = await fs.realpath(absPath);
+    } catch {
+      // Broken link, or a path we cannot resolve. Either way, not followable.
+      return null;
+    }
+
+    const realRootValue = await realRoot();
+    if (realRootValue === null) return null;
+
+    if (real === realRootValue) return real;
+    if (real.startsWith(realRootValue + path.sep)) return real;
+
+    return null;
+  }
+
+  /**
+   * Identity for cycle detection.
+   *
+   * `dev:ino` is the exact answer where the filesystem supplies it. Windows
+   * reports ino as 0 for some filesystems, so the real path is the fallback.
+   *
+   * @param {string} real - Canonical path
+   * @param {import('node:fs').Stats} stat - Stats for the directory
+   * @returns {string} Stable identity key
+   */
+  function identityKey(real, stat) {
+    if (stat && stat.ino) return `${stat.dev}:${stat.ino}`;
+    return real;
   }
 
   async function* walk(dir, layers, depth = 0) {
@@ -616,11 +674,28 @@ export async function* walkWithIgnore(root, options = {}) {
       // Handle symlinks
       let isDir = entry.isDirectory();
       let stat = null;
+      let realPath = null;
 
       if (entry.isSymbolicLink()) {
         if (!followSymlinks) {
           continue; // Skip symlinks by default
         }
+
+        // A link is only followed if it lands back inside the repository.
+        // Without this, a link committed to a repository could pull in any
+        // file the running user can read: `ln -s ~/.ssh secrets` is a
+        // one-line exfiltration of a private key into an AI context.
+        realPath = await containedRealPath(absPath);
+        if (realPath === null) {
+          reportExclusion(
+            absPath,
+            { reason: EXCLUSION_REASONS.SYMLINK_ESCAPE, rule: 'followSymlinks' },
+            0,
+            false,
+          );
+          continue;
+        }
+
         stat = await statWithRetry(absPath);
         if (!stat) continue;
         isDir = stat.isDirectory();
@@ -651,6 +726,23 @@ export async function* walkWithIgnore(root, options = {}) {
 
         // Recurse into subdirectory (respect maxDepth if set)
         if (maxDepth === undefined || depth < maxDepth) {
+          // Only directories reached *through a link* are claimed. Real
+          // directories are acyclic by construction, and claiming them meant a
+          // directory was pruned whenever its own alias happened to sort first
+          // — `alias/` would be walked and `real/` dropped.
+          if (realPath !== null) {
+            if (!stat) {
+              stat = await statWithRetry(absPath);
+              if (!stat) continue;
+            }
+            const key = identityKey(realPath, stat);
+            if (visitedDirectories.has(key)) {
+              stats.directoriesPruned++;
+              continue;
+            }
+            visitedDirectories.add(key);
+          }
+
           yield* walk(absPath, nextLayers, depth + 1);
         }
       } else {

@@ -10,6 +10,8 @@
  * Specification: http://ndjson.org/
  * Each line is a valid, self-contained JSON value separated by \n
  */
+import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
+
 class NDJSONFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
     this.stage = stage;
@@ -56,6 +58,8 @@ class NDJSONFormatter {
     // Metadata record
     const metadata = {
       type: 'metadata',
+      // Must match `formatStream()`'s NDJSON, which already carried it.
+      format: OUTPUT_FORMAT_VERSIONS.ndjson,
       directory: input.basePath,
       generated: new Date().toISOString(),
       fileCount: files.length,

@@ -9,8 +9,31 @@ import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 class DeduplicateFilesStage extends Stage {
   constructor(options = {}) {
     super(options);
-    this.hashAlgorithm = options.hashAlgorithm || 'md5';
+    // SHA-256, not MD5. This hash is the sole identity test for "these two
+    // files are the same", and a collision here silently deletes a file from
+    // the context. MD5 collisions are cheap to construct on purpose, so a
+    // repository could carry two different files that dedupe into one.
+    this.hashAlgorithm = options.hashAlgorithm || 'sha256';
     this.keepFirst = options.keepFirst !== false; // By default, keep first occurrence
+  }
+
+  /**
+   * Whether a file's content stands in for the file rather than being it.
+   *
+   * Binary placeholders and structure-only notices are the same handful of
+   * bytes for every file that gets one, so hashing them says only "both were
+   * replaced by a placeholder" — never "both are the same file". Without this,
+   * `--dedupe` deletes every binary but the first.
+   *
+   * Base64 is exempt: that content really is the file.
+   *
+   * @param {Object} file - File entry
+   * @returns {boolean} True when the content is a stand-in
+   * @private
+   */
+  _hasSyntheticContent(file) {
+    if (file.binaryCategory === 'structure-only') return true;
+    return Boolean(file.isBinary) && file.encoding !== 'base64';
   }
 
   /**
@@ -57,36 +80,61 @@ class DeduplicateFilesStage extends Stage {
         continue;
       }
 
+      // A placeholder is not evidence of duplication.
+      if (this._hasSyntheticContent(file)) {
+        uniqueFiles.push(file);
+        continue;
+      }
+
       // Calculate content hash
       const hash = this.calculateHash(file.content);
 
       if (contentHashes.has(hash)) {
-        // Found a duplicate
-        const original = contentHashes.get(hash);
+        const previous = contentHashes.get(hash);
+
+        // `keepFirst: false` keeps the last occurrence instead, so the survivor
+        // is swapped in place rather than appended. Position is preserved
+        // either way: reordering here would undo the sort budgets depend on.
+        let kept = previous;
+        let dropped = file;
+
+        if (!this.keepFirst) {
+          const slot = uniqueFiles.indexOf(previous);
+          if (slot !== -1) {
+            uniqueFiles[slot] = file;
+            kept = file;
+            dropped = previous;
+            contentHashes.set(hash, file);
+          }
+        }
+
+        const droppedPath = dropped.path || dropped.relativePath;
+        const keptPath = kept.path || kept.relativePath;
+
         duplicates.push({
-          file: file.path || file.relativePath,
-          duplicateOf: original.path || original.relativePath,
-          size: file.size || file.stats?.size || 0,
+          file: droppedPath,
+          duplicateOf: keptPath,
+          size: dropped.size || dropped.stats?.size || 0,
         });
 
         input?.exclusionReport?.add({
-          path: file.path || file.relativePath,
-          size: file.size || file.stats?.size || 0,
+          path: droppedPath,
+          size: dropped.size || dropped.stats?.size || 0,
           reason: EXCLUSION_REASONS.DUPLICATE,
-          rule: `duplicateOf:${original.path || original.relativePath}`,
+          rule: `duplicateOf:${keptPath}`,
         });
 
         // Emit deduplication event
         if (context && context.emit) {
           context.emit('file:deduplicated', {
-            original: original.path || original.relativePath,
-            duplicate: file.path || file.relativePath,
+            original: keptPath,
+            duplicate: droppedPath,
           });
         }
 
         logger.debug('Found duplicate file', {
-          file: file.path || file.relativePath,
-          original: original.path || original.relativePath,
+          file: droppedPath,
+          original: keptPath,
           hash,
         });
       } else {

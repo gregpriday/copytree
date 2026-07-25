@@ -241,52 +241,64 @@ expect(normalized).toMatchGolden('simple.xml');
 
 ## Coverage Targets
 
+Coverage is a **ratchet**, not an aspiration. The thresholds in `jest.config.js`
+are set at the measured baseline so that they actually hold, and are raised as
+coverage improves. They are never lowered without a reason recorded in the
+commit message.
+
+This section previously documented an 80% global threshold as "enforced via
+`jest.config.js`" while `coverageThreshold` was absent from that file entirely.
+Nothing was enforced, and the real global figure was around 70%. A threshold
+nobody measures is worse than none, because it is quoted in review as though it
+were a fact.
+
 ### Global Coverage
 
-**Target:** 80% across all metrics (branches, functions, lines, statements)
+Everything not named in a per-file entry below:
 
-**Current Status:** Enforced via `jest.config.js`
+| Metric | Threshold |
+| ------ | --------: |
+| Statements | 67% |
+| Branches | 57% |
+| Functions | 65% |
+| Lines | 67% |
 
-```javascript
-coverageThreshold: {
-  global: {
-    branches: 80,
-    functions: 80,
-    lines: 80,
-    statements: 80
-  }
-}
+Jest removes any file matched by a path-specific key from the `global` pool, so
+these numbers describe the remainder, and are lower than the "All files" row the
+coverage report prints (about 70% / 61%).
+
+### Per-File Thresholds
+
+Stricter thresholds apply where a gap is most expensive: traversal containment,
+budget arithmetic, secret handling, and anything deciding what leaves the
+process. See `coverageThreshold` in `jest.config.js` for the current values.
+
+- `src/utils/scopeResolver.js`
+- `src/utils/ignoreWalker.js`
+- `src/utils/exclusionReport.js`
+- `src/pipeline/stages/BudgetStage.js`
+- `src/pipeline/stages/FileLoadingStage.js`
+- `src/pipeline/stages/SecretsGuardStage.js`
+- `src/pipeline/stages/SortFilesStage.js`
+
+### Modules Wanted Next
+
+These are below where they should be and are the natural next targets for the
+ratchet, not current guarantees:
+
+- `src/config/ConfigManager.js` (~54% statements, ~41% branches)
+- `src/utils/parallelWalker.js` (~74% statements, ~68% branches)
+- `src/ui/hooks/usePipeline.js` (effectively untested)
+
+### Running Coverage
+
+```bash
+npm run test:coverage
 ```
 
-### Module-Specific Targets
-
-#### Critical Paths (95% coverage)
-
-- `src/pipeline/Pipeline.js`
-- `src/pipeline/Stage.js`
-- `src/config/ConfigManager.js`
-- `src/transforms/TransformerRegistry.js`
-- `src/utils/GitUtils.js`
-
-#### High-Priority (90% coverage)
-
-- All pipeline stages (`src/pipeline/stages/*.js`)
-- Core transformers (FileLoader, PDF, Image, CSV, Markdown)
-- Service layer (`src/services/*.js`)
-
-#### Standard (80% coverage)
-
-- UI components (`src/ui/*.js`)
-- Utility functions (`src/utils/*.js`)
-- Command implementations (`src/commands/*.js`)
-
-### Commands (100% coverage)
-
-All CLI commands should have comprehensive tests covering:
-- Argument parsing
-- Option validation
-- Error handling
-- Output formatting
+The command fails when any threshold is unmet. Branch coverage is included
+deliberately: line coverage alone passes for code where only the happy path is
+ever taken.
 - Exit codes
 
 ---

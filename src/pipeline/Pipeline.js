@@ -246,7 +246,7 @@ class Pipeline extends EventEmitter {
                     result,
                   );
 
-            if (this.options.continueOnError) {
+            if (this.options.continueOnError && !stageInstance.fatal) {
               this.context.logger.warn(
                 `[Pipeline] Validation warning in ${stageName}: ${validationError.message}`,
               );
@@ -376,7 +376,10 @@ class Pipeline extends EventEmitter {
           error,
         });
 
-        if (!this.options.continueOnError) {
+        // A fatal stage overrides continueOnError. Recovering past one produces
+        // output that looks complete and is not — the single outcome a caller
+        // has no way to detect.
+        if (!this.options.continueOnError || stageInstance.fatal) {
           throw error;
         }
       }
@@ -387,6 +390,14 @@ class Pipeline extends EventEmitter {
 
   /**
    * Process stages in parallel (when applicable)
+   *
+   * Errors are not caught here. `_processSequential` has already applied the
+   * `continueOnError` / `fatal` policy, so anything reaching this point is an
+   * error it deliberately chose to propagate — a fatal stage or a cancellation.
+   * Swallowing it and substituting `null` undid that decision and reinstated
+   * exactly the "looks successful, is not" outcome the fatal flag exists to
+   * prevent.
+   *
    * @private
    */
   async _processParallel(input) {
@@ -398,16 +409,7 @@ class Pipeline extends EventEmitter {
       const batch = chunks.slice(i, i + this.options.maxConcurrency);
 
       const batchResults = await Promise.all(
-        batch.map(async (chunk, _index) => {
-          try {
-            return await this._processSequential(chunk);
-          } catch (error) {
-            if (!this.options.continueOnError) {
-              throw error;
-            }
-            return null;
-          }
-        }),
+        batch.map(async (chunk) => await this._processSequential(chunk)),
       );
 
       results.push(...batchResults);

@@ -19,6 +19,18 @@ class Stage {
     this.name = this.constructor.name;
     this.pipeline = options.pipeline; // Reference to parent pipeline for event emission
 
+    // Whether a failure in this stage must fail the whole run.
+    //
+    // `continueOnError` is on for every production pipeline, which means a
+    // stage that throws is logged, skipped, and the run reports success. That
+    // is the right behaviour for a stage whose absence only costs polish, and
+    // the wrong behaviour for one whose absence changes what gets emitted: a
+    // skipped secrets guard produces unredacted output with exit code 0.
+    //
+    // Subclasses set `this.fatal = true` after `super()` to opt out of that
+    // recovery. See `handleError()` for stages that can degrade gracefully.
+    this.fatal = options.fatal === true;
+
     // Performance optimization: throttle file events
     this.fileEventCount = 0;
     this.lastFileEventTime = 0;
