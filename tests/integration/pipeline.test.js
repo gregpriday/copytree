@@ -298,7 +298,40 @@ describe('Pipeline Integration Tests', () => {
       });
 
       expect(result.output.length).toBeLessThan(1600); // Account for XML wrapper and instructions
-      expect(result.output).toContain('truncated due to character limit');
+      // A 1000-character single line cannot be cut at a line boundary, so the
+      // stage falls back to a marked mid-line cut rather than dropping the file.
+      expect(result.output).toContain('truncated mid-line');
+      expect(result.files[0].truncated).toBe(true);
+      expect(result.files[0].originalLength).toBe(1000);
+    });
+
+    it('truncates at a line boundary when one is available', async () => {
+      const lines = Array.from({ length: 50 }, (_, i) => `line ${i}`).join('\n');
+      await fs.writeFile(path.join(tempDir, 'lines.txt'), lines);
+
+      pipeline.through([
+        new FileDiscoveryStage({
+          basePath: tempDir,
+          patterns: ['lines.txt'],
+          respectGitignore: false,
+        }),
+        new FileLoadingStage({ encoding: 'utf8' }),
+        new CharLimitStage({ limit: 120 }),
+      ]);
+
+      const result = await pipeline.process({
+        basePath: tempDir,
+        profile: {},
+        options: {},
+      });
+
+      const content = result.files[0].content;
+      expect(content).toContain('… [truncated');
+      expect(content).not.toContain('truncated mid-line');
+      // Everything before the marker is whole lines
+      const body = content.slice(0, content.indexOf('\n… ['));
+      expect(body.split('\n').every((line) => /^line \d+$/.test(line))).toBe(true);
+      expect(result.files[0].totalLines).toBe(50);
     });
   });
 

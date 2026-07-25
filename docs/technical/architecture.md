@@ -21,6 +21,40 @@ The `Pipeline` class (`src/pipeline/Pipeline.js`) serves as the orchestration en
 
 All processing stages inherit from the `Stage` base class (`src/pipeline/Stage.js`), which defines the core interface and provides common functionality like logging, progress reporting, and utility methods.
 
+### Stage Order
+
+Both entry points — the CLI (`src/commands/copy.js`) and the programmatic API (`src/api/scan.js`) — assemble the same ordered pipeline. Where they diverge is only in which optional stages are present, never in the order or in what gets excluded.
+
+| # | Stage | Always? | Responsibility |
+|---|-------|---------|----------------|
+| 1 | `FileDiscoveryStage` | yes | Layered ignore evaluation, scope traversal, size gate, exclusion accounting |
+| 2 | `AlwaysIncludeStage` | when `always` is set | Marks force-included files |
+| 3 | `GitFilterStage` | with `--modified` / `--changed` | Git status filtering |
+| 4 | `ProfileFilterStage` | yes | Caller `exclude` / `filter` patterns get the final say |
+| 5 | `SortFilesStage` | yes | Establishes the order budgets will truncate from |
+| 6 | `BudgetStage` | yes | `maxFileCount`, then `maxTotalSize` |
+| 7 | `LimitStage` | with `--head` | Hard head limit |
+| 8 | `FileLoadingStage` | unless `--only-tree` | Reads content, classifies binaries |
+| 9 | `SecretsGuardStage` | when enabled | Detection and redaction |
+| 10 | `TransformStage` | when transformers apply | Document conversion, etc. |
+| 11 | `DeduplicateFilesStage` | with `--dedupe` | Content-hash dedup |
+| 12 | `CharLimitStage` | with `--char-limit` | Character budget, line-boundary truncation |
+| 13 | `InstructionsStage` | CLI only | Loads the instructions block |
+| 14 | `OutputFormattingStage` / `StreamingOutputStage` | yes | Renders the versioned output |
+
+Two ordering constraints are load-bearing:
+
+- **Sort precedes budget.** Budgets truncate from the tail, so "which files survive" is only meaningful once the order is defined. `--sort modified` means "keep the recently-touched files when the budget bites"; that is a promise the pipeline can only keep if sorting has already happened.
+- **Dedup follows loading.** Duplicates are decided by content hash, and there is no content before `FileLoadingStage`.
+
+### Exclusion Accounting
+
+`FileDiscoveryStage` creates an `ExclusionReport` and threads it through the pipeline on `input.exclusionReport`. Any stage that drops a file records it with a stable reason key from `EXCLUSION_REASONS` (see `src/utils/exclusionReport.js`).
+
+Aggregate counts are collected unconditionally: they are incremented at the point of a decision that was already being made, so they cost nothing. Per-file detail — the matched rule, and the ignore file and line it came from — is only retained under `explain: true`, because resolving which individual rule produced a verdict requires compiling rules one at a time.
+
+The report surfaces as `result.stats.excluded`, and via `onSummary` for streaming consumers.
+
 ## PipelineContext Contract
 
 The PipelineContext provides stages with access to shared resources and pipeline state. Every stage receives this context during initialization and can use it throughout its lifecycle.

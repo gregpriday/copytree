@@ -9,17 +9,27 @@
 
 import {
   copy,
+  copyStream,
   scan,
   format,
+  resolveScope,
+  estimateTokens,
   ConfigManager,
+  EXCLUSION_REASONS,
   ProgressEvent,
   ProgressCallback,
   CopyOptions,
   CopyResult,
   ScanOptions,
+  ScanSummary,
   FormatOptions,
   FileResult,
   ManifestEntry,
+  ManifestOutcome,
+  ExclusionSummary,
+  ExclusionDetail,
+  ExclusionReason,
+  ErrorCode,
 } from 'copytree';
 
 // ============================================================================
@@ -78,7 +88,8 @@ function testProgressTypes() {
   const event: ProgressEvent = {
     percent: 50,
     message: 'Processing files...',
-    stage: 'FileDiscoveryStage',
+    // Stable stage id, never a class name — consumers render this directly.
+    stage: 'discover',
     filesProcessed: 100,
     totalFiles: 200,
     currentFile: 'src/index.ts',
@@ -320,4 +331,120 @@ async function testCombinedUsage() {
   // Type check the result
   const outputString: string = result.output;
   const fileCount: number = result.stats.totalFiles;
+}
+
+// ============================================================================
+// Daintree requirements: scope, budgets, accounting, outcomes
+// ============================================================================
+
+async function testScopedCopy() {
+  // Literal paths, not globs: nothing for the caller to escape.
+  const result = await copy('/repo', {
+    scope: ['src/panels/[draft]', 'package.json'],
+    filter: ['**/*.ts'],
+  });
+
+  const version: string | null = result.outputFormatVersion;
+  const scoped: string[] | undefined = result.stats.scope;
+
+  // Scope entries can also be resolved directly.
+  const entries = await resolveScope('/repo', ['src']);
+  const abs: string = entries[0].absolutePath;
+  const rel: string = entries[0].relativePath;
+  const isDir: boolean = entries[0].isDirectory;
+
+  return { version, scoped, abs, rel, isDir };
+}
+
+async function testBudgetsAndAccounting() {
+  const result = await copy('/repo', {
+    sizeGate: 128 * 1024,
+    maxTotalSize: 2_000_000,
+    maxFileCount: 500,
+    charLimit: 400_000,
+    explain: true,
+  });
+
+  const truncated: boolean | undefined = result.stats.truncated;
+  const by: 'maxFileCount' | 'maxTotalSize' | 'charLimit' | undefined = result.stats.truncatedBy;
+
+  const excluded: ExclusionSummary = result.stats.excluded;
+  const total: number = excluded.total;
+  const gated: number | undefined = excluded.byReason.sizeGate;
+  const largest: ExclusionDetail[] | undefined = excluded.largest;
+
+  // Reasons are machine-readable keys, rendered by a switch.
+  const reason: ExclusionReason = EXCLUSION_REASONS.SIZE_GATE;
+
+  // Emptiness is an outcome, not an error.
+  const empty: boolean = result.stats.noFilesMatched;
+
+  return { truncated, by, total, gated, largest, reason, empty };
+}
+
+async function testManifestOutcomes() {
+  const { manifest, stats } = await copy('/repo', { dryRun: true });
+
+  for (const entry of manifest) {
+    const outcome: ManifestOutcome = entry.outcome;
+    if (outcome === 'structure-only' || outcome === 'binary-placeholder') {
+      continue;
+    }
+  }
+
+  const chars: number = stats.estimatedOutputChars;
+  const tokens: number = stats.estimatedTokens;
+  const roughly: number = estimateTokens(chars);
+
+  return { chars, tokens, roughly };
+}
+
+async function testStreamingParity() {
+  let final: { manifest: ManifestEntry[]; stats: CopyResult['stats'] } | undefined;
+
+  for await (const chunk of copyStream('/repo', {
+    scope: ['src'],
+    maxTotalSize: 1_000_000,
+    onSummary: (summary: ScanSummary) => {
+      const n: number = summary.totalFiles;
+      return n;
+    },
+    onComplete: (result) => {
+      final = result;
+    },
+  })) {
+    const text: string = chunk;
+    if (text.length === 0) break;
+  }
+
+  return final;
+}
+
+async function testHermeticConfig() {
+  // Skip ~/.copytree entirely: same inputs, same context, every machine.
+  const cfg = await ConfigManager.create({ userConfig: false, strict: true });
+
+  if (!cfg.isDefaultsLoaded) {
+    const errors = cfg.getLoadErrors();
+    throw new Error(`config failed: ${errors.map((e) => e.scope).join(', ')}`);
+  }
+
+  return copy('/repo', { config: cfg });
+}
+
+async function testTypedErrors() {
+  try {
+    await copy('/repo', { scope: ['../elsewhere'] });
+  } catch (error) {
+    const code = (error as { code?: ErrorCode }).code;
+    switch (code) {
+      case 'ERR_SCOPE_OUTSIDE_ROOT':
+      case 'ERR_PATH_NOT_FOUND':
+      case 'ERR_ABORTED':
+        return code;
+      default:
+        throw error;
+    }
+  }
+  return undefined;
 }

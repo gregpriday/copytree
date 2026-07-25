@@ -1,37 +1,72 @@
 // src/utils/BinaryDetector.js
 import fs from 'fs-extra';
 import path from 'path';
+import copytreeDefaults from '../../config/copytree.js';
 
 /**
- * File categories for binary detection and policy application
+ * Default extension groups.
+ *
+ * The authoritative list lives in `config/copytree.js` under `binaryExtensions`
+ * so projects can override a single group without restating the rest. This
+ * import keeps the detector usable standalone (tests, direct API consumers)
+ * without duplicating the list.
  */
-const CATEGORIES = {
-  image: [
-    '.png',
-    '.jpg',
-    '.jpeg',
-    '.gif',
-    '.bmp',
-    '.webp',
-    '.ico',
-    '.tif',
-    '.tiff',
-    '.psd',
-    '.heic',
-  ],
-  media: ['.mp3', '.aac', '.wav', '.flac', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.wmv', '.flv'],
-  archive: ['.zip', '.7z', '.rar', '.tar', '.gz', '.bz2', '.xz', '.lz', '.tgz'],
-  exec: ['.exe', '.dll', '.so', '.dylib', '.a', '.o', '.class', '.jar', '.war', '.app'],
-  font: ['.ttf', '.otf', '.woff', '.woff2', '.eot'],
-  database: ['.sqlite', '.sqlite3', '.db', '.mdb', '.accdb', '.dbf'],
-  cert: ['.pem', '.der', '.crt', '.cer', '.p12', '.pfx', '.key'],
-  document: ['.pdf', '.doc', '.docx', '.odt', '.rtf', '.epub', '.html', '.htm'],
-  other: ['.bin', '.dat'],
-};
+const DEFAULT_CATEGORIES = copytreeDefaults.binaryExtensions;
 
 /**
- * Magic number signatures for common binary formats
- * Each entry has: category, signature bytes, and detected extension
+ * Extensions that must never be classified as binary, regardless of what a
+ * user's config says. These are source-code extensions that collide with
+ * binary formats (`.ts` is TypeScript far more often than MPEG transport
+ * stream) and the failure mode is silent: source would vanish from every
+ * context generated against the project.
+ */
+const NEVER_BINARY = new Set([
+  '.ts',
+  '.tsx',
+  '.m',
+  '.mm',
+  '.h',
+  '.hh',
+  '.hpp',
+  '.hxx',
+  '.r',
+  '.d',
+  '.pl',
+  '.pm',
+  '.cs',
+  '.rs',
+  '.go',
+  '.swift',
+  '.kt',
+  '.kts',
+  '.scala',
+  '.lua',
+  '.sql',
+  '.sh',
+  '.bash',
+  '.zsh',
+  '.fish',
+  '.ps1',
+  '.bat',
+  '.cmd',
+  '.vue',
+  '.svelte',
+  '.astro',
+  '.html',
+  '.htm',
+  '.svg',
+  '.md',
+  '.mdx',
+  '.yml',
+  '.yaml',
+  '.toml',
+  '.ini',
+]);
+
+/**
+ * Magic number signatures for common binary formats.
+ * Only consulted for files whose extension is unknown, so the cost is bounded
+ * to files we could not classify from the path alone.
  */
 const MAGIC = [
   // Images
@@ -64,33 +99,33 @@ const MAGIC = [
   { cat: 'archive', sig: [0x52, 0x61, 0x72, 0x21, 0x1a, 0x07], ext: '.rar', name: 'RAR' },
 
   // Executables
-  { cat: 'exec', sig: [0x7f, 0x45, 0x4c, 0x46], ext: '.elf', name: 'ELF' }, // ELF
-  { cat: 'exec', sig: [0x4d, 0x5a], ext: '.exe', name: 'PE/MZ' }, // MZ (PE)
+  { cat: 'executable', sig: [0x7f, 0x45, 0x4c, 0x46], ext: '.elf', name: 'ELF' },
+  { cat: 'executable', sig: [0x4d, 0x5a], ext: '.exe', name: 'PE/MZ' },
   {
-    cat: 'exec',
+    cat: 'executable',
     sig: [0xfe, 0xed, 0xfa, 0xce],
     ext: '.macho',
     name: 'Mach-O (32-bit BE)',
   },
   {
-    cat: 'exec',
+    cat: 'executable',
     sig: [0xfe, 0xed, 0xfa, 0xcf],
     ext: '.macho',
     name: 'Mach-O (64-bit BE)',
   },
   {
-    cat: 'exec',
+    cat: 'executable',
     sig: [0xce, 0xfa, 0xed, 0xfe],
     ext: '.macho',
     name: 'Mach-O (32-bit LE)',
   },
   {
-    cat: 'exec',
+    cat: 'executable',
     sig: [0xcf, 0xfa, 0xed, 0xfe],
     ext: '.macho',
     name: 'Mach-O (64-bit LE)',
   },
-  { cat: 'exec', sig: [0xca, 0xfe, 0xba, 0xbe], ext: '.macho', name: 'Mach-O Fat Binary' },
+  { cat: 'executable', sig: [0xca, 0xfe, 0xba, 0xbe], ext: '.macho', name: 'Mach-O Fat Binary' },
 
   // Database
   {
@@ -107,34 +142,94 @@ const MAGIC = [
 const PRINTABLE = new Set([0x09, 0x0a, 0x0d]); // tab, LF, CR
 
 /**
- * Categorize a file by its extension
- * @param {string} ext - File extension (with dot)
- * @returns {string|null} Category name or null
+ * Cache of extension -> category lookup tables, keyed by the groups object
+ * identity. Config objects are long-lived, so this collapses the per-file cost
+ * to a single Map hit.
  */
-function categorizeByExt(ext) {
-  const lower = (ext || '').toLowerCase();
-  for (const [cat, list] of Object.entries(CATEGORIES)) {
-    if (list.includes(lower)) return cat;
+const lookupCache = new WeakMap();
+
+/**
+ * Build (or reuse) a flat extension -> category map from grouped extension config
+ * @param {Object} groups - Category name -> array of extensions
+ * @returns {Map<string, string>} Lowercased extension -> category
+ */
+function getLookup(groups) {
+  // A caller may hand us `undefined` (config key absent) or a primitive from a
+  // malformed config; neither can key a WeakMap.
+  if (!groups || typeof groups !== 'object') {
+    groups = DEFAULT_CATEGORIES;
   }
-  return null;
+  if (!groups || typeof groups !== 'object') {
+    return new Map();
+  }
+
+  const cached = lookupCache.get(groups);
+  if (cached) return cached;
+
+  const map = new Map();
+  for (const [category, list] of Object.entries(groups)) {
+    if (!Array.isArray(list)) continue;
+    for (const ext of list) {
+      const lower = String(ext).toLowerCase();
+      if (NEVER_BINARY.has(lower)) continue;
+      // First group wins, so `document` claims `.key` before `cert` only if it
+      // is declared first. Order in config is meaningful and documented there.
+      if (!map.has(lower)) {
+        map.set(lower, category);
+      }
+    }
+  }
+
+  lookupCache.set(groups, map);
+  return map;
 }
 
 /**
- * Detect if a file is binary and categorize it
+ * Categorize a file by its extension alone. No filesystem access.
+ *
+ * @param {string} ext - File extension (with dot)
+ * @param {Object} [groups] - Grouped extension config (defaults to built-in list)
+ * @returns {string|null} Category name, or null if the extension is unknown
+ */
+export function categorizeByExt(ext, groups = DEFAULT_CATEGORIES) {
+  const lower = (ext || '').toLowerCase();
+  if (!lower || NEVER_BINARY.has(lower)) return null;
+  return getLookup(groups).get(lower) ?? null;
+}
+
+/**
+ * Detect whether a file is binary and categorize it.
+ *
+ * Extension first: when the extension is known, the verdict is returned from the
+ * path with no `open`, no `read`, and no `close`. A 3 GB video costs the same as
+ * a 40 KB source file. Content sniffing runs only for unknown extensions.
+ *
  * @param {string} filePath - Path to the file
  * @param {Object} opts - Detection options
- * @param {number} opts.sampleBytes - Number of bytes to read for detection
- * @param {number} opts.nonPrintableThreshold - Ratio threshold for binary detection
+ * @param {number} [opts.sampleBytes=8192] - Bytes to read when sniffing content
+ * @param {number} [opts.nonPrintableThreshold=0.3] - Non-printable ratio that means binary
+ * @param {Object} [opts.extensions] - Grouped extension config
  * @returns {Promise<Object>} Detection result with isBinary, category, reason, ext, and name
  */
 export async function detect(filePath, opts = {}) {
   const sampleBytes = opts.sampleBytes ?? 8192;
   const nonPrintableThreshold = opts.nonPrintableThreshold ?? 0.3;
+  const groups = opts.extensions ?? DEFAULT_CATEGORIES;
 
   const ext = path.extname(filePath);
-  let category = categorizeByExt(ext);
+  const category = categorizeByExt(ext, groups);
 
-  // Allocate buffer only for the sample size to avoid loading large files into memory
+  // Extension is decisive. Return without touching the filesystem.
+  if (category) {
+    return {
+      isBinary: true,
+      category,
+      reason: 'extension',
+      ext,
+    };
+  }
+
+  // Unknown extension: sniff a bounded prefix of the content.
   const buf = Buffer.alloc(sampleBytes);
   let bytesRead;
   let fd = null;
@@ -178,7 +273,7 @@ export async function detect(filePath, opts = {}) {
   if (sample.some((b) => b === 0)) {
     return {
       isBinary: true,
-      category: category || 'other',
+      category: 'other',
       reason: 'null-byte',
       ext,
     };
@@ -193,11 +288,11 @@ export async function detect(filePath, opts = {}) {
   }
   const ratio = sample.length ? nonPrintable / sample.length : 0;
 
-  if (category || ratio > nonPrintableThreshold) {
+  if (ratio > nonPrintableThreshold) {
     return {
       isBinary: true,
-      category: category || 'other',
-      reason: category ? 'extension' : 'ratio',
+      category: 'other',
+      reason: 'ratio',
       ext,
     };
   }
@@ -211,6 +306,22 @@ export async function detect(filePath, opts = {}) {
 }
 
 /**
+ * Extensions that a document transformer can turn into text.
+ * `.html`/`.htm` are deliberately absent: HTML is source code in most repos and
+ * is read as text, not run through a document converter.
+ */
+const CONVERTIBLE_DOCUMENTS = new Set([
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.dot',
+  '.dotx',
+  '.odt',
+  '.rtf',
+  '.epub',
+]);
+
+/**
  * Check if a document type is convertible to text
  * @param {string} category - File category
  * @param {string} ext - File extension
@@ -218,7 +329,7 @@ export async function detect(filePath, opts = {}) {
  */
 export function isConvertibleDocument(category, ext) {
   if (category !== 'document') return false;
-  return ['.pdf', '.doc', '.docx', '.odt', '.rtf', '.epub', '.html', '.htm'].includes(
-    (ext || '').toLowerCase(),
-  );
+  return CONVERTIBLE_DOCUMENTS.has((ext || '').toLowerCase());
 }
+
+export { DEFAULT_CATEGORIES, NEVER_BINARY };

@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { ConfigManager } from '../config/ConfigManager.js';
-import { ValidationError } from '../utils/errors.js';
+import { ValidationError, isAbortError } from '../utils/errors.js';
 import { logger as defaultLogger } from '../utils/logger.js';
 
 class Pipeline extends EventEmitter {
@@ -316,6 +316,16 @@ class Pipeline extends EventEmitter {
           timestamp: stageEnd,
         });
       } catch (error) {
+        // Cancellation is not a stage failure and is never recoverable: the
+        // caller asked the run to stop, so stop. Without this, `continueOnError`
+        // marches every remaining stage through an aborted result and turns a
+        // cancel into a stream of spurious recovery warnings.
+        if (isAbortError(error)) {
+          this.stats.endTime = Date.now();
+          this.emit('stage:error', { stage: stageName, index: i, error });
+          throw error;
+        }
+
         // Call onError hook if it exists (before handleError)
         if (typeof stageInstance.onError === 'function') {
           try {

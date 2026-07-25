@@ -1,5 +1,6 @@
 import Stage from '../Stage.js';
 import { minimatch } from 'minimatch';
+import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 
 class ProfileFilterStage extends Stage {
   constructor(options = {}) {
@@ -13,6 +14,7 @@ class ProfileFilterStage extends Stage {
     const startTime = Date.now();
 
     const originalCount = input.files.length;
+    const report = input.exclusionReport;
 
     // Filter files
     const filteredFiles = input.files.filter((file) => {
@@ -33,6 +35,12 @@ class ProfileFilterStage extends Stage {
         // If filter patterns exist but file doesn't match any, exclude it
         if (!matched) {
           this.log(`Excluding ${file.path} (no filter match)`, 'debug');
+          report?.add({
+            path: file.path,
+            size: file.size || 0,
+            reason: EXCLUSION_REASONS.FILTER_PATTERN,
+            rule: this.filter.join(', '),
+          });
           return false;
         }
       }
@@ -41,6 +49,12 @@ class ProfileFilterStage extends Stage {
       for (const pattern of this.exclude) {
         if (minimatch(file.path, pattern, { dot: true, nocase: process.platform === 'win32' })) {
           this.log(`Excluding ${file.path} (matches ${pattern})`, 'debug');
+          report?.add({
+            path: file.path,
+            size: file.size || 0,
+            reason: EXCLUSION_REASONS.OPTION_EXCLUDE,
+            rule: pattern,
+          });
           return false;
         }
       }

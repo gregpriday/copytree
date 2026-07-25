@@ -49,31 +49,45 @@ copytree --display
 
 ## 🎯 Why CopyTree?
 
-- **Smart File Discovery** - Intelligent selection with `.gitignore`, `.copytreeignore`, and `.copytreeinclude` support
-- **Multiple Output Formats** - XML (default), Markdown, JSON, tree view
-- **Profile System** - Default profile with customizable overrides
+- **One ignore engine** - Nested `.gitignore` at every depth, `.git/info/exclude`, your global
+  gitignore, `.copytreeignore`, and `.copytreeinclude`, all applied through a single path used by
+  both the CLI and the SDK. No `git check-ignore` subprocess, and no git repository required
+- **Scoped copy** - Copy one folder with the whole repository's rules, using literal paths rather
+  than globs
+- **Budgets that bind** - Per-file size gate, total size, file count, and character budget, all
+  applied in a defined order and always reported when they truncate
+- **Exclusion accounting** - Every run can answer "what didn't make it, and why", down to the
+  ignore file and line number
+- **Extension-first binary handling** - A 3 GB `.mp4` costs one `stat`, not an open and a read
+- **Multiple Output Formats** - XML (default), Markdown, JSON, NDJSON, SARIF, tree view, each
+  versioned so downstream prompts can detect a change
 - **Git Integration** - Filter by modified files, branch diffs, staged changes
-- **External Sources** - Include files from GitHub repos or other directories
-- **Character Limiting** - Stay within AI context windows automatically
+- **Token estimates** - "Copied 47 files (~78k tokens)" is the number that decides whether you
+  paste it
 - **Secrets Detection** - Prevent accidental exposure of API keys and credentials
-- **Electron Ready** - Works in Electron ≥28 main processes for desktop apps
+- **Electron Ready** - Works in Electron ≥34 main processes for desktop apps
 
 ## 🔧 Frequently Used Flags
 
 - `--format <xml|json|markdown|tree>` – Output format (default: **xml**)
+- `--scope <path...>` – Copy only these paths (literal, not globs), with root-anchored ignore rules
 - `-t, --only-tree` – Tree structure only (no file contents)
 - `-i, --display` – Print to terminal instead of clipboard
 - `--clipboard` – Force copy to clipboard
 - `-S, --stream` – Stream output to stdout/file (ideal for large projects or CI)
-- `-C, --char-limit <n>` – Enforce character budget per file
+- `-x, --exclude <pattern...>` – Exclude glob patterns
+- `-C, --char-limit <n>` – Character budget across all file content
+- `--size-gate <size>` / `--no-size-gate` – Per-file size gate, applied before opening (default 256KB)
+- `--max-total-size <size>` / `--max-files <n>` – Bound the whole context
+- `--explain` – Report which rule excluded each file, and where that rule came from
 - `--with-line-numbers` – Add line numbers to file contents
 - `--info` – Include file metadata (size, modified date)
 - `--show-size` – Show file sizes in output
 - `--with-git-status` – Include git status for each file
 - `-r, --as-reference` – Generate file and copy its reference (for LLMs)
-- `--always <pattern...>` – Force include specific patterns
+- `--always <pattern...>` – Force include specific patterns (the only thing that lifts the size gate)
 - `--dedupe` – Remove duplicate files
-- `--sort <path|size|modified|name|extension>` – Sort files
+- `--sort <path|size|modified|name|extension>` – Sort files (also decides which survive a budget)
 
 ## 🍳 Common Recipes
 
@@ -96,8 +110,19 @@ copytree https://github.com/user/repo/tree/main/src -o repo-src.xml
 copytree -S --format markdown > output.md
 copytree --stream --format json | jq .
 
-# Dry run (preview without copying)
+# One folder, but with the whole repository's ignore rules
+copytree --scope src/panels/file-browser
+
+# Several entries at once; paths are literal, so no glob escaping
+copytree --scope "src/[draft]" package.json
+
+# Bound the context, and keep the recently-touched files when it bites
+# (budgets keep the head of the sorted list, so ask for newest-first)
+copytree --max-total-size 2MB --sort modified --sort-order desc
+
+# Dry run (preview without copying), with the reason each file was dropped
 copytree --dry-run
+copytree --dry-run --explain
 
 # Show only tree structure (no file contents)
 copytree -t
@@ -174,6 +199,83 @@ config/**
 ```
 
 **Note:** `.copytreeinclude` patterns have the highest precedence and will override all other exclusion rules, including `.gitignore`, `.copytreeignore`, and profile excludes.
+
+## 📦 Programmatic API
+
+CopyTree is designed to be embedded, not just run. The SDK and the CLI share one selection path, so
+what you get from `copy()` is what `copytree` would have printed.
+
+```js
+import { copy, ConfigManager } from 'copytree';
+
+// Create the config once per process (or per project), not per call.
+// `userConfig: false` skips ~/.copytree so the same inputs produce the same
+// context on every machine — important when the app is shared or signed.
+const config = await ConfigManager.create({ userConfig: false });
+
+const result = await copy(repoRoot, {
+  scope: ['src/panels/file-browser'],   // literal paths, dirs or files
+  maxTotalSize: 2_000_000,
+  charLimit: 400_000,
+  explain: true,
+  config,
+});
+
+console.log(result.output);                      // formatted context
+console.log(result.outputFormatVersion);         // 'copytree-xml@1'
+console.log(result.stats.estimatedTokens);       // ~78000
+console.log(result.stats.excluded.byReason);     // { gitignore: 380, sizeGate: 1, ... }
+
+if (result.stats.truncated) {
+  console.warn(`Dropped ${result.stats.truncatedCount} files (${result.stats.truncatedBy})`);
+}
+```
+
+**Preview before you commit.** A dry run reads nothing and formats nothing, but selects the same
+files, in the same order, under the same budgets as the real run:
+
+```js
+const plan = await copy(repoRoot, { dryRun: true, config });
+plan.manifest.forEach(({ path, size, outcome }) => {
+  // outcome: 'included' | 'structure-only' | 'binary-placeholder' | 'truncated'
+  console.log(outcome, path, size);
+});
+```
+
+**Stream when the output is large.** `copyStream()` takes the same options and still gives you the
+numbers; chunks never split a code point, so they can go straight to a PTY or socket:
+
+```js
+import { copyStream } from 'copytree';
+
+let summary;
+for await (const chunk of copyStream(repoRoot, { config, onComplete: (r) => (summary = r) })) {
+  pty.write(chunk);
+}
+console.log(`${summary.stats.totalFiles} files, ~${summary.stats.estimatedTokens} tokens`);
+```
+
+**Errors are typed.** Switch on `error.code`, never on the message:
+
+```js
+import { ERROR_CODES } from 'copytree';
+
+try {
+  await copy(repoRoot, { scope: [selectedPath], config });
+} catch (error) {
+  switch (error.code) {
+    case ERROR_CODES.SCOPE_OUTSIDE_ROOT: return showOutsideProjectWarning();
+    case ERROR_CODES.PATH_NOT_FOUND:     return showMissingPathWarning();
+    case ERROR_CODES.ABORTED:            return; // user cancelled
+    default: throw error;
+  }
+}
+```
+
+"No files matched" is **not** an error. An empty folder or a fully-ignored scope returns a valid
+empty result with `stats.noFilesMatched === true`.
+
+Full types ship with the package (`types/index.d.ts`).
 
 ## 🛠️ Requirements
 

@@ -194,29 +194,31 @@ describe('parallelWalker', () => {
       }
     });
 
-    it.skip('should handle AbortSignal cancellation', async () => {
-      // OPTIMIZED: Create files in parallel and use fewer files for faster test
+    it('should handle AbortSignal cancellation', async () => {
       const files = Array.from({ length: 20 }, (_, i) =>
         fs.writeFile(path.join(testDir, `file${i}.js`), 'content'),
       );
       await Promise.all(files);
 
+      // Abort up front so the assertion does not race the traversal finishing:
+      // 20 tiny files can be walked in well under any timer delay.
       const controller = new AbortController();
-      const filesPromise = getAllFilesParallel(testDir, {
-        concurrency: 2,
-        signal: controller.signal,
+      controller.abort();
+
+      await expect(
+        getAllFilesParallel(testDir, { concurrency: 2, signal: controller.signal }),
+      ).rejects.toMatchObject({
+        name: 'AbortError',
+        code: 'ERR_ABORTED',
       });
-
-      // Abort after a short delay
-      setTimeout(() => controller.abort(), 10);
-
-      await expect(filesPromise).rejects.toThrow('aborted');
-    }, 30000); // Reduced file count to 20 for faster test execution
+    }, 30000);
   });
 
   describe('backpressure', () => {
-    it.skip('should respect highWaterMark', async () => {
-      // OPTIMIZED: Create files in parallel and use fewer files for faster test
+    // These were skipped because they hung. The traversal deadlocked whenever a
+    // producer filled the buffer: the producer waited for the consumer to drain,
+    // while the consumer only woke when a producer task settled. Nothing moved.
+    it('should respect highWaterMark', async () => {
       const files = Array.from({ length: 20 }, (_, i) =>
         fs.writeFile(path.join(testDir, `file${i}.js`), 'content'),
       );
@@ -235,7 +237,39 @@ describe('parallelWalker', () => {
       }
 
       expect(yieldedCount).toBe(20);
-    }, 30000); // Reduced file count to 20 for faster test execution (20ms of delays + overhead)
+    }, 30000);
+
+    it.each([2, 4, 17])(
+      'completes when one directory yields far more entries than highWaterMark (%i)',
+      async (highWaterMark) => {
+        // The exact shape that deadlocked: a single readdir producing many more
+        // results than the buffer can hold.
+        const count = 120;
+        await Promise.all(
+          Array.from({ length: count }, (_, i) =>
+            fs.writeFile(path.join(testDir, `f${String(i).padStart(3, '0')}.js`), 'x'),
+          ),
+        );
+
+        const files = await getAllFilesParallel(testDir, { concurrency: 5, highWaterMark });
+        expect(files).toHaveLength(count);
+      },
+      30000,
+    );
+
+    it('completes across nested directories with a tiny buffer', async () => {
+      const dirs = ['', 'a', 'a/b', 'a/b/c'];
+      for (const dir of dirs) {
+        const full = path.join(testDir, dir);
+        await fs.ensureDir(full);
+        await Promise.all(
+          Array.from({ length: 30 }, (_, i) => fs.writeFile(path.join(full, `f${i}.js`), 'x')),
+        );
+      }
+
+      const files = await getAllFilesParallel(testDir, { concurrency: 3, highWaterMark: 2 });
+      expect(files).toHaveLength(dirs.length * 30);
+    }, 30000);
   });
 
   describe('deterministic ordering', () => {

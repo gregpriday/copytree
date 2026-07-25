@@ -45,10 +45,13 @@ class FileLoadingStage extends Stage {
         };
       }
 
-      // 2. Use centralized binary detector
+      // 2. Use centralized binary detector.
+      //    Extension first: a known-binary extension is decided from the path
+      //    with no open/read, so a multi-gigabyte video costs one stat.
       const det = await detect(file.absolutePath, {
         sampleBytes: this.config.get('copytree.binaryDetect.sampleBytes', 8192),
         nonPrintableThreshold: this.config.get('copytree.binaryDetect.nonPrintableThreshold', 0.3),
+        extensions: this.config.get('copytree.binaryExtensions', undefined),
       });
 
       // Get policy for this file's category

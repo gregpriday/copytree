@@ -8,6 +8,7 @@ import {
 } from '../../utils/markdown.js';
 import { hashFile, hashContent } from '../../utils/fileHash.js';
 import { sanitizeForComment } from '../../utils/helpers.js';
+import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
 
 class MarkdownFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
@@ -33,7 +34,7 @@ class MarkdownFormatter {
 
     // YAML front matter
     lines.push('---');
-    lines.push('format: copytree-md@1');
+    lines.push(`format: ${OUTPUT_FORMAT_VERSIONS.markdown}`);
     lines.push('tool: copytree');
     lines.push(`generated: ${escapeYamlScalar(new Date().toISOString())}`);
     lines.push(`base_path: ${escapeYamlScalar(input.basePath)}`);

@@ -1,5 +1,9 @@
 import { EventEmitter } from 'events';
-import { ProgressTracker } from '../../../src/utils/ProgressTracker.js';
+import {
+  ProgressTracker,
+  PIPELINE_STAGES,
+  stageIdFor,
+} from '../../../src/utils/ProgressTracker.js';
 
 /**
  * Create a mock pipeline (EventEmitter) for testing.
@@ -59,7 +63,7 @@ describe('ProgressTracker', () => {
 
       pipeline.emit('pipeline:start', {});
       expect(updates.length).toBe(1);
-      expect(updates[0]).toEqual({ percent: 0, message: 'Starting...' });
+      expect(updates[0]).toEqual({ percent: 0, message: 'Starting...', stage: 'unknown' });
     });
   });
 
@@ -75,7 +79,7 @@ describe('ProgressTracker', () => {
 
     it('emits 0% on pipeline:start', () => {
       pipeline.emit('pipeline:start', {});
-      expect(updates[0]).toEqual({ percent: 0, message: 'Starting...' });
+      expect(updates[0]).toEqual({ percent: 0, message: 'Starting...', stage: 'unknown' });
     });
 
     it('emits 100% on pipeline:complete', () => {
@@ -354,5 +358,29 @@ describe('ProgressTracker', () => {
       const stageCompleteUpdate = updates.find((u) => u.message === 'Completed S1');
       expect(stageCompleteUpdate.percent).toBeLessThanOrEqual(99);
     });
+  });
+});
+
+describe('stable stage identifiers', () => {
+  it('maps stage class names to stable ids, never leaking the class name', () => {
+    // Consumers render `progress.stage` directly; "FileDiscoveryStage" showing
+    // up in a user-facing toast is the bug this mapping exists to prevent.
+    expect(stageIdFor('FileDiscoveryStage')).toBe(PIPELINE_STAGES.DISCOVER);
+    expect(stageIdFor('BudgetStage')).toBe(PIPELINE_STAGES.BUDGET);
+    expect(stageIdFor('CharLimitStage')).toBe(PIPELINE_STAGES.CHAR_LIMIT);
+    expect(stageIdFor('OutputFormattingStage')).toBe(PIPELINE_STAGES.FORMAT);
+    expect(stageIdFor('StreamingOutputStage')).toBe(PIPELINE_STAGES.FORMAT);
+  });
+
+  it('falls back to "unknown" for an unrecognized stage', () => {
+    expect(stageIdFor('SomeFutureStage')).toBe(PIPELINE_STAGES.UNKNOWN);
+    expect(stageIdFor(undefined)).toBe(PIPELINE_STAGES.UNKNOWN);
+  });
+
+  it('exposes ids that are stable, lowerCamelCase tokens', () => {
+    for (const id of Object.values(PIPELINE_STAGES)) {
+      expect(id).toMatch(/^[a-z][A-Za-z]*$/);
+    }
+    expect(Object.isFrozen(PIPELINE_STAGES)).toBe(true);
   });
 });

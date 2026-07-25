@@ -34,6 +34,7 @@ import path from 'path';
 import Clipboard from '../../utils/clipboard.js';
 import os from 'os';
 import { config } from '../../config/ConfigManager.js';
+import { buildProfileFromCliOptions, setupPipelineStages } from '../../commands/copy.js';
 
 const CopyView = () => {
   const {
@@ -73,10 +74,15 @@ const CopyView = () => {
     const startTime = Date.now();
 
     try {
-      // Handle dry-run mode early
+      // Handle dry-run mode early.
+      //
+      // Delegated wholesale to the command implementation rather than
+      // reimplemented here. A preview whose selection logic differs from the
+      // real run is worse than no preview, and every option the CLI accepts
+      // (--ext, --min-size, --no-tests, --head, ...) is already handled there.
       if (options.dryRun) {
-        console.log('Dry run mode - showing what would be copied without doing it');
-        console.log('Files would be processed from:', targetPath);
+        const copyCommand = (await import('../../commands/copy.js')).default;
+        await copyCommand(targetPath, options);
         process.exit(0);
         return;
       }
@@ -86,9 +92,12 @@ const CopyView = () => {
       // Ensure configuration is loaded before proceeding
       await config().loadConfiguration();
 
-      const profileName = options.profile || 'default';
       updateState({ currentStage: 'Preparing configuration' });
-      const profile = buildPipelineProfile(options);
+      // Same profile builder the non-UI path uses. The UI used to construct its
+      // own, which silently dropped most flags: it read `options.alwaysInclude`
+      // where the CLI sets `options.always`, and passed nothing at all to the
+      // discovery stage.
+      const profile = await buildProfileFromCliOptions(options, path.resolve(targetPath));
 
       // 2. Validate and resolve path
       let basePath;
@@ -150,86 +159,6 @@ const CopyView = () => {
       });
       process.exit(1);
     }
-  };
-
-  const buildPipelineProfile = (options) => ({
-    alwaysInclude: Array.isArray(options.alwaysInclude) ? options.alwaysInclude : [],
-    limits: {
-      files: options.maxFiles,
-      charLimit: options.charLimit,
-    },
-  });
-
-  const setupPipelineStages = async (basePath, profile, options) => {
-    const stages = [];
-
-    // Import stage classes
-    const { default: FileDiscoveryStage } =
-      await import('../../pipeline/stages/FileDiscoveryStage.js');
-    const { default: ProfileFilterStage } =
-      await import('../../pipeline/stages/ProfileFilterStage.js');
-    const { default: GitFilterStage } = await import('../../pipeline/stages/GitFilterStage.js');
-    const { default: LimitStage } = await import('../../pipeline/stages/LimitStage.js');
-    const { default: SortFilesStage } = await import('../../pipeline/stages/SortFilesStage.js');
-    const { default: AlwaysIncludeStage } =
-      await import('../../pipeline/stages/AlwaysIncludeStage.js');
-    const { default: FileLoadingStage } = await import('../../pipeline/stages/FileLoadingStage.js');
-    const { default: TransformStage } = await import('../../pipeline/stages/TransformStage.js');
-    const { default: CharLimitStage } = await import('../../pipeline/stages/CharLimitStage.js');
-    const { default: DeduplicateFilesStage } =
-      await import('../../pipeline/stages/DeduplicateFilesStage.js');
-    const { default: InstructionsStage } =
-      await import('../../pipeline/stages/InstructionsStage.js');
-    const { default: OutputFormattingStage } =
-      await import('../../pipeline/stages/OutputFormattingStage.js');
-
-    // 1. File Discovery
-    stages.push(FileDiscoveryStage);
-
-    // 2. Profile Filtering
-    stages.push(ProfileFilterStage);
-
-    // 3. Git Filtering (if enabled)
-    if (options.modified || options.changed) {
-      stages.push(GitFilterStage);
-    }
-
-    // 4. Limits
-    if (options.maxFiles || profile.limits?.files) {
-      stages.push(LimitStage);
-    }
-
-    // 5. Sort Files
-    stages.push(SortFilesStage);
-
-    // 6. Always Include
-    if (profile.alwaysInclude && profile.alwaysInclude.length > 0) {
-      stages.push(AlwaysIncludeStage);
-    }
-
-    // 7. File Loading
-    stages.push(FileLoadingStage);
-
-    // 8. Transform
-    if (!options.noTransform) {
-      stages.push(TransformStage);
-    }
-
-    // 9. Character Limit
-    if (options.charLimit || profile.limits?.charLimit) {
-      stages.push(CharLimitStage);
-    }
-
-    // 10. Deduplicate
-    stages.push(DeduplicateFilesStage);
-
-    // 12. Instructions Stage (load instructions unless disabled)
-    stages.push(InstructionsStage);
-
-    // 13. Output Formatting
-    stages.push(OutputFormattingStage);
-
-    return stages;
   };
 
   const prepareOutput = async (result, options) => {

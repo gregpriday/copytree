@@ -1,13 +1,78 @@
 /**
+ * Stable pipeline stage identifiers.
+ *
+ * These are part of the public API: `progress.stage` is rendered by consuming
+ * applications, so the set of values must be stable and mappable. Adding a stage
+ * is additive; renaming one is breaking.
+ *
+ * @readonly
+ * @enum {string}
+ */
+export const PIPELINE_STAGES = Object.freeze({
+  DISCOVER: 'discover',
+  ALWAYS_INCLUDE: 'alwaysInclude',
+  GIT_FILTER: 'gitFilter',
+  FILTER: 'filter',
+  SORT: 'sort',
+  BUDGET: 'budget',
+  LIMIT: 'limit',
+  LOAD: 'load',
+  SECRETS: 'secrets',
+  TRANSFORM: 'transform',
+  DEDUPE: 'dedupe',
+  CHAR_LIMIT: 'charLimit',
+  INSTRUCTIONS: 'instructions',
+  FORMAT: 'format',
+  UNKNOWN: 'unknown',
+});
+
+/**
+ * Class name -> stable stage id and human label.
+ *
+ * Consumers should switch on the id, not the label; the label is a default
+ * rendering, not a contract.
+ */
+const STAGE_INFO = {
+  FileDiscoveryStage: [PIPELINE_STAGES.DISCOVER, 'Discovering files'],
+  AlwaysIncludeStage: [PIPELINE_STAGES.ALWAYS_INCLUDE, 'Including required files'],
+  GitFilterStage: [PIPELINE_STAGES.GIT_FILTER, 'Filtering by git status'],
+  ProfileFilterStage: [PIPELINE_STAGES.FILTER, 'Applying filters'],
+  SortFilesStage: [PIPELINE_STAGES.SORT, 'Sorting files'],
+  BudgetStage: [PIPELINE_STAGES.BUDGET, 'Applying budgets'],
+  LimitStage: [PIPELINE_STAGES.LIMIT, 'Applying limits'],
+  FileLoadingStage: [PIPELINE_STAGES.LOAD, 'Loading file contents'],
+  SecretsGuardStage: [PIPELINE_STAGES.SECRETS, 'Scanning for secrets'],
+  TransformStage: [PIPELINE_STAGES.TRANSFORM, 'Transforming files'],
+  DeduplicateFilesStage: [PIPELINE_STAGES.DEDUPE, 'Removing duplicates'],
+  CharLimitStage: [PIPELINE_STAGES.CHAR_LIMIT, 'Applying character limits'],
+  InstructionsStage: [PIPELINE_STAGES.INSTRUCTIONS, 'Processing instructions'],
+  OutputFormattingStage: [PIPELINE_STAGES.FORMAT, 'Formatting output'],
+  StreamingOutputStage: [PIPELINE_STAGES.FORMAT, 'Streaming output'],
+};
+
+/**
+ * Map a stage class name to its stable identifier.
+ * @param {string} stageName - Stage class name
+ * @returns {string} Stable stage id from {@link PIPELINE_STAGES}
+ */
+export function stageIdFor(stageName) {
+  return STAGE_INFO[stageName]?.[0] ?? PIPELINE_STAGES.UNKNOWN;
+}
+
+/**
  * Normalizes pipeline events into simple progress updates.
  *
  * Translates detailed pipeline events (stage:start, stage:complete, file:batch,
- * stage:progress) into a simple { percent, message } format for UI consumers.
+ * stage:progress) into a simple `{ percent, message, stage }` format for UI
+ * consumers.
  *
  * Progress guarantees:
  * - Always starts at 0%
- * - Always ends at 100% on success
+ * - Always ends at 100% exactly once, on success
  * - Monotonically increasing (never goes backward)
+ * - `stage` is a stable id from {@link PIPELINE_STAGES}, never a class name
+ * - Fires during discovery, not only during formatting: on a large repository
+ *   the walk is the long pole, and a bar that sits at 0% then jumps reads as a hang
  * - Throttled to avoid overwhelming UI (default 100ms)
  */
 export class ProgressTracker {
@@ -37,7 +102,7 @@ export class ProgressTracker {
    */
   attach(pipeline) {
     pipeline.on('pipeline:start', () => {
-      this._emitForced({ percent: 0, message: 'Starting...' });
+      this._emitForced({ percent: 0, message: 'Starting...', stage: PIPELINE_STAGES.UNKNOWN });
       this.started = true;
     });
 
@@ -46,7 +111,11 @@ export class ProgressTracker {
       this.currentStageProgress = 0;
 
       const percent = this._calculatePercent();
-      this._emit({ percent, message: `${this._formatStageName(data.stage)}...` });
+      this._emit({
+        percent,
+        message: `${this._formatStageName(data.stage)}...`,
+        stage: stageIdFor(data.stage),
+      });
     });
 
     pipeline.on('stage:progress', (data) => {
@@ -54,7 +123,7 @@ export class ProgressTracker {
 
       const percent = this._calculatePercent();
       const message = data.message || `${this._formatStageName(data.stage)}...`;
-      this._emit({ percent, message });
+      this._emit({ percent, message, stage: stageIdFor(data.stage) });
     });
 
     pipeline.on('file:batch', (data) => {
@@ -62,7 +131,7 @@ export class ProgressTracker {
       const message = data.lastFile
         ? `Processing ${data.lastFile}`
         : `Processed ${data.count} files`;
-      this._emit({ percent, message });
+      this._emit({ percent, message, stage: stageIdFor(data.stage) });
     });
 
     pipeline.on('stage:complete', (data) => {
@@ -73,11 +142,12 @@ export class ProgressTracker {
       this._emit({
         percent,
         message: `Completed ${this._formatStageName(data.stage)}`,
+        stage: stageIdFor(data.stage),
       });
     });
 
     pipeline.on('pipeline:complete', () => {
-      this._emitForced({ percent: 100, message: 'Complete' });
+      this._emitForced({ percent: 100, message: 'Complete', stage: PIPELINE_STAGES.UNKNOWN });
       this.finished = true;
     });
 
@@ -85,7 +155,11 @@ export class ProgressTracker {
       // On error, emit final progress at whatever we reached
       if (!this.finished) {
         const percent = this._calculatePercent();
-        this._emitForced({ percent, message: 'Error occurred' });
+        this._emitForced({
+          percent,
+          message: 'Error occurred',
+          stage: PIPELINE_STAGES.UNKNOWN,
+        });
         this.finished = true;
       }
     });
@@ -110,25 +184,7 @@ export class ProgressTracker {
    */
   _formatStageName(stageName) {
     // Convert "FileDiscoveryStage" -> "Discovering files"
-    // Convert "ProfileFilterStage" -> "Filtering by profile"
-    const stageMessages = {
-      FileDiscoveryStage: 'Discovering files',
-      AlwaysIncludeStage: 'Including required files',
-      GitFilterStage: 'Filtering by git status',
-      ProfileFilterStage: 'Applying filters',
-      DeduplicateFilesStage: 'Removing duplicates',
-      SortFilesStage: 'Sorting files',
-      FileLoadingStage: 'Loading file contents',
-      TransformStage: 'Transforming files',
-      CharLimitStage: 'Applying character limits',
-      SecretsGuardStage: 'Scanning for secrets',
-      InstructionsStage: 'Processing instructions',
-      LimitStage: 'Applying limits',
-      OutputFormattingStage: 'Formatting output',
-      StreamingOutputStage: 'Streaming output',
-    };
-
-    return stageMessages[stageName] || stageName;
+    return STAGE_INFO[stageName]?.[1] ?? stageName;
   }
 
   /**

@@ -17,12 +17,18 @@
  * Used by the onProgress callback to report progress updates.
  */
 export interface ProgressEvent {
-  /** Progress percentage (0-100) */
+  /**
+   * Progress percentage (0-100).
+   * Monotonic within a run, and reaches 100 exactly once on success.
+   */
   percent: number;
   /** Human-readable progress message */
   message: string;
-  /** Current stage name */
-  stage?: string;
+  /**
+   * Stable stage identifier, never a class name.
+   * Fires during discovery as well as formatting.
+   */
+  stage?: PipelineStageId;
   /** Files processed so far */
   filesProcessed?: number;
   /** Total files estimated */
@@ -37,6 +43,195 @@ export interface ProgressEvent {
  * Progress callback function signature
  */
 export type ProgressCallback = (progress: ProgressEvent) => void;
+
+/**
+ * Stable pipeline stage identifiers.
+ *
+ * Part of the public API: `ProgressEvent.stage` is rendered by consuming
+ * applications, so these values are stable. Adding a stage is additive;
+ * renaming one is breaking.
+ */
+export type PipelineStageId =
+  | 'discover'
+  | 'alwaysInclude'
+  | 'gitFilter'
+  | 'filter'
+  | 'sort'
+  | 'budget'
+  | 'limit'
+  | 'load'
+  | 'secrets'
+  | 'transform'
+  | 'dedupe'
+  | 'charLimit'
+  | 'instructions'
+  | 'format'
+  | 'unknown';
+
+export const PIPELINE_STAGES: Readonly<Record<string, PipelineStageId>>;
+
+/** Map a stage class name to its stable identifier. */
+export function stageIdFor(stageName: string): PipelineStageId;
+
+// ============================================================================
+// Exclusion Accounting
+// ============================================================================
+
+/**
+ * Stable exclusion reason keys.
+ *
+ * Values are machine-readable and never prose: they cross process boundaries
+ * and get rendered by switch statements. New reasons are additive.
+ */
+export type ExclusionReason =
+  | 'gitignore'
+  | 'copytreeignore'
+  | 'globalGitignore'
+  | 'gitInfoExclude'
+  | 'configExclude'
+  | 'optionExclude'
+  | 'filterPattern'
+  | 'testExclude'
+  | 'binaryExtension'
+  | 'sizeGate'
+  | 'totalSizeBudget'
+  | 'fileCountBudget'
+  | 'charBudget'
+  | 'scopeFilter'
+  | 'gitFilter'
+  | 'duplicate'
+  | 'unreadable';
+
+export const EXCLUSION_REASONS: Readonly<Record<string, ExclusionReason>>;
+
+/** One excluded entry, with the rule that excluded it when known. */
+export interface ExclusionDetail {
+  /** POSIX path relative to the base path */
+  path: string;
+  /** File size in bytes (0 when unknown, e.g. a pruned directory) */
+  size: number;
+  /** Why it was excluded */
+  reason: ExclusionReason;
+  /** The pattern that matched, when known */
+  rule?: string;
+  /** Which ignore file and line produced the rule, e.g. `/repo/.gitignore:12` */
+  ruleSource?: string;
+}
+
+/**
+ * Exclusion accounting for a run.
+ *
+ * Aggregate counts are always present and cost nothing extra. The `largest`
+ * detail list is only populated when `explain: true` was requested.
+ *
+ * A pruned directory counts as a single exclusion representing its entire
+ * subtree; CopyTree does not descend into an excluded directory to count what
+ * is inside it.
+ */
+export interface ExclusionSummary {
+  /** How many entries were excluded */
+  total: number;
+  /** Counts keyed by reason */
+  byReason: Partial<Record<ExclusionReason, number>>;
+  /** The largest exclusions, only under `explain: true` */
+  largest?: ExclusionDetail[];
+}
+
+// ============================================================================
+// Manifest Outcomes
+// ============================================================================
+
+/**
+ * What happened to a file.
+ *
+ * `excluded:<reason>` uses the {@link ExclusionReason} keys.
+ */
+export type ManifestOutcome =
+  | 'included'
+  | 'structure-only'
+  | 'binary-placeholder'
+  | 'truncated'
+  | `excluded:${string}`;
+
+export const MANIFEST_OUTCOMES: Readonly<Record<string, ManifestOutcome>>;
+
+/** Output format version strings, e.g. `copytree-xml@1`. */
+export const OUTPUT_FORMAT_VERSIONS: Readonly<Record<string, string>>;
+
+/** Get the version string for a format name, or null if unknown. */
+export function versionFor(format: string): string | null;
+
+/** Average characters per token used by the estimator. */
+export const CHARS_PER_TOKEN: number;
+
+/**
+ * Estimate tokens from a character count.
+ * Heuristic: accurate to roughly ±20%, with no tokenizer dependency and no
+ * per-model accuracy claim.
+ */
+export function estimateTokens(chars: number): number;
+
+/** Estimate the formatted output size, in characters, for a set of files. */
+export function estimateOutputChars(
+  files: Array<Pick<FileResult, 'path' | 'size'> & { content?: string; isBinary?: boolean }>,
+  options?: { format?: string; onlyTree?: boolean; addLineNumbers?: boolean },
+): number;
+
+// ============================================================================
+// Scope
+// ============================================================================
+
+/** A resolved `scope` entry. */
+export interface ScopeEntry {
+  /** Platform-native absolute path */
+  absolutePath: string;
+  /** POSIX path relative to the base path */
+  relativePath: string;
+  /** Whether the entry is a directory */
+  isDirectory: boolean;
+}
+
+/**
+ * Resolve, validate, and normalize a scope selection.
+ *
+ * Entries are literal paths, not globs. Duplicates are removed and a parent
+ * subsumes its children.
+ *
+ * @throws ScopeError `ERR_SCOPE_OUTSIDE_ROOT` when an entry escapes the base path
+ * @throws ScopeError `ERR_PATH_NOT_FOUND` when an entry does not exist
+ */
+export function resolveScope(
+  basePath: string,
+  scope: string | string[],
+  options?: { followSymlinks?: boolean },
+): Promise<ScopeEntry[]>;
+
+/**
+ * Classify a file extension without touching the filesystem.
+ * Returns null for unknown extensions and for source-code extensions that must
+ * never be treated as binary (`.ts`, `.h`, `.html`, ...).
+ */
+export function categorizeByExt(
+  ext: string,
+  groups?: Record<string, string[]>,
+): string | null;
+
+/** Detect whether a file is binary. Extension first, content sniff only when unknown. */
+export function detectBinary(
+  filePath: string,
+  options?: {
+    sampleBytes?: number;
+    nonPrintableThreshold?: number;
+    extensions?: Record<string, string[]>;
+  },
+): Promise<{
+  isBinary: boolean;
+  category: string;
+  reason: 'extension' | 'magic' | 'null-byte' | 'ratio' | 'textual' | 'error';
+  ext: string;
+  name?: string;
+  error?: string;
+}>;
 
 // ============================================================================
 // Logger Types
@@ -86,6 +281,15 @@ export interface ManifestEntry {
   path: string;
   /** File size in bytes */
   size: number;
+  /** ISO timestamp of last modification, when known */
+  modified?: string;
+  /**
+   * What happened to this file.
+   *
+   * A structure-only lock file and a fully included source file are not the
+   * same thing, and a preview built from the manifest has to tell them apart.
+   */
+  outcome: ManifestOutcome;
 }
 
 /**
@@ -118,11 +322,42 @@ export interface FileResult {
  * Options for the scan() function
  */
 export interface ScanOptions {
-  /** Additional include patterns */
+  /** Additional include patterns (globs) */
   filter?: string | string[];
-  /** Additional exclude patterns */
+  /** Additional exclude patterns (globs) */
   exclude?: string | string[];
-  /** Use .gitignore rules (default: true) */
+  /**
+   * Literal paths (files or directories) to traverse instead of the whole tree.
+   *
+   * Not globs: a directory named `src/[draft]` is just a path, with nothing for
+   * the caller to escape. Ignore rules still resolve from `basePath` — root
+   * `.gitignore`, root `.copytreeignore`, and every nested ignore file between
+   * the root and the selection — so a scoped run selects exactly the files a
+   * filtered full run would. Output paths stay relative to `basePath`, so
+   * `@`-references handed to an agent still resolve.
+   *
+   * Traversal starts at the selection, so cost scales with what was selected
+   * rather than with the size of the repository. Composes with `filter`:
+   * `{ scope: ['src'], filter: ['**\/*.ts'] }` means TypeScript files under src.
+   */
+  scope?: string | string[];
+  /**
+   * Let `scope` entries override the ignore rules that would exclude them
+   * (default: false).
+   *
+   * Off by default so the invariant above holds. Turn it on for the deliberate
+   * gesture — a user who navigated into a gitignored folder and asked for it.
+   * Config exclusions still apply, so `node_modules` stays out.
+   */
+  scopeIgnoresIgnoreFiles?: boolean;
+  /**
+   * Use gitignore rules (default: true).
+   *
+   * Covers nested `.gitignore` at every depth, `.git/info/exclude`, and the
+   * user's global gitignore (`core.excludesFile`). All plain filesystem reads:
+   * CopyTree never shells out to `git check-ignore` and never requires the
+   * target to be a git repository.
+   */
   respectGitignore?: boolean;
   /** Only git modified files */
   modified?: boolean;
@@ -138,13 +373,39 @@ export interface ScanOptions {
   includeHidden?: boolean;
   /** Follow symbolic links (default: false) */
   followSymlinks?: boolean;
-  /** Maximum file size in bytes */
+  /**
+   * Memory-safety ceiling in bytes (default: 10MB).
+   * Nothing above this is ever read, and nothing lifts it.
+   */
   maxFileSize?: number;
-  /** Maximum total size in bytes */
+  /**
+   * Hard per-file size gate in bytes, applied from `stat()` (default: 256KB).
+   *
+   * Files above it are never opened; they are reported under
+   * `stats.excluded.byReason.sizeGate`. Distinct from `maxFileSize`, which is
+   * about memory, and from `charLimit`, which truncates *after* reading.
+   * Only `always` / `.copytreeinclude` overrides it. `false` disables it.
+   */
+  sizeGate?: number | false;
+  /**
+   * Total size budget in bytes across all selected files.
+   * Applied after sorting, so which files survive follows `sort`.
+   */
   maxTotalSize?: number;
-  /** Maximum number of files */
+  /**
+   * Maximum number of files.
+   * Applied after sorting, so which files survive follows `sort`.
+   */
   maxFileCount?: number;
-  /** Patterns to force include */
+  /**
+   * Character budget across all file content.
+   * Truncates at a line boundary, marks the cut inline, and never emits an
+   * unpaired UTF-16 surrogate.
+   */
+  charLimit?: number;
+  /** Collect per-file exclusion detail in `stats.excluded.largest` */
+  explain?: boolean;
+  /** Patterns to force include. The only thing that overrides `sizeGate`. */
   always?: string | string[];
   /** AbortSignal for cancellation */
   signal?: AbortSignal;
@@ -156,8 +417,16 @@ export interface ScanOptions {
   includeContent?: boolean;
   /** Remove duplicate files */
   dedupe?: boolean;
-  /** Sort order: 'path', 'size', 'modified', 'name', 'extension', 'depth' */
+  /** Sort key: 'path', 'size', 'modified', 'name', 'extension', 'depth' */
   sort?: 'path' | 'size' | 'modified' | 'name' | 'extension' | 'depth';
+  /**
+   * Sort direction (default: 'asc').
+   *
+   * Budgets keep the head of the sorted list, so this decides which files
+   * survive when one bites. `sort: 'modified'` alone keeps the oldest files;
+   * add `sortOrder: 'desc'` to keep the most recently touched.
+   */
+  sortOrder?: 'asc' | 'desc';
   /**
    * ConfigManager instance for isolated configuration.
    * If not provided, an isolated instance will be created.
@@ -174,6 +443,40 @@ export interface ScanOptions {
    * Limits how frequently progress callbacks are invoked.
    */
   progressThrottleMs?: number;
+  /**
+   * Called once after the pipeline completes and before any file is yielded.
+   *
+   * This is how a streaming consumer gets the counts, exclusion accounting and
+   * truncation status without buffering the whole run.
+   */
+  onSummary?: (summary: ScanSummary) => void;
+}
+
+/** Summary of a scan, delivered via `ScanOptions.onSummary`. */
+export interface ScanSummary {
+  /** Files selected */
+  totalFiles: number;
+  /** Total size of selected files in bytes */
+  totalSize: number;
+  /**
+   * True when nothing matched.
+   *
+   * A valid, common outcome (an empty folder, a fully-ignored scope), not an
+   * error: `copy()` returns a valid empty document rather than throwing.
+   */
+  noFilesMatched: boolean;
+  /** Exclusion accounting */
+  excluded: ExclusionSummary;
+  /** Whether a budget dropped files */
+  truncated: boolean;
+  /** How many files a budget dropped */
+  truncatedCount?: number;
+  /** Which budget bit first */
+  truncatedBy?: 'maxFileCount' | 'maxTotalSize' | 'charLimit';
+  /** Set when the retained set is larger than `maxTotalSize` */
+  budgetExceeded?: boolean;
+  /** Resolved scope entries, when scoped */
+  scope?: string[];
 }
 
 /**
@@ -183,6 +486,8 @@ export interface ScanOptions {
  * @param basePath - Path to directory to scan
  * @param options - Scan options
  * @returns Async iterable of file results
+ * @throws ValidationError `ERR_PATH_NOT_FOUND` when basePath does not exist
+ * @throws ScopeError `ERR_SCOPE_OUTSIDE_ROOT` / `ERR_PATH_NOT_FOUND` for bad scope entries
  */
 export function scan(
   basePath: string,
@@ -277,11 +582,22 @@ export interface CopyOptions extends ScanOptions, FormatOptions {
   secretsReport?: string;
   /** Include summary information */
   info?: boolean;
-  /** Preview without processing */
+  /**
+   * Plan the run without reading or formatting content.
+   *
+   * Every stat-based budget (`sizeGate`, `maxFileSize`, `maxFileCount`,
+   * `maxTotalSize`) applies exactly as it would in the real run, so the
+   * selection is identical.
+   *
+   * Two options cannot be planned exactly, because both need content:
+   * `charLimit` is planned from byte size, which equals character length for
+   * ASCII but overestimates for multi-byte text; `dedupe` cannot run at all.
+   * With either option set, treat the preview as an estimate.
+   */
   dryRun?: boolean;
   /** Verbose error output */
   verbose?: boolean;
-  /** Character limit per file */
+  /** Character budget across all file content */
   charLimit?: number;
   /** Instructions to include in output */
   instructions?: string;
@@ -315,30 +631,36 @@ export interface CopyResult {
   /** Formatted output string */
   output: string;
   /**
+   * Version of the emitted format, e.g. `copytree-xml@1`.
+   *
+   * The output shape and its delimiters are a compatibility surface: agents are
+   * prompted against them, so a change is versioned rather than silent.
+   */
+  outputFormatVersion: string | null;
+  /**
    * Full file results including content, metadata, and git status.
    * Use `manifest` instead when you only need paths and sizes — it avoids
    * retaining megabytes of file content in memory.
    */
   files: FileResult[];
   /**
-   * Lightweight manifest of included files — an array of `{ path, size }` objects.
-   * Ideal for building UI file-breakdowns (e.g. tooltips or lists) without
-   * holding the full file content in memory.
+   * Lightweight manifest of included files.
    *
-   * Consistent shape across both normal runs and dry runs: entries always have
-   * `path` and `size` (bytes), never `content` — but the set of files in the
-   * manifest follows the same inclusion rules as `result.files` for each mode.
+   * Safe to retain in a long-lived process: entries carry `path`, `size`,
+   * `modified` and an `outcome`, never `content`. The `outcome` is what makes
+   * this usable for a preview — a structure-only lock file and a fully included
+   * source file are distinguishable.
    *
    * @example
    * const result = await copy('./src');
-   * result.manifest.forEach(({ path, size }) => {
-   *   console.log(`${path}: ${size} bytes`);
+   * result.manifest.forEach(({ path, size, outcome }) => {
+   *   console.log(`${outcome}\t${path}: ${size} bytes`);
    * });
    *
    * @example
-   * // Dry run: get file list without processing content
+   * // Dry run: get the plan without reading content
    * const { manifest } = await copy('./src', { dryRun: true });
-   * console.log(`Would include ${manifest.length} files`);
+   * console.log(`Would include ${manifest.filter((f) => f.outcome === 'included').length} files`);
    */
   manifest: ManifestEntry[];
   /** Processing statistics */
@@ -351,6 +673,46 @@ export interface CopyResult {
     totalSize: number;
     /** Output size in bytes */
     outputSize?: number;
+    /**
+     * Output characters. Measured on a real run, estimated on a dry run.
+     *
+     * Bytes on disk are the wrong unit for deciding whether a context fits;
+     * output characters are what the budget is actually spent on.
+     */
+    estimatedOutputChars: number;
+    /**
+     * Rough token count (chars/4).
+     *
+     * Heuristic: accurate to roughly ±20%, no tokenizer dependency, no
+     * per-model accuracy claim. Enough to turn "312 KB" into "~78k tokens",
+     * which is the number that decides whether you paste it.
+     */
+    estimatedTokens: number;
+    /**
+     * True when nothing matched.
+     *
+     * A valid, common outcome, not a failure: `copy()` returns a valid empty
+     * document instead of throwing, so a caller can say "nothing to copy here".
+     */
+    noFilesMatched: boolean;
+    /** Exclusion accounting: what didn't make it, and why */
+    excluded: ExclusionSummary;
+    /** Whether a budget dropped files. Truncation is reported, never silent. */
+    truncated?: boolean;
+    /** How many files a budget dropped */
+    truncatedCount?: number;
+    /** Which budget bit first */
+    truncatedBy?: 'maxFileCount' | 'maxTotalSize' | 'charLimit';
+    /**
+     * Set when the retained set is larger than `maxTotalSize`.
+     *
+     * Happens only when the first file alone exceeds the budget: it is kept,
+     * because returning nothing at all is a worse answer, and the overshoot is
+     * reported here rather than hidden.
+     */
+    budgetExceeded?: boolean;
+    /** Resolved scope entries, when scoped */
+    scope?: string[];
     /** Secrets detection summary (if enabled) */
     secretsGuard?: {
       detected: number;
@@ -395,9 +757,20 @@ export interface CopyStreamOptions extends ScanOptions, FormatOptions {
    */
   config?: ConfigManager;
   /** Progress callback function */
-  onProgress?: (progress: { percent: number; message: string }) => void;
+  onProgress?: ProgressCallback;
   /** Add line numbers (alias for addLineNumbers) */
   withLineNumbers?: boolean;
+  /** Plan the run and report, emitting no chunks */
+  dryRun?: boolean;
+  /**
+   * Called once after the last chunk with the same numbers `copy()` returns.
+   * Choosing streaming does not mean giving up the stats and manifest.
+   */
+  onComplete?: (result: {
+    outputFormatVersion: string | null;
+    manifest: ManifestEntry[];
+    stats: CopyResult['stats'];
+  }) => void;
 }
 
 /**
@@ -1110,15 +1483,47 @@ export class TransformerRegistry {
 // Configuration
 // ============================================================================
 
+/** Options for constructing a ConfigManager. */
+export interface ConfigManagerOptions {
+  /** Skip JSON schema validation */
+  noValidate?: boolean;
+  /**
+   * Load `~/.copytree` (default: true).
+   *
+   * Set false for a hermetic configuration that depends only on the package
+   * defaults. For a CLI a user config directory is a feature; for an embedded
+   * application it means the context depends on a file outside the project,
+   * different on every machine, and a `.js` file there is arbitrary code
+   * executed in the host process.
+   */
+  userConfig?: boolean;
+  /** Explicit source list, e.g. `['defaults']`. Takes precedence over `userConfig`. */
+  configSources?: Array<'defaults' | 'user'>;
+  /** Override the user config directory */
+  userConfigPath?: string;
+  /**
+   * Throw `ERR_CONFIG_INVALID` when a source fails to load, instead of warning
+   * and continuing with a partial (possibly empty) configuration.
+   */
+  strict?: boolean;
+}
+
 /**
  * Configuration manager for CopyTree.
  * Supports both singleton pattern (deprecated) and instance-based usage.
+ *
+ * Everything resolves from the package directory and the explicit `basePath`
+ * passed to the API; nothing consults `process.cwd()`.
+ *
+ * A loaded instance is safe to share across concurrent `copy()` / `scan()`
+ * calls. Create one per process or per project, not one per call: loading
+ * parses every config file and compiles the JSON schema.
  */
 export class ConfigManager {
   /**
    * Create a new ConfigManager instance (use ConfigManager.create() instead)
    */
-  constructor(options?: { noValidate?: boolean });
+  constructor(options?: ConfigManagerOptions);
 
   /**
    * Static factory method to create and initialize a ConfigManager instance.
@@ -1126,7 +1531,18 @@ export class ConfigManager {
    * @param options - Configuration options
    * @returns Promise resolving to an initialized ConfigManager instance
    */
-  static create(options?: { noValidate?: boolean }): Promise<ConfigManager>;
+  static create(options?: ConfigManagerOptions): Promise<ConfigManager>;
+
+  /**
+   * Whether the package default configuration loaded successfully.
+   *
+   * False means the run would proceed with no exclusion lists at all, which
+   * looks like success and is not. Check this after `create()` when embedding.
+   */
+  readonly isDefaultsLoaded: boolean;
+
+  /** Load failures encountered during initialization; empty when clean. */
+  getLoadErrors(): Array<{ scope: string; message: string }>;
 
   /**
    * Get configuration value using dot notation
@@ -1235,12 +1651,43 @@ export class FileSystemError extends CopyTreeError {
 
 export class ConfigurationError extends CopyTreeError {}
 export class ValidationError extends CopyTreeError {}
+export class ScopeError extends CopyTreeError {
+  /** The offending scope entry, as the caller supplied it */
+  scopePath: string;
+}
 export class PipelineError extends CopyTreeError {}
 export class TransformError extends CopyTreeError {}
 export class GitError extends CopyTreeError {}
 export class ProfileError extends CopyTreeError {}
 export class InstructionsError extends CopyTreeError {}
 export class SecretsDetectedError extends CopyTreeError {}
+
+/**
+ * Stable, machine-readable error codes.
+ *
+ * Switch on `error.code` to pick a recovery action. Values never change once
+ * released; new codes are additive. Substring matching on `error.message` is
+ * not a supported integration.
+ */
+export type ErrorCode =
+  | 'ERR_PATH_NOT_FOUND'
+  | 'ERR_NOT_A_DIRECTORY'
+  | 'ERR_SCOPE_OUTSIDE_ROOT'
+  | 'ERR_INVALID_OPTION'
+  | 'ERR_INVALID_FORMAT'
+  | 'ERR_CONFIG_INVALID'
+  | 'ERR_ABORTED'
+  | 'ERR_NO_FILES_MATCHED';
+
+export const ERROR_CODES: Readonly<Record<string, ErrorCode>>;
+
+/**
+ * Create the canonical abort error: `name === 'AbortError'`, `code === 'ERR_ABORTED'`.
+ */
+export function createAbortError(message?: string): Error;
+
+/** Whether an error represents a cancellation. */
+export function isAbortError(error: unknown): boolean;
 
 // ============================================================================
 // Default Export

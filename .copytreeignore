@@ -1,25 +1,59 @@
 # CopyTree Ignore File
-# Exclude files and directories that aren't needed for code work
+#
+# Tuned for exporting CopyTree itself as AI context: ship the source and the
+# design docs, drop the scaffolding. Everything here is recoverable:
+#   copytree --scope tests/unit/utils --scope-include-ignored -S   # one subtree
+#   echo 'tests/**' >> .copytreeinclude                            # the lot
+#
+# Prefer .copytreeinclude for the override: it is the only mechanism that wins
+# on every output path. `--always` and `--scope-include-ignored` are currently
+# dropped unless you also pass -S/--stream (see src/ui/components/CopyView.js,
+# which reads options.alwaysInclude while the CLI sets options.always).
+#
+# Syntax is .gitignore syntax, including directory pruning: once `dir/**` is
+# excluded, a `!dir/sub/file` negation only takes effect if `!dir/sub/` is
+# re-included first (otherwise the walker never descends into it).
 
-# Documentation - exclude detailed guides but keep overview docs
+# ── Tests ────────────────────────────────────────────────────────────────────
+# The suite is >50% of the export by size and mostly restates behaviour the
+# source already shows. Excluded wholesale; use --always to bring it back.
+tests/**
+
+# ── Documentation ────────────────────────────────────────────────────────────
+# User-facing guides largely restate `copytree --help`. Keep the three
+# developer references that describe design decisions source alone won't show.
 docs/**
+!docs/technical/
+!docs/technical/architecture.md
+!docs/reference/
+!docs/reference/configuration.md
+!docs/development/
+!docs/development/transformer-traits.md
 
-# Tests - exclude test fixtures (especially large images) but keep test code
-tests/fixtures/**
+# ── Lockfiles ────────────────────────────────────────────────────────────────
+# Enormous, generated, zero signal. package.json carries the dependency story.
+package-lock.json
+**/package-lock.json
 
-# Configuration and tooling files that are rarely modified
+# ── Build and test tooling ───────────────────────────────────────────────────
+# Config for how the project is built and linted, not what it does.
 babel.config.json
+eslint.config.js
 jest.config.js
 jest.integration.config.js
-eslint.config.js
+jest.performance.config.js
+.prettierignore
+.gitattributes
+# .babelrc and .prettierrc are not listed: config/copytree.js pins them under
+# forceIncludeDotfiles, which outranks this file. They are ~300 B combined.
 
-# Debug and temporary files
-debug-hang.js
+# ── Agent and editor scaffolding ─────────────────────────────────────────────
+# Slash commands and workflow notes for this repo's own tooling. CLAUDE.md
+# stays — it is the project constitution and reads as useful context.
+.claude/**
 
-# Changelog and license (less relevant for code work)
+# ── Housekeeping ─────────────────────────────────────────────────────────────
 CHANGELOG.md
 LICENSE
-
-# Example/template files - keep the default profile, exclude examples
-# (commented out to keep profiles for reference)
-# profiles/**
+**/.gitkeep
+debug-hang.js

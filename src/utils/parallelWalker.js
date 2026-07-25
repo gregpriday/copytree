@@ -12,9 +12,8 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import ignore from 'ignore';
 import { withFsRetry } from './retryableFs.js';
-import { isRetryableFsError } from './errors.js';
+import { isRetryableFsError, createAbortError } from './errors.js';
 import {
   recordRetry,
   recordGiveUp,
@@ -22,73 +21,12 @@ import {
   recordSuccessAfterRetry,
 } from './fsErrorReport.js';
 import { toPosix } from './pathUtils.js';
-
-/**
- * Read ignore rules from a file
- * @param {string} filePath - Absolute path to ignore file
- * @returns {Promise<string[]>} Array of rule lines (or empty if file doesn't exist)
- */
-async function readRules(filePath) {
-  try {
-    const content = await fs.readFile(filePath, 'utf8');
-    // Strip UTF-8 BOM if present
-    const cleaned = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
-    return cleaned.split('\n');
-  } catch {
-    // File doesn't exist or can't be read - treat as no rules
-    return [];
-  }
-}
-
-/**
- * Determine if a path should be ignored based on layered ignore rules
- * @param {string} absPath - Absolute path to test
- * @param {string} root - Root directory path
- * @param {Array<{base: string, ig: any}>} layers - Stack of ignore layers
- * @param {boolean} [isDirectory=false] - Whether the path is a directory
- * @returns {{ignored: boolean, rule?: string, layer?: string}} Ignore decision and explanation
- */
-function isIgnored(absPath, root, layers, isDirectory = false) {
-  const relToRoot = toPosix(path.relative(root, absPath));
-  let ignored = false;
-  let matchedRule = null;
-  let matchedLayer = null;
-
-  for (const { base, ig } of layers) {
-    const relToLayer = toPosix(path.relative(base, absPath));
-
-    // Skip if path isn't under this layer's base
-    if (relToLayer.startsWith('..')) continue;
-
-    // Test with directory trailing slash if it's a directory
-    const testPath = isDirectory && !relToLayer.endsWith('/') ? relToLayer + '/' : relToLayer;
-
-    // Use .test() if available (returns {ignored, unignored}), otherwise fallback to .ignores()
-    const result = ig.test?.(testPath) ?? {
-      ignored: ig.ignores(testPath),
-      unignored: false,
-    };
-
-    if (result.ignored !== undefined) {
-      if (result.ignored) {
-        ignored = true;
-        matchedRule = 'exclude';
-        matchedLayer = base;
-      }
-      if (result.unignored) {
-        ignored = false;
-        matchedRule = 'include (negation)';
-        matchedLayer = base;
-      }
-    }
-  }
-
-  return {
-    ignored,
-    rule: matchedRule,
-    layer: matchedLayer,
-  };
-}
+import {
+  evaluateIgnore as isIgnored,
+  layersForDirectory,
+  buildScopeContext,
+} from './ignoreWalker.js';
+import { EXCLUSION_REASONS } from './exclusionReport.js';
 
 /**
  * Parallel directory walker with bounded concurrency
@@ -97,20 +35,25 @@ function isIgnored(absPath, root, layers, isDirectory = false) {
  * @generator
  * @param {string} root - Root directory to walk
  * @param {Object} options - Walk options
- * @param {string} [options.ignoreFileName='.copytreeignore'] - Name of ignore files to process
+ * @param {string} [options.ignoreFileName='.copytreeignore'] - Legacy single ignore file name
+ * @param {string[]} [options.ignoreFileNames] - Ordered ignore file names; later layers win
  * @param {boolean} [options.includeDirectories=false] - Whether to yield directories
  * @param {boolean} [options.followSymlinks=false] - Whether to follow symbolic links
  * @param {boolean} [options.explain=false] - Include explanation for each decision
- * @param {Array} [options.initialLayers=[]] - Pre-existing ignore layers (e.g., from .gitignore)
+ * @param {Array} [options.initialLayers=[]] - Pre-existing ignore layers (e.g., config excludes)
  * @param {Object} [options.config] - Configuration object for retry settings
  * @param {number} [options.concurrency=5] - Maximum concurrent directory operations
  * @param {number} [options.highWaterMark] - Backpressure threshold (default: 2x concurrency)
+ * @param {string[]} [options.scope] - Absolute paths to traverse instead of the whole root
+ * @param {boolean} [options.scopeIgnoresIgnoreFiles=false] - Let scope entries override ignore rules
+ * @param {Function} [options.onExclude] - Called for every excluded entry
  * @param {AbortSignal} [options.signal] - Abort signal for cancellation
  * @yields {{path: string, stats: fs.Stats, explanation?: Object}} File information
  */
 export async function* walkParallel(root, options = {}) {
   const {
     ignoreFileName = '.copytreeignore',
+    ignoreFileNames,
     includeDirectories = false,
     followSymlinks = false,
     explain = false,
@@ -120,7 +63,30 @@ export async function* walkParallel(root, options = {}) {
     highWaterMark = concurrency * 2,
     signal,
     maxDepth = undefined,
+    scope = null,
+    scopeIgnoresIgnoreFiles = false,
+    onExclude = null,
   } = options;
+
+  const ignoreNames =
+    Array.isArray(ignoreFileNames) && ignoreFileNames.length > 0
+      ? ignoreFileNames
+      : [ignoreFileName];
+
+  // Ignore files are metadata, not content: never emit them.
+  const suppressedNames = new Set([...ignoreNames, '.gitignore', '.copytreeignore']);
+
+  function reportExclusion(absPath, decision, size, isDirectory) {
+    if (!onExclude) return;
+    onExclude({
+      path: toPosix(path.relative(root, absPath)),
+      size: size || 0,
+      reason: decision.reason || EXCLUSION_REASONS.CONFIG_EXCLUDE,
+      rule: decision.rule,
+      ruleSource: decision.ruleSource,
+      isDirectory: Boolean(isDirectory),
+    });
+  }
 
   // Extract retry configuration with defaults
   const retryConfig = {
@@ -164,7 +130,7 @@ export async function* walkParallel(root, options = {}) {
     if (throttleEnabled) {
       while (buffer.length >= maxBuffer) {
         if (signal?.aborted) {
-          throw new Error('Traversal aborted');
+          throw createAbortError('Traversal aborted');
         }
         if (!drainWaitPromise) {
           drainWaitPromise = new Promise((resolve) => {
@@ -176,6 +142,7 @@ export async function* walkParallel(root, options = {}) {
     }
 
     buffer.push(result);
+    signalData();
   }
 
   function notifyDrain() {
@@ -188,8 +155,32 @@ export async function* walkParallel(root, options = {}) {
     }
   }
 
-  // Track if traversal is complete
-  let done = false;
+  // Wake the consumer as soon as output exists.
+  //
+  // Without this the consumer only wakes when a worker task settles, while a
+  // worker that filled the buffer is itself waiting for the consumer to drain
+  // it — so a single directory yielding more than `highWaterMark` entries hangs
+  // the traversal outright.
+  let dataWaitPromise = null;
+  let resolveDataWait = null;
+
+  function signalData() {
+    if (resolveDataWait) {
+      const resolve = resolveDataWait;
+      resolveDataWait = null;
+      dataWaitPromise = null;
+      resolve();
+    }
+  }
+
+  function waitForData() {
+    if (!dataWaitPromise) {
+      dataWaitPromise = new Promise((resolve) => {
+        resolveDataWait = resolve;
+      });
+    }
+    return dataWaitPromise;
+  }
 
   /**
    * Check if we should follow a symlink (and detect cycles)
@@ -218,7 +209,7 @@ export async function* walkParallel(root, options = {}) {
    */
   async function processEntry(dir, entry, layers, depth) {
     if (signal?.aborted) {
-      throw new Error('Traversal aborted');
+      throw createAbortError('Traversal aborted');
     }
 
     const absPath = path.join(dir, entry.name);
@@ -256,12 +247,13 @@ export async function* walkParallel(root, options = {}) {
     }
 
     // Check if this path should be ignored
-    const decision = isIgnored(absPath, root, layers, isDir);
+    const decision = isIgnored(absPath, root, layers, isDir, explain);
 
     if (isDir) {
       let queuedResult = null;
       if (decision.ignored) {
         stats.directoriesPruned++;
+        reportExclusion(absPath, decision, 0, true);
         return; // Don't descend into ignored directories
       }
 
@@ -300,12 +292,12 @@ export async function* walkParallel(root, options = {}) {
 
       if (decision.ignored) {
         stats.filesExcluded++;
+        reportExclusion(absPath, decision, 0, false);
         return;
       }
 
       // Yield file
       if (!stat) {
-        const statStart = Date.now();
         try {
           stat = await withFsRetry(() => fs.stat(absPath), {
             ...retryConfig,
@@ -338,14 +330,10 @@ export async function* walkParallel(root, options = {}) {
   async function processDirectory(dir, layers, depth) {
     stats.directoriesScanned++;
 
-    // Load ignore rules at this level
-    const ignoreFilePath = path.join(dir, ignoreFileName);
-    const localRules = await readRules(ignoreFilePath);
-    const localIg = ignore().add(localRules);
-    const nextLayers = [...layers, { base: dir, ig: localIg }];
+    // Load ignore rules contributed by this directory (layered, later wins)
+    const nextLayers = [...layers, ...(await layersForDirectory(dir, ignoreNames, false))];
 
     let entries;
-    const readdirStart = Date.now();
     try {
       entries = await withFsRetry(() => fs.readdir(dir, { withFileTypes: true }), {
         ...retryConfig,
@@ -364,9 +352,7 @@ export async function* walkParallel(root, options = {}) {
     }
 
     // Filter out ignore files themselves to prevent them from appearing in output
-    entries = entries.filter(
-      (entry) => entry.name !== ignoreFileName && entry.name !== '.gitignore',
-    );
+    entries = entries.filter((entry) => !suppressedNames.has(entry.name));
 
     // Sort entries for deterministic order across platforms
     entries.sort((a, b) => a.name.localeCompare(b.name));
@@ -378,8 +364,71 @@ export async function* walkParallel(root, options = {}) {
     return entryResults.filter(Boolean);
   }
 
-  // Initialize queue with root directory
-  queue.push({ dir: root, layers: initialLayers, depth: 0 });
+  // Seed the queue. Without a scope that is just the root; with a scope the
+  // ignore layers along root -> entry are read up front so rules stay
+  // root-anchored while traversal starts at the selection.
+  if (!scope || scope.length === 0) {
+    queue.push({ dir: root, layers: initialLayers, depth: 0 });
+  } else {
+    for (const entry of scope) {
+      const absEntry = path.resolve(entry);
+
+      // Identical semantics to walkWithIgnore: ancestors are evaluated before
+      // their rules are loaded, so a scoped run cannot surface rules a full walk
+      // would have pruned past.
+      const { layers, prunedAt } = await buildScopeContext(
+        root,
+        absEntry,
+        ignoreNames,
+        false,
+        initialLayers,
+        scopeIgnoresIgnoreFiles,
+      );
+
+      let entryStat;
+      try {
+        entryStat = await withFsRetry(() => fs.stat(absEntry), retryConfig);
+      } catch (error) {
+        if (onExclude) {
+          onExclude({
+            path: toPosix(path.relative(root, absEntry)),
+            size: 0,
+            reason: EXCLUSION_REASONS.UNREADABLE,
+            rule: error.code,
+            isDirectory: false,
+          });
+        }
+        continue;
+      }
+
+      const isDir = entryStat.isDirectory();
+
+      const decision = prunedAt
+        ? {
+            ignored: true,
+            reason: EXCLUSION_REASONS.GITIGNORE,
+            rule: `ancestor excluded: ${toPosix(path.relative(root, prunedAt))}`,
+          }
+        : isIgnored(absEntry, root, layers, isDir, explain);
+
+      if (decision.ignored) {
+        if (isDir) stats.directoriesPruned++;
+        else stats.filesExcluded++;
+        reportExclusion(absEntry, decision, isDir ? 0 : entryStat.size, isDir);
+        continue;
+      }
+
+      if (isDir) {
+        if (includeDirectories) {
+          buffer.push({ path: absEntry, stats: entryStat });
+        }
+        queue.push({ dir: absEntry, layers, depth: 0 });
+      } else {
+        stats.filesScanned++;
+        buffer.push({ path: absEntry, stats: entryStat });
+      }
+    }
+  }
 
   // Main traversal loop
   try {
@@ -387,7 +436,7 @@ export async function* walkParallel(root, options = {}) {
 
     while (queue.length > 0 || running.size > 0) {
       if (signal?.aborted) {
-        throw new Error('Traversal aborted');
+        throw createAbortError('Traversal aborted');
       }
 
       while (queue.length > 0 && running.size < concurrency) {
@@ -431,7 +480,8 @@ export async function* walkParallel(root, options = {}) {
       }
 
       if (buffer.length === 0 && running.size > 0) {
-        await Promise.race(running);
+        // Wake on either a finished directory or the first buffered result.
+        await Promise.race([...running, waitForData()]);
       }
     }
 
@@ -440,8 +490,6 @@ export async function* walkParallel(root, options = {}) {
       yield buffer.shift();
       notifyDrain();
     }
-
-    done = true;
   } finally {
     // Ensure we clear the limit to free resources
     if (limit.clearQueue) {
