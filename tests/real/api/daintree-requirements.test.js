@@ -129,6 +129,22 @@ describe('gitignore fidelity', () => {
     });
   });
 
+  it.each(['!vendor/', '!vendor/**', '!vendor/a.js', '!*.js'])(
+    'keeps caller --exclude above a gitignore negation (%s)',
+    async (negation) => {
+      // Documented precedence: caller excludes outrank every ignore file. Worth
+      // asserting directly rather than trusting the layer order, because a
+      // negation is the one construct that can re-include something.
+      await withTempDir(`req-r2-precedence-${negation.replace(/\W/g, '')}`, async (root) => {
+        await fs.outputFile(`${root}/.gitignore`, `${negation}\n`);
+        await fs.outputFile(`${root}/vendor/a.js`, 'export {};\n');
+        await fs.outputFile(`${root}/top.md`, '# top\n');
+
+        expect(await paths(root, { exclude: ['vendor'] })).toEqual(['top.md']);
+      });
+    },
+  );
+
   it('does not require the target to be a git repository', async () => {
     await withFixture('req-d2-nogit', async (root) => {
       // No .git anywhere; ignore files are read directly from disk.
