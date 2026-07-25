@@ -1,6 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [0.16.0] - 2026-07-25
+
+Skips 0.15.0, which was published to npm in error on 2026-02-26 and cannot be
+reused. Nothing in this release relates to that version.
 
 Breaking changes are listed first. Every behaviour change here, including the
 ones too small to list, is recorded with its rationale in
@@ -33,6 +36,24 @@ ones too small to list, is recorded with its rationale in
 
 ### Added
 
+- **Scoped copy** - `--scope <path...>` / `scope` copies only the named paths,
+  using literal paths rather than globs, with ignore rules still resolving from
+  the repository root and output paths still root-relative. Traversal starts at
+  the selection, so cost scales with what was asked for. `--scope-include-ignored`
+  lifts the ignore rules blocking a selection.
+- **Budgets that bind** - `--max-total-size`, `--max-files` and `--size-gate`,
+  applied after sorting in a defined order, with truncation always reported
+  (`stats.truncated`, `truncatedBy`, `truncatedCount`) rather than silent.
+- **Exclusion accounting** - `stats.excluded` answers "what didn't make it, and
+  why" by stable reason key. `--explain` adds the matched rule and the ignore
+  file and line it came from.
+- **Manifest** - `result.manifest` gives a lightweight per-file view carrying
+  `path`, `size`, `modified` and an `outcome`, never content, so it is safe to
+  retain in a long-lived process and to drive a preview from.
+- **Output format versioning** - `result.outputFormatVersion`
+  (e.g. `copytree-xml@1`), so a downstream prompt can detect a format change.
+- **Token and size estimates** - `stats.estimatedTokens` and
+  `estimatedOutputChars`, measured on a real run and estimated on a dry run.
 - `--scope-include-config-excluded` / `scopeIgnoresConfigExcludes`, to let a
   `--scope` entry reach a config-excluded directory such as `node_modules`.
   `.git` is excluded by a layer no option lifts.
@@ -42,6 +63,17 @@ ones too small to list, is recorded with its rationale in
   failing on a file too large to scan.
 - Exclusion accounting reasons `secretFile`, `secretUnscannable` and
   `symlinkEscape`.
+
+### Changed
+
+- **Startup and hot-path performance** - `Intl.Collator` instances are hoisted
+  rather than built per comparison, binaries are classified from a single read
+  instead of a separate `stat` and `read`, file-loading concurrency is bounded,
+  per-file config lookups are lifted out of formatter loops, `ConfigManager.get`
+  has a fast path, and the CLI loads its Ink UI only when it renders.
+- **Security: `simple-git` 3.31.1 to 3.36.0**, clearing a critical RCE advisory
+  (GHSA-hffm-xvc3-vprc and two related). `npm audit --omit=dev` reports zero
+  vulnerabilities; remaining findings are dev-only.
 
 ### Fixed
 
@@ -72,6 +104,8 @@ ones too small to list, is recorded with its rationale in
 - `charLimit: 0` is honoured as a budget instead of being promoted to the 2M
   default.
 - `npm run test:integration` runs integration tests rather than the whole suite.
+- Caller `--exclude` patterns now win over gitignore negations, so an explicit
+  exclusion cannot be re-included by a rule in the repository.
 - `.git` is unreachable by any option, including a `!.git/` negation in an ignore
   file and an `--always '.git/**'` force-include.
 - A private key's body is redacted, not just its `-----BEGIN-----` header.
@@ -84,6 +118,23 @@ ones too small to list, is recorded with its rationale in
 - A short source file containing a NUL byte is not misclassified as binary.
 - Non-text content is excluded rather than crashing the run with a `TypeError`.
 - `--dedupe` no longer drops files that differ only in their redacted secrets.
+
+### Infrastructure
+
+- Migrate to ESLint 10 and TypeScript 7. ESLint 10's recommended set enabled
+  `no-useless-assignment` and `preserve-caught-error`, which surfaced eight real
+  findings; the dead `.eslintrc.json` is removed, and `tests/types/tsconfig.json`
+  resolves its path mapping relative to itself now that `baseUrl` is gone.
+- Rework the benchmark harness into a modular suite (`tests/performance/bench.js`
+  plus `lib/` modules and declared scenarios), documented in
+  `docs/technical/benchmarking.md`, with `benchmark:all`, `benchmark:fixtures`
+  and `benchmark:compare` scripts.
+- Upgrade dependencies, drop the unused `inquirer`, and bump GitHub Actions to
+  current majors.
+- Add real, unit and e2e coverage for the new stages and utilities; the suite is
+  1554 tests across 98 suites with coverage thresholds enforced.
+- Record every intentional behaviour change, with rationale, in
+  `docs/technical/behavior-ledger.md`.
 
 ## [0.14.2] - 2026-02-27
 
