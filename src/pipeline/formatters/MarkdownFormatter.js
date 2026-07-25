@@ -10,6 +10,54 @@ import { hashFile, hashContent } from '../../utils/fileHash.js';
 import { sanitizeForComment } from '../../utils/helpers.js';
 import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
 
+/**
+ * How many files are hashed at once.
+ *
+ * Unbounded would issue one open per file in the selection simultaneously and
+ * walk straight into the descriptor limit on a large export. Kept deliberately
+ * modest: hashing concurrently is what made this fast, but each in-flight read
+ * holds a buffer, and allocating them faster than the collector reclaims them
+ * raises peak memory for a library that has to sit inside someone else's
+ * Electron process. Past about this width the wall-clock gain flattens while
+ * the memory cost keeps climbing.
+ */
+const HASH_CONCURRENCY = 8;
+
+/**
+ * Compute the `sha256` attribute for every file, concurrently.
+ *
+ * Hashing prefers the file on disk and falls back to the in-memory content,
+ * matching what the per-file path did; only the scheduling changes.
+ *
+ * @param {Object[]} files - Files to hash
+ * @returns {Promise<Map<Object, string|null>>} File entry -> hex digest
+ */
+async function hashAll(files) {
+  const hashes = new Map();
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < files.length) {
+      const file = files[cursor++];
+      try {
+        if (file.absolutePath) {
+          hashes.set(file, await hashFile(file.absolutePath, 'sha256', { size: file.size }));
+        } else if (typeof file.content === 'string') {
+          hashes.set(file, hashContent(file.content, 'sha256'));
+        }
+      } catch {
+        // Ignore hash computation errors, exactly as the per-file path did.
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(HASH_CONCURRENCY, files.length) }, () => worker()),
+  );
+
+  return hashes;
+}
+
 class MarkdownFormatter {
   constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
     this.stage = stage; // Delegates helper methods and config
@@ -91,20 +139,34 @@ class MarkdownFormatter {
       lines.push('## Files');
       lines.push('');
 
+      // Resolved once rather than per file: these answers do not vary across the
+      // selection, and `config.get` walks a dotted path on every call.
+      const binaryAction = this.stage.config.get('copytree.binaryFileAction', 'placeholder');
+      const binaryPolicies = this.stage.config.get('copytree.binaryPolicy', {}) || {};
+      const commentTemplate = this.stage.config.get(
+        'copytree.binaryCommentTemplates.markdown',
+        '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
+      );
+      const placeholderText = this.stage.config.get(
+        'copytree.binaryPlaceholderText',
+        '[Binary file not included]',
+      );
+
+      // Every file's hash was computed inside the loop, each awaited before the
+      // next began, and each opening its own read stream. That serialized one
+      // full re-read of the entire selection from disk, in a formatter whose
+      // input is already in memory. Hashing every file concurrently up front
+      // produces the same digests without the serialization.
+      const hashes = await hashAll(files);
+
       for (const file of files) {
         const relPath = `@${file.path}`;
-        const binaryAction = this.stage.config.get('copytree.binaryFileAction', 'placeholder');
-        const policy =
-          this.stage.config.get('copytree.binaryPolicy', {})[file.binaryCategory] || binaryAction;
+        const policy = binaryPolicies[file.binaryCategory] || binaryAction;
 
         // Check if file should be rendered as a comment
         if (file.excluded || (file.isBinary && policy === 'comment')) {
-          const tpl = this.stage.config.get(
-            'copytree.binaryCommentTemplates.markdown',
-            '<!-- {TYPE} File Excluded: {PATH} ({SIZE}) -->',
-          );
           const categoryName = (file.binaryCategory || 'Binary').toUpperCase();
-          const msg = tpl
+          const msg = commentTemplate
             .replace('{TYPE}', sanitizeForComment(categoryName))
             .replace('{PATH}', sanitizeForComment(relPath))
             .replace('{SIZE}', this.stage.formatBytes(file.size || 0));
@@ -118,17 +180,7 @@ class MarkdownFormatter {
             ? file.modified.toISOString()
             : new Date(file.modified).toISOString()
           : null;
-        // Prefer hashing absolute file if available; fall back to content hash
-        let sha = null;
-        try {
-          if (file.absolutePath) {
-            sha = await hashFile(file.absolutePath, 'sha256');
-          } else if (typeof file.content === 'string') {
-            sha = hashContent(file.content, 'sha256');
-          }
-        } catch (_e) {
-          // Ignore hash computation errors
-        }
+        const sha = hashes.get(file) ?? null;
         let binaryMode = undefined;
         if (file.isBinary) {
           if (binaryAction === 'base64' || file.encoding === 'base64') binaryMode = 'base64';
@@ -169,14 +221,7 @@ class MarkdownFormatter {
             lines.push('Content-Transfer: base64');
             lines.push(typeof content === 'string' ? content : '');
           } else if (binaryAction === 'placeholder') {
-            lines.push(
-              typeof content === 'string'
-                ? content
-                : this.stage.config.get(
-                    'copytree.binaryPlaceholderText',
-                    '[Binary file not included]',
-                  ) || '',
-            );
+            lines.push(typeof content === 'string' ? content : placeholderText || '');
           } else {
             // skip mode: emit empty block
           }

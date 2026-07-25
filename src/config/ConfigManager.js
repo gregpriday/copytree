@@ -9,6 +9,29 @@ import { ConfigurationError, ERROR_CODES } from '../utils/errors.js';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Split dotted config paths, cached.
+ *
+ * The set of distinct config keys a process asks for is small and fixed, while
+ * the number of lookups scales with the number of files. Bounded so a caller
+ * generating keys dynamically cannot grow it without limit.
+ */
+const SEGMENT_CACHE = new Map();
+const SEGMENT_CACHE_LIMIT = 512;
+
+/**
+ * Split and remember a dotted path.
+ * @param {string} path - Dotted config path
+ * @returns {string[]} Path segments
+ */
+function cacheSegments(path) {
+  const segments = path.split('.');
+  if (SEGMENT_CACHE.size < SEGMENT_CACHE_LIMIT) {
+    SEGMENT_CACHE.set(path, segments);
+  }
+  return segments;
+}
+
 /** Configuration sources, in precedence order (later wins). */
 const CONFIG_SOURCES = Object.freeze(['defaults', 'user']);
 
@@ -269,6 +292,20 @@ class ConfigManager {
    * @returns {*} Configuration value
    */
   get(path, defaultValue) {
+    // Plain dotted keys, which is nearly all of them, are walked directly.
+    // `_.get` re-parses the path string on every call, and hot paths ask for the
+    // same handful of keys once per file. Anything with brackets or a non-string
+    // path still goes through lodash so the full accessor grammar keeps working.
+    if (typeof path === 'string' && !path.includes('[')) {
+      const segments = SEGMENT_CACHE.get(path) ?? cacheSegments(path);
+      let current = this.config;
+      for (let i = 0; i < segments.length; i++) {
+        if (current === null || current === undefined) return defaultValue;
+        current = current[segments[i]];
+      }
+      return current === undefined ? defaultValue : current;
+    }
+
     return _.get(this.config, path, defaultValue);
   }
 

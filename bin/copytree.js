@@ -10,23 +10,51 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-import React from 'react';
-// Use dynamic import for ESM-only ink
-let render;
-let App;
-(async () => {
-  const ink = await import('ink');
-  render = ink.render;
-  const appModule = await import('../src/ui/App.js');
-  App = appModule.default;
-})().catch((_e) => {
-  // Defer error until first render attempt
-  render = undefined;
-  App = undefined;
-});
 import { Command, InvalidArgumentError } from 'commander';
 import { readFileSync } from 'fs';
 import { logger } from '../src/utils/logger.js';
+
+/**
+ * Load the terminal UI on first use.
+ *
+ * React, Ink, and the App component are only needed by commands that actually
+ * render. They used to be pulled in at module load: React statically, and Ink
+ * plus the App tree by a fire-and-forget async block at the top of the file.
+ * That made every invocation pay for the UI, including `--stream`, `--display`,
+ * and `--help`, none of which render anything.
+ *
+ * The eager load was also racy. Nothing awaited it, so a command handler could
+ * reach `render` before it was assigned; every call site already had to guard
+ * with `if (!render || !App)` and import again. That guard is now the only path,
+ * which makes the load both lazy and properly ordered.
+ *
+ * @returns {Promise<{render: Function, App: Function, React: Object}>} UI entry points
+ */
+let uiPromise = null;
+function loadUi() {
+  if (!uiPromise) {
+    uiPromise = Promise.all([import('react'), import('ink'), import('../src/ui/App.js')]).then(
+      ([reactModule, ink, appModule]) => ({
+        React: reactModule.default,
+        render: ink.render,
+        App: appModule.default,
+      }),
+    );
+  }
+  return uiPromise;
+}
+
+/**
+ * Render a UI command, loading the UI layer on demand.
+ * @param {string} command - Command name for the App component
+ * @param {string|null} targetPath - Path argument, when the command takes one
+ * @param {Object} options - Parsed commander options
+ * @returns {Promise<void>}
+ */
+async function renderCommand(command, targetPath, options) {
+  const { render, App, React } = await loadUi();
+  render(React.createElement(App, { command, path: targetPath, options }));
+}
 
 /**
  * Apply logging options from parsed CLI options to the global logger singleton.
@@ -207,19 +235,7 @@ program
       return;
     }
 
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'copy',
-        path: targetPath || '.',
-        options,
-      }),
-    );
+    await renderCommand('copy', targetPath || '.', options);
   });
 
 // 9. Config validate command
@@ -228,19 +244,7 @@ program
   .description('Validate application configuration')
   .option('--no-validate', 'Skip schema validation (for testing)')
   .action(async (options) => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'config:validate',
-        path: null,
-        options,
-      }),
-    );
+    await renderCommand('config:validate', null, options);
   });
 
 // 10. Config inspect command
@@ -252,19 +256,7 @@ program
   .option('--no-redact', 'Show all values including sensitive ones')
   .option('--format <type>', 'Output format: table, json (default: table)', 'table')
   .action(async (options) => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'config:inspect',
-        path: null,
-        options,
-      }),
-    );
+    await renderCommand('config:inspect', null, options);
   });
 
 // 11. Cache clear command
@@ -277,19 +269,7 @@ program
   .option('--status', 'Show cache status after clearing')
   .option('-v, --verbose', 'Show verbose output')
   .action(async (options) => {
-    if (!render || !App) {
-      const ink = await import('ink');
-      render = ink.render;
-      const appModule = await import('../src/ui/App.js');
-      App = appModule.default;
-    }
-    render(
-      React.createElement(App, {
-        command: 'cache:clear',
-        path: null,
-        options,
-      }),
-    );
+    await renderCommand('cache:clear', null, options);
   });
 
 // 12. Install copytree command - REMOVED

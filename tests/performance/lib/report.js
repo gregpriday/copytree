@@ -150,22 +150,56 @@ export function renderComparison(comparison) {
     lines.push('');
   }
 
-  lines.push('| ID | Scenario | Before | After | Change | Improvement |');
-  lines.push('| --- | --- | ---: | ---: | ---: | ---: |');
+  lines.push('| ID | Scenario | Before | After | Change | Peak RSS before | after |');
+  lines.push('| --- | --- | ---: | ---: | ---: | ---: | ---: |');
 
   for (const entry of comparison.comparisons) {
     if (entry.status === 'new' || entry.status === 'missing' || entry.status === 'failed') {
-      lines.push(`| ${entry.id} | ${entry.title} | - | - | ${entry.status} | - |`);
+      lines.push(`| ${entry.id} | ${entry.title} | - | - | ${entry.status} | - | - |`);
       continue;
     }
     const wall = entry.metrics.wallMs;
     if (!wall) continue;
-    const sign = wall.deltaPercent > 0 ? '+' : '';
+    const rss = entry.metrics.rssGrowthBytes;
+    const change =
+      wall.improvementPercent > 0
+        ? `**${wall.improvementPercent}% faster**`
+        : `${wall.deltaPercent > 0 ? '+' : ''}${wall.deltaPercent}%`;
+
     lines.push(
       `| ${entry.id} | ${entry.title} | ${formatMs(wall.baseline)} | ${formatMs(wall.candidate)} ` +
-        `| ${sign}${wall.deltaPercent}% | **${wall.improvementPercent > 0 ? `${wall.improvementPercent}% faster` : '-'}** |`,
+        `| ${change} | ${rss ? formatBytes(rss.baseline) : '-'} | ${rss ? formatBytes(rss.candidate) : '-'} |`,
     );
   }
+
+  // Time to first byte is reported separately: for a streaming consumer it is a
+  // different promise from total duration, and a change in one does not imply a
+  // change in the other.
+  const responsiveness = comparison.comparisons.filter(
+    (entry) => entry.metrics?.firstByteMs || entry.metrics?.firstFileMs,
+  );
+  if (responsiveness.length > 0) {
+    lines.push('');
+    lines.push('### Responsiveness');
+    lines.push('| ID | Metric | Before | After | Change |');
+    lines.push('| --- | --- | ---: | ---: | ---: |');
+    for (const entry of responsiveness) {
+      for (const key of ['firstByteMs', 'firstFileMs']) {
+        const metric = entry.metrics[key];
+        if (!metric) continue;
+        lines.push(
+          `| ${entry.id} | ${key} | ${formatMs(metric.baseline)} | ${formatMs(metric.candidate)} ` +
+            `| ${metric.improvementPercent > 0 ? `${metric.improvementPercent}% faster` : `${metric.deltaPercent}%`} |`,
+        );
+      }
+    }
+  }
+
+  const verified = comparison.comparisons.filter((entry) => entry.status === 'ok').length;
+  lines.push('');
+  lines.push(
+    `Output fingerprints matched on ${verified} of ${comparison.comparisons.length} scenarios.`,
+  );
 
   if (comparison.correctnessBreaks.length > 0) {
     lines.push('');

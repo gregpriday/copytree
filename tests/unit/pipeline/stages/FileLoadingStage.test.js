@@ -1,9 +1,19 @@
 import { jest } from '@jest/globals';
 import fs from 'fs-extra';
-import { detect, isConvertibleDocument } from '../../../../src/utils/BinaryDetector.js';
+import {
+  detect,
+  detectFromBuffer,
+  categorizeByExt,
+  isConvertibleDocument,
+} from '../../../../src/utils/BinaryDetector.js';
 
 jest.mock('../../../../src/utils/BinaryDetector.js', () => ({
   detect: jest.fn(),
+  // The stage classifies by extension first and only reads when that is
+  // inconclusive, so both the buffer-based and the path-based entry points have
+  // to be stubbed for the stage to be exercised in isolation.
+  detectFromBuffer: jest.fn(),
+  categorizeByExt: jest.fn(),
   isConvertibleDocument: jest.fn(),
 }));
 
@@ -12,6 +22,8 @@ import FileLoadingStage from '../../../../src/pipeline/stages/FileLoadingStage.j
 describe('FileLoadingStage', () => {
   beforeEach(() => {
     detect.mockResolvedValue({ isBinary: false, category: 'text', ext: '.txt' });
+    detectFromBuffer.mockReturnValue({ isBinary: false, category: 'text', ext: '.txt' });
+    categorizeByExt.mockReturnValue(null);
     isConvertibleDocument.mockReturnValue(false);
   });
 

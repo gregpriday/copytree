@@ -112,6 +112,23 @@ const startup = [
     },
   },
   {
+    id: 'START-02',
+    domain: 'startup',
+    // The streaming path renders no terminal UI, so it is the scenario that
+    // shows what the UI layer costs a command that never uses it.
+    title: 'Cold CLI, empty directory, --stream (no terminal UI)',
+    fixture: 'empty',
+    mode: 'cold-process',
+    samples: 8,
+    warmup: 2,
+    memory: false,
+    gc: false,
+    async run({ fixture }) {
+      const { code } = await runCli([fixture.path, '--format', 'tree', '--stream']);
+      return { exitCode: code };
+    },
+  },
+  {
     id: 'START-04',
     domain: 'startup',
     title: 'ConfigManager.create() cold, no user config',
