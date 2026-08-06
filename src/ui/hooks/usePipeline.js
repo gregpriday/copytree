@@ -1,33 +1,26 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import { useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext.js';
 
-const usePipeline = () => {
-  const { updateState, addLog } = useAppContext();
-  const pipelineRef = useRef(null);
-  const startTimeRef = useRef(null);
-  const progressUpdateTimer = useRef(null);
+// Kept as a plain factory (not itself a hook) so listener wiring is
+// unit-testable without rendering a React tree.
+export const createRunPipeline = (updateState, addLog) => {
+  return async (pipeline, input) => {
+    let startTime = null;
+    let progressTimer = null;
 
-  // Debounced state update to prevent excessive re-renders
-  const debouncedUpdateState = useCallback(
-    (updates) => {
-      if (progressUpdateTimer.current) {
-        clearTimeout(progressUpdateTimer.current);
+    // Debounced state update to prevent excessive re-renders
+    const debouncedUpdateState = (updates) => {
+      if (progressTimer) {
+        clearTimeout(progressTimer);
       }
-      progressUpdateTimer.current = setTimeout(() => {
+      progressTimer = setTimeout(() => {
         updateState(updates);
-        progressUpdateTimer.current = null;
+        progressTimer = null;
       }, 30); // Update max every 30ms
-    },
-    [updateState],
-  );
-
-  useEffect(() => {
-    if (!pipelineRef.current) return;
-
-    const pipeline = pipelineRef.current;
+    };
 
     const handlePipelineStart = (data) => {
-      startTimeRef.current = Date.now();
+      startTime = Date.now();
       updateState({
         isLoading: true,
         currentStage: 'Starting pipeline...',
@@ -74,7 +67,7 @@ const usePipeline = () => {
     };
 
     const handlePipelineComplete = (data) => {
-      const duration = Date.now() - startTimeRef.current;
+      const duration = Date.now() - (startTime ?? Date.now());
       updateState({
         isLoading: false,
         currentStage: null,
@@ -93,7 +86,7 @@ const usePipeline = () => {
     };
 
     const handlePipelineError = (data) => {
-      const duration = Date.now() - startTimeRef.current;
+      const duration = Date.now() - (startTime ?? Date.now());
       updateState({
         isLoading: false,
         currentStage: null,
@@ -137,44 +130,46 @@ const usePipeline = () => {
       });
     };
 
-    // Register event listeners
-    pipeline.on('pipeline:start', handlePipelineStart);
-    pipeline.on('stage:start', handleStageStart);
-    pipeline.on('stage:complete', handleStageComplete);
-    pipeline.on('stage:error', handleStageError);
-    pipeline.on('stage:log', handleStageLog);
-    pipeline.on('stage:progress', handleStageProgress);
-    pipeline.on('file:processed', handleFileEvent);
-    pipeline.on('file:transformed', handleFileEvent);
-    pipeline.on('file:loaded', handleFileEvent);
-    pipeline.on('file:batch', handleFileBatch);
-    pipeline.on('pipeline:complete', handlePipelineComplete);
-    pipeline.on('pipeline:error', handlePipelineError);
+    const listeners = [
+      ['pipeline:start', handlePipelineStart],
+      ['stage:start', handleStageStart],
+      ['stage:complete', handleStageComplete],
+      ['stage:error', handleStageError],
+      ['stage:log', handleStageLog],
+      ['stage:progress', handleStageProgress],
+      ['file:processed', handleFileEvent],
+      ['file:transformed', handleFileEvent],
+      ['file:loaded', handleFileEvent],
+      ['file:batch', handleFileBatch],
+      ['pipeline:complete', handlePipelineComplete],
+      ['pipeline:error', handlePipelineError],
+    ];
 
-    // Cleanup
-    return () => {
-      if (progressUpdateTimer.current) {
-        clearTimeout(progressUpdateTimer.current);
+    try {
+      // Attach before process() starts so no early events (e.g.
+      // pipeline:start) are missed, and always detach — even if process()
+      // throws — so a reused pipeline instance never accumulates stale
+      // listeners.
+      for (const [event, handler] of listeners) {
+        pipeline.on(event, handler);
       }
-      pipeline.off('pipeline:start', handlePipelineStart);
-      pipeline.off('stage:start', handleStageStart);
-      pipeline.off('stage:complete', handleStageComplete);
-      pipeline.off('stage:error', handleStageError);
-      pipeline.off('stage:log', handleStageLog);
-      pipeline.off('stage:progress', handleStageProgress);
-      pipeline.off('file:processed', handleFileEvent);
-      pipeline.off('file:transformed', handleFileEvent);
-      pipeline.off('file:loaded', handleFileEvent);
-      pipeline.off('file:batch', handleFileBatch);
-      pipeline.off('pipeline:complete', handlePipelineComplete);
-      pipeline.off('pipeline:error', handlePipelineError);
-    };
-  }, [updateState, addLog, debouncedUpdateState]);
 
-  const runPipeline = async (pipeline, input) => {
-    pipelineRef.current = pipeline;
-    return await pipeline.process(input);
+      return await pipeline.process(input);
+    } finally {
+      if (progressTimer) {
+        clearTimeout(progressTimer);
+        progressTimer = null;
+      }
+      for (const [event, handler] of listeners) {
+        pipeline.off(event, handler);
+      }
+    }
   };
+};
+
+const usePipeline = () => {
+  const { updateState, addLog } = useAppContext();
+  const runPipeline = useMemo(() => createRunPipeline(updateState, addLog), [updateState, addLog]);
 
   return { runPipeline };
 };

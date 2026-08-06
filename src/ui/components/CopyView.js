@@ -287,6 +287,24 @@ const CopyView = () => {
     );
   }
 
+  // `--display` puts the formatted document itself on stdout, and Ink renders
+  // to that same stream. Anything the UI draws is therefore interleaved with
+  // the document, which breaks the one thing a caller doing
+  // `copytree --display | jq` is relying on. So in that mode the UI is reduced
+  // to the single completion line that trails the document, with no progress
+  // suffix, no per-stage log stream, and no boxed preview of output that was
+  // already written verbatim. Progress feedback still belongs on stdout in
+  // every other destination, where stdout is not carrying the document.
+  const documentOnStdout = resolveDestination(options) === 'display';
+
+  if (documentOnStdout) {
+    return React.createElement(PipelineStatus, {
+      currentStage,
+      isLoading,
+      progress: 0,
+    });
+  }
+
   return React.createElement(
     Box,
     { flexDirection: 'column' },
