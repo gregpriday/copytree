@@ -1,6 +1,24 @@
 import { EventEmitter } from 'events';
 import { createRunPipeline } from '../../../../src/ui/hooks/usePipeline.js';
 
+const PIPELINE_EVENTS = [
+  'pipeline:start',
+  'stage:start',
+  'stage:complete',
+  'stage:error',
+  'stage:log',
+  'stage:progress',
+  'file:processed',
+  'file:transformed',
+  'file:loaded',
+  'file:batch',
+  'pipeline:complete',
+  'pipeline:error',
+];
+
+const totalListeners = (pipeline) =>
+  PIPELINE_EVENTS.reduce((sum, event) => sum + pipeline.listenerCount(event), 0);
+
 class MockPipeline extends EventEmitter {
   constructor() {
     super();
@@ -45,13 +63,14 @@ describe('createRunPipeline', () => {
       }),
     );
     expect(addLog).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'success', message: expect.stringContaining('Completed stage') }),
+      expect.objectContaining({
+        type: 'success',
+        message: expect.stringContaining('Completed stage'),
+      }),
     );
 
-    // Listeners must be removed once the run finishes.
-    expect(pipeline.listenerCount('pipeline:start')).toBe(0);
-    expect(pipeline.listenerCount('stage:start')).toBe(0);
-    expect(pipeline.listenerCount('pipeline:complete')).toBe(0);
+    // All 12 listeners must be removed once the run finishes.
+    expect(totalListeners(pipeline)).toBe(0);
   });
 
   test('detaches listeners even when process() throws', async () => {
@@ -68,8 +87,7 @@ describe('createRunPipeline', () => {
     expect(updateState).toHaveBeenCalledWith(
       expect.objectContaining({ isLoading: true, currentStage: 'Starting pipeline...' }),
     );
-    expect(pipeline.listenerCount('pipeline:start')).toBe(0);
-    expect(pipeline.listenerCount('pipeline:error')).toBe(0);
+    expect(totalListeners(pipeline)).toBe(0);
   });
 
   test('debounces stage:progress updates instead of calling updateState synchronously', async () => {
@@ -92,6 +110,29 @@ describe('createRunPipeline', () => {
       };
 
       await runPipeline(pipeline, {});
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('cancels a pending debounced update on cleanup so it never fires after the run resolves', async () => {
+    jest.useFakeTimers();
+    try {
+      const runPipeline = createRunPipeline(updateState, addLog);
+      const pipeline = new EventEmitter();
+      pipeline.stages = [{ name: 'stageA' }];
+      pipeline.process = async () => {
+        // Emitted right before resolving — the 30ms debounce timer is still
+        // pending when process() (and therefore runPipeline) resolves.
+        pipeline.emit('stage:progress', { stage: 'stageA', progress: 90, message: 'Almost done' });
+        return 'ok';
+      };
+
+      await runPipeline(pipeline, {});
+      updateState.mockClear();
+
+      jest.advanceTimersByTime(1000);
+      expect(updateState).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
     }

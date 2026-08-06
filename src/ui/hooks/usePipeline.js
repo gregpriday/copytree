@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext.js';
 
 // Kept as a plain factory (not itself a hook) so listener wiring is
@@ -145,14 +145,15 @@ export const createRunPipeline = (updateState, addLog) => {
       ['pipeline:error', handlePipelineError],
     ];
 
-    // Attach before process() starts so no early events (e.g. pipeline:start)
-    // are missed, and always detach — even if process() throws — so a
-    // reused pipeline instance never accumulates stale listeners.
-    for (const [event, handler] of listeners) {
-      pipeline.on(event, handler);
-    }
-
     try {
+      // Attach before process() starts so no early events (e.g.
+      // pipeline:start) are missed, and always detach — even if process()
+      // throws — so a reused pipeline instance never accumulates stale
+      // listeners.
+      for (const [event, handler] of listeners) {
+        pipeline.on(event, handler);
+      }
+
       return await pipeline.process(input);
     } finally {
       if (progressTimer) {
@@ -168,7 +169,7 @@ export const createRunPipeline = (updateState, addLog) => {
 
 const usePipeline = () => {
   const { updateState, addLog } = useAppContext();
-  const runPipeline = useCallback(createRunPipeline(updateState, addLog), [updateState, addLog]);
+  const runPipeline = useMemo(() => createRunPipeline(updateState, addLog), [updateState, addLog]);
 
   return { runPipeline };
 };
