@@ -9,7 +9,7 @@ The rule this exists to enforce: **do not approve a changed golden file because
 
 ---
 
-## Unreleased (dependency and process-boundary pass)
+## 0.17.0 (dependency and process-boundary pass)
 
 The first performance pass removed duplicated work. This one removes
 *dependencies* and *process boundaries* — the fixed cost every invocation paid
@@ -78,7 +78,7 @@ what changes is that it can no longer drift underneath a release.
 
 ---
 
-## Unreleased (performance pass)
+## 0.17.0 (performance pass)
 
 Mostly removal of duplicated work, which by definition changes nothing
 observable. These are the exceptions.
@@ -139,7 +139,7 @@ The built-in scanner remains the fallback for Gitleaks being absent or failing.
 A file that Gitleaks passes and the weaker scanner would have flagged is now
 reported clean.
 
-## Unreleased (CLI output pass)
+## 0.17.0 (CLI output pass)
 
 One controller and one terminal reporter replaced the two copy implementations
 (an Ink component for the default path, `commands/copy.js` for `--stream` and
@@ -174,7 +174,7 @@ preview no longer reads file contents, runs transformers or scans for secrets.
 Its token count is an estimate rather than a measurement, as it was before the
 output stage was reachable from this path.
 
-## Unreleased (embedder feedback pass)
+## 0.16.0 (embedder feedback pass)
 
 Reported against the pre-release by the embedding application, running the SDK
 over a ~3,500 file repository. Everything here is a fix to something introduced
@@ -370,7 +370,7 @@ warnings went to the terminal regardless.
 
 ---
 
-## Unreleased (release-readiness pass)
+## 0.16.0 (release-readiness pass)
 
 ### Security
 

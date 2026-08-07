@@ -1,5 +1,164 @@
 # Changelog
 
+## [0.17.0] - 2026-08-07
+
+A performance and terminal-output release. Nothing in the selection logic or the
+output formats changed: the same command over the same tree produces the same
+bytes. What changed is how much a run costs before it does any work, and how much
+it says about itself while doing it.
+
+Every behaviour change here, including the ones too small to list, is recorded
+with its rationale in
+[docs/technical/behavior-ledger.md](docs/technical/behavior-ledger.md).
+
+### Changed
+
+- **A normal run now prints a progress line and a completion line, nothing
+  else.** The per-stage log stream and the run summary box are behind
+  `-v, --verbose`. Anything that scraped stderr for stage names or the summary
+  table will find less there.
+- **One reporter draws every copy run.** The Ink copy UI — which ran its own
+  pipeline, resolved its own destination and wrote its own completion text — is
+  gone; `src/ui/feedback` replaces it with a status vocabulary that has an ASCII
+  fallback, a single message catalogue, structured completion/warning/failure
+  models, and a renderer that honours `--no-color`, `--quiet` and NDJSON. Ink
+  remains only for `config:validate` and `config:inspect`, which draw real
+  tables.
+- **stdout carries the requested document and nothing else**; everything said to
+  a person goes to stderr. `--display --format json | jq` stays valid while a
+  run reports progress. Pipeline stages no longer write to the terminal at all.
+- **Progress names what a stage is doing, not its class** — `Discovering files`
+  rather than `FileDiscoveryStage`. An unrecognised stage is de-PascalCased, so
+  no class name reaches a user.
+- **A successful redaction is a note naming the files, not a warning.** A warning
+  is now reserved for a finding the guard could not redact, or a file it could
+  not scan.
+- **`-o/--output` no longer reveals the file in Finder/Explorer.** On macOS that
+  launched `osascript`, woke Finder and stole focus, which makes `-o` unusable
+  in a loop. Opt in with `--reveal`.
+- **`--dry-run` writes nothing at all.** It previously still produced the output
+  file in some paths.
+- **Markdown `sha256` describes the emitted content, not the file on disk.** In
+  streamed output this was a disclosure: by the time a file is streamed its
+  content has been redacted, so hashing the path published the digest of the
+  unredacted original next to the redacted document — enough to confirm a guess
+  at the removed bytes. Buffered output was fixed alongside it. Digests for
+  unredacted, untransformed files are unchanged.
+- **Streamed output carries the format version** that buffered output has always
+  carried. A streamed document was previously indistinguishable from an
+  unversioned one.
+- **File ordering is pinned rather than taken from the host's ICU.** Ordering
+  decides which files survive a budget, so the same command could select
+  differently across Node versions or on a small-ICU build. Printable-ASCII
+  paths now compare against a frozen weight table derived from
+  `Intl.Collator`, verified against it for every character pair and 500,000
+  random strings; non-ASCII paths still defer to a real collator. No ordering
+  changes on a full-ICU platform — it simply can no longer drift underneath a
+  release.
+- **`colorize: 'always'` into a pipe now actually colours.** Chalk's own
+  detection ran before the logger's policy could ask, so an explicit request
+  for colour into a pipe or a file produced none.
+- **`stats.secretsGuard.scanner` reports `none` when nothing was scanned.** It
+  reported `builtin` even for runs where no file ever reached a scanner, which
+  named a scanner for protection applied to nothing.
+- **Gitleaks stops after an operational failure.** A missing config or an
+  incompatible binary fails identically for every file; CopyTree retried per
+  file and logged a warning each time. It is now reported once and the run
+  finishes on the built-in scanner. Findings are unchanged.
+- **`stage:complete` carries `memoryUsage: null`** unless `--profile` asked for
+  it.
+- **Programmatic results are no longer re-sorted after `SortFilesStage`**, which
+  had been quietly overriding the stage that owns the order.
+- **`InstructionsStage.validate()` is a no-op**; a named instructions set that
+  cannot be loaded now fails from `process()`. The user-visible result is
+  unchanged — `--instructions nope` still fails — but `validate()` and
+  `process()` used to disagree for this case and only `validate()`'s answer ever
+  reached anyone.
+
+### Fixed
+
+- **Progress never reached the UI.** `usePipeline` registered its listeners in a
+  `useEffect` that read `pipelineRef.current` on the render where it was still
+  null, and setting a ref triggers no re-render, so nothing was ever attached.
+- **UI chrome interleaved with the document under `--display`** once those
+  listeners worked. The display destination now renders only the trailing
+  completion line.
+- **A streamed `--output` to a bad path** produced an uncaught error, or a file
+  truncated during stage assembly. The file is opened in the stage that writes
+  it, after the format is validated and with its error listener attached.
+- **`--changed <bad-ref>` returned the whole repository unfiltered and exited
+  0.** A stage that failed and carried on is now reported.
+- **A denied clipboard permission reported a copy that never happened.**
+  `osascript`'s exit status is checked, and a failure falls back to text.
+- **Branch names containing slashes broke GitHub URLs** — `feature/x/y` was cut
+  to `feature`. URL parsing moved to the `URL` class, the branch/subpath split
+  is resolved against real refs by longest match, and `.git` suffixes, trailing
+  slashes, query strings and percent-encoded paths are handled. Git invocations
+  use `execFileSync` with argv arrays so nothing from a URL reaches a shell,
+  paths are checked for traversal and symlinked-root escape before any disk
+  access, tag refs work, `/blob/` URLs are rejected with an actionable message,
+  and the cache updates via fetch+reset so a force-pushed remote cannot leave a
+  stale "up to date" cache.
+- **The GitHub cache-key separator was a literal NUL byte in the source**, which
+  made git treat the file as binary and cost diffs, blame and merges. Written as
+  `'\0'` the hash input is byte-identical, so cache keys are unchanged.
+- Resolved the `brace-expansion` (GHSA-rgw5-rvv9-x895), `fast-uri`
+  (GHSA-7p8r-x3mc-p8w7) and `js-yaml` (GHSA-5p4m-2wfm-xmqj) advisories.
+
+### Performance
+
+Interactive runs are 18–22% faster end to end — `--version` 51→33 ms, 100 files
+119→93 ms, this repository 143→118 ms — with 1,000 files 12% faster and 10,000
+files 4%. Output was compared byte-for-byte against the previous release across
+36 format and flag combinations, all six sort keys, six selection modes, and
+1,000- and 10,000-file projects.
+
+- **Four dependencies left the invocation path.** lodash (6.8 ms), fs-extra
+  (6.3 ms) and chalk (4.7 ms) are replaced by `config/objectUtils.js`,
+  `src/utils/fsx.js` and `src/utils/ansi.js`, each covering only what CopyTree
+  uses and each pinned to the original by an equivalence test suite. `fsx`
+  promisifies the callback `fs` API rather than using `node:fs/promises`, which
+  is roughly twice as slow on `stat`.
+- **ICU stays off the startup path** via `src/utils/collation.js`, which also
+  produces the ordering guarantee described above.
+- **Feature-only modules load only when a run needs them**: js-yaml, the GitHub
+  handler, the clipboard, the profiler, the parallel walker, and the three
+  unselected formatters. `--version` is answered before Commander is built.
+- **The pipeline stopped rebuilding what it was handed.** It was constructing a
+  second `ConfigManager` and repeating the whole load — schema compile, default
+  module imports, deep clones, merge, validate — on every run.
+- **The transformer registry is built only when the selection needs it**, so an
+  ordinary source copy never imports the transformation subsystem or hashes a
+  cache key per file for a no-op transformer.
+- **Schema validation is skipped entirely when no user config file or env
+  override contributed**; ajv and ajv-formats load lazily.
+- **Repeated probing is gone**: one `readdir` for folder profiles instead of
+  twelve `pathExists` calls, one instructions load instead of four probes, three
+  integers passed to the walker instead of a deep clone of all configuration,
+  Gitleaks arguments resolved once per adapter instead of once per file, one
+  `package.json` read, and discovery's include matchers compiled once instead of
+  reparsed per file.
+
+### Removed
+
+- `xmlbuilder2` and `ink-spinner` are no longer dependencies; nothing imported
+  either. A production install goes from 135 packages to 128.
+- Dead modules `src/utils/performance.js` and `src/ui/hooks/useInk.js`, both
+  published in the tarball and reached by nothing.
+- The unreachable `profile:validate` path in `ValidationView`, which
+  dynamically imported a module that does not exist.
+
+### Infrastructure
+
+- `npm run knip` reports anything the module graph never arrives at, so an
+  unused dependency is a failed check rather than something noticed later.
+- `npm run benchmark:latency` measures cold CLI latency — shell to prompt,
+  including Node startup — across six scenarios against per-scenario budgets,
+  reporting median and MAD and labelling deltas below the noise floor as such.
+- `npm run benchmark:latency-ab` compares two checkouts in interleaved pairs, so
+  load shared by both cancels out of the difference. The single-checkout harness
+  cannot produce a trustworthy number on a busy machine.
+
 ## [0.16.0] - 2026-07-25
 
 Skips 0.15.0, which was published to npm in error on 2026-02-26 and cannot be
