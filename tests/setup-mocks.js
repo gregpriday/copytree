@@ -173,7 +173,7 @@ jest.mock('clipboardy', () => ({
 
 // Mock fs-extra (comprehensive mock with all functions from centralized mock)
 // Note: Can't import external modules in jest.mock() factory, so we inline it
-jest.mock('fs-extra', () => {
+jest.mock('../src/utils/fsx.js', () => {
   const pathExists = jest.fn().mockResolvedValue(true);
   const stat = jest.fn().mockResolvedValue({ isDirectory: () => true });
   const writeFile = jest.fn().mockResolvedValue();

@@ -1,29 +1,23 @@
 import Stage from '../Stage.js';
 import path from 'path';
+import {
+  comparatorFor as stringComparatorFor,
+  compareCollated,
+  comparePlain,
+} from '../../utils/collation.js';
 
 /**
- * Shared collator for path and name ordering.
+ * Path and name ordering.
  *
  * `String.prototype.localeCompare(other, undefined, options)` has to construct a
  * collator from those options on every call, and this comparator runs O(n log n)
- * times. Hoisting it to one reusable `Intl.Collator` produces byte-identical
- * ordering for far less work: sorting 50,000 paths went from roughly 1.2 s to
- * under 60 ms.
+ * times: sorting 50,000 paths took roughly 1.2 s that way.
  *
- * The locale is pinned rather than left to the host. Sort order decides which
- * files survive a budget, so a run under `LANG=tr_TR` selecting a different set
- * than the same run under `LANG=en_US` is a reproducibility bug, not a
- * cosmetic one.
+ * `compareCollated` reproduces `Intl.Collator('en', {numeric: true, sensitivity:
+ * 'base'})` from a frozen weight table for printable ASCII, and defers to a real
+ * collator for anything else. See `src/utils/collation.js` for why the table is
+ * frozen rather than derived, and for the equivalence testing behind it.
  */
-const SORT_LOCALE = 'en';
-
-const PATH_COLLATOR = new Intl.Collator(SORT_LOCALE, {
-  numeric: true,
-  sensitivity: 'base',
-});
-
-/** Collator matching bare `localeCompare(other)` for extension ordering. */
-const PLAIN_COLLATOR = new Intl.Collator(SORT_LOCALE);
 
 /**
  * Total, locale-independent ordering of two strings by UTF-16 code unit.
@@ -82,6 +76,11 @@ class SortFilesStage extends Stage {
       this.sortBy = sortBy; // 'path', 'size', 'modified', 'name', 'extension'
       this.order = order; // 'asc' or 'desc'
     }
+
+    // `process()` narrows this to the ASCII comparator once it has seen the
+    // paths. The general form is the default so a comparator called directly —
+    // by a test, or by another stage — still handles any alphabet.
+    this._compareStrings = compareCollated;
   }
 
   /**
@@ -96,6 +95,12 @@ class SortFilesStage extends Stage {
 
     const startTime = Date.now();
     this.log(`Sorting ${files.length} files by ${this.sortBy} (${this.order})`, 'info');
+
+    // Which string comparator to use is settled once, by scanning the paths
+    // for anything outside printable ASCII. Asking per comparison meant an O(n)
+    // alphabet scan inside a function called O(n log n) times, which cost more
+    // than the comparison it was guarding.
+    this._compareStrings = stringComparatorFor(files.map((file) => pathOf(file)));
 
     // Resolve the comparator and the direction once rather than re-running the
     // switch and the string equality inside every comparison.
@@ -156,7 +161,7 @@ class SortFilesStage extends Stage {
   compareByPath(a, b) {
     const pathA = pathOf(a);
     const pathB = pathOf(b);
-    const collated = PATH_COLLATOR.compare(pathA, pathB);
+    const collated = this._compareStrings(pathA, pathB);
     return collated !== 0 ? collated : compareCodeUnits(pathA, pathB);
   }
 
@@ -199,7 +204,7 @@ class SortFilesStage extends Stage {
    * Compare by file name only (not full path)
    */
   compareByName(a, b) {
-    const nameCompare = PATH_COLLATOR.compare(path.basename(pathOf(a)), path.basename(pathOf(b)));
+    const nameCompare = this._compareStrings(path.basename(pathOf(a)), path.basename(pathOf(b)));
     // Same basename in two directories is the common case here, not an edge
     // case: without the fallback, every `index.js` in the tree ties.
     return nameCompare !== 0 ? nameCompare : this.compareByPath(a, b);
@@ -217,7 +222,7 @@ class SortFilesStage extends Stage {
       return this.compareByPath(a, b);
     }
 
-    return PLAIN_COLLATOR.compare(extA, extB);
+    return comparePlain(extA, extB);
   }
 
   /**

@@ -8,7 +8,7 @@
  */
 
 // Unmock fs-extra to use real filesystem for ConfigManager loading
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 // Use real imports since ConfigManager.create needs to actually work
 import { ConfigManager, config } from '../../../src/config/ConfigManager.js';

@@ -45,6 +45,10 @@ class SecretsGuardStage extends Stage {
     this.fatal = true;
     this.gitleaks = new GitleaksAdapter(options.gitleaks || {});
     this.useGitleaks = false;
+    // Which scanner to use is decided on the first file that has bytes to scan,
+    // not at construction — see `_resolveScanner()`.
+    this._scannerResolved = false;
+    this._gitleaksFailureReported = false;
     this._resolveSettings();
   }
 
@@ -91,8 +95,24 @@ class SecretsGuardStage extends Stage {
   async onInit(context) {
     await super.onInit(context);
     this._resolveSettings();
+  }
 
-    if (!this.enabled || this.planOnly) return;
+  /**
+   * Decide which scanner to use, on first need.
+   *
+   * This used to happen in `onInit()`, which runs before the stage knows
+   * whether there is anything to scan — so `copytree --only-tree`, a dry run, an
+   * empty directory, and a selection whose every file was excluded as
+   * secret-prone all spawned `gitleaks version` to answer a question they never
+   * asked. Resolving it here means the external process is started only by a run
+   * that has bytes to hand it.
+   *
+   * @returns {Promise<void>}
+   * @private
+   */
+  async _resolveScanner() {
+    if (this._scannerResolved) return;
+    this._scannerResolved = true;
 
     this.useGitleaks = await this.gitleaks.isAvailable();
     if (this.useGitleaks) {
@@ -219,6 +239,9 @@ class SecretsGuardStage extends Stage {
       // Every clean file used to pay for both, which on a repository of mostly
       // clean files is the common case, not the exception. The built-in scanner
       // remains the fallback for when Gitleaks is absent or fails.
+      // The first file with content to scan is what decides which scanner runs.
+      await this._resolveScanner();
+
       let fileFindings = [];
       let scanned = false;
 
@@ -227,7 +250,18 @@ class SecretsGuardStage extends Stage {
           fileFindings = await this.gitleaks.scanString(file.content, filePath);
           scanned = true;
         } catch (error) {
-          this.log(`Gitleaks scan failed for ${filePath}: ${error.message}`, 'warn');
+          // Said once, not once per file. The adapter opens its circuit on an
+          // operational failure, so the condition that produced this will
+          // produce it again for every remaining file — and a warning repeated
+          // a thousand times buries the one line that explains the run.
+          if (!this._gitleaksFailureReported) {
+            this._gitleaksFailureReported = true;
+            this.log(
+              `Gitleaks scan failed (${error.message}); using the built-in scanner for the rest of this run`,
+              'warn',
+            );
+          }
+          this.useGitleaks = false;
         }
       }
 
@@ -284,9 +318,10 @@ class SecretsGuardStage extends Stage {
         ...(input.stats || {}),
         secretsGuard: {
           enabled: true,
-          // Nothing was scanned in a plan, so naming a scanner would overstate
-          // what the numbers below mean.
-          scanner: this.planOnly ? 'none' : this.useGitleaks ? 'gitleaks' : 'builtin',
+          // Nothing was scanned in a plan, and nothing was scanned when every
+          // file was excluded before it reached a scanner, so naming one in
+          // either case would overstate what the numbers below mean.
+          scanner: this._scannerName(),
           planOnly: this.planOnly,
           findings: findings.length,
           redacted: redactionCount,
@@ -301,7 +336,7 @@ class SecretsGuardStage extends Stage {
           // the matched bytes, so the report is safe to write to a file or to
           // stdout; it carries positions, rule ids and fingerprints only.
           report: {
-            scanner: this.planOnly ? 'none' : this.useGitleaks ? 'gitleaks' : 'builtin',
+            scanner: this._scannerName(),
             redactionMode: this.redactionMode,
             findings,
           },
@@ -344,6 +379,22 @@ class SecretsGuardStage extends Stage {
 
   _isExcluded(filePath) {
     return this._excludeMatchers.some((matcher) => matcher.match(filePath));
+  }
+
+  /**
+   * Which scanner actually ran.
+   *
+   * `builtin` is only claimed once the built-in scanner has really been used.
+   * A plan reads no bytes, and a selection whose every file was excluded as
+   * secret-prone or unscannable never reaches a scanner at all — reporting a
+   * scanner for those said protection had been applied to nothing.
+   *
+   * @returns {'none'|'gitleaks'|'builtin'} Scanner name for the stats block
+   * @private
+   */
+  _scannerName() {
+    if (this.planOnly || !this._scannerResolved) return 'none';
+    return this.useGitleaks ? 'gitleaks' : 'builtin';
   }
 
   _basicScan(file) {

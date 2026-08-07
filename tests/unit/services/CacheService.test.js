@@ -2,7 +2,7 @@
 jest.mock('../../../src/utils/logger.js');
 
 // Unmock fs-extra to test real file operations
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 import { CacheService } from '../../../src/services/CacheService.js';
 import fs from 'fs-extra';

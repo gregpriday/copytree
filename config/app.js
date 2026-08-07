@@ -1,25 +1,14 @@
 import { env } from '../src/config/ConfigManager.js';
-import fs from 'fs-extra';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { VERSION as version } from '../src/version.js';
 
-// Read version from CopyTree's own package.json.
+// The version comes from `src/version.js`, which resolves `package.json` from
+// its own module location rather than from `process.cwd()` — CopyTree is
+// normally run from inside someone else's project, and that project almost
+// always has its own `package.json`.
 //
-// Resolved from this module, not from process.cwd(). CopyTree is normally run
-// from inside someone else's project, and that project almost always has its
-// own package.json — so a cwd-relative lookup reported the *target* project's
-// version as CopyTree's, and fell back to a hard-coded string everywhere else.
-const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-const packageJsonPath = path.join(moduleDir, '..', 'package.json');
-
-let version = 'unknown';
-try {
-  version = fs.readJsonSync(packageJsonPath).version;
-} catch {
-  // A package without a readable package.json is broken in ways a stale
-  // hard-coded version would only disguise.
-  console.warn(`Could not read version from ${packageJsonPath}`);
-}
+// This module used to repeat that read itself, which meant a second open and a
+// second JSON parse of the same file on every run, and pulled `fs-extra` into
+// the default configuration path purely to perform it.
 
 export default {
   // Application metadata

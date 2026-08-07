@@ -9,7 +9,6 @@ import {
   isAbortError,
 } from '../utils/errors.js';
 import { config } from '../config/ConfigManager.js';
-import Clipboard from '../utils/clipboard.js';
 import {
   describeDestination,
   normalizeFormat,
@@ -30,12 +29,9 @@ import {
   classifyWarnings,
 } from '../ui/feedback/model.js';
 import ProgressTracker from '../utils/ProgressTracker.js';
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 import path from 'path';
-import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
 import { summarize as getFsErrorSummary, reset as resetFsErrors } from '../utils/fsErrorReport.js';
-import FolderProfileLoader from '../config/FolderProfileLoader.js';
-import { Profiler, writeProfilingReport } from '../utils/profiler.js';
 import { parseSize } from '../utils/helpers.js';
 import { resolveScope } from '../utils/scopeResolver.js';
 import { buildEstimates } from '../utils/estimate.js';
@@ -96,6 +92,7 @@ async function copyCommand(targetPath = '.', options = {}) {
     if (options.profile) {
       // Profiler.start() rolls back (disconnects) on partial failure, so a
       // throw during startup leaks nothing.
+      const { Profiler } = await import('../utils/profiler.js');
       profiler = new Profiler({
         type: options.profile,
         profileDir: options.profileDir || '.profiles',
@@ -254,10 +251,16 @@ function applyLoggingOptions(options) {
  * @returns {Promise<string>} Absolute base path
  */
 async function resolveBasePath(targetPath, reporter) {
-  if (GitHubUrlHandler.isGitHubUrl(targetPath)) {
-    reporter.note(`Cloning ${targetPath}`);
-    const githubHandler = new GitHubUrlHandler(targetPath);
-    return githubHandler.getFiles();
+  // Recognising a GitHub URL is a string test; *handling* one pulls in a
+  // handler with its own git, filesystem and child-process machinery. A local
+  // path — which is nearly every invocation — should not pay to parse it.
+  if (/^https?:\/\/(?:www\.)?github\.com\//i.test(targetPath)) {
+    const { default: GitHubUrlHandler } = await import('../services/GitHubUrlHandler.js');
+    if (GitHubUrlHandler.isGitHubUrl(targetPath)) {
+      reporter.note(`Cloning ${targetPath}`);
+      const githubHandler = new GitHubUrlHandler(targetPath);
+      return githubHandler.getFiles();
+    }
   }
 
   const basePath = path.resolve(targetPath);
@@ -344,6 +347,7 @@ async function finishProfiling(profiler, { result, options, targetPath, startTim
   }
 
   const pipelineStats = result.pipelineStats || {};
+  const { writeProfilingReport } = await import('../utils/profiler.js');
   const reportPath = await writeProfilingReport({
     profileDir: options.profileDir || '.profiles',
     timestamp: savedTimestamp,
@@ -402,6 +406,20 @@ async function writeSecretsReport(result, options, reporter) {
 }
 
 /**
+ * Load the clipboard layer on first need.
+ *
+ * Only three of the five destinations touch the clipboard. `-o`, `--display`
+ * and `--stream` never do, and `--dry-run` writes nothing at all — so the
+ * platform helper, and the child-process machinery behind it, stay out of the
+ * graph for those.
+ *
+ * @returns {Promise<Object>} The Clipboard module
+ */
+function clipboard() {
+  return import('../utils/clipboard.js').then((module) => module.default);
+}
+
+/**
  * Put the output where it was asked to go.
  *
  * Delivery returns a description of what actually happened rather than printing
@@ -434,7 +452,7 @@ async function deliverOutput(result, options, basePath, reporter) {
   if (requested === 'reference') {
     const tempFile = await writeReferenceFile(output, basePath, options.format);
     try {
-      await Clipboard.copyFileReference(tempFile);
+      await (await clipboard()).copyFileReference(tempFile);
       return {
         requested,
         actual: 'reference',
@@ -469,7 +487,7 @@ async function deliverOutput(result, options, basePath, reporter) {
   }
 
   try {
-    await Clipboard.copyText(output);
+    await (await clipboard()).copyText(output);
     return { requested, actual: 'clipboard', status: 'success', fallbackUsed: false };
   } catch (error) {
     const tempFile = await writeReferenceFile(output, basePath, options.format);
@@ -500,7 +518,7 @@ async function deliverOutput(result, options, basePath, reporter) {
  */
 async function revealIfRequested(filePath, options) {
   if (!options?.reveal) return;
-  await Clipboard.revealInFinder(filePath);
+  await (await clipboard()).revealInFinder(filePath);
 }
 
 /**
@@ -510,9 +528,16 @@ function reportRun({ reporter, result, options, delivery, warnings, notices = []
   const included = (result.files || []).filter((f) => f !== null);
   const stats = {
     files: included.length,
-    outputBytes: result.output
-      ? Buffer.byteLength(result.output, 'utf8')
-      : result.stats?.outputSize,
+    // `OutputFormattingStage` already measured this, over the same string.
+    // Recomputing it walked the whole document a second time to reach the
+    // identical number — a megabyte of UTF-8 length counting to print one
+    // figure in a status line. The remaining fallbacks are for the paths that
+    // do not set it: streaming reports through `stats`, and a stage list ending
+    // early has no size at all.
+    outputBytes:
+      result.outputSize ??
+      result.stats?.outputSize ??
+      (result.output ? Buffer.byteLength(result.output, 'utf8') : undefined),
     estimatedTokens:
       result.stats?.estimatedTokens ??
       buildEstimates(included, {
@@ -672,6 +697,7 @@ async function buildProfileFromCliOptions(options, basePath) {
     // Folder profiles belong to the project being copied, not to whatever
     // directory the process happens to be started from. An embedder's cwd is
     // its own app bundle; a shell user may well be a level above the target.
+    const { default: FolderProfileLoader } = await import('../config/FolderProfileLoader.js');
     const loader = new FolderProfileLoader({ cwd: basePath || process.cwd() });
     try {
       if (namedProfile) {

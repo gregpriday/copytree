@@ -17,7 +17,7 @@ let Box, Text;
   Text = undefined;
 });
 import { useAppContext } from '../contexts/AppContext.js';
-import fs from 'fs-extra';
+import fs from '../../utils/fsx.js';
 import path from 'path';
 import os from 'os';
 

@@ -8,7 +8,7 @@ import {
 } from '../../../src/utils/gitignoreSources.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 describe('parseExcludesFile', () => {
   it('reads core.excludesFile', () => {

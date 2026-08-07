@@ -1,10 +1,10 @@
-import fs from 'fs-extra';
+import fs from '../../../src/utils/fsx.js';
 import path from 'path';
 import FileLoader from '../../../src/utils/fileLoader.js';
 import { summarize, reset } from '../../../src/utils/fsErrorReport.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 function createLoader(basePath, options = {}) {
   return new FileLoader({

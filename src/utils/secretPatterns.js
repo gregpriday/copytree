@@ -248,6 +248,56 @@ const BASIC_PATTERNS = [
 ];
 
 /**
+ * Cheap pre-check: could this content possibly match any rule above?
+ *
+ * Every rule in `BASIC_PATTERNS` requires one of a small set of literal
+ * substrings to be present — a provider's published prefix, a PEM header, or a
+ * credential keyword in the assigned name. This tests for those directly, which
+ * is a handful of scans by a native `indexOf`-class routine, instead of running
+ * seven backtracking regexes over a file that cannot match any of them.
+ *
+ * **This must never be stricter than the rules it guards.** A false positive
+ * here costs one wasted scan of one file. A false negative publishes a
+ * credential. Whenever a rule is added to or widened in `BASIC_PATTERNS`, its
+ * required literal has to be added here too — `tests/unit/utils/` asserts the
+ * two agree by scanning a corpus of positives with and without the prefilter.
+ *
+ * Written as two alternations rather than a chain of `includes` because the
+ * keyword and prefix sets both need case-insensitivity or several literals; a
+ * single pass by the regex engine over a rejected file beats twenty passes.
+ */
+
+/**
+ * Published token prefixes, and the PEM header, as plain literals.
+ *
+ * Loosened deliberately relative to the full rules: `AKIA` without its 16
+ * trailing characters, `gh` followed by any of the type letters and an
+ * underscore. Matching more than the rule does is the safe direction.
+ */
+const SECRET_PREFIX_HINT =
+  /AKIA|-----BEGIN|gh[pousr]_|github_pat_|[sr]k_(?:live|test)_|glpat-|xox[baprs]-|AIza|sk-ant-|sk-proj-|SG\.|npm_/;
+
+/**
+ * Credential keywords, matching the `SECRET_KEYWORD` and `ENV_KEY_KEYWORD`
+ * alternations that gate the two generic rules.
+ *
+ * `aws` is included on its own account: the AWS secret-key rule keys off it
+ * rather than off a generic keyword.
+ */
+const SECRET_KEYWORD_HINT =
+  /api[_-]?key|apikey|secret|access[_-]?token|auth[_-]?token|token|password|passwd|client[_-]?secret|credential|private[_-]?key|aws/i;
+
+/**
+ * Whether content is worth running the full rule set over.
+ *
+ * @param {string} content - File content
+ * @returns {boolean} True when a rule could conceivably match
+ */
+export function couldContainSecret(content) {
+  return SECRET_PREFIX_HINT.test(content) || SECRET_KEYWORD_HINT.test(content);
+}
+
+/**
  * Shannon entropy of a string, in bits per character.
  *
  * Distinguishes a random credential (typically above 3.5) from a repeated or
@@ -404,11 +454,22 @@ function positionAt(lineStarts, index) {
  */
 export function scanContent(content, filePath) {
   if (!content) return [];
+  if (!couldContainSecret(content)) return [];
 
-  const lineStarts = [0];
-  for (let i = 0; i < content.length; i++) {
-    if (content[i] === '\n') lineStarts.push(i + 1);
-  }
+  // Line starts are built on demand, because the overwhelming majority of files
+  // produce no findings and this index exists only to turn an offset into a
+  // line and column for one. Building it eagerly walked every byte of every
+  // clean file in the repository for nothing.
+  let lineStarts = null;
+  const lineIndex = () => {
+    if (lineStarts === null) {
+      lineStarts = [0];
+      for (let i = 0; i < content.length; i++) {
+        if (content.charCodeAt(i) === 10) lineStarts.push(i + 1);
+      }
+    }
+    return lineStarts;
+  };
 
   // Spans, not findings: two rules can match the same credential (a Stripe key
   // assigned to a name called `api_key` matches both PROVIDER_TOKEN and
@@ -419,8 +480,12 @@ export function scanContent(content, filePath) {
   const results = [];
 
   for (const pattern of BASIC_PATTERNS) {
-    // Patterns are module-level and carry `lastIndex` state across calls.
-    const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+    // Patterns are module-level and `g`/`gm` regexes carry `lastIndex` between
+    // calls, so it is reset rather than the whole expression recompiled. A fresh
+    // `new RegExp` per pattern per file also threw away V8's compiled form and
+    // its internal caches every time.
+    const regex = pattern.regex;
+    regex.lastIndex = 0;
     let match;
 
     while ((match = regex.exec(content)) !== null) {
@@ -449,8 +514,8 @@ export function scanContent(content, filePath) {
       if (overlapsClaimed(claimed, startIndex, endIndex)) continue;
       insertClaimed(claimed, startIndex, endIndex);
 
-      const start = positionAt(lineStarts, startIndex);
-      const end = positionAt(lineStarts, endIndex - 1);
+      const start = positionAt(lineIndex(), startIndex);
+      const end = positionAt(lineIndex(), endIndex - 1);
 
       results.push({
         RuleID: pattern.id,

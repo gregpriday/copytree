@@ -1,5 +1,5 @@
 // Static import for fs-extra (mocked)
-import fs from 'fs-extra';
+import fs from '../../../src/utils/fsx.js';
 import { randomUUID } from 'crypto';
 
 // Use dynamic import for module under test

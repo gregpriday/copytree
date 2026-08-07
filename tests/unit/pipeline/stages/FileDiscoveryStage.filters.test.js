@@ -1,5 +1,5 @@
 // Unmock fs-extra for this test (real filesystem operations)
-jest.unmock('fs-extra');
+jest.unmock('../../../../src/utils/fsx.js');
 
 import fs from 'fs-extra';
 import path from 'path';

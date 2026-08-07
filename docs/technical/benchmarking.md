@@ -44,6 +44,31 @@ node tests/performance/latency.bench.js --compare before.json
 node tests/performance/latency.bench.js --filter tiny --samples 20
 ```
 
+### When the machine is not idle: `latency-ab`
+
+`latency.bench.js` compares a run against a *saved* run, which means comparing
+across time — and on a machine doing anything else, load moves a median further
+than any realistic change does. A background build has been observed moving the
+same scenario from 96 ms to 168 ms.
+
+`latency-ab.bench.js` removes that confound by never comparing across time. It
+takes a second checkout and measures in **pairs**: one invocation of each, back
+to back, alternating which goes first so neither side keeps the warmer cache.
+The reported change is the median of the per-pair *differences*, so load that hit
+both members of a pair cancels out of it.
+
+```bash
+git worktree add --detach /tmp/copytree-base <baseline-ref>
+ln -s "$PWD/node_modules" /tmp/copytree-base/node_modules
+npm run benchmark:latency-ab -- --baseline /tmp/copytree-base --samples 25
+```
+
+Read the **B wins** column before the percentage. It counts the pairs the
+candidate won; with no real difference it sits near half, whatever the medians
+say. A change that is real shows up as a near-unanimous win count, and that
+holds even when the absolute numbers are inflated by load — which is the whole
+point of the harness.
+
 Budgets live in `latency-budgets.json` and are ceilings on the **median**, not
 the mean: process startup has a long right tail — the scheduler, the page cache,
 an antivirus hook — and one outlier moves a mean enough to invent a regression

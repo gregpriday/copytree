@@ -1,4 +1,4 @@
-jest.mock('fs-extra');
+jest.mock('../../../src/utils/fsx.js');
 
 // Mock config
 const mockConfig = {
@@ -11,7 +11,7 @@ const mockConfig = {
 };
 
 // Static import
-import fs from 'fs-extra';
+import fs from '../../../src/utils/fsx.js';
 
 // Use dynamic import for module under test
 let BinaryTransformer;

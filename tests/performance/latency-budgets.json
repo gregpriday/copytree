@@ -4,30 +4,30 @@
   "regressionThresholdPercent": 5,
   "scenarios": {
     "version": {
-      "p50Ms": 70,
-      "description": "Process start and module graph only. Rises whenever a dependency is added to the startup path."
+      "p50Ms": 46,
+      "description": "Process start and module graph only. Answered before Commander is built, so this rises the moment anything is added to the entry point's static imports."
     },
     "empty": {
-      "p50Ms": 140,
+      "p50Ms": 112,
       "description": "Startup plus configuration, no traversal."
     },
     "tiny-100": {
-      "p50Ms": 160,
+      "p50Ms": 131,
       "description": "The common interactive case: select, load, format, write."
     },
     "tiny-100-display": {
-      "p50Ms": 158,
+      "p50Ms": 128,
       "description": "Same work, delivered to stdout."
     },
     "tiny-100-tree": {
-      "p50Ms": 140,
+      "p50Ms": 112,
       "description": "Selection and tree rendering, no file contents."
     },
     "tiny-100-dry": {
-      "p50Ms": 130,
+      "p50Ms": 110,
       "description": "Selection only. The floor for anything that walks the tree."
     }
   },
-  "_measured": "Clean medians on the reference machine at the time of writing: version 50, empty 102, tiny-100 117, display 116, only-tree 102, dry-run 96 ms. Budgets sit ~35% above these.",
-  "_noise": "Check the reported mad (median absolute deviation) before believing a delta. On an idle machine it is ~1-2 ms; a mad above ~5 ms means something else was running and the medians are not comparable."
+  "_measured": "Clean medians on the reference machine at the time of writing: version 34, empty 82, tiny-100 97, display 95, only-tree 83, dry-run 81 ms. Budgets sit ~35% above these.",
+  "_noise": "Check the reported mad (median absolute deviation) before believing a delta. On an idle machine it is ~1-2 ms; a mad above ~5 ms means something else was running and the medians are not comparable. On a machine that will not go quiet, use latency-ab.bench.js instead — it compares two checkouts in interleaved pairs, so shared load cancels out."
 }

@@ -115,7 +115,7 @@ class BinaryTransformer extends BaseTransformer {
    * @returns {Promise<Object>} Transformed file
    */
   async transformToBase64(file) {
-    const fs = await import('fs-extra');
+    const fs = await import('../../utils/fsx.js');
 
     try {
       // Check size limit for base64 encoding

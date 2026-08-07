@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import fs from 'fs-extra';
+import fs from './fsx.js';
 
 /**
  * Generate a hash for file content

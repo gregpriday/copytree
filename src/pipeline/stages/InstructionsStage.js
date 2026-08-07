@@ -33,12 +33,17 @@ class InstructionsStage extends Stage {
 
       this.log(`Loading instructions: ${instructionsName}`, 'debug');
 
-      // Load instructions
-      this.log(`Loading instructions: ${instructionsName}`, 'debug');
+      // Whether the caller named this set, or it is the configured default. A
+      // set asked for by name must exist; falling back silently would emit a
+      // document missing the instructions the caller believes are in it.
+      const named =
+        typeof input.options?.instructions === 'string' && input.options.instructions !== '';
+
       let instructionsContent;
       try {
         instructionsContent = await this.instructionsLoader.load(instructionsName);
       } catch (error) {
+        if (named) throw error;
         this.log(
           `Instructions '${instructionsName}' not found, continuing without instructions: ${error.message}`,
           'warn',
@@ -83,31 +88,23 @@ class InstructionsStage extends Stage {
   }
 
   /**
-   * Validate that instructions exist if specified
-   * @param {Object} input - Input to validate
-   * @returns {boolean} - True if valid
+   * Validate that instructions exist, when a specific set was named.
+   *
+   * There is no `exists()` probe here any more. `exists()` checked the user
+   * directory and then the app directory, and `load()` — running moments later
+   * in `process()` — checked exactly the same two paths again before reading.
+   * That is four filesystem probes per run to answer one question, on a stage
+   * that runs on every copy.
+   *
+   * `load()` already distinguishes "found" from "not found", and `process()`
+   * already turns the latter into either a warning or a rethrow depending on
+   * whether the caller named the set. Validating here as well only made the
+   * cheap case pay for the rare one.
+   *
+   * @param {Object} _input - Unused
+   * @returns {boolean} Always true
    */
-  async validate(input) {
-    // Skip validation if instructions are disabled
-    if (input.options?.noInstructions || input.options?.instructions === false) {
-      return true;
-    }
-
-    let instructionsName = input.options?.instructions;
-
-    // If instructions is true but not a string, use default
-    if (instructionsName === true || !instructionsName) {
-      instructionsName = this.config.get('app.defaultInstructions', 'default');
-    }
-
-    // Check if instructions exist
-    const exists = await this.instructionsLoader.exists(instructionsName);
-
-    // Only throw error if a specific instructions set was requested (not true or default)
-    if (!exists && input.options?.instructions && input.options.instructions !== true) {
-      throw new Error(`Instructions '${instructionsName}' not found`);
-    }
-
+  validate(_input) {
     return true;
   }
 }

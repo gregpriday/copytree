@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import chalk from './ansi.js';
 import stripAnsi from 'strip-ansi';
 import { config } from '../config/ConfigManager.js';
 import { EventEmitter } from 'events';

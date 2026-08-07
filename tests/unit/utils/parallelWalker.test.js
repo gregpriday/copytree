@@ -3,7 +3,7 @@
  */
 
 // Unmock fs-extra to allow real filesystem operations for these tests
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 jest.unmock('p-limit');
 
 import { jest } from '@jest/globals';

@@ -16,7 +16,7 @@ import { ERROR_CODES } from '../../../src/utils/errors.js';
 import { EXCLUSION_REASONS } from '../../../src/utils/exclusionReport.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 let config;
 

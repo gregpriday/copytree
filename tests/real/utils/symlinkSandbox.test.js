@@ -4,7 +4,7 @@ import { walkWithIgnore } from '../../../src/utils/ignoreWalker.js';
 import { walkParallel } from '../../../src/utils/parallelWalker.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 /**
  * Collect every path a walker yields, relative to the root, POSIX-style.

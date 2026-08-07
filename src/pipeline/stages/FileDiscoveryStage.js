@@ -16,7 +16,6 @@
 
 import Stage from '../Stage.js';
 import { walkWithIgnore } from '../../utils/ignoreWalker.js';
-import { walkParallel } from '../../utils/parallelWalker.js';
 import micromatch from 'micromatch';
 import fastGlob from 'fast-glob';
 import ignore from 'ignore';
@@ -165,7 +164,19 @@ class FileDiscoveryStage extends Stage {
       followSymlinks: this.options.followSymlinks === true,
       explain,
       initialLayers,
-      config: this.config.all(), // Pass full config for retry settings
+      // The three retry settings the walkers actually read, and nothing else.
+      // This was `this.config.all()`, which deep-clones the entire merged
+      // configuration — including the exclusion lists, which are the largest
+      // thing in it — once per run, to reach three integers.
+      config: {
+        copytree: {
+          fs: {
+            retryAttempts: this.config.get('copytree.fs.retryAttempts', 3),
+            retryDelay: this.config.get('copytree.fs.retryDelay', 100),
+            maxDelay: this.config.get('copytree.fs.maxDelay', 2000),
+          },
+        },
+      },
       maxDepth: this.maxDepth !== null ? this.maxDepth : undefined,
       signal: input.options?.signal,
       onExclude: (record) => report.add(record),
@@ -185,9 +196,13 @@ class FileDiscoveryStage extends Stage {
       }
     }
 
-    // Choose walker based on configuration
+    // Choose walker based on configuration.
+    //
+    // The parallel walker is loaded only when it is the one being used.
+    // Parallel discovery is off by default, so importing both meant every run
+    // parsed a traversal implementation it was not going to call.
     const walker = parallelEnabled
-      ? walkParallel(this.basePath, walkOptions)
+      ? (await import('../../utils/parallelWalker.js')).walkParallel(this.basePath, walkOptions)
       : walkWithIgnore(this.basePath, walkOptions);
 
     const usePatternFilter = this.patterns.length > 0 && !this.patterns.includes('**/*');

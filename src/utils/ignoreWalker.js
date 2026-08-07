@@ -41,7 +41,23 @@ const ruleCache = new Map();
  * collator constructions for one sort. One shared instance produces exactly the
  * same ordering.
  */
-const ENTRY_COLLATOR = new Intl.Collator();
+/**
+ * Built on first use, not at import. Constructing any `Intl` object initialises
+ * ICU, which measured at ~5 ms — paid by every invocation that loaded this
+ * module, including `--only-tree` and `--dry-run` runs that never reach a
+ * directory listing.
+ *
+ * The locale is still the host's, deliberately unchanged here: this ordering
+ * feeds traversal, which `SortFilesStage` re-sorts canonically afterwards, and
+ * pinning it is a behaviour question rather than a performance one.
+ *
+ * @returns {Intl.Collator} Shared collator
+ */
+let entryCollator = null;
+function entryComparator() {
+  if (!entryCollator) entryCollator = new Intl.Collator();
+  return entryCollator;
+}
 
 /**
  * Clear all cached ignore rules.
@@ -695,7 +711,8 @@ export async function* walkWithIgnore(root, options = {}) {
 
     // Sort entries for deterministic order across platforms
     // fs.readdir order is not guaranteed and differs between Windows/Unix
-    entries.sort((a, b) => ENTRY_COLLATOR.compare(a.name, b.name));
+    const collator = entryComparator();
+    entries.sort((a, b) => collator.compare(a.name, b.name));
 
     // One relative path per layer for this directory, reused by every entry in
     // it instead of being recomputed per entry per layer.

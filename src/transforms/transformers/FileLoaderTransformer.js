@@ -1,5 +1,5 @@
 import BaseTransformer from '../BaseTransformer.js';
-import fs from 'fs-extra';
+import fs from '../../utils/fsx.js';
 
 /**
  * Default file loader transformer

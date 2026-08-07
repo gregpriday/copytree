@@ -1,7 +1,14 @@
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 import path from 'path';
 import os from 'os';
-import _ from 'lodash';
+import {
+  cloneDeep,
+  get as pathGet,
+  has as pathHas,
+  isEqual,
+  merge,
+  set as pathSet,
+} from './objectUtils.js';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { ConfigurationError, ERROR_CODES } from '../utils/errors.js';
 
@@ -243,8 +250,8 @@ class ConfigManager {
         // same object, so assigning it directly made `set()` on one instance
         // mutate the defaults every other instance would go on to read — which
         // defeats the isolation that makes concurrent copy() calls safe.
-        this.config[configName] = _.cloneDeep(configData);
-        this.defaultConfig[configName] = _.cloneDeep(configData);
+        this.config[configName] = cloneDeep(configData);
+        this.defaultConfig[configName] = cloneDeep(configData);
         loaded++;
       } catch (error) {
         this._recordLoadError(configName, error);
@@ -284,10 +291,10 @@ class ConfigManager {
         }
 
         // Store user config for provenance tracking
-        this.userConfig[configName] = _.cloneDeep(userConfigData);
+        this.userConfig[configName] = cloneDeep(userConfigData);
 
         // Deep merge with existing config
-        this.config[configName] = _.merge({}, this.config[configName] || {}, userConfigData);
+        this.config[configName] = merge({}, this.config[configName] || {}, userConfigData);
         loaded++;
       } catch (error) {
         this._recordLoadError(`user:${configName}`, error);
@@ -330,10 +337,10 @@ class ConfigManager {
    * @returns {*} Configuration value
    */
   get(path, defaultValue) {
-    // Plain dotted keys, which is nearly all of them, are walked directly.
-    // `_.get` re-parses the path string on every call, and hot paths ask for the
-    // same handful of keys once per file. Anything with brackets or a non-string
-    // path still goes through lodash so the full accessor grammar keeps working.
+    // Plain dotted keys, which is nearly all of them, are walked directly
+    // against a cache of pre-split segments, because hot paths ask for the same
+    // handful of keys once per file. Anything with brackets or a non-string path
+    // goes through the general accessor, which re-parses but is rare.
     if (typeof path === 'string' && !path.includes('[')) {
       const segments = SEGMENT_CACHE.get(path) ?? cacheSegments(path);
       let current = this.config;
@@ -344,7 +351,7 @@ class ConfigManager {
       return current === undefined ? defaultValue : current;
     }
 
-    return _.get(this.config, path, defaultValue);
+    return pathGet(this.config, path, defaultValue);
   }
 
   /**
@@ -353,7 +360,7 @@ class ConfigManager {
    * @param {*} value - Value to set
    */
   set(path, value) {
-    _.set(this.config, path, value);
+    pathSet(this.config, path, value);
   }
 
   /**
@@ -362,7 +369,7 @@ class ConfigManager {
    * @returns {boolean}
    */
   has(path) {
-    return _.has(this.config, path);
+    return pathHas(this.config, path);
   }
 
   /**
@@ -370,7 +377,7 @@ class ConfigManager {
    * @returns {Object} All configuration (deep copy)
    */
   all() {
-    return _.cloneDeep(this.config);
+    return cloneDeep(this.config);
   }
 
   /**
@@ -625,8 +632,8 @@ class ConfigManager {
     }
 
     // Get the value from user config at this path
-    const userValue = _.get(this.userConfig, path);
-    return userValue !== undefined && _.isEqual(userValue, value);
+    const userValue = pathGet(this.userConfig, path);
+    return userValue !== undefined && isEqual(userValue, value);
   }
 
   /**

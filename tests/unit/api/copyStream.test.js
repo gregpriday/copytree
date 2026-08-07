@@ -1,5 +1,5 @@
 // Unmock fs-extra for these tests to use real filesystem
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 import { copyStream } from '../../../src/api/copyStream.js';
 import { ValidationError } from '../../../src/utils/errors.js';

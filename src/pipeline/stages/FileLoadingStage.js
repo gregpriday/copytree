@@ -1,5 +1,5 @@
 import Stage from '../Stage.js';
-import fs from 'fs-extra';
+import fs from '../../utils/fsx.js';
 import path from 'path';
 import {
   detect,

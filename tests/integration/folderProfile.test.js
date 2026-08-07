@@ -5,7 +5,7 @@ import path from 'path';
 import { withTempDir } from '../helpers/tempfs.js';
 
 // This suite uses real filesystem behavior.
-jest.unmock('fs-extra');
+jest.unmock('../../src/utils/fsx.js');
 
 async function createTestProject(tmpDir) {
   const testProjectDir = path.join(tmpDir, 'test-project');

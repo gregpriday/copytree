@@ -14,7 +14,7 @@ let walkWithIgnore;
 let FileLoader;
 
 beforeAll(async () => {
-  jest.unmock('fs-extra');
+  jest.unmock('../../src/utils/fsx.js');
   ({ promises: fs } = await import('node:fs'));
   ({ withFsRetry } = await import('../../src/utils/retryableFs.js'));
   ({ recordRetry, recordGiveUp, recordPermanent, recordSuccessAfterRetry, summarize, reset } =

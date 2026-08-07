@@ -31,17 +31,13 @@ describe('transform candidate extensions', () => {
       if (nonDefault.length > 0) claimed.add(ext.toLowerCase());
     }
 
-    const missing = [...claimed].filter(
-      (ext) => !CANDIDATE_EXTENSIONS.has(ext),
-    );
+    const missing = [...claimed].filter((ext) => !CANDIDATE_EXTENSIONS.has(ext));
     expect(missing).toEqual([]);
   });
 
   it('lists nothing that no transformer claims', async () => {
     const registry = await TransformerRegistry.createDefault();
-    const stale = [...CANDIDATE_EXTENSIONS].filter(
-      (ext) => !registry.extensionMap.has(ext),
-    );
+    const stale = [...CANDIDATE_EXTENSIONS].filter((ext) => !registry.extensionMap.has(ext));
 
     expect(stale).toEqual([]);
   });

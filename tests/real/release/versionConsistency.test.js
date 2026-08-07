@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 const execFileAsync = promisify(execFile);
 

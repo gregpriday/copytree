@@ -6,7 +6,7 @@ import { ProgressTracker } from '../utils/ProgressTracker.js';
 import { ExclusionReport } from '../utils/exclusionReport.js';
 import { resolveScope } from '../utils/scopeResolver.js';
 import path from 'path';
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 
 /**
  * Stage-computed stats forwarded verbatim from the pipeline result, onto the

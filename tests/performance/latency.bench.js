@@ -207,7 +207,9 @@ async function main() {
   const env = environment();
   console.log(`node ${process.version} · ${env.cpuModel || os.cpus()[0]?.model || 'unknown cpu'}`);
   console.log(`${options.samples} samples after ${options.warmup} warmups, median reported\n`);
-  console.log(`${'scenario'.padEnd(26)} ${'p50'.padStart(8)} ${'mad'.padStart(7)} ${'p90'.padStart(8)}  budget`);
+  console.log(
+    `${'scenario'.padEnd(26)} ${'p50'.padStart(8)} ${'mad'.padStart(7)} ${'p90'.padStart(8)}  budget`,
+  );
 
   for (const row of results) {
     const budget = BUDGETS.scenarios[row.id];

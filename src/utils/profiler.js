@@ -1,5 +1,5 @@
 import inspector from 'inspector';
-import fs from 'fs-extra';
+import fs from './fsx.js';
 import path from 'path';
 
 const VALID_TYPES = ['cpu', 'heap', 'all'];

@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fs from './fsx.js';
 import path from 'path';
 import fastGlob from 'fast-glob';
 import { logger } from './logger.js';

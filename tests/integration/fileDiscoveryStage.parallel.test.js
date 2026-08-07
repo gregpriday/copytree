@@ -3,7 +3,7 @@
  */
 
 // Unmock fs-extra and ConfigManager to allow real filesystem and config operations for these tests
-jest.unmock('fs-extra');
+jest.unmock('../../src/utils/fsx.js');
 jest.unmock('p-limit');
 jest.unmock('../../src/config/ConfigManager.js');
 

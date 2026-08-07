@@ -186,16 +186,27 @@ export function plural(count, noun) {
 }
 
 /**
- * Thousands separators for counts, built once.
+ * Insert thousands separators into a run of digits.
  *
- * `Number.prototype.toLocaleString()` constructs a fresh `Intl.NumberFormat` on
- * every call, which is the single most expensive thing this module did — the
- * first call pulls in ICU. Pinned to `en-US` deliberately: this is one field in
- * a status line whose other numbers are already formatted in English, and a
- * count that switches separator style with `LANG` is a diff in every log that
- * captures it.
+ * This was `Intl.NumberFormat`, and it was **the most expensive thing in this
+ * module by an order of magnitude**: the first `Intl` constructor in a process
+ * initialises ICU, which measured at ~9 ms. Hoisting it to module scope — as an
+ * earlier pass did, to stop `toLocaleString()` rebuilding it per call — moved
+ * that cost to *import* time, so every run paid it, including `--only-tree`
+ * runs that never format a count at all.
+ *
+ * ICU buys nothing here. The output is pinned to `en-US` on purpose (a count
+ * whose separator style changes with `LANG` is a diff in every log that captures
+ * it), the input is always a non-negative integer, and anything large enough for
+ * grouping to be interesting has already taken the `k` / `M` branch below — so
+ * the widest string this ever groups is `9,999`.
+ *
+ * @param {number} n - Non-negative integer
+ * @returns {string} The number with `,` every three digits
  */
-const COUNT_FORMAT = new Intl.NumberFormat('en-US');
+function group(n) {
+  return String(n).replace(/\B(?=(?:\d{3})+$)/g, ',');
+}
 
 /**
  * Format a count, abbreviating past a thousand.
@@ -206,7 +217,7 @@ export function formatCount(value) {
   const n = Number(value) || 0;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 10_000) return `${Math.round(n / 1_000)}k`;
-  return COUNT_FORMAT.format(n);
+  return group(n);
 }
 
 /**

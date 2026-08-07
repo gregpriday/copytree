@@ -1,5 +1,5 @@
 // Unmock fs-extra for these tests to use real filesystem
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 import Clipboard from '../../../src/utils/clipboard.js';
 

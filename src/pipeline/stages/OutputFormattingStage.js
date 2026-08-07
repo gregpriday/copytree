@@ -1,13 +1,31 @@
 import Stage from '../Stage.js';
 import { ERROR_CODES, ValidationError } from '../../utils/errors.js';
-import XMLFormatter from '../formatters/XMLFormatter.js';
-import MarkdownFormatter from '../formatters/MarkdownFormatter.js';
-import NDJSONFormatter from '../formatters/NDJSONFormatter.js';
-import SARIFFormatter from '../formatters/SARIFFormatter.js';
 import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
+import { comparePlain } from '../../utils/collation.js';
 
-/** Matches bare `localeCompare(other)`, built once instead of per comparison. */
-const NAME_COLLATOR = new Intl.Collator();
+/**
+ * Where each document formatter lives, loaded when one is chosen.
+ *
+ * A run produces exactly one format. Importing all four meant every XML copy —
+ * the default, and so the overwhelming majority — also parsed the Markdown,
+ * NDJSON and SARIF formatters and everything behind them, to use none of them.
+ *
+ * `json` and `tree` are absent because they are rendered by this stage itself.
+ *
+ * Null-prototype, so a format named after an inherited property — `constructor`,
+ * `toString` — is unknown rather than resolving to something truthy that is not
+ * a module loader.
+ */
+const FORMATTER_MODULES = Object.assign(Object.create(null), {
+  xml: () => import('../formatters/XMLFormatter.js'),
+  markdown: () => import('../formatters/MarkdownFormatter.js'),
+  ndjson: () => import('../formatters/NDJSONFormatter.js'),
+  sarif: () => import('../formatters/SARIFFormatter.js'),
+});
+
+// Tree-node ordering uses the shared collation helper, which keeps ICU out of
+// the startup path: constructing an `Intl.Collator` at module scope initialised
+// ICU on every run that formatted anything, whether or not a tree was rendered.
 
 class OutputFormattingStage extends Stage {
   constructor(options = {}) {
@@ -52,54 +70,23 @@ class OutputFormattingStage extends Stage {
     const startTime = Date.now();
 
     let output;
-    switch (this.format) {
-      case 'xml': {
-        const formatter = new XMLFormatter({
-          stage: this,
-          addLineNumbers: this.addLineNumbers,
-          onlyTree: this.onlyTree,
-        });
-        output = await formatter.format(input);
-        break;
-      }
-      case 'json':
-        output = this.formatAsJSON(input);
-        break;
-      case 'tree':
-        output = this.formatAsTree(input);
-        break;
-      case 'markdown': {
-        const formatter = new MarkdownFormatter({
-          stage: this,
-          addLineNumbers: this.addLineNumbers,
-          onlyTree: this.onlyTree,
-        });
-        output = await formatter.format(input);
-        break;
-      }
-      case 'ndjson': {
-        const formatter = new NDJSONFormatter({
-          stage: this,
-          addLineNumbers: this.addLineNumbers,
-          onlyTree: this.onlyTree,
-        });
-        output = await formatter.format(input);
-        break;
-      }
-      case 'sarif': {
-        const formatter = new SARIFFormatter({
-          stage: this,
-          addLineNumbers: this.addLineNumbers,
-          onlyTree: this.onlyTree,
-        });
-        output = await formatter.format(input);
-        break;
-      }
-      default:
-        throw new ValidationError(`Unknown output format: ${this.format}`, 'format', this.format, {
-          code: ERROR_CODES.INVALID_FORMAT,
-          value: this.format,
-        });
+    if (this.format === 'json') {
+      output = this.formatAsJSON(input);
+    } else if (this.format === 'tree') {
+      output = this.formatAsTree(input);
+    } else if (FORMATTER_MODULES[this.format]) {
+      const { default: Formatter } = await FORMATTER_MODULES[this.format]();
+      const formatter = new Formatter({
+        stage: this,
+        addLineNumbers: this.addLineNumbers,
+        onlyTree: this.onlyTree,
+      });
+      output = await formatter.format(input);
+    } else {
+      throw new ValidationError(`Unknown output format: ${this.format}`, 'format', this.format, {
+        code: ERROR_CODES.INVALID_FORMAT,
+        value: this.format,
+      });
     }
 
     this.log(`Formatted output in ${this.getElapsedTime(startTime)}`, 'info');
@@ -242,7 +229,7 @@ class OutputFormattingStage extends Stage {
       if (aIsFile && !bIsFile) return 1;
       if (!aIsFile && bIsFile) return -1;
 
-      return NAME_COLLATOR.compare(a, b);
+      return comparePlain(a, b);
     });
 
     entries.forEach(([name, value], index) => {

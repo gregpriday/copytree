@@ -9,6 +9,75 @@ The rule this exists to enforce: **do not approve a changed golden file because
 
 ---
 
+## Unreleased (dependency and process-boundary pass)
+
+The first performance pass removed duplicated work. This one removes
+*dependencies* and *process boundaries* — the fixed cost every invocation paid
+before it did anything. Almost all of it is invisible; these are the exceptions.
+
+### Streamed Markdown `sha256` describes the emitted content
+
+The buffered formatter was fixed in the previous pass; `StreamingOutputStage`
+still did the opposite, and for the same reason it was wrong there: by the time
+a file is streamed its content has been redacted by `SecretsGuardStage` and
+rewritten by transformers, so hashing `file.absolutePath` published the digest
+of the *unredacted* original beside the redacted document. That is enough to
+confirm a guess at the removed bytes. It also reopened and reread every selected
+file, serialized inside the per-file transform. Hashes now come from the emitted
+content, falling back to disk only when there is none.
+
+### A named instructions set that cannot be loaded now fails from `process()`
+
+The result is unchanged — `--instructions nope` still fails — but the check
+moved. `validate()` asked `InstructionsLoader.exists()`, which probes the user
+directory and then the app directory; `process()` then called `load()`, which
+probes the same two paths again. Four probes per run, on a stage that runs on
+every copy, to reach a conclusion the load already reaches.
+
+Stage-level behaviour did change for anyone calling `InstructionsStage.process()`
+directly: it used to return the input unchanged when a *named* set failed to
+load, while `validate()` threw for that same case. The two disagreed and only
+`validate()`'s answer ever reached a user. `validate()` is now a no-op.
+
+### `secretsGuard.scanner` reports `none` when nothing was scanned
+
+It reported `builtin` whenever Gitleaks was absent, including for runs where no
+file ever reached a scanner — every file excluded as secret-prone, or as
+unscannable. Naming a scanner there said protection had been applied to nothing.
+`gitleaks` and `builtin` now mean a scanner actually ran.
+
+### Gitleaks stops after an operational failure
+
+An incompatible binary, a missing config, a scanner that disappears mid-run:
+these fail identically for every remaining file. CopyTree used to retry per file,
+so a misconfigured scanner produced one doomed process and one identical warning
+per file. The failure is now reported once and the built-in scanner finishes the
+run. Findings are unchanged; a run that previously logged a thousand warnings
+logs one.
+
+### `--log-level`/`colorize: always` into a pipe now actually colours
+
+The logger built styled strings with Chalk and then decided *itself*, via
+`_shouldColorize()`, whether to write them or strip them. Chalk's own detection
+ran first and returned unstyled text whenever it judged the destination not to be
+a terminal — so asking for colour explicitly, into a pipe or a file, produced
+none. Colour is now emitted unconditionally by `utils/ansi.js` and the logger's
+existing policy makes the only decision. Auto mode on a TTY, and every
+non-colour case, are byte-identical.
+
+### File ordering is pinned rather than taken from the host's ICU
+
+`SortFilesStage` compared paths with `Intl.Collator`, whose collation data ships
+with Node. Ordering decides which files survive a budget, so the same command on
+the same tree could select differently across Node versions or on a
+small-ICU/system-ICU build. Printable-ASCII paths — effectively all of them —
+now compare against a frozen weight table derived from that collator, verified
+against it for every character pair and 500,000 random strings. Non-ASCII paths
+still defer to a real collator. No ordering changes on the reference platform;
+what changes is that it can no longer drift underneath a release.
+
+---
+
 ## Unreleased (performance pass)
 
 Mostly removal of duplicated work, which by definition changes nothing
