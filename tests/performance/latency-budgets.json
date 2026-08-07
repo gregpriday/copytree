@@ -1,0 +1,33 @@
+{
+  "_comment": "End-to-end CLI latency budgets: shell to prompt, including Node startup. Distinct from budgets.json, which bounds walker throughput and memory. These are ceilings on what a person waits for, set roughly 35% above the measured median on the reference machine so ordinary scheduling noise does not fail a build while a real regression still does.",
+  "_reference": "Apple Silicon laptop, local SSD, Node 26. Recalibrate with --json on the target hardware before enforcing in CI.",
+  "regressionThresholdPercent": 5,
+  "scenarios": {
+    "version": {
+      "p50Ms": 70,
+      "description": "Process start and module graph only. Rises whenever a dependency is added to the startup path."
+    },
+    "empty": {
+      "p50Ms": 140,
+      "description": "Startup plus configuration, no traversal."
+    },
+    "tiny-100": {
+      "p50Ms": 160,
+      "description": "The common interactive case: select, load, format, write."
+    },
+    "tiny-100-display": {
+      "p50Ms": 158,
+      "description": "Same work, delivered to stdout."
+    },
+    "tiny-100-tree": {
+      "p50Ms": 140,
+      "description": "Selection and tree rendering, no file contents."
+    },
+    "tiny-100-dry": {
+      "p50Ms": 130,
+      "description": "Selection only. The floor for anything that walks the tree."
+    }
+  },
+  "_measured": "Clean medians on the reference machine at the time of writing: version 50, empty 102, tiny-100 117, display 116, only-tree 102, dry-run 96 ms. Budgets sit ~35% above these.",
+  "_noise": "Check the reported mad (median absolute deviation) before believing a delta. On an idle machine it is ~1-2 ms; a mad above ~5 ms means something else was running and the medians are not comparable."
+}

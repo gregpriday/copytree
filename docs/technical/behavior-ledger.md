@@ -49,6 +49,18 @@ Two `process.memoryUsage()` calls per stage per run, to fill a field only
 is still always present; construct a `Pipeline` with `measureMemory: true` (as
 `--profile` now does) to populate it.
 
+### Schema validation runs only when there is user configuration
+
+`loadConfiguration()` read `config/schema.json`, constructed Ajv, compiled the
+schema and validated the merged result on every invocation — including the
+overwhelmingly common one where no `~/.copytree` config exists and no
+environment overrides are set, so the "merged result" is exactly the defaults
+that shipped inside the package. Validation exists to catch bad *user* input;
+re-proving the packaged defaults on every run is what the test suite is for.
+Ajv is now imported lazily and validation runs when a user config file or an
+env override actually contributed. `config:validate` is unaffected — it never
+used this path, it has its own checks.
+
 ### A clean Gitleaks result is final
 
 Every clean file was scanned twice: Gitleaks, then the built-in regex scanner

@@ -10,6 +10,7 @@ produced.**
 ```bash
 npm run benchmark              # the pull-request scorecard (11 scenarios)
 npm run benchmark:all          # every scenario
+npm run benchmark:latency      # cold-CLI latency: what a person waits for
 npm run benchmark:fixtures     # generate fixtures only, then exit
 
 node tests/performance/bench.js --filter DISC          # one domain
@@ -20,6 +21,42 @@ node tests/performance/bench.js --compare before.json after.json
 Fixtures are cached under `$TMPDIR/copytree-bench-fixtures` (override with
 `COPYTREE_BENCH_FIXTURES`). First run generates roughly 130 MB across eight
 fixtures in under ten seconds; later runs reuse them. `--clean` removes them.
+
+## Two harnesses, because there are two questions
+
+`bench.js` measures **throughput** — how fast the walker gets through 50,000
+paths, and at what memory cost. `latency.bench.js` measures **latency** — how
+long `copytree` takes from shell to prompt on a small repository, which is what
+most invocations actually are.
+
+They cannot share a harness because their requirements are opposite. A
+throughput benchmark runs in-process and amortises startup away so the work
+dominates. A latency benchmark has to *include* startup, because on a
+hundred-file project startup is the majority of the wall clock: an in-process
+measurement of that copy reports the ~20 ms of work and hides the ~95 ms the
+user waited. Optimising against the throughput harness alone is how a CLI ends
+up with an excellent walker behind a slow `require` graph.
+
+```bash
+npm run benchmark:latency
+node tests/performance/latency.bench.js --json before.json
+node tests/performance/latency.bench.js --compare before.json
+node tests/performance/latency.bench.js --filter tiny --samples 20
+```
+
+Budgets live in `latency-budgets.json` and are ceilings on the **median**, not
+the mean: process startup has a long right tail — the scheduler, the page cache,
+an antivirus hook — and one outlier moves a mean enough to invent a regression
+that is not there.
+
+**Read `mad` before believing a delta.** The median absolute deviation is the
+harness's own noise floor. On an idle machine it sits around 1–2 ms; above about
+5 ms something else was running and the medians are not comparable to a previous
+run. The `--compare` mode applies this automatically and labels any difference
+smaller than the combined noise of both runs as `(within noise)` rather than
+reporting a percentage that means nothing. Comparisons taken on a busy laptop
+have shown the same scenario at 96 ms and 168 ms, with `mad` correctly rising
+from 2 ms to 10 ms — the number to check first when a result looks surprising.
 
 ## Design decisions that matter
 

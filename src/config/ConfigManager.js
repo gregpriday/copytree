@@ -3,8 +3,6 @@ import path from 'path';
 import os from 'os';
 import _ from 'lodash';
 import { fileURLToPath, pathToFileURL } from 'url';
-import Ajv from 'ajv';
-import addFormats from 'ajv-formats';
 import { ConfigurationError, ERROR_CODES } from '../utils/errors.js';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -88,14 +86,10 @@ class ConfigManager {
       process.env.COPYTREE_NO_VALIDATE !== 'true' &&
       process.env.NODE_ENV !== 'test';
 
-    // Initialize AJV validator
-    this.ajv = new Ajv({
-      allErrors: true,
-      removeAdditional: false,
-      strict: false,
-      coerceTypes: true,
-    });
-    addFormats(this.ajv);
+    // AJV is built on demand — see `loadSchema()`. Constructing it here meant
+    // every run paid for the validator, the format extensions, the schema read
+    // and the schema compile, including the runs that never validate anything.
+    this.ajv = null;
 
     this.schema = null;
     this.validate = null;
@@ -154,21 +148,25 @@ class ConfigManager {
   }
 
   async _doLoadConfiguration() {
-    // 1. Load schema for validation
-    await this.loadSchema();
-
-    // 2. Load default configuration files
+    // 1. Load default configuration files
     if (this.enabledSources.includes('defaults')) {
       await this.loadDefaults();
     }
 
-    // 3. Load user configuration overrides
+    // 2. Load user configuration overrides
     if (this.enabledSources.includes('user')) {
       await this.loadUserConfig();
     }
 
-    // 4. Validate final configuration if enabled
-    if (this.validationEnabled) {
+    // 3. Validate the final configuration, when there is anything to validate.
+    //
+    // Schema validation exists to catch bad *user* input. With no user config
+    // file and no environment overrides, the merged result is exactly the
+    // defaults that shipped inside this package — so validating re-proves, on
+    // every single invocation, something the test suite already proves once.
+    // The cost is a schema read, an Ajv construction and a schema compile.
+    if (this.validationEnabled && this._hasUntrustedConfig()) {
+      await this.loadSchema();
       this.validateConfig();
     }
 
@@ -387,9 +385,25 @@ class ConfigManager {
   }
 
   /**
-   * Load and compile JSON schema
+   * Whether anything outside the packaged defaults contributed to the config.
+   *
+   * @returns {boolean} True when a user config file or env override was applied
+   * @private
+   */
+  _hasUntrustedConfig() {
+    return (
+      this.userConfigLoaded ||
+      Object.keys(this.userConfig).length > 0 ||
+      Object.keys(this.envOverrides).length > 0
+    );
+  }
+
+  /**
+   * Load and compile the JSON schema, once.
    */
   async loadSchema() {
+    if (this.validate) return;
+
     try {
       const schemaPath = path.join(this.configPath, 'schema.json');
 
@@ -401,6 +415,22 @@ class ConfigManager {
           ...this.schema,
           $id: `${this.schema.$id || 'copytree-config'}-${Date.now()}`,
         };
+
+        // Imported here rather than at module scope: `ajv` and `ajv-formats`
+        // together are a measurable share of CLI startup, and a run with no
+        // user configuration to check never reaches this point.
+        const [{ default: Ajv }, { default: addFormats }] = await Promise.all([
+          import('ajv'),
+          import('ajv-formats'),
+        ]);
+
+        this.ajv = new Ajv({
+          allErrors: true,
+          removeAdditional: false,
+          strict: false,
+          coerceTypes: true,
+        });
+        addFormats(this.ajv);
 
         this.validate = this.ajv.compile(uniqueSchema);
       } else {

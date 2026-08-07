@@ -34,6 +34,7 @@
     "benchmark:fixtures": "node tests/performance/bench.js --fixtures",
     "benchmark:compare": "node tests/performance/bench.js --compare",
     "benchmark:discovery": "node tests/performance/file-discovery.bench.js",
+    "benchmark:latency": "node tests/performance/latency.bench.js",
     "test:performance": "jest --config jest.performance.config.js --runInBand",
     "lint": "eslint src/ bin/",
     "lint:fix": "eslint src/ bin/ --fix",
