@@ -199,7 +199,10 @@ export class PipelineEventCollector extends EventEmitter {
       const { data } = event;
       if (!data.stage) errors.push('stage:complete missing stage');
       if (typeof data.duration !== 'number') errors.push('stage:complete missing duration');
-      if (!data.memoryUsage) errors.push('stage:complete missing memoryUsage');
+      // `memoryUsage` is always present and may be null: heap snapshots are
+      // opt-in (`measureMemory`), because taking two per stage on every run
+      // costs more than the diagnostic is worth to a run nobody is profiling.
+      if (!('memoryUsage' in data)) errors.push('stage:complete missing memoryUsage');
     }
 
     return {

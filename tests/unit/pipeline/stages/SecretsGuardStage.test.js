@@ -102,6 +102,26 @@ describe('SecretsGuardStage', () => {
     expect(error.message).not.toContain('supersecretvalue12345');
   });
 
+  /**
+   * A clean verdict from the stronger scanner is a verdict. Every clean file
+   * used to be scanned twice — Gitleaks, then the built-in regex pass over the
+   * same bytes — which on a repository of mostly clean files is the common
+   * case, not the exception.
+   */
+  test('does not rerun the builtin scan after a clean gitleaks result', async () => {
+    mockGitleaks.scanString.mockResolvedValue([]);
+
+    const stage = new SecretsGuardStage({ enabled: true, redactionMode: 'generic' });
+    await stage.onInit();
+
+    // Content the builtin scanner would flag, so a second pass is detectable.
+    const result = await stage.process(buildInput('password = supersecretvalue12345'));
+
+    expect(mockGitleaks.scanString).toHaveBeenCalledTimes(1);
+    expect(result.findings).toHaveLength(0);
+    expect(result.files[0].redacted).toBeFalsy();
+  });
+
   test('falls back to basic scan when gitleaks call errors', async () => {
     mockGitleaks.scanString.mockRejectedValue(new Error('gitleaks timed out'));
 

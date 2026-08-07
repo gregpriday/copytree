@@ -5,14 +5,9 @@
 // Note: Removed @babel/register for better performance
 
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 import { Command, InvalidArgumentError, Option } from 'commander';
-import { readFileSync } from 'fs';
 import { logger } from '../src/utils/logger.js';
+import { VERSION } from '../src/version.js';
 
 /**
  * Load the terminal UI on first use.
@@ -67,7 +62,7 @@ function applyLoggingOptions(options) {
   }
 }
 
-const pkg = JSON.parse(readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+const pkg = { version: VERSION };
 
 const program = new Command();
 
@@ -100,6 +95,7 @@ program
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
   .option('-o, --output <file>', 'Save output to file')
+  .option('--reveal', 'After writing a file, show it in the OS file manager')
   .option(
     '--format <format>',
     'Output format: xml, markdown|md, json, ndjson, sarif, tree (default: xml)',

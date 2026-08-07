@@ -32,6 +32,12 @@ class Pipeline extends EventEmitter {
       ...options,
     };
 
+    // Per-stage heap snapshots are diagnostic, not operational: only
+    // `--profile`, `COPYTREE_PERFORMANCE` and the benchmark harness read them.
+    // Opt in rather than pay for them on every run.
+    this.measureMemory =
+      options.measureMemory ?? (process.env.COPYTREE_PERFORMANCE === 'true' || false);
+
     this.stats = {
       startTime: null,
       endTime: null,
@@ -274,16 +280,21 @@ class Pipeline extends EventEmitter {
           }
         }
 
-        // Capture timing and metrics for this stage
+        // Capture timing and metrics for this stage.
+        //
+        // `process.memoryUsage()` walks the V8 heap statistics and is far from
+        // free; it ran twice per stage on every run, to fill in a field only
+        // `--profile` and the benchmark harness ever read. Timing stays
+        // unconditional — it is a single clock read and the reporter uses it.
         const stageStart = Date.now();
-        const stageStartMemory = process.memoryUsage();
+        const stageStartMemory = this.measureMemory ? process.memoryUsage() : null;
         const inputSize = result?.files?.length || (Array.isArray(result) ? result.length : 1);
 
         // Execute main stage processing
         const output = await processMethod.call(stageInstance, result);
 
         const stageEnd = Date.now();
-        const stageEndMemory = process.memoryUsage();
+        const stageEndMemory = this.measureMemory ? process.memoryUsage() : null;
         const stageDuration = stageEnd - stageStart;
         const outputSize = output?.files?.length || (Array.isArray(output) ? output.length : 1);
 
@@ -292,15 +303,18 @@ class Pipeline extends EventEmitter {
         this.stats.perStageMetrics[stageName] = {
           inputSize,
           outputSize,
-          memoryUsage: {
-            before: stageStartMemory,
-            after: stageEndMemory,
-            delta: {
-              rss: stageEndMemory.rss - stageStartMemory.rss,
-              heapUsed: stageEndMemory.heapUsed - stageStartMemory.heapUsed,
-              heapTotal: stageEndMemory.heapTotal - stageStartMemory.heapTotal,
-            },
-          },
+          memoryUsage:
+            stageStartMemory && stageEndMemory
+              ? {
+                  before: stageStartMemory,
+                  after: stageEndMemory,
+                  delta: {
+                    rss: stageEndMemory.rss - stageStartMemory.rss,
+                    heapUsed: stageEndMemory.heapUsed - stageStartMemory.heapUsed,
+                    heapTotal: stageEndMemory.heapTotal - stageStartMemory.heapTotal,
+                  },
+                }
+              : null,
           timestamp: stageEnd,
         };
 

@@ -26,8 +26,19 @@ const HASH_CONCURRENCY = 8;
 /**
  * Compute the `sha256` attribute for every file, concurrently.
  *
- * Hashing prefers the file on disk and falls back to the in-memory content,
- * matching what the per-file path did; only the scheduling changes.
+ * Hashes the content that is actually being emitted, and only falls back to
+ * reading the file when there is no content in hand — `--only-tree`, or a file
+ * the loader skipped.
+ *
+ * It used to be the other way round, which was both slower and wrong. Slower,
+ * because every selected file had already been read into memory by
+ * `FileLoadingStage` and this opened and read the whole selection a second time
+ * purely to hash it. Wrong, because by this point the content in memory is no
+ * longer necessarily the content on disk: `SecretsGuardStage` has redacted it
+ * and transformers have rewritten it. So a redacted file was published
+ * alongside the digest of its *unredacted* original — a hash that does not
+ * describe the document it is attached to, and one that lets a reader confirm a
+ * guess at the very bytes redaction removed.
  *
  * @param {Object[]} files - Files to hash
  * @returns {Promise<Map<Object, string|null>>} File entry -> hex digest
@@ -40,10 +51,10 @@ async function hashAll(files) {
     while (cursor < files.length) {
       const file = files[cursor++];
       try {
-        if (file.absolutePath) {
-          hashes.set(file, await hashFile(file.absolutePath, 'sha256', { size: file.size }));
-        } else if (typeof file.content === 'string') {
+        if (file.content != null) {
           hashes.set(file, hashContent(file.content, 'sha256'));
+        } else if (file.absolutePath) {
+          hashes.set(file, await hashFile(file.absolutePath, 'sha256', { size: file.size }));
         }
       } catch {
         // Ignore hash computation errors, exactly as the per-file path did.

@@ -121,8 +121,10 @@ describe('Pipeline Event Contract', () => {
           index: expect.any(Number),
           output: expect.any(Object),
           duration: expect.any(Number),
-          memoryUsage: expect.any(Object),
         });
+
+        // Always carried, null unless memory measurement was requested.
+        expect(event.data).toHaveProperty('memoryUsage');
 
         // Duration should be positive
         expect(event.data.duration).toBeGreaterThanOrEqual(0);
@@ -428,8 +430,14 @@ describe('Pipeline Event Contract', () => {
       expect(slow.duration).toBeGreaterThanOrEqual(45); // More lenient to avoid flakiness
     });
 
-    it('tracks memory deltas between stages', async () => {
-      const pipeline = createTestPipeline([new MockStage('stage-1'), new MockStage('stage-2')]);
+    it('tracks memory deltas between stages when measurement is enabled', async () => {
+      // Opt in explicitly: this is the measurement feature under test, and it
+      // is off by default so that an ordinary run does not pay for two
+      // `process.memoryUsage()` calls per stage to fill a field only the
+      // profiler reads.
+      const pipeline = createTestPipeline([new MockStage('stage-1'), new MockStage('stage-2')], {
+        measureMemory: true,
+      });
       const collector = new PipelineEventCollector(pipeline);
 
       await pipeline.process({ files: [] });

@@ -9,6 +9,55 @@ The rule this exists to enforce: **do not approve a changed golden file because
 
 ---
 
+## Unreleased (performance pass)
+
+Mostly removal of duplicated work, which by definition changes nothing
+observable. These are the exceptions.
+
+### `-o/--output` no longer opens a file manager
+
+Writing a file used to also reveal it in Finder/Explorer/`xdg-open`. Two
+different requests, one of which was never made: on macOS it launches
+`osascript`, wakes Finder and steals focus, which makes `-o` unusable in a loop
+or a script — the place `-o` is most used. Opt in with `--reveal`.
+
+### Markdown `sha256` describes the emitted content, not the file on disk
+
+`MarkdownFormatter` hashed `file.absolutePath`, reopening and rereading the
+entire selection that `FileLoadingStage` had already read. It also produced the
+wrong answer: by that point the content in memory has been redacted by
+`SecretsGuardStage` and rewritten by transformers, so a redacted file was
+published beside the digest of its *unredacted* original — a hash that does not
+describe the document carrying it, and one that lets a reader confirm a guess at
+the bytes redaction removed. Hashes now come from the emitted content, falling
+back to disk only when there is none (`--only-tree`).
+
+### Programmatic results are no longer re-sorted after `SortFilesStage`
+
+`scan()` ran a second full sort using a bare `new Intl.Collator()` — the
+*system* locale, no numeric handling, ties unresolved — over a selection
+`SortFilesStage` had already ordered with a collator pinned to `en`, numeric
+aware, with a code-unit tie-break. So the second sort did not merely repeat
+O(n log n) work, it replaced a deterministic order with a machine-dependent one:
+the same command on the same tree produced different documents under different
+`LANG` settings. `SortFilesStage`'s ordering is now canonical.
+
+### `stage:complete` carries `memoryUsage: null` unless asked
+
+Two `process.memoryUsage()` calls per stage per run, to fill a field only
+`--profile`, `COPYTREE_PERFORMANCE=true` and the benchmark harness read. The key
+is still always present; construct a `Pipeline` with `measureMemory: true` (as
+`--profile` now does) to populate it.
+
+### A clean Gitleaks result is final
+
+Every clean file was scanned twice: Gitleaks, then the built-in regex scanner
+over the same bytes, because the fallback triggered on *zero findings* rather
+than on failure. On a repository of mostly clean files that is the common path.
+The built-in scanner remains the fallback for Gitleaks being absent or failing.
+A file that Gitleaks passes and the weaker scanner would have flagged is now
+reported clean.
+
 ## Unreleased (CLI output pass)
 
 One controller and one terminal reporter replaced the two copy implementations

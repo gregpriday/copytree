@@ -274,6 +274,53 @@ describe('GitleaksAdapter', () => {
       expect(version).toBeNull();
     });
   });
+
+  /**
+   * Scanning is per-file; process creation must not be. `scanString()` used to
+   * call `getVersion()` on every call, so a thousand-file repository spawned a
+   * thousand extra `gitleaks version` processes to re-derive a constant.
+   */
+  describe('process creation', () => {
+    it('runs `gitleaks version` once, however many files are scanned', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+      mockSpawn.mockImplementation(() => createMockProcess(0, '[]', ''));
+
+      await adapter.isAvailable();
+      await adapter.scanString('a', 'a.js');
+      await adapter.scanString('b', 'b.js');
+      await adapter.scanString('c', 'c.js');
+
+      expect(mockExecAsyncFn).toHaveBeenCalledTimes(1);
+      // One scan process per file, and nothing more.
+      expect(mockSpawn).toHaveBeenCalledTimes(3);
+    });
+
+    it('answers isAvailable() from the same probe as getVersion()', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+
+      expect(await adapter.isAvailable()).toBe(true);
+      expect(await adapter.getVersion()).toBe('8.19.0');
+
+      expect(mockExecAsyncFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports unavailable when the binary cannot be run', async () => {
+      mockExecAsyncFn = jest.fn().mockRejectedValue(new Error('Command not found'));
+
+      expect(await adapter.isAvailable()).toBe(false);
+    });
+
+    it('builds the same argument vector for every scan', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+      mockSpawn.mockImplementation(() => createMockProcess(0, '[]', ''));
+
+      await adapter.scanString('a', 'a.js');
+      await adapter.scanString('b', 'b.js');
+
+      expect(mockSpawn.mock.calls[0][1]).toEqual(mockSpawn.mock.calls[1][1]);
+      expect(mockSpawn.mock.calls[0][1]).toContain('stdin');
+    });
+  });
 });
 
 /**

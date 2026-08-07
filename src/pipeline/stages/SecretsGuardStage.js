@@ -4,7 +4,7 @@ import SecretRedactor from '../../utils/SecretRedactor.js';
 import { SecretsDetectedError } from '../../utils/errors.js';
 import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 import { scanContent } from '../../utils/secretPatterns.js';
-import { minimatch } from 'minimatch';
+import { Minimatch } from 'minimatch';
 
 /**
  * How many paths to name in the stats block.
@@ -214,17 +214,24 @@ class SecretsGuardStage extends Stage {
         continue;
       }
 
+      // Gitleaks is the stronger scanner, and a clean verdict from it is a
+      // verdict — not a reason to run the weaker scanner over the same bytes.
+      // Every clean file used to pay for both, which on a repository of mostly
+      // clean files is the common case, not the exception. The built-in scanner
+      // remains the fallback for when Gitleaks is absent or fails.
       let fileFindings = [];
+      let scanned = false;
 
       if (this.useGitleaks) {
         try {
           fileFindings = await this.gitleaks.scanString(file.content, filePath);
+          scanned = true;
         } catch (error) {
           this.log(`Gitleaks scan failed for ${filePath}: ${error.message}`, 'warn');
         }
       }
 
-      if (!this.useGitleaks || fileFindings.length === 0) {
+      if (!scanned) {
         fileFindings = this._basicScan(file);
       }
 
@@ -303,20 +310,40 @@ class SecretsGuardStage extends Stage {
     };
   }
 
+  /**
+   * The exclusion patterns, compiled once.
+   *
+   * `minimatch(path, pattern)` parses the pattern and builds a matcher on every
+   * call, and this ran once per pattern per file — the default list against a
+   * thousand files meant tens of thousands of throwaway parses. `Minimatch`
+   * instances are the same matcher, built once and asked many times.
+   *
+   * @returns {import('minimatch').Minimatch[]} Compiled matchers
+   * @private
+   */
+  get _excludeMatchers() {
+    if (!this.__excludeMatchers) {
+      this.__excludeMatchers = this.excludeGlobs.map(
+        (pattern) =>
+          new Minimatch(pattern, {
+            dot: true,
+            nocase: process.platform === 'win32',
+            // Bare names like `id_rsa` and `*.pem` are meant at any depth.
+            // Without this they only matched at the repository root, so
+            // `keys/id_rsa` and `certs/server.pem` were scanned rather than
+            // excluded — and the scanner's job on a private key is much harder
+            // than simply not emitting it. Ignored by minimatch for patterns
+            // containing a slash, so `.aws/credentials` keeps its path
+            // semantics.
+            matchBase: true,
+          }),
+      );
+    }
+    return this.__excludeMatchers;
+  }
+
   _isExcluded(filePath) {
-    return this.excludeGlobs.some((pattern) =>
-      minimatch(filePath, pattern, {
-        dot: true,
-        nocase: process.platform === 'win32',
-        // Bare names like `id_rsa` and `*.pem` are meant at any depth. Without
-        // this they only matched at the repository root, so `keys/id_rsa` and
-        // `certs/server.pem` were scanned rather than excluded — and the
-        // scanner's job on a private key is much harder than simply not
-        // emitting it. Ignored by minimatch for patterns containing a slash, so
-        // `.aws/credentials` keeps its path semantics.
-        matchBase: true,
-      }),
-    );
+    return this._excludeMatchers.some((matcher) => matcher.match(filePath));
   }
 
   _basicScan(file) {
