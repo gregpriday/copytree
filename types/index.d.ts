@@ -5,7 +5,7 @@
  * Full IntelliSense support for TypeScript consumers including Canopy.
  *
  * @module copytree
- * @version 0.16.0
+ * @version 0.17.0
  */
 
 // ============================================================================
