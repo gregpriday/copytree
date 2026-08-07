@@ -75,6 +75,7 @@ copytree --display
 - `--scope <path...>` – Copy only these paths (literal, not globs), with root-anchored ignore rules
 - `-t, --only-tree` – Tree structure only (no file contents)
 - `-i, --display` – Print to terminal instead of clipboard
+- `-v, --verbose` – Show per-stage progress logs and a run summary (default output is one progress line plus one completion line)
 - `-y, --clipboard` – Copy the output text itself, instead of a file reference
 - `-S, --stream` – Stream output to stdout/file (ideal for large projects or CI)
 - `-x, --exclude <pattern...>` – Exclude glob patterns

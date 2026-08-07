@@ -125,6 +125,18 @@ copytree --display
 copytree -i
 ```
 
+#### `--verbose`, `-v`
+Show per-stage progress logs and a run summary. By default a run prints only a
+live progress line and one completion line; use this when you need to see what
+each pipeline stage did or how long the run took.
+
+```bash
+copytree --verbose
+copytree -v
+```
+
+Ignored with `--display`, where the document itself occupies stdout.
+
 #### `--stream`, `-S`
 Stream output without buffering (useful for piping).
 

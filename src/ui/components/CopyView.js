@@ -290,18 +290,21 @@ const CopyView = () => {
   // `--display` puts the formatted document itself on stdout, and Ink renders
   // to that same stream. Anything the UI draws is therefore interleaved with
   // the document, which breaks the one thing a caller doing
-  // `copytree --display | jq` is relying on. So in that mode the UI is reduced
-  // to the single completion line that trails the document, with no progress
-  // suffix, no per-stage log stream, and no boxed preview of output that was
-  // already written verbatim. Progress feedback still belongs on stdout in
-  // every other destination, where stdout is not carrying the document.
+  // `copytree --display | jq` is relying on. So that mode never gets the
+  // chrome, not even under --verbose.
   const documentOnStdout = resolveDestination(options) === 'display';
 
-  if (documentOnStdout) {
+  // A normal run should say what it did and stop — a live progress line while
+  // it works, one completion line when it's done. The per-stage log stream and
+  // the run summary are debugging tools, so they are opt-in via --verbose
+  // rather than the default every invocation pays for.
+  const verbose = Boolean(options.verbose) && !documentOnStdout;
+
+  if (!verbose) {
     return React.createElement(PipelineStatus, {
       currentStage,
       isLoading,
-      progress: 0,
+      progress: documentOnStdout ? 0 : progress,
     });
   }
 

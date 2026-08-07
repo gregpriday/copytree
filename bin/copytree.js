@@ -101,6 +101,7 @@ program
     'Output format: xml, markdown|md, json, ndjson, sarif, tree (default: xml)',
   )
   .option('-i, --display', 'Display output to console')
+  .option('-v, --verbose', 'Show per-stage progress logs and a run summary')
   .option('-S, --stream', 'Stream output')
   .option('--dry-run', 'Show what would be copied without doing it')
   .option('-l, --head <n>', 'Limit to first N files')
