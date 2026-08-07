@@ -1,1 +1,2 @@
-Unknown output format: foo
+[error] Unknown format: foo
+  Choose xml, markdown, json, ndjson, sarif or tree

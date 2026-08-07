@@ -1,3 +1,5 @@
+import { PHASES } from '../ui/feedback/messages.js';
+
 /**
  * Stable pipeline stage identifiers.
  *
@@ -57,6 +59,42 @@ const STAGE_INFO = {
  */
 export function stageIdFor(stageName) {
   return STAGE_INFO[stageName]?.[0] ?? PIPELINE_STAGES.UNKNOWN;
+}
+
+/**
+ * Stable stage id -> user-facing phase.
+ *
+ * The stage ids stay as they are — they are a public contract and each one
+ * names a real, separately-failing step. What a person watching a run needs is
+ * coarser: sorting, budgeting and limiting are all "deciding which files to
+ * include", and announcing them individually flickers through three labels in
+ * under a tenth of a second.
+ */
+const STAGE_PHASES = Object.freeze({
+  [PIPELINE_STAGES.DISCOVER]: PHASES.DISCOVER,
+  [PIPELINE_STAGES.ALWAYS_INCLUDE]: PHASES.SELECT,
+  [PIPELINE_STAGES.GIT_FILTER]: PHASES.SELECT,
+  [PIPELINE_STAGES.FILTER]: PHASES.SELECT,
+  [PIPELINE_STAGES.SORT]: PHASES.SELECT,
+  [PIPELINE_STAGES.BUDGET]: PHASES.SELECT,
+  [PIPELINE_STAGES.LIMIT]: PHASES.SELECT,
+  [PIPELINE_STAGES.LOAD]: PHASES.LOAD,
+  [PIPELINE_STAGES.TRANSFORM]: PHASES.TRANSFORM,
+  [PIPELINE_STAGES.DEDUPE]: PHASES.CONTEXT,
+  [PIPELINE_STAGES.CHAR_LIMIT]: PHASES.CONTEXT,
+  [PIPELINE_STAGES.SECRETS]: PHASES.SECRETS,
+  [PIPELINE_STAGES.INSTRUCTIONS]: PHASES.CONTEXT,
+  [PIPELINE_STAGES.FORMAT]: PHASES.FORMAT,
+  [PIPELINE_STAGES.UNKNOWN]: PHASES.PREPARE,
+});
+
+/**
+ * Map a stable stage id to the phase a person sees.
+ * @param {string} stageId - A {@link PIPELINE_STAGES} value
+ * @returns {string} A {@link PHASES} value
+ */
+export function userPhaseFor(stageId) {
+  return STAGE_PHASES[stageId] ?? PHASES.PREPARE;
 }
 
 /**
@@ -123,7 +161,17 @@ export class ProgressTracker {
 
       const percent = this._calculatePercent();
       const message = data.message || `${this._formatStageName(data.stage)}...`;
-      this._emit({ percent, message, stage: stageIdFor(data.stage) });
+      this._emit({
+        percent,
+        message,
+        stage: stageIdFor(data.stage),
+        // Counts are what the CLI actually renders: "Reading files… 284/612" is
+        // a number a reader can trust, where a percentage spread across stages
+        // of wildly different cost is monotonic but misleading.
+        completed: data.completed,
+        total: data.total,
+        item: data.item,
+      });
     });
 
     pipeline.on('file:batch', (data) => {
@@ -131,7 +179,13 @@ export class ProgressTracker {
       const message = data.lastFile
         ? `Processing ${data.lastFile}`
         : `Processed ${data.count} files`;
-      this._emit({ percent, message, stage: stageIdFor(data.stage) });
+      this._emit({
+        percent,
+        message,
+        stage: stageIdFor(data.stage),
+        completed: data.count,
+        item: data.lastFile,
+      });
     });
 
     pipeline.on('stage:complete', (data) => {
@@ -206,7 +260,7 @@ export class ProgressTracker {
     this.lastPercent = progress.percent;
     this.lastEmitTime = now;
     try {
-      this.onProgress(progress);
+      this.onProgress({ ...progress, phase: userPhaseFor(progress.stage) });
     } catch {
       // Swallow callback exceptions — progress tracking must not fail the operation
     }
@@ -227,7 +281,7 @@ export class ProgressTracker {
     this.lastPercent = progress.percent;
     this.lastEmitTime = Date.now();
     try {
-      this.onProgress(progress);
+      this.onProgress({ ...progress, phase: userPhaseFor(progress.stage) });
     } catch {
       // Swallow callback exceptions — progress tracking must not fail the operation
     }

@@ -4,7 +4,6 @@ import { generateTransformCacheKey } from '../../utils/fileHash.js';
 import { TransformError } from '../../utils/errors.js';
 import path from 'path';
 import appConfig from '../../../config/app.js';
-import { logger } from '../../utils/logger.js';
 
 class TransformStage extends Stage {
   constructor(options = {}) {
@@ -27,16 +26,24 @@ class TransformStage extends Stage {
 
   async process(input) {
     this.log(`Transforming ${input.files.length} files`, 'debug');
-    return this.processWithDisplay(input);
+    return this.transformFiles(input);
   }
 
-  // New method that handles display of active transformations
-  async processWithDisplay(input) {
+  /**
+   * Transform every file that has a transformer, reporting progress as counts.
+   *
+   * This stage used to draw its own multi-line display: clearing lines, moving
+   * the cursor and writing filenames straight to stdout. A stage cannot own the
+   * terminal — it collided with Ink and with the spinner, it wrote to the same
+   * stream as `--display` and `--stream`, and it ignored `--no-color`,
+   * `--quiet` and the log level entirely. It now emits what it knows and lets
+   * the reporter decide whether to draw anything at all.
+   */
+  async transformFiles(input) {
     const { files } = input;
     const startTime = Date.now();
     let transformCount = 0;
     let errorCount = 0;
-    // logger is already imported at the top
 
     // Import p-limit dynamically (v7+ uses default export)
     const { default: pLimit } = await import('p-limit');
@@ -75,14 +82,36 @@ class TransformStage extends Stage {
       }
     }
 
-    // Show multi-line display if we have heavy transformers
+    // Progress is only worth reporting when there is something slow to wait
+    // for. A run whose transformers are all cheap finishes before a reader
+    // could read the label.
     const activeTransforms = filesToTransform.length;
-    const showMultiLine = hasHeavyTransformers && activeTransforms > 0;
+    const reportProgress = hasHeavyTransformers && activeTransforms > 0;
     let activeFiles = [];
     let completedCount = 0;
 
     // Pre-index filesToTransform by file for O(1) lookup instead of O(n)
     const transformMap = new Map(filesToTransform.map((info) => [info.file, info]));
+
+    /**
+     * Report what is being converted, as data.
+     *
+     * `activeFiles` is included so a verbose renderer can list what is in
+     * flight; a default renderer shows one line with the counts and ignores it.
+     * Either way the decision belongs to whoever owns the terminal.
+     */
+    const reportTransformProgress = () => {
+      this.emitProgress(
+        Math.round((completedCount / activeTransforms) * 100),
+        `Converting documents… ${completedCount}/${activeTransforms}`,
+        {
+          completed: completedCount,
+          total: activeTransforms,
+          item: activeFiles[0],
+          activeFiles: activeFiles.slice(0, this.maxConcurrency),
+        },
+      );
+    };
 
     // Process files with active transform display
     const transformPromises = files.map((file) =>
@@ -102,10 +131,9 @@ class TransformStage extends Stage {
         const filename = path.basename(file.path);
 
         try {
-          // Update display if showing multi-line
-          if (showMultiLine) {
+          if (reportProgress) {
             activeFiles.push(filename);
-            updateTransformDisplay();
+            reportTransformProgress();
           }
 
           // Perform transformation
@@ -121,11 +149,10 @@ class TransformStage extends Stage {
               await this.cache.set(cacheKey, transformed);
             }
 
-            // Update display
             completedCount++;
-            if (showMultiLine) {
+            if (reportProgress) {
               activeFiles = activeFiles.filter((f) => f !== filename);
-              updateTransformDisplay();
+              reportTransformProgress();
             }
 
             return transformed;
@@ -136,10 +163,10 @@ class TransformStage extends Stage {
           errorCount++;
           this.log(`Failed to transform ${file.path}: ${error.message}`, 'warn');
 
-          // Update display on error
-          if (showMultiLine) {
+          if (reportProgress) {
+            completedCount++;
             activeFiles = activeFiles.filter((f) => f !== filename);
-            updateTransformDisplay();
+            reportTransformProgress();
           }
 
           return {
@@ -152,48 +179,12 @@ class TransformStage extends Stage {
       }),
     );
 
-    // Helper function to update the multi-line display
-    const updateTransformDisplay = () => {
-      if (!process.stdout.isTTY) return;
-
-      // Clear previous lines
-      const linesToClear = Math.min(activeFiles.length + 1, this.maxConcurrency + 1);
-      for (let i = 0; i < linesToClear; i++) {
-        process.stdout.write('\x1b[2K'); // Clear line
-        if (i < linesToClear - 1) {
-          process.stdout.write('\x1b[1A'); // Move up
-        }
-        process.stdout.write('\r'); // Return to start
-      }
-
-      // Write current status
-      logger.updateSpinner(`Transforming (${completedCount}/${activeTransforms})`);
-
-      // Write active files
-      activeFiles.slice(0, this.maxConcurrency).forEach((file) => {
-        process.stdout.write(`\n  → ${file}`);
-      });
-    };
-
-    // Start display if needed
-    if (showMultiLine && activeTransforms > 0) {
-      logger.updateSpinner(`Transforming (0/${activeTransforms})`);
+    if (reportProgress) {
+      reportTransformProgress();
     }
 
     // Wait for all transformations to complete
     const transformedFiles = await Promise.all(transformPromises);
-
-    // Clear multi-line display if it was shown
-    if (showMultiLine && process.stdout.isTTY) {
-      const linesToClear = Math.min(activeFiles.length + 1, this.maxConcurrency + 1);
-      for (let i = 0; i < linesToClear; i++) {
-        process.stdout.write('\x1b[2K\r'); // Clear line and return to start
-        if (i < linesToClear - 1) {
-          process.stdout.write('\x1b[1A'); // Move up
-        }
-      }
-      logger.updateSpinner('Processing files');
-    }
 
     // Flush any batch transformers
     if (this.registry) {

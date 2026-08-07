@@ -25,7 +25,9 @@ describe('Negative cases', () => {
     const errorOutput = stderr || stdout;
     const normalized = normalize(errorOutput, { projectRoot: PROJECT });
 
-    expect(normalized).toContain('Unknown output format: foo');
+    // The rejected value, and the set it should have come from.
+    expect(normalized).toContain('Unknown format: foo');
+    expect(normalized).toContain('Choose xml, markdown, json, ndjson, sarif or tree');
     expect(normalized).toMatchGolden('negative/unknown-format-error.txt.golden');
   }, 30000);
 
@@ -40,20 +42,20 @@ describe('Negative cases', () => {
     expect(normalized).toMatchGolden('negative/invalid-path.txt.golden');
   }, 30000);
 
-  test('conflicting flags --clipboard and --display', async () => {
+  // Two destinations is a contradiction only the caller can resolve, so it is
+  // rejected before any work happens rather than silently resolved by
+  // precedence — which used to mean one of the two requests was ignored with
+  // no indication that it had been.
+  test('conflicting flags --clipboard and --display are rejected', async () => {
     const { code, stdout, stderr } = await runCli([PROJECT, '--clipboard', '--display']);
 
-    // This test is environment-dependent (clipboard availability varies)
-    // Accept either success or predictable failure
-    if (code !== 0) {
-      // Command failed - this is expected in CI environments without clipboard
-      const errorOutput = stderr || stdout;
-      expect(errorOutput).toBeTruthy();
-      // Note: We don't validate exact error message since it varies by environment
-    } else {
-      // Command succeeded - clipboard and display can coexist
-      expect(code).toBe(0);
-    }
+    expect(code).not.toBe(0);
+
+    const errorOutput = normalize(stderr || stdout, { projectRoot: PROJECT });
+    expect(errorOutput).toContain('Choose one output destination');
+    expect(errorOutput).toContain('Use only one of --output, --display, --stream or --clipboard');
+    // Nothing was produced: the run stopped before the pipeline started.
+    expect(stdout).toBe('');
   }, 30000);
 
   test('invalid filter pattern', async () => {

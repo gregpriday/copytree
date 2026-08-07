@@ -1,9 +1,12 @@
 import {
+  describeDestination,
   extensionForFormat,
   normalizeFormat,
   referenceFilePath,
   resolveDestination,
+  validateDestinationOptions,
 } from '../../../src/utils/outputDestination.js';
+import { ERROR_CODES } from '../../../src/utils/errors.js';
 
 describe('resolveDestination', () => {
   // Writing a file reference is the default. Copying the output text itself is
@@ -70,5 +73,51 @@ describe('referenceFilePath', () => {
 
   test('falls back to a generic name when there is no base path', () => {
     expect(referenceFilePath(undefined, 'json')).toMatch(/copytree-\d+\.json$/);
+  });
+});
+
+describe('validateDestinationOptions', () => {
+  test('accepts a single destination, or none at all', () => {
+    expect(validateDestinationOptions({})).toBe(true);
+    expect(validateDestinationOptions({ output: 'out.xml' })).toBe(true);
+    expect(validateDestinationOptions({ display: true })).toBe(true);
+    expect(validateDestinationOptions({ clipboard: true })).toBe(true);
+  });
+
+  // `--stream --output file` is not a contradiction: streaming is how the file
+  // gets written, not a second place to put it.
+  test('treats --stream as a delivery mode, not a competing destination', () => {
+    expect(validateDestinationOptions({ stream: true, output: 'out.xml' })).toBe(true);
+  });
+
+  // Silent precedence quietly did one of the two things asked for and never
+  // mentioned the other. Only the caller can say which one they meant.
+  test('rejects two destinations, naming both', () => {
+    expect(() => validateDestinationOptions({ display: true, clipboard: true })).toThrow(
+      /--display and --clipboard/,
+    );
+  });
+
+  test('raises a typed error a caller can switch on', () => {
+    try {
+      validateDestinationOptions({ output: 'a.xml', display: true });
+      throw new Error('should have thrown');
+    } catch (error) {
+      expect(error.code).toBe(ERROR_CODES.INVALID_OPTION);
+      expect(error.details.suggestion).toContain('Use only one of');
+    }
+  });
+});
+
+describe('describeDestination', () => {
+  test('says which destinations put the payload on stdout', () => {
+    expect(describeDestination('display').writesPayloadToStdout).toBe(true);
+    expect(describeDestination('stream').writesPayloadToStdout).toBe(true);
+    expect(describeDestination('reference').writesPayloadToStdout).toBe(false);
+    expect(describeDestination('file').writesPayloadToStdout).toBe(false);
+  });
+
+  test('falls back to the default destination for an unknown value', () => {
+    expect(describeDestination('nonsense').label).toBe('file reference');
   });
 });

@@ -6,6 +6,15 @@ import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 import { scanContent } from '../../utils/secretPatterns.js';
 import { minimatch } from 'minimatch';
 
+/**
+ * How many paths to name in the stats block.
+ *
+ * Enough to answer "which one?" on a normal run, few enough that a repository
+ * full of key material cannot turn a status line into a wall of text. The
+ * counts alongside these lists are always exact.
+ */
+const MAX_REPORTED_PATHS = 5;
+
 const SECRET_FILE_PATTERNS = [
   '.env',
   '.env.*',
@@ -106,6 +115,16 @@ class SecretsGuardStage extends Stage {
     let redactionCount = 0;
     let excludedCount = 0;
     let unscannableCount = 0;
+    // Which files, not just how many. "1 secret-prone file left out" tells the
+    // reader something happened but not whether it mattered; naming `.env` ends
+    // the question. Capped so a repository full of key material cannot turn one
+    // status line into a wall of text — the count still reports the total.
+    const excludedPaths = [];
+    const unscannablePaths = [];
+    const redactedPaths = [];
+    const remember = (list, filePath) => {
+      if (list.length < MAX_REPORTED_PATHS) list.push(filePath);
+    };
 
     for (const file of files) {
       if (!file) {
@@ -124,6 +143,7 @@ class SecretsGuardStage extends Stage {
           rule: 'secretsGuard.exclude',
         });
         excludedCount++;
+        remember(excludedPaths, filePath);
         continue;
       }
 
@@ -143,6 +163,7 @@ class SecretsGuardStage extends Stage {
           rule: 'secretsGuard.nonTextContent',
         });
         unscannableCount++;
+        remember(unscannablePaths, filePath);
         continue;
       }
 
@@ -181,6 +202,7 @@ class SecretsGuardStage extends Stage {
             rule: 'secretsGuard.maxFileBytes',
           });
           unscannableCount++;
+          remember(unscannablePaths, filePath);
           continue;
         }
       }
@@ -227,6 +249,7 @@ class SecretsGuardStage extends Stage {
             this.redactionMode,
           );
           redactionCount += count;
+          remember(redactedPaths, filePath);
           processedFiles.push({ ...file, content, redacted: true });
           continue;
         }
@@ -236,9 +259,13 @@ class SecretsGuardStage extends Stage {
     }
 
     if (findings.length > 0) {
+      // Debug, not warn: the redaction count reaches the reader on the run's
+      // completion headline, in their words rather than this stage's. Emitting
+      // it here as well said the same thing twice, once with a class name
+      // attached, and did so regardless of --quiet.
       this.log(
         `Secrets Guard: detected ${findings.length} potential secret(s), redacted ${redactionCount}`,
-        'warn',
+        'debug',
       );
     }
 
@@ -258,6 +285,11 @@ class SecretsGuardStage extends Stage {
           redacted: redactionCount,
           excludedSecretFiles: excludedCount,
           excludedUnscannable: unscannableCount,
+          // Sample paths, for a status line that can name what it is talking
+          // about. Truncated at MAX_REPORTED_PATHS; the counts above are exact.
+          excludedSecretFilePaths: excludedPaths,
+          excludedUnscannablePaths: unscannablePaths,
+          redactedPaths,
           // `--secrets-report` reads this. The findings are already stripped of
           // the matched bytes, so the report is safe to write to a file or to
           // stdout; it carries positions, rule ids and fingerprints only.

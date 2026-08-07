@@ -9,6 +9,75 @@ copytree [path] [options]
 **Arguments:**
 - `path` - Directory path or GitHub URL to copy (defaults to current directory)
 
+## What a Run Prints
+
+A normal run shows one live progress line while it works, then replaces it with
+one line saying what happened:
+
+```text
+📎 File reference copied — 612 files · ~184k tokens
+```
+
+A successful run leads with **where the output went**, because there is nothing
+to warn about and that is the next thing you want to know. Anything else leads
+with the **outcome**:
+
+| Glyph                 | ASCII     | Meaning                                                              |
+| --------------------- | --------- | -------------------------------------------------------------------- |
+| `📎` `📋` `💾` `🖥️` `📡` | `[ok]`    | Succeeded — file reference, clipboard, file, terminal, stream         |
+| `⚠`                   | `[warn]`  | Usable output, but a limit or a fallback changed it                   |
+| `✗`                   | `[error]` | Failed; nothing was produced                                          |
+| `○`                   | `-`       | Nothing to do, or nothing done — preview, empty selection, cancelled  |
+
+Anywhere Unicode is not safe — a redirected stream, `TERM=dumb`, a legacy
+Windows console — every one of these degrades to its ASCII form.
+
+The token estimate is always present, because that is the number that decides
+whether the context will fit.
+
+A run that finishes faster than ~130ms never shows a spinner at all, so short
+commands produce exactly one line.
+
+### stdout and stderr
+
+- **stdout** carries the requested document, and nothing else — XML, Markdown,
+  JSON, NDJSON, SARIF or the tree.
+- **stderr** carries everything addressed to a person: progress, the completion
+  line, warnings, errors and verbose detail.
+
+This is a contract, not a convention. `copytree --display --format json | jq .`
+is valid while the run still reports its progress, and no pipeline stage writes
+to either stream directly.
+
+Under `--log-format json` the feedback becomes NDJSON on stderr — one object per
+line, stable `event` names (`run.start`, `phase.change`, `run.complete`,
+`run.failed`), no ANSI and no emoji.
+
+### Warnings
+
+CopyTree warns only about things that could change whether you trust the output:
+files omitted by a budget or the size gate, content shortened by `--char-limit`,
+unreadable files, a file it could not scan for secrets, a failed conversion, or a
+clipboard fallback.
+
+Routine filtering — `.gitignore`, `node_modules`, your own `--exclude` — is the
+tool working as asked, and is reported only under `--verbose`.
+
+**Redactions are not warnings.** When the secrets guard redacts a match or leaves
+out a secret-prone file, that is the feature working, and its detector is tuned
+to over-match on purpose. Those appear as a calm note under a normal success
+line, naming the files involved:
+
+```text
+📎 File reference copied — 67 files · ~630k tokens
+  3 possible secrets redacted in config.js, server.js and deploy.js
+  1 secret-prone file left out: .env
+```
+
+A warning is reserved for the cases where the guard could *not* do its job: a
+finding it failed to redact (the credential is still in the output), or a file it
+could not scan and therefore excluded.
+
 ## Command Options
 
 ### Profile Options
@@ -126,16 +195,28 @@ copytree -i
 ```
 
 #### `--verbose`, `-v`
-Show per-stage progress logs and a run summary. By default a run prints only a
-live progress line and one completion line; use this when you need to see what
-each pipeline stage did or how long the run took.
+Show run detail: the phases as they happen, what was selected and what was not,
+and the output size and duration on the completion line. By default a run prints
+only a live progress line and one completion line.
 
 ```bash
 copytree --verbose
 copytree -v
 ```
 
-Ignored with `--display`, where the document itself occupies stdout.
+`--verbose` is for you; `--log-level debug` is for diagnosing CopyTree itself
+(stage names, timings, cache hits). They are separate on purpose.
+
+#### `--quiet`, `-q`
+Say nothing about a successful run. Progress, the completion line and non-fatal
+warnings are all suppressed; failures still go to stderr and still set a non-zero
+exit code.
+
+```bash
+copytree --quiet -o context.xml
+```
+
+`--log-level error` and `--log-format silent` have the same effect.
 
 #### `--stream`, `-S`
 Stream output without buffering (useful for piping).

@@ -1,1 +1,2 @@
-Path does not exist: <PROJECT_ROOT>
+[error] Path not found: <PROJECT_ROOT>
+  Check the path or run copytree from the project root

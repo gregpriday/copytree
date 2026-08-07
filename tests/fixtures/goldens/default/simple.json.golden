@@ -35,4 +35,4 @@
       "content": "export function test() {\n  return 42;\n}\n"
     }
   ]
-}🖥️ 3 files [<MEMORY>] displayed to terminal
+}

@@ -1,7 +1,7 @@
 import FolderProfileLoader from '../../../src/config/FolderProfileLoader.js';
 import fs from 'fs/promises';
 import path from 'path';
-import { ConfigurationError } from '../../../src/utils/errors.js';
+import { ProfileError } from '../../../src/utils/errors.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
 // Unmock fs-extra for these tests since we're using real filesystem operations
@@ -205,10 +205,10 @@ include:
       });
     });
 
-    it('should throw ConfigurationError if named profile not found', async () => {
+    it('should throw ProfileError if named profile not found', async () => {
       await withTempDir('no-named', async (tmpDir) => {
         const loader = new FolderProfileLoader({ cwd: tmpDir });
-        await expect(loader.loadNamed('nonexistent')).rejects.toThrow(ConfigurationError);
+        await expect(loader.loadNamed('nonexistent')).rejects.toThrow(ProfileError);
         await expect(loader.loadNamed('nonexistent')).rejects.toThrow(/Profile not found/);
       });
     });
@@ -289,10 +289,10 @@ include:
       expect(profile.name).toBe('.copytree');
     });
 
-    it('should throw ConfigurationError if data is not an object', () => {
-      expect(() => loader.validate(null, 'test.yml')).toThrow(ConfigurationError);
-      expect(() => loader.validate('string', 'test.yml')).toThrow(ConfigurationError);
-      expect(() => loader.validate([], 'test.yml')).toThrow(ConfigurationError);
+    it('should throw ProfileError if data is not an object', () => {
+      expect(() => loader.validate(null, 'test.yml')).toThrow(ProfileError);
+      expect(() => loader.validate('string', 'test.yml')).toThrow(ProfileError);
+      expect(() => loader.validate([], 'test.yml')).toThrow(ProfileError);
     });
   });
 

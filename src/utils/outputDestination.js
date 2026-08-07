@@ -1,6 +1,7 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs-extra';
+import { ERROR_CODES, ValidationError } from './errors.js';
 
 /**
  * File extension for each output format.
@@ -87,4 +88,98 @@ export function resolveDestination(options = {}) {
   return 'reference';
 }
 
-export default { extensionForFormat, referenceFilePath, writeReferenceFile, resolveDestination };
+/**
+ * Flags that each name a destination, in the order precedence used to apply.
+ * `--stream --output file` is not a conflict: streaming is *how* the file is
+ * written, not a second place to put it.
+ */
+const DESTINATION_FLAGS = Object.freeze([
+  ['output', '--output'],
+  ['display', '--display'],
+  ['clipboard', '--clipboard'],
+]);
+
+/**
+ * Destinations `--stream` cannot deliver to.
+ *
+ * Streaming writes as it goes, to stdout or to a file. There is no way to
+ * stream to a clipboard, and `resolveDestination` resolved the pair in favour
+ * of the stream — so `--stream --clipboard` succeeded, said nothing, and left
+ * the clipboard untouched.
+ */
+const STREAM_INCOMPATIBLE = Object.freeze([['clipboard', '--clipboard']]);
+
+/**
+ * Reject a command that names more than one destination.
+ *
+ * `resolveDestination` picks the first match, which meant `--display --clipboard`
+ * silently did one of the two things asked for and never mentioned the other.
+ * Silent precedence is the wrong answer to a contradiction: the user has stated
+ * two intentions and only they can say which one they meant.
+ *
+ * @param {Object} [options] - CLI options
+ * @throws {ValidationError} When two or more destinations are requested
+ * @returns {true} When the options name at most one destination
+ */
+export function validateDestinationOptions(options = {}) {
+  if (options.stream) {
+    const incompatible = STREAM_INCOMPATIBLE.filter(([key]) => options[key]).map(([, f]) => f);
+    if (incompatible.length > 0) {
+      throw new ValidationError(
+        `--stream cannot be combined with ${incompatible.join(' or ')}`,
+        'destination',
+        incompatible,
+        {
+          code: ERROR_CODES.INVALID_OPTION,
+          field: 'output destination',
+          suggestion: 'Stream to stdout or to --output, or drop --stream',
+        },
+      );
+    }
+  }
+
+  const named = DESTINATION_FLAGS.filter(([key]) => options[key]).map(([, flag]) => flag);
+
+  if (named.length > 1) {
+    throw new ValidationError(
+      `Choose one output destination — ${named.join(' and ')} were both given`,
+      'destination',
+      named,
+      {
+        code: ERROR_CODES.INVALID_OPTION,
+        field: 'output destination',
+        suggestion: 'Use only one of --output, --display, --stream or --clipboard',
+      },
+    );
+  }
+
+  return true;
+}
+
+/**
+ * Describe a destination for the reporter and for delivery.
+ *
+ * @param {string} destination - A value from {@link resolveDestination}
+ * @returns {{type: string, label: string, writesPayloadToStdout: boolean, supportsProgress: boolean}}
+ *   Destination descriptor
+ */
+export function describeDestination(destination) {
+  const descriptors = {
+    reference: { label: 'file reference', writesPayloadToStdout: false, supportsProgress: true },
+    clipboard: { label: 'clipboard', writesPayloadToStdout: false, supportsProgress: true },
+    file: { label: 'file', writesPayloadToStdout: false, supportsProgress: true },
+    display: { label: 'terminal', writesPayloadToStdout: true, supportsProgress: true },
+    stream: { label: 'stream', writesPayloadToStdout: true, supportsProgress: true },
+  };
+  const descriptor = descriptors[destination] ?? descriptors.reference;
+  return { type: destination, ...descriptor };
+}
+
+export default {
+  extensionForFormat,
+  referenceFilePath,
+  writeReferenceFile,
+  resolveDestination,
+  validateDestinationOptions,
+  describeDestination,
+};

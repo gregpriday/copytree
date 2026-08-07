@@ -15,7 +15,6 @@ let Text;
   Text = undefined;
 });
 
-import CopyView from './components/CopyView.js';
 import ValidationView from './components/ValidationView.js';
 import ConfigInspectView from './components/ConfigInspectView.js';
 
@@ -31,9 +30,11 @@ const AppContent = () => {
       return React.createElement(Text, null, 'Loading...');
     }
 
+    // `copy` is deliberately absent: it renders one progress line and one
+    // completion line through the terminal reporter, which needs no component
+    // tree and cannot finish without flushing. Ink remains only for the
+    // configuration commands, which genuinely draw a persistent table.
     switch (command) {
-      case 'copy':
-        return React.createElement(CopyView);
       case 'config:validate':
         return React.createElement(ValidationView);
       case 'config:inspect':

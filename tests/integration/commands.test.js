@@ -206,9 +206,12 @@ output:
         );
 
         expect(exitCode).toBe(0);
-        // Check both stdout and stderr as output might go to stderr
+        // A dry run is a preview: it selected, sorted and budgeted, but read
+        // and wrote nothing. The neutral status says so without claiming a
+        // success it did not achieve.
         const output = stdout + stderr;
-        expect(output).toMatch(/dry run/i);
+        expect(output).toMatch(/Preview/);
+        expect(output).toMatch(/No content was read/);
       });
     });
 
@@ -216,7 +219,8 @@ output:
       const { exitCode, stderr } = await runCommand(`node "${cliPath}" copy "/non/existent/path"`);
 
       expect(exitCode).not.toBe(0);
-      expect(stderr).toContain('does not exist');
+      expect(stderr).toContain('Path not found: /non/existent/path');
+      expect(stderr).toContain('Check the path or run copytree from the project root');
     });
   });
 
@@ -245,8 +249,9 @@ output:
       const { exitCode, stderr } = await runCommand(`node "${cliPath}" totally-invalid-subcommand`);
 
       expect(exitCode).not.toBe(0);
-      // The error message might be about path not existing since it treats it as a path
-      expect(stderr).toMatch(/does not exist|unknown command/i);
+      // `copy` is the default command, so an unrecognised subcommand is read
+      // as a path — and reported as the missing path it is.
+      expect(stderr).toMatch(/path not found|unknown command/i);
     });
 
     test('should reject removed install:copytree command', async () => {
@@ -254,8 +259,8 @@ output:
       const { exitCode, stderr } = await runCommand(`node "${cliPath}" install:copytree`);
 
       expect(exitCode).not.toBe(0);
-      // Commander treats unknown commands as paths, so it will fail with "does not exist"
-      expect(stderr).toContain('does not exist');
+      // Commander treats unknown commands as paths, so this reports a missing path.
+      expect(stderr).toContain('Path not found: install:copytree');
     });
 
     test('should handle invalid options', async () => {
@@ -380,7 +385,7 @@ output:
 
         expect(exitCode).toBe(0);
         const output = stdout + stderr;
-        expect(output).toMatch(/dry run/i);
+        expect(output).toMatch(/Preview/);
         // Note: We can't easily test actual clipboard in CI, so we test dry-run
       });
     });
