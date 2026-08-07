@@ -186,6 +186,18 @@ export function plural(count, noun) {
 }
 
 /**
+ * Thousands separators for counts, built once.
+ *
+ * `Number.prototype.toLocaleString()` constructs a fresh `Intl.NumberFormat` on
+ * every call, which is the single most expensive thing this module did — the
+ * first call pulls in ICU. Pinned to `en-US` deliberately: this is one field in
+ * a status line whose other numbers are already formatted in English, and a
+ * count that switches separator style with `LANG` is a diff in every log that
+ * captures it.
+ */
+const COUNT_FORMAT = new Intl.NumberFormat('en-US');
+
+/**
  * Format a count, abbreviating past a thousand.
  * @param {number} value - Count
  * @returns {string} Human-readable count
@@ -194,7 +206,7 @@ export function formatCount(value) {
   const n = Number(value) || 0;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 10_000) return `${Math.round(n / 1_000)}k`;
-  return n.toLocaleString('en-US');
+  return COUNT_FORMAT.format(n);
 }
 
 /**

@@ -206,7 +206,7 @@ class FileDiscoveryStage extends Stage {
       }
 
       // Check if this file matches our include patterns (if specified)
-      if (usePatternFilter && !micromatch.isMatch(relativePath, this.patterns)) {
+      if (usePatternFilter && !this.matchesIncludePatterns(relativePath)) {
         report.add({
           path: relativePath,
           size: fileSize,
@@ -437,6 +437,42 @@ class FileDiscoveryStage extends Stage {
   }
 
   /**
+   * Compiled matchers, built on first use and reused for every path.
+   *
+   * `micromatch.isMatch(path, patterns)` compiles the pattern list into regular
+   * expressions on each call, and both of these were called once per discovered
+   * file — so a run over a thousand files parsed the same ten force-include
+   * globs a thousand times. `micromatch.matcher()` returns the compiled matcher
+   * so the parse happens once.
+   *
+   * Lazy rather than constructed up front: a stage built for `--only-tree` or a
+   * dry run may never reach the walk, and compiling globs it will not use is the
+   * same waste in a smaller package.
+   *
+   * @param {string} relativePath - POSIX path relative to the base path
+   * @returns {boolean} Whether the path is force-included
+   */
+  matchesForceInclude(relativePath) {
+    if (!this._forceIncludeMatcher) {
+      this._forceIncludeMatcher = micromatch.matcher(this.forceInclude, { dot: true });
+    }
+    return this._forceIncludeMatcher(relativePath);
+  }
+
+  /**
+   * Whether a path satisfies the caller's include patterns.
+   *
+   * @param {string} relativePath - POSIX path relative to the base path
+   * @returns {boolean} Whether the path matches
+   */
+  matchesIncludePatterns(relativePath) {
+    if (!this._includeMatcher) {
+      this._includeMatcher = micromatch.matcher(this.patterns);
+    }
+    return this._includeMatcher(relativePath);
+  }
+
+  /**
    * The size gate in effect for a path.
    *
    * `always` / `.copytreeinclude` is an explicit statement of intent and is the
@@ -446,9 +482,7 @@ class FileDiscoveryStage extends Stage {
    * @returns {number|null} Byte ceiling, or null when no gate applies
    */
   effectiveSizeGate(relativePath) {
-    const forced =
-      this.forceInclude.length > 0 &&
-      micromatch.isMatch(relativePath, this.forceInclude, { dot: true });
+    const forced = this.forceInclude.length > 0 && this.matchesForceInclude(relativePath);
 
     // maxFileSize is a memory-safety ceiling and is never lifted.
     if (forced) return this.maxFileSize;
