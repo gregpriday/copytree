@@ -2,6 +2,43 @@ import { TransformError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 
 /**
+ * Extensions that a non-default transformer in `createDefault()` claims.
+ *
+ * This exists so a caller can answer "is there anything here to transform?"
+ * without building the registry, because building it means importing every
+ * transformer module. On an ordinary source-code copy the answer is always no,
+ * and the whole transformation subsystem — registry, cache service, traits
+ * scheduling — was being constructed and walked to discover that.
+ *
+ * The default transformer is deliberately excluded. It claims every file and
+ * returns already-loaded content unchanged, so its presence is not evidence
+ * that a run needs the stage at all.
+ *
+ * `transformerCandidateExtensions.test.js` asserts this stays in step with what
+ * `createDefault()` actually registers, so adding a transformer that claims a
+ * new extension fails the suite rather than silently never running.
+ *
+ * @type {ReadonlySet<string>}
+ */
+export const CANDIDATE_EXTENSIONS = Object.freeze(
+  new Set([
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.zip',
+    '.tar',
+    '.gz',
+    '.rar',
+    '.7z',
+    '.exe',
+    '.dll',
+    '.so',
+    '.dylib',
+  ]),
+);
+
+/**
  * Registry for file transformers
  * Manages transformer registration and selection based on file type
  * Includes traits-based validation and optimization

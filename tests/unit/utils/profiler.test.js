@@ -7,7 +7,7 @@
 import { jest } from '@jest/globals';
 import path from 'path';
 import os from 'os';
-import fs from 'fs-extra';
+import fs from '../../../src/utils/fsx.js';
 import { Profiler, writeProfilingReport } from '../../../src/utils/profiler.js';
 
 // ─── Mock session factory ─────────────────────────────────────────────────────

@@ -10,7 +10,7 @@
 import { jest } from '@jest/globals';
 
 // Unmock fs-extra to allow real file operations if needed
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 let OutputFormattingStage;
 

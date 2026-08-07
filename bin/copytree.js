@@ -5,14 +5,21 @@
 // Note: Removed @babel/register for better performance
 
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 import { Command, InvalidArgumentError, Option } from 'commander';
-import { readFileSync } from 'fs';
-import { logger } from '../src/utils/logger.js';
+import { VERSION } from '../src/version.js';
+
+// `--version` is the one invocation with no work behind it, so it should carry
+// no graph behind it either. Answered here, before Commander is asked to build
+// a command with seventy options and their parsers, and before anything reaches
+// the logger — which pulls in Chalk and the configuration system.
+//
+// Restricted to the exact single-argument forms on purpose. `copytree --version
+// extra` is a mistake, and Commander gives a better account of it than this
+// would.
+if (process.argv.length === 3 && (process.argv[2] === '--version' || process.argv[2] === '-V')) {
+  process.stdout.write(`${VERSION}\n`);
+  process.exit(0);
+}
 
 /**
  * Load the terminal UI on first use.
@@ -51,23 +58,7 @@ async function renderCommand(command, targetPath, options) {
   render(React.createElement(App, { command, path: targetPath, options }));
 }
 
-/**
- * Apply logging options from parsed CLI options to the global logger singleton.
- * Must be called before any logger usage in command handlers.
- *
- * @param {Object} options - Parsed commander options
- */
-function applyLoggingOptions(options) {
-  const logOptions = {};
-  if (options.logLevel !== undefined) logOptions.level = options.logLevel;
-  if (options.logFormat !== undefined) logOptions.format = options.logFormat;
-  if (options.color === false) logOptions.colorize = 'never';
-  if (Object.keys(logOptions).length > 0) {
-    logger.configure(logOptions);
-  }
-}
-
-const pkg = JSON.parse(readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+const pkg = { version: VERSION };
 
 const program = new Command();
 
@@ -100,6 +91,7 @@ program
   .option('-m, --modified', 'Only include git modified files')
   .option('-c, --changed <ref>', 'Only include files changed since git ref')
   .option('-o, --output <file>', 'Save output to file')
+  .option('--reveal', 'After writing a file, show it in the OS file manager')
   .option(
     '--format <format>',
     'Output format: xml, markdown|md, json, ndjson, sarif, tree (default: xml)',
@@ -226,7 +218,12 @@ program
   )
   .option('--no-color', 'Disable ANSI color codes in log output')
   .action(async (targetPath, options) => {
-    applyLoggingOptions(options);
+    // Logging options are applied by `copyCommand`, which has to do it anyway —
+    // it is also the entry point for the programmatic callers that never pass
+    // through here. Doing it a second time in this file bought nothing and
+    // forced the logger, and therefore Chalk and the configuration system, into
+    // the entry point's static import graph.
+    //
     // Auto-detect format from output file extension
     if (!options.format && options.output) {
       const formatByExt = {

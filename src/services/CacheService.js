@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 import path from 'path';
 import crypto from 'crypto';
 import os from 'os';

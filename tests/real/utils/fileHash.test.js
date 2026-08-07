@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { hashFile, hashContent } from '../../../src/utils/fileHash.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 /**
  * Reference digest, computed independently of the implementation under test.

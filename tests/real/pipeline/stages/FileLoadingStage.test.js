@@ -3,7 +3,7 @@ import path from 'path';
 import FileLoadingStage from '../../../../src/pipeline/stages/FileLoadingStage.js';
 import { withTempDir } from '../../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../../src/utils/fsx.js');
 
 function makeConfig(overrides = {}) {
   return {

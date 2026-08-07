@@ -2,6 +2,7 @@ import Stage from '../Stage.js';
 import { CacheService } from '../../services/CacheService.js';
 import { generateTransformCacheKey } from '../../utils/fileHash.js';
 import { TransformError } from '../../utils/errors.js';
+import { CANDIDATE_EXTENSIONS } from '../../transforms/TransformerRegistry.js';
 import path from 'path';
 import appConfig from '../../../config/app.js';
 
@@ -9,24 +10,83 @@ class TransformStage extends Stage {
   constructor(options = {}) {
     super(options);
     this.registry = options.registry;
+    // A caller that has no registry yet passes a factory instead, so that
+    // building one — which means importing every transformer module — happens
+    // only for a run that turns out to need it.
+    this.registryFactory = options.registryFactory || null;
     this.transformerConfig = options.transformers || {};
     this.maxConcurrency = options.maxConcurrency || appConfig.maxConcurrency || 5;
     this.noCache = options.noCache;
+    this.cacheEnabled = options.cacheEnabled ?? true;
+    this._cache = options.cache ?? null;
+  }
 
-    // Initialize cache for transformations (disabled if noCache is true)
-    // Only create cache if not disabled
-    this.cache = options.noCache
-      ? null
-      : options.cache ||
-        CacheService.create('transformations', {
-          enabled: options.cacheEnabled ?? true,
-          defaultTtl: 86400, // 24 hours
-        });
+  /**
+   * The transformation cache, opened on first use.
+   *
+   * Constructing it eagerly meant every copy paid for a cache service that a
+   * run without heavy transformers never reads from — and only heavy
+   * transformers consult it.
+   */
+  get cache() {
+    if (this.noCache) return null;
+    if (!this._cache) {
+      this._cache = CacheService.create('transformations', {
+        enabled: this.cacheEnabled,
+        defaultTtl: 86400, // 24 hours
+      });
+    }
+    return this._cache;
   }
 
   async process(input) {
-    this.log(`Transforming ${input.files.length} files`, 'debug');
+    const files = input.files || [];
+
+    // Decide whether there is any work here before building anything. The
+    // stage used to run unconditionally on the CLI path: for every file it
+    // resolved the default transformer, built a cache key — a JSON.stringify
+    // and a SHA-256 per file — and allocated a p-limit promise, all so that
+    // `FileLoaderTransformer` could observe that the content was already
+    // loaded and hand the file straight back.
+    // A caller that handed over a built registry has already decided this stage
+    // is wanted, and gets it. The skip applies to the factory form, where the
+    // whole point is to avoid building one.
+    if (!this.registry) {
+      if (!this.registryFactory || !this.hasWorkToDo(files)) {
+        this.log('No files require transformation, skipping', 'debug');
+        return input;
+      }
+      this.registry = await this.registryFactory();
+    }
+
+    this.log(`Transforming ${files.length} files`, 'debug');
     return this.transformFiles(input);
+  }
+
+  /**
+   * Whether any file in the selection could be transformed.
+   *
+   * Deliberately conservative: an explicitly configured transformer, a file the
+   * loader flagged as convertible, or an extension a non-default transformer
+   * claims all count. Anything unrecognised runs the stage.
+   *
+   * @param {Object[]} files - Selected files
+   * @returns {boolean} True when the stage has something to do
+   */
+  hasWorkToDo(files) {
+    // An explicit `transformers:` block in a profile is a request, and it can
+    // name transformers this stage cannot see from extensions alone.
+    if (Object.values(this.transformerConfig).some((entry) => entry?.enabled !== false)) {
+      return true;
+    }
+
+    return files.some((file) => {
+      if (!file) return false;
+      if (file.needsTransform) return true;
+      if (file.content === undefined) return true;
+      const match = file.path?.match(/\.[^.\\/]+$/);
+      return match ? CANDIDATE_EXTENSIONS.has(match[0].toLowerCase()) : false;
+    });
   }
 
   /**

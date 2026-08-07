@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import fs from 'fs-extra';
+import fs from './fsx.js';
 import path from 'path';
 import os from 'os';
 

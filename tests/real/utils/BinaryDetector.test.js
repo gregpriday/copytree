@@ -7,7 +7,7 @@ import {
 } from '../../../src/utils/BinaryDetector.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 describe('BinaryDetector', () => {
   test('returns error classification when an unknown-extension file cannot be read', async () => {

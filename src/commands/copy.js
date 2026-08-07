@@ -1,5 +1,4 @@
 import Pipeline from '../pipeline/Pipeline.js';
-import TransformerRegistry from '../transforms/TransformerRegistry.js';
 import { logger } from '../utils/logger.js';
 import {
   CommandError,
@@ -10,7 +9,6 @@ import {
   isAbortError,
 } from '../utils/errors.js';
 import { config } from '../config/ConfigManager.js';
-import Clipboard from '../utils/clipboard.js';
 import {
   describeDestination,
   normalizeFormat,
@@ -31,28 +29,16 @@ import {
   classifyWarnings,
 } from '../ui/feedback/model.js';
 import ProgressTracker from '../utils/ProgressTracker.js';
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 import path from 'path';
-import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
 import { summarize as getFsErrorSummary, reset as resetFsErrors } from '../utils/fsErrorReport.js';
-import FolderProfileLoader from '../config/FolderProfileLoader.js';
-import { Profiler, writeProfilingReport } from '../utils/profiler.js';
 import { parseSize } from '../utils/helpers.js';
 import { resolveScope } from '../utils/scopeResolver.js';
 import { buildEstimates } from '../utils/estimate.js';
 
-// Lazy initialization for Jest compatibility
-let pkg;
-try {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  pkg = JSON.parse(readFileSync(path.join(__dirname, '../../package.json'), 'utf8'));
-} catch (error) {
-  // In test environment, these may not be available
-  pkg = { version: '0.0.0-test' };
-}
+import { VERSION } from '../version.js';
+
+const pkg = { version: VERSION };
 
 /**
  * Run a copy, then say what happened.
@@ -106,6 +92,7 @@ async function copyCommand(targetPath = '.', options = {}) {
     if (options.profile) {
       // Profiler.start() rolls back (disconnects) on partial failure, so a
       // throw during startup leaks nothing.
+      const { Profiler } = await import('../utils/profiler.js');
       profiler = new Profiler({
         type: options.profile,
         profileDir: options.profileDir || '.profiles',
@@ -113,12 +100,26 @@ async function copyCommand(targetPath = '.', options = {}) {
       await profiler.start();
     }
 
-    await config().loadConfiguration();
+    // One instance, loaded once, and then handed to everything that needs it.
+    // The pipeline used to be constructed without it, so `_initializeStages()`
+    // built a second ConfigManager and repeated the whole load: schema read and
+    // Ajv compile, default module enumeration and dynamic import, deep clones,
+    // user config read, merge and validate — none of which produced an answer
+    // different from the one already sitting in this variable.
+    const cfg = config();
+    await cfg.loadConfiguration();
 
     basePath = await resolveBasePath(targetPath, reporter);
     const profileConfig = await buildProfileFromCliOptions(options, basePath);
 
-    const result = await runPipeline({ basePath, profileConfig, options, startTime, reporter });
+    const result = await runPipeline({
+      basePath,
+      profileConfig,
+      options,
+      startTime,
+      reporter,
+      config: cfg,
+    });
 
     if (profiler) {
       profiler = await finishProfiling(profiler, {
@@ -250,10 +251,16 @@ function applyLoggingOptions(options) {
  * @returns {Promise<string>} Absolute base path
  */
 async function resolveBasePath(targetPath, reporter) {
-  if (GitHubUrlHandler.isGitHubUrl(targetPath)) {
-    reporter.note(`Cloning ${targetPath}`);
-    const githubHandler = new GitHubUrlHandler(targetPath);
-    return githubHandler.getFiles();
+  // Recognising a GitHub URL is a string test; *handling* one pulls in a
+  // handler with its own git, filesystem and child-process machinery. A local
+  // path — which is nearly every invocation — should not pay to parse it.
+  if (/^https?:\/\/(?:www\.)?github\.com\//i.test(targetPath)) {
+    const { default: GitHubUrlHandler } = await import('../services/GitHubUrlHandler.js');
+    if (GitHubUrlHandler.isGitHubUrl(targetPath)) {
+      reporter.note(`Cloning ${targetPath}`);
+      const githubHandler = new GitHubUrlHandler(targetPath);
+      return githubHandler.getFiles();
+    }
   }
 
   const basePath = path.resolve(targetPath);
@@ -275,8 +282,14 @@ async function resolveBasePath(targetPath, reporter) {
  *
  * @returns {Promise<Object>} Pipeline result
  */
-async function runPipeline({ basePath, profileConfig, options, startTime, reporter }) {
+async function runPipeline({ basePath, profileConfig, options, startTime, reporter, config: cfg }) {
   const pipeline = new Pipeline({
+    // The already-loaded instance. Without it the pipeline loads configuration
+    // a second time, for every invocation.
+    config: cfg,
+    // The profiling report prints per-stage memory deltas, so a run that was
+    // asked for one still collects them.
+    measureMemory: Boolean(options.profile),
     continueOnError: true,
     emitProgress: true,
     // Stage logs go through the same silence the reporter observes. Without
@@ -285,7 +298,7 @@ async function runPipeline({ basePath, profileConfig, options, startTime, report
     // knows to erase it first.
     quiet: reporter.quiet,
   });
-  const stages = await setupPipelineStages(basePath, profileConfig, options);
+  const stages = await setupPipelineStages(basePath, profileConfig, options, { config: cfg });
   pipeline.through(stages);
 
   const tracker = new ProgressTracker({
@@ -334,6 +347,7 @@ async function finishProfiling(profiler, { result, options, targetPath, startTim
   }
 
   const pipelineStats = result.pipelineStats || {};
+  const { writeProfilingReport } = await import('../utils/profiler.js');
   const reportPath = await writeProfilingReport({
     profileDir: options.profileDir || '.profiles',
     timestamp: savedTimestamp,
@@ -392,6 +406,20 @@ async function writeSecretsReport(result, options, reporter) {
 }
 
 /**
+ * Load the clipboard layer on first need.
+ *
+ * Only three of the five destinations touch the clipboard. `-o`, `--display`
+ * and `--stream` never do, and `--dry-run` writes nothing at all — so the
+ * platform helper, and the child-process machinery behind it, stay out of the
+ * graph for those.
+ *
+ * @returns {Promise<Object>} The Clipboard module
+ */
+function clipboard() {
+  return import('../utils/clipboard.js').then((module) => module.default);
+}
+
+/**
  * Put the output where it was asked to go.
  *
  * Delivery returns a description of what actually happened rather than printing
@@ -424,7 +452,7 @@ async function deliverOutput(result, options, basePath, reporter) {
   if (requested === 'reference') {
     const tempFile = await writeReferenceFile(output, basePath, options.format);
     try {
-      await Clipboard.copyFileReference(tempFile);
+      await (await clipboard()).copyFileReference(tempFile);
       return {
         requested,
         actual: 'reference',
@@ -448,7 +476,7 @@ async function deliverOutput(result, options, basePath, reporter) {
     const outputPath = path.resolve(options.output);
     await fs.ensureDir(path.dirname(outputPath));
     await fs.writeFile(outputPath, output, 'utf8');
-    await Clipboard.revealInFinder(outputPath);
+    await revealIfRequested(outputPath, options);
     return { requested, actual: 'file', status: 'success', path: outputPath, fallbackUsed: false };
   }
 
@@ -459,11 +487,11 @@ async function deliverOutput(result, options, basePath, reporter) {
   }
 
   try {
-    await Clipboard.copyText(output);
+    await (await clipboard()).copyText(output);
     return { requested, actual: 'clipboard', status: 'success', fallbackUsed: false };
   } catch (error) {
     const tempFile = await writeReferenceFile(output, basePath, options.format);
-    await Clipboard.revealInFinder(tempFile);
+    await revealIfRequested(tempFile, options);
     return {
       requested,
       actual: 'file',
@@ -476,15 +504,40 @@ async function deliverOutput(result, options, basePath, reporter) {
 }
 
 /**
+ * Show the written file in the OS file manager, when asked to.
+ *
+ * `-o` used to do this unconditionally. Writing a file and opening a window are
+ * different requests, and only one of them was made: on macOS the reveal
+ * launches `osascript`, wakes Finder, and pulls focus away from the terminal —
+ * tens to hundreds of milliseconds of work, and a visible interruption, on
+ * every `copytree -o out.xml`. It also makes the command unusable in a loop or
+ * a script, which is exactly where `-o` gets used.
+ *
+ * @param {string} filePath - File that was written
+ * @param {Object} options - Parsed CLI options
+ */
+async function revealIfRequested(filePath, options) {
+  if (!options?.reveal) return;
+  await (await clipboard()).revealInFinder(filePath);
+}
+
+/**
  * Turn a finished run into one model and hand it to the reporter.
  */
 function reportRun({ reporter, result, options, delivery, warnings, notices = [], startTime }) {
   const included = (result.files || []).filter((f) => f !== null);
   const stats = {
     files: included.length,
-    outputBytes: result.output
-      ? Buffer.byteLength(result.output, 'utf8')
-      : result.stats?.outputSize,
+    // `OutputFormattingStage` already measured this, over the same string.
+    // Recomputing it walked the whole document a second time to reach the
+    // identical number — a megabyte of UTF-8 length counting to print one
+    // figure in a status line. The remaining fallbacks are for the paths that
+    // do not set it: streaming reports through `stats`, and a stage list ending
+    // early has no size at all.
+    outputBytes:
+      result.outputSize ??
+      result.stats?.outputSize ??
+      (result.output ? Buffer.byteLength(result.output, 'utf8') : undefined),
     estimatedTokens:
       result.stats?.estimatedTokens ??
       buildEstimates(included, {
@@ -644,6 +697,7 @@ async function buildProfileFromCliOptions(options, basePath) {
     // Folder profiles belong to the project being copied, not to whatever
     // directory the process happens to be started from. An embedder's cwd is
     // its own app bundle; a shell user may well be a level above the target.
+    const { default: FolderProfileLoader } = await import('../config/FolderProfileLoader.js');
     const loader = new FolderProfileLoader({ cwd: basePath || process.cwd() });
     try {
       if (namedProfile) {
@@ -775,7 +829,7 @@ async function buildProfileFromCliOptions(options, basePath) {
 /**
  * Setup pipeline stages based on profile and options
  */
-async function setupPipelineStages(basePath, profile, options) {
+async function setupPipelineStages(basePath, profile, options, { config: cfg } = {}) {
   const stages = [];
 
   // Resolve --scope before the pipeline runs. The pipeline continues on stage
@@ -899,12 +953,20 @@ async function setupPipelineStages(basePath, profile, options) {
       }),
     );
 
-    // 8. Transformer Stage
+    // 8. Transformer Stage.
+    //
+    //    The registry is passed as a factory, not an instance: building it
+    //    imports every transformer module, and the stage now decides from the
+    //    selected files whether it needs one at all. An ordinary source-code
+    //    copy never touches the transformation subsystem.
     const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
-    const registry = await TransformerRegistry.createDefault();
     stages.push(
       new TransformStage({
-        registry,
+        registryFactory: async () => {
+          const { default: TransformerRegistry } =
+            await import('../transforms/TransformerRegistry.js');
+          return TransformerRegistry.createDefault({ config: cfg });
+        },
         transformers: profile.transformers || {},
         noCache: options.noCache,
       }),

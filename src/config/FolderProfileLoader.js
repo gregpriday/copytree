@@ -1,7 +1,12 @@
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 import path from 'path';
-import yaml from 'js-yaml';
 import { ProfileError } from '../utils/errors.js';
+
+/**
+ * Profile file extensions, in precedence order. The empty string is the
+ * extensionless `.copytree`, parsed as an INI-style file.
+ */
+const EXTENSIONS = Object.freeze(['.yml', '.yaml', '.json', '']);
 
 /**
  * FolderProfileLoader - Lightweight profile loader for folder-level configuration
@@ -18,21 +23,44 @@ class FolderProfileLoader {
   }
 
   /**
+   * Find the highest-priority `.copytree*` file matching a base name.
+   *
+   * One directory listing, rather than a `pathExists` probe per extension.
+   * Discovery runs on every copy and almost always finds nothing, so the old
+   * shape was four filesystem round trips to answer "no" — and `loadNamed()`
+   * and `exists()` each did the same four again.
+   *
+   * @param {string} base - File stem, e.g. `.copytree` or `.copytree-api`
+   * @returns {Promise<string|null>} Absolute path, or null when absent
+   * @private
+   */
+  async _find(base) {
+    let entries;
+    try {
+      entries = await fs.readdir(this.cwd);
+    } catch {
+      // An unreadable directory has no profile in it, which is the same answer
+      // as an empty one for every caller here.
+      return null;
+    }
+
+    const present = new Set(entries);
+    for (const ext of EXTENSIONS) {
+      const name = `${base}${ext}`;
+      if (present.has(name)) return path.join(this.cwd, name);
+    }
+
+    return null;
+  }
+
+  /**
    * Auto-discover profile in current directory
    * Searches for .copytree* files in priority order
    * @returns {Promise<FolderProfile|null>}
    */
   async discover() {
-    const extensions = ['.yml', '.yaml', '.json', ''];
-
-    for (const ext of extensions) {
-      const filePath = path.join(this.cwd, `.copytree${ext}`);
-      if (await fs.pathExists(filePath)) {
-        return await this.load(filePath);
-      }
-    }
-
-    return null;
+    const filePath = await this._find('.copytree');
+    return filePath ? this.load(filePath) : null;
   }
 
   /**
@@ -43,14 +71,8 @@ class FolderProfileLoader {
    * @throws {ProfileError} If profile not found
    */
   async loadNamed(name) {
-    const extensions = ['.yml', '.yaml', '.json', ''];
-
-    for (const ext of extensions) {
-      const filePath = path.join(this.cwd, `.copytree-${name}${ext}`);
-      if (await fs.pathExists(filePath)) {
-        return await this.load(filePath);
-      }
-    }
+    const filePath = await this._find(`.copytree-${name}`);
+    if (filePath) return this.load(filePath);
 
     // A named profile that does not exist is a profile error, not a broken
     // configuration: the config is fine, the name is wrong. The distinction
@@ -73,6 +95,10 @@ class FolderProfileLoader {
       if (ext === '.json') {
         data = JSON.parse(content);
       } else if (ext === '.yml' || ext === '.yaml') {
+        // Loaded here rather than at module scope: `js-yaml` is a parser most
+        // runs never need, because most projects have no folder profile and a
+        // JSON or INI-style one needs no YAML support at all.
+        const { default: yaml } = await import('js-yaml');
         data = yaml.load(content);
         // YAML parsing empty file returns null/undefined, treat as empty object
         if (!data) {
@@ -234,26 +260,7 @@ class FolderProfileLoader {
    * @returns {Promise<boolean>}
    */
   async exists(name = null) {
-    if (name) {
-      const extensions = ['.yml', '.yaml', '.json', ''];
-      for (const ext of extensions) {
-        const filePath = path.join(this.cwd, `.copytree-${name}${ext}`);
-        if (await fs.pathExists(filePath)) {
-          return true;
-        }
-      }
-      return false;
-    } else {
-      // Check for auto-discoverable profile
-      const extensions = ['.yml', '.yaml', '.json', ''];
-      for (const ext of extensions) {
-        const filePath = path.join(this.cwd, `.copytree${ext}`);
-        if (await fs.pathExists(filePath)) {
-          return true;
-        }
-      }
-      return false;
-    }
+    return (await this._find(name ? `.copytree-${name}` : '.copytree')) !== null;
   }
 }
 

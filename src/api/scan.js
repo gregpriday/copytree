@@ -6,10 +6,7 @@ import { ProgressTracker } from '../utils/ProgressTracker.js';
 import { ExclusionReport } from '../utils/exclusionReport.js';
 import { resolveScope } from '../utils/scopeResolver.js';
 import path from 'path';
-import fs from 'fs-extra';
-
-/** Matches bare `localeCompare(other)`, hoisted so it is built once. */
-const SCAN_COLLATOR = new Intl.Collator();
+import fs from '../utils/fsx.js';
 
 /**
  * Stage-computed stats forwarded verbatim from the pipeline result, onto the
@@ -523,13 +520,18 @@ export async function* scan(basePath, options = {}) {
     // Yield files in stable order
     const files = (result.files || []).filter((file) => file !== null);
 
-    // The sort stage already ordered these; this keeps the historical tie-break
-    // for callers who did not request an explicit order. The collator is hoisted
-    // because `localeCompare` builds one per call, and this runs O(n log n)
-    // times on top of a sort that already happened.
-    if (!options.sort) {
-      files.sort((a, b) => SCAN_COLLATOR.compare(a.path, b.path));
-    }
+    // Deliberately not re-sorted. `SortFilesStage` has already ordered these,
+    // and its ordering is the canonical one: pinned to the `en` locale, numeric
+    // aware, with a code-unit tie-break so the result does not depend on
+    // filesystem enumeration order.
+    //
+    // The second sort that used to sit here ran a bare `new Intl.Collator()` —
+    // the *system* locale, no numeric handling, ties left unresolved — over the
+    // whole selection, so it did not merely repeat the stage's O(n log n) work,
+    // it overwrote a deterministic order with a machine-dependent one. Two
+    // developers running the same command against the same tree under different
+    // `LANG` settings got different documents, which is precisely the bug the
+    // pinned collator in `SortFilesStage` exists to prevent.
 
     if (options.onSummary) {
       const report =

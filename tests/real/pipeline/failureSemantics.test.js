@@ -5,7 +5,7 @@ import Stage from '../../../src/pipeline/Stage.js';
 import { ConfigManager } from '../../../src/config/ConfigManager.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 /**
  * A stage that always throws.

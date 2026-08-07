@@ -9,6 +9,136 @@ The rule this exists to enforce: **do not approve a changed golden file because
 
 ---
 
+## Unreleased (dependency and process-boundary pass)
+
+The first performance pass removed duplicated work. This one removes
+*dependencies* and *process boundaries* — the fixed cost every invocation paid
+before it did anything. Almost all of it is invisible; these are the exceptions.
+
+### Streamed Markdown `sha256` describes the emitted content
+
+The buffered formatter was fixed in the previous pass; `StreamingOutputStage`
+still did the opposite, and for the same reason it was wrong there: by the time
+a file is streamed its content has been redacted by `SecretsGuardStage` and
+rewritten by transformers, so hashing `file.absolutePath` published the digest
+of the *unredacted* original beside the redacted document. That is enough to
+confirm a guess at the removed bytes. It also reopened and reread every selected
+file, serialized inside the per-file transform. Hashes now come from the emitted
+content, falling back to disk only when there is none.
+
+### A named instructions set that cannot be loaded now fails from `process()`
+
+The result is unchanged — `--instructions nope` still fails — but the check
+moved. `validate()` asked `InstructionsLoader.exists()`, which probes the user
+directory and then the app directory; `process()` then called `load()`, which
+probes the same two paths again. Four probes per run, on a stage that runs on
+every copy, to reach a conclusion the load already reaches.
+
+Stage-level behaviour did change for anyone calling `InstructionsStage.process()`
+directly: it used to return the input unchanged when a *named* set failed to
+load, while `validate()` threw for that same case. The two disagreed and only
+`validate()`'s answer ever reached a user. `validate()` is now a no-op.
+
+### `secretsGuard.scanner` reports `none` when nothing was scanned
+
+It reported `builtin` whenever Gitleaks was absent, including for runs where no
+file ever reached a scanner — every file excluded as secret-prone, or as
+unscannable. Naming a scanner there said protection had been applied to nothing.
+`gitleaks` and `builtin` now mean a scanner actually ran.
+
+### Gitleaks stops after an operational failure
+
+An incompatible binary, a missing config, a scanner that disappears mid-run:
+these fail identically for every remaining file. CopyTree used to retry per file,
+so a misconfigured scanner produced one doomed process and one identical warning
+per file. The failure is now reported once and the built-in scanner finishes the
+run. Findings are unchanged; a run that previously logged a thousand warnings
+logs one.
+
+### `--log-level`/`colorize: always` into a pipe now actually colours
+
+The logger built styled strings with Chalk and then decided *itself*, via
+`_shouldColorize()`, whether to write them or strip them. Chalk's own detection
+ran first and returned unstyled text whenever it judged the destination not to be
+a terminal — so asking for colour explicitly, into a pipe or a file, produced
+none. Colour is now emitted unconditionally by `utils/ansi.js` and the logger's
+existing policy makes the only decision. Auto mode on a TTY, and every
+non-colour case, are byte-identical.
+
+### File ordering is pinned rather than taken from the host's ICU
+
+`SortFilesStage` compared paths with `Intl.Collator`, whose collation data ships
+with Node. Ordering decides which files survive a budget, so the same command on
+the same tree could select differently across Node versions or on a
+small-ICU/system-ICU build. Printable-ASCII paths — effectively all of them —
+now compare against a frozen weight table derived from that collator, verified
+against it for every character pair and 500,000 random strings. Non-ASCII paths
+still defer to a real collator. No ordering changes on the reference platform;
+what changes is that it can no longer drift underneath a release.
+
+---
+
+## Unreleased (performance pass)
+
+Mostly removal of duplicated work, which by definition changes nothing
+observable. These are the exceptions.
+
+### `-o/--output` no longer opens a file manager
+
+Writing a file used to also reveal it in Finder/Explorer/`xdg-open`. Two
+different requests, one of which was never made: on macOS it launches
+`osascript`, wakes Finder and steals focus, which makes `-o` unusable in a loop
+or a script — the place `-o` is most used. Opt in with `--reveal`.
+
+### Markdown `sha256` describes the emitted content, not the file on disk
+
+`MarkdownFormatter` hashed `file.absolutePath`, reopening and rereading the
+entire selection that `FileLoadingStage` had already read. It also produced the
+wrong answer: by that point the content in memory has been redacted by
+`SecretsGuardStage` and rewritten by transformers, so a redacted file was
+published beside the digest of its *unredacted* original — a hash that does not
+describe the document carrying it, and one that lets a reader confirm a guess at
+the bytes redaction removed. Hashes now come from the emitted content, falling
+back to disk only when there is none (`--only-tree`).
+
+### Programmatic results are no longer re-sorted after `SortFilesStage`
+
+`scan()` ran a second full sort using a bare `new Intl.Collator()` — the
+*system* locale, no numeric handling, ties unresolved — over a selection
+`SortFilesStage` had already ordered with a collator pinned to `en`, numeric
+aware, with a code-unit tie-break. So the second sort did not merely repeat
+O(n log n) work, it replaced a deterministic order with a machine-dependent one:
+the same command on the same tree produced different documents under different
+`LANG` settings. `SortFilesStage`'s ordering is now canonical.
+
+### `stage:complete` carries `memoryUsage: null` unless asked
+
+Two `process.memoryUsage()` calls per stage per run, to fill a field only
+`--profile`, `COPYTREE_PERFORMANCE=true` and the benchmark harness read. The key
+is still always present; construct a `Pipeline` with `measureMemory: true` (as
+`--profile` now does) to populate it.
+
+### Schema validation runs only when there is user configuration
+
+`loadConfiguration()` read `config/schema.json`, constructed Ajv, compiled the
+schema and validated the merged result on every invocation — including the
+overwhelmingly common one where no `~/.copytree` config exists and no
+environment overrides are set, so the "merged result" is exactly the defaults
+that shipped inside the package. Validation exists to catch bad *user* input;
+re-proving the packaged defaults on every run is what the test suite is for.
+Ajv is now imported lazily and validation runs when a user config file or an
+env override actually contributed. `config:validate` is unaffected — it never
+used this path, it has its own checks.
+
+### A clean Gitleaks result is final
+
+Every clean file was scanned twice: Gitleaks, then the built-in regex scanner
+over the same bytes, because the fallback triggered on *zero findings* rather
+than on failure. On a repository of mostly clean files that is the common path.
+The built-in scanner remains the fallback for Gitleaks being absent or failing.
+A file that Gitleaks passes and the weaker scanner would have flagged is now
+reported clean.
+
 ## Unreleased (CLI output pass)
 
 One controller and one terminal reporter replaced the two copy implementations

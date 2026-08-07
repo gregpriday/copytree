@@ -5,7 +5,7 @@ import { ConfigManager } from '../config/ConfigManager.js';
 import { buildManifest } from '../utils/manifest.js';
 import { buildEstimates } from '../utils/estimate.js';
 import { versionFor } from '../utils/outputVersion.js';
-import { summaryStats } from './copy.js';
+import { summaryStats } from './resultStats.js';
 
 /**
  * @typedef {import('./scan.js').ScanOptions} ScanOptions

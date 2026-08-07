@@ -1,5 +1,5 @@
 import { jest } from '@jest/globals';
-import fs from 'fs-extra';
+import fs from '../../../../src/utils/fsx.js';
 import {
   detect,
   detectFromBuffer,

@@ -16,7 +16,6 @@
 
 import Stage from '../Stage.js';
 import { walkWithIgnore } from '../../utils/ignoreWalker.js';
-import { walkParallel } from '../../utils/parallelWalker.js';
 import micromatch from 'micromatch';
 import fastGlob from 'fast-glob';
 import ignore from 'ignore';
@@ -165,7 +164,19 @@ class FileDiscoveryStage extends Stage {
       followSymlinks: this.options.followSymlinks === true,
       explain,
       initialLayers,
-      config: this.config.all(), // Pass full config for retry settings
+      // The three retry settings the walkers actually read, and nothing else.
+      // This was `this.config.all()`, which deep-clones the entire merged
+      // configuration — including the exclusion lists, which are the largest
+      // thing in it — once per run, to reach three integers.
+      config: {
+        copytree: {
+          fs: {
+            retryAttempts: this.config.get('copytree.fs.retryAttempts', 3),
+            retryDelay: this.config.get('copytree.fs.retryDelay', 100),
+            maxDelay: this.config.get('copytree.fs.maxDelay', 2000),
+          },
+        },
+      },
       maxDepth: this.maxDepth !== null ? this.maxDepth : undefined,
       signal: input.options?.signal,
       onExclude: (record) => report.add(record),
@@ -185,9 +196,13 @@ class FileDiscoveryStage extends Stage {
       }
     }
 
-    // Choose walker based on configuration
+    // Choose walker based on configuration.
+    //
+    // The parallel walker is loaded only when it is the one being used.
+    // Parallel discovery is off by default, so importing both meant every run
+    // parsed a traversal implementation it was not going to call.
     const walker = parallelEnabled
-      ? walkParallel(this.basePath, walkOptions)
+      ? (await import('../../utils/parallelWalker.js')).walkParallel(this.basePath, walkOptions)
       : walkWithIgnore(this.basePath, walkOptions);
 
     const usePatternFilter = this.patterns.length > 0 && !this.patterns.includes('**/*');
@@ -206,7 +221,7 @@ class FileDiscoveryStage extends Stage {
       }
 
       // Check if this file matches our include patterns (if specified)
-      if (usePatternFilter && !micromatch.isMatch(relativePath, this.patterns)) {
+      if (usePatternFilter && !this.matchesIncludePatterns(relativePath)) {
         report.add({
           path: relativePath,
           size: fileSize,
@@ -437,6 +452,42 @@ class FileDiscoveryStage extends Stage {
   }
 
   /**
+   * Compiled matchers, built on first use and reused for every path.
+   *
+   * `micromatch.isMatch(path, patterns)` compiles the pattern list into regular
+   * expressions on each call, and both of these were called once per discovered
+   * file — so a run over a thousand files parsed the same ten force-include
+   * globs a thousand times. `micromatch.matcher()` returns the compiled matcher
+   * so the parse happens once.
+   *
+   * Lazy rather than constructed up front: a stage built for `--only-tree` or a
+   * dry run may never reach the walk, and compiling globs it will not use is the
+   * same waste in a smaller package.
+   *
+   * @param {string} relativePath - POSIX path relative to the base path
+   * @returns {boolean} Whether the path is force-included
+   */
+  matchesForceInclude(relativePath) {
+    if (!this._forceIncludeMatcher) {
+      this._forceIncludeMatcher = micromatch.matcher(this.forceInclude, { dot: true });
+    }
+    return this._forceIncludeMatcher(relativePath);
+  }
+
+  /**
+   * Whether a path satisfies the caller's include patterns.
+   *
+   * @param {string} relativePath - POSIX path relative to the base path
+   * @returns {boolean} Whether the path matches
+   */
+  matchesIncludePatterns(relativePath) {
+    if (!this._includeMatcher) {
+      this._includeMatcher = micromatch.matcher(this.patterns);
+    }
+    return this._includeMatcher(relativePath);
+  }
+
+  /**
    * The size gate in effect for a path.
    *
    * `always` / `.copytreeinclude` is an explicit statement of intent and is the
@@ -446,9 +497,7 @@ class FileDiscoveryStage extends Stage {
    * @returns {number|null} Byte ceiling, or null when no gate applies
    */
   effectiveSizeGate(relativePath) {
-    const forced =
-      this.forceInclude.length > 0 &&
-      micromatch.isMatch(relativePath, this.forceInclude, { dot: true });
+    const forced = this.forceInclude.length > 0 && this.matchesForceInclude(relativePath);
 
     // maxFileSize is a memory-safety ceiling and is never lifted.
     if (forced) return this.maxFileSize;

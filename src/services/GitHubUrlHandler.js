@@ -2,7 +2,7 @@ import { execFileSync } from 'child_process';
 import crypto from 'crypto';
 import { URL } from 'url';
 import path from 'path';
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 import os from 'os';
 import { logger } from '../utils/logger.js';
 import { CommandError } from '../utils/errors.js';

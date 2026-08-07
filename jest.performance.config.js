@@ -28,8 +28,6 @@ export default {
     '^@/(.*)$': '<rootDir>/src/$1.js',
     // Keep lightweight UI mocks — these are never used by performance tests
     // but prevent import errors if transitive deps pull them in.
-    '^chalk$': '<rootDir>/tests/mocks/chalk.js',
-    '^ora$': '<rootDir>/tests/mocks/ora.js',
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
   },

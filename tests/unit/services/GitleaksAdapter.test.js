@@ -1,17 +1,17 @@
 import { jest } from '@jest/globals';
-import { spawn, exec } from 'child_process';
+import { spawn } from 'node:child_process';
 import { EventEmitter } from 'events';
 
-// Create a mock execAsync wrapper  - hoisting-safe approach
+// Version detection goes through `execFile`, promisified. Mocking the
+// promisified wrapper rather than the callback form keeps the assertions about
+// *how many processes are started*, which is what this suite is really for.
 let mockExecAsyncFn = jest.fn();
 
-// Mock child_process
-jest.mock('child_process');
+jest.mock('node:child_process');
 
-jest.mock('util', () => ({
+jest.mock('node:util', () => ({
   promisify: (fn) => {
-    if (fn.name === 'exec') {
-      // Return a function that calls the mutable mockExecAsyncFn
+    if (fn.name === 'execFile') {
       return (...args) => mockExecAsyncFn(...args);
     }
     return fn;
@@ -272,6 +272,106 @@ describe('GitleaksAdapter', () => {
 
       const version = await adapter.getVersion();
       expect(version).toBeNull();
+    });
+  });
+
+  /**
+   * Scanning is per-file; process creation must not be. `scanString()` used to
+   * call `getVersion()` on every call, so a thousand-file repository spawned a
+   * thousand extra `gitleaks version` processes to re-derive a constant.
+   */
+  describe('process creation', () => {
+    it('runs `gitleaks version` once, however many files are scanned', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+      mockSpawn.mockImplementation(() => createMockProcess(0, '[]', ''));
+
+      await adapter.isAvailable();
+      await adapter.scanString('a', 'a.js');
+      await adapter.scanString('b', 'b.js');
+      await adapter.scanString('c', 'c.js');
+
+      expect(mockExecAsyncFn).toHaveBeenCalledTimes(1);
+      // One scan process per file, and nothing more.
+      expect(mockSpawn).toHaveBeenCalledTimes(3);
+    });
+
+    it('answers isAvailable() from the same probe as getVersion()', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+
+      expect(await adapter.isAvailable()).toBe(true);
+      expect(await adapter.getVersion()).toBe('8.19.0');
+
+      expect(mockExecAsyncFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports unavailable when the binary cannot be run', async () => {
+      mockExecAsyncFn = jest.fn().mockRejectedValue(new Error('Command not found'));
+
+      expect(await adapter.isAvailable()).toBe(false);
+    });
+
+    it('builds the same argument vector for every scan', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+      mockSpawn.mockImplementation(() => createMockProcess(0, '[]', ''));
+
+      await adapter.scanString('a', 'a.js');
+      await adapter.scanString('b', 'b.js');
+
+      expect(mockSpawn.mock.calls[0][1]).toEqual(mockSpawn.mock.calls[1][1]);
+      expect(mockSpawn.mock.calls[0][1]).toContain('stdin');
+    });
+
+    it('runs `gitleaks version` without a shell', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+
+      await adapter.getVersion();
+
+      // Binary and arguments passed separately, so a path containing a space
+      // needs no quoting and nothing is interpreted by a shell.
+      expect(mockExecAsyncFn).toHaveBeenCalledWith('gitleaks', ['version'], expect.any(Object));
+    });
+  });
+
+  /**
+   * An operational failure recurs for every remaining file. Retrying it once per
+   * file turns a misconfigured scanner into the slowest possible run: a thousand
+   * doomed processes, and a thousand identical warnings burying the one line
+   * that explains what went wrong.
+   */
+  describe('circuit breaker', () => {
+    it('starts no further processes after an operational failure', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+      mockSpawn.mockImplementation(() => createMockProcess(2, '', 'unknown flag: --redact=100'));
+
+      await expect(adapter.scanString('a', 'a.js')).rejects.toThrow(/Gitleaks execution failed/);
+      await expect(adapter.scanString('b', 'b.js')).rejects.toThrow(/Gitleaks execution failed/);
+      await expect(adapter.scanString('c', 'c.js')).rejects.toThrow(/Gitleaks execution failed/);
+
+      expect(mockSpawn).toHaveBeenCalledTimes(1);
+    });
+
+    it('rethrows the original failure, so the caller sees one cause', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+      mockSpawn.mockImplementation(() => createMockProcess(2, '', 'boom'));
+
+      const first = await adapter.scanString('a', 'a.js').catch((error) => error);
+      const second = await adapter.scanString('b', 'b.js').catch((error) => error);
+
+      expect(second).toBe(first);
+      expect(adapter.failure).toBe(first);
+    });
+
+    it('does not open the circuit when secrets are found', async () => {
+      mockExecAsyncFn = jest.fn().mockResolvedValue({ stdout: 'v8.19.0', stderr: '' });
+      const finding = JSON.stringify([{ RuleID: 'aws-access-key', StartLine: 1 }]);
+      mockSpawn.mockImplementation(() => createMockProcess(1, finding, ''));
+
+      // Exit code 1 means "secrets detected", which is a successful scan.
+      expect(await adapter.scanString('a', 'a.js')).toHaveLength(1);
+      expect(await adapter.scanString('b', 'b.js')).toHaveLength(1);
+
+      expect(adapter.failure).toBeNull();
+      expect(mockSpawn).toHaveBeenCalledTimes(2);
     });
   });
 });

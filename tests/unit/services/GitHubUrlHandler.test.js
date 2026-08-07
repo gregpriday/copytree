@@ -1,5 +1,5 @@
 // Mock dependencies before imports
-jest.mock('fs-extra');
+jest.mock('../../../src/utils/fsx.js');
 jest.mock('child_process');
 jest.mock('../../../src/utils/logger.js', () => ({
   logger: {
@@ -10,7 +10,7 @@ jest.mock('../../../src/utils/logger.js', () => ({
   },
 }));
 
-import fs from 'fs-extra';
+import fs from '../../../src/utils/fsx.js';
 import path from 'path';
 import { execFileSync, execSync } from 'child_process';
 import GitHubUrlHandler from '../../../src/services/GitHubUrlHandler.js';

@@ -1,11 +1,11 @@
 // Mock the actual ConfigManager to avoid loading real config files
-jest.mock('fs-extra');
+jest.mock('../../../src/utils/fsx.js');
 
 // Mock config before importing ConfigManager
 jest.mock('../../../src/config.js', () => import('../../mocks/config.js'));
 
 // Static imports for Node.js modules
-import fs from 'fs-extra';
+import fs from '../../../src/utils/fsx.js';
 
 // Import temp file management helpers
 import { withTempDir, settleFs } from '../../helpers/tempfs.js';

@@ -70,8 +70,6 @@ const mockedProject = {
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
-    '^chalk$': '<rootDir>/tests/mocks/chalk.js',
-    '^ora$': '<rootDir>/tests/mocks/ora.js',
     '^.*/config/ConfigManager\\.js$': '<rootDir>/tests/mocks/ConfigManager.js',
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
@@ -98,8 +96,6 @@ const realProject = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
     // Keep non-intrusive mocks (UI libraries, etc.)
-    '^chalk$': '<rootDir>/tests/mocks/chalk.js',
-    '^ora$': '<rootDir>/tests/mocks/ora.js',
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
     '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
@@ -115,16 +111,8 @@ const loggerUnitProject = {
   ...baseConfig,
   displayName: 'logger',
   testMatch: ['**/tests/unit/utils/logger.test.js'],
-  // Do NOT reset mocks between tests: the chalk mock uses jest.fn() and
-  // resetMocks would clear the implementations, making chalk.red() return
-  // undefined instead of the input string.
-  clearMocks: false,
-  resetMocks: false,
-  restoreMocks: false,
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1.js',
-    '^chalk$': '<rootDir>/tests/mocks/chalk.js',
-    '^ora$': '<rootDir>/tests/mocks/ora.js',
     // logger.js is intentionally NOT mocked here
     '^.*/config/ConfigManager\\.js$': '<rootDir>/tests/mocks/ConfigManager.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',

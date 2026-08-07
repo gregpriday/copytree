@@ -1,5 +1,5 @@
 // Unmock fs-extra for integration tests
-jest.unmock('fs-extra');
+jest.unmock('../../src/utils/fsx.js');
 
 import { exec } from 'child_process';
 import path from 'path';

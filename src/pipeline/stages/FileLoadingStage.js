@@ -1,5 +1,5 @@
 import Stage from '../Stage.js';
-import fs from 'fs-extra';
+import fs from '../../utils/fsx.js';
 import path from 'path';
 import {
   detect,
@@ -133,6 +133,11 @@ class FileLoadingStage extends Stage {
           encoding: undefined,
           binaryCategory: det.category,
           binaryName: det.name,
+          // The one file shape that genuinely requires the transform stage:
+          // raw bytes deliberately left unconverted for a transformer to pick
+          // up. Recording it here means the stage can be skipped outright when
+          // no file in the selection carries it.
+          needsTransform: true,
         };
       }
 

@@ -1,12 +1,10 @@
-import { spawn } from 'child_process';
-import { promisify } from 'util';
-import { exec } from 'child_process';
-import fs from 'fs-extra';
-import path from 'path';
-import os from 'os';
-import crypto from 'crypto';
+import { execFile, spawn } from 'node:child_process';
+import { promisify } from 'node:util';
 
-const execAsync = promisify(exec);
+// `execFile`, not `exec`: version detection does not need a shell, and starting
+// one is a second process plus a round of command-string parsing on a path the
+// user may well have put a space in.
+const execFileAsync = promisify(execFile);
 
 /**
  * Adapter for Gitleaks secret scanning engine
@@ -30,6 +28,26 @@ class GitleaksAdapter {
     this.extraArgs = options.extraArgs || [];
     this.logLevel = options.logLevel || 'fatal';
     this._available = null; // Cache availability check
+    this._versionPromise = null; // Cache `gitleaks version`, once per adapter
+    this._scanArgsPromise = null; // Cache the derived argument vector
+
+    // Circuit breaker. An operational failure — the binary is incompatible,
+    // missing a config it was pointed at, or gone from disk mid-run — will fail
+    // identically for every remaining file. Without this, a thousand-file
+    // repository spawns a thousand doomed processes and logs a thousand
+    // warnings, turning a scanner misconfiguration into the slowest possible
+    // run. `broken` is set once; the caller then falls back to the built-in
+    // scanner for the rest of the run.
+    this.broken = null;
+  }
+
+  /**
+   * Whether the scanner has failed operationally and should not be retried.
+   *
+   * @returns {Error|null} The failure that opened the circuit, or null
+   */
+  get failure() {
+    return this.broken;
   }
 
   /**
@@ -41,14 +59,11 @@ class GitleaksAdapter {
       return this._available;
     }
 
-    try {
-      await execAsync(`"${this.binaryPath}" version`, { timeout: 5000 });
-      this._available = true;
-      return true;
-    } catch (error) {
-      this._available = false;
-      return false;
-    }
+    // Availability and version are the same question asked twice: both ran
+    // `gitleaks version`, so every scanned run spawned the binary once to learn
+    // it existed and again to learn what it was. Asking once answers both.
+    this._available = (await this.getVersion()) !== null;
+    return this._available;
   }
 
   /**
@@ -60,48 +75,14 @@ class GitleaksAdapter {
    * @throws {Error} If gitleaks execution fails
    */
   async scanString(content, logicalPath = 'stdin') {
-    // Check gitleaks version for compatibility
-    const version = (await this.getVersion()) || '';
-    const supportsStdin = /^8\.(19|[2-9]\d)\./.test(version) || /^9\./.test(version);
-    const supportsRedactPercent = /^8\.(19|[2-9]\d)\./.test(version) || /^9\./.test(version);
+    // A scanner that has already failed operationally fails the same way again.
+    // Rethrowing the original keeps the caller's fallback path identical to the
+    // first failure, without paying for another process to rediscover it.
+    if (this.broken) throw this.broken;
 
-    // Build command arguments with version-appropriate options
-    const args = [];
-
-    // Use stdin if available, otherwise use detect
-    if (supportsStdin) {
-      args.push('stdin');
-    } else {
-      args.push('detect', '--no-git');
-    }
-
-    args.push(
-      '--report-format',
-      'json',
-      '--report-path',
-      '-', // stdout
-      '--no-banner',
-      '--no-color',
-      '--log-level',
-      this.logLevel,
-    );
-
-    // Add redaction flag based on version
-    if (supportsRedactPercent) {
-      args.push('--redact=100'); // Newer versions support percentage
-    } else {
-      args.push('--redact'); // Older versions use boolean flag
-    }
-
-    // Add custom config if specified
-    if (this.configPath) {
-      args.push('-c', this.configPath);
-    }
-
-    // Add any extra arguments
-    if (this.extraArgs.length > 0) {
-      args.push(...this.extraArgs);
-    }
+    // Version detection and argument assembly are resolved once per adapter,
+    // not once per file.
+    const { args } = await this._scanArgs();
 
     try {
       const findings = await this._executeGitleaks(args, content);
@@ -129,8 +110,11 @@ class GitleaksAdapter {
         }
       }
 
-      // For other errors, rethrow
-      throw new Error(`Gitleaks execution failed: ${error.message}`, { cause: error });
+      // Anything else is operational — a spawn failure, an unparseable exit
+      // code, a timeout. It will recur for every remaining file, so the circuit
+      // opens here and this is the last process this adapter starts.
+      this.broken = new Error(`Gitleaks execution failed: ${error.message}`, { cause: error });
+      throw this.broken;
     }
   }
 
@@ -216,14 +200,70 @@ class GitleaksAdapter {
    * @returns {Promise<string|null>} Version string or null if not available
    */
   async getVersion() {
-    try {
-      const { stdout } = await execAsync(`"${this.binaryPath}" version`, { timeout: 5000 });
-      // Parse version from output (format: "v8.19.0" or similar)
-      const match = stdout.match(/v?(\d+\.\d+\.\d+)/);
-      return match ? match[1] : stdout.trim();
-    } catch (error) {
-      return null;
-    }
+    // One `gitleaks version` per adapter, not one per file. This used to be
+    // called from `scanString()`, so scanning a thousand files spawned a
+    // thousand extra processes purely to re-derive an answer that cannot change
+    // while the process is running.
+    if (this._versionPromise) return this._versionPromise;
+
+    this._versionPromise = (async () => {
+      try {
+        const { stdout } = await execFileAsync(this.binaryPath, ['version'], { timeout: 5000 });
+        // Parse version from output (format: "v8.19.0" or similar)
+        const match = stdout.match(/v?(\d+\.\d+\.\d+)/);
+        return match ? match[1] : stdout.trim();
+      } catch (error) {
+        return null;
+      }
+    })();
+
+    return this._versionPromise;
+  }
+
+  /**
+   * Resolve the capability flags and static argument list for this binary, once.
+   *
+   * The argument vector depends only on the binary's version and this adapter's
+   * own options, none of which vary per file, so it is built a single time and
+   * reused for every scan.
+   *
+   * @returns {Promise<{args: string[]}>} Arguments common to every scan
+   * @private
+   */
+  async _scanArgs() {
+    if (this._scanArgsPromise) return this._scanArgsPromise;
+
+    this._scanArgsPromise = (async () => {
+      const version = (await this.getVersion()) || '';
+      const modern = /^8\.(19|[2-9]\d)\./.test(version) || /^9\./.test(version);
+
+      const args = modern ? ['stdin'] : ['detect', '--no-git'];
+
+      args.push(
+        '--report-format',
+        'json',
+        '--report-path',
+        '-', // stdout
+        '--no-banner',
+        '--no-color',
+        '--log-level',
+        this.logLevel,
+        // Newer versions take a percentage; older ones take a boolean flag.
+        modern ? '--redact=100' : '--redact',
+      );
+
+      if (this.configPath) {
+        args.push('-c', this.configPath);
+      }
+
+      if (this.extraArgs.length > 0) {
+        args.push(...this.extraArgs);
+      }
+
+      return { args };
+    })();
+
+    return this._scanArgsPromise;
   }
 }
 

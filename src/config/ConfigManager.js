@@ -1,10 +1,15 @@
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 import path from 'path';
 import os from 'os';
-import _ from 'lodash';
+import {
+  cloneDeep,
+  get as pathGet,
+  has as pathHas,
+  isEqual,
+  merge,
+  set as pathSet,
+} from './objectUtils.js';
 import { fileURLToPath, pathToFileURL } from 'url';
-import Ajv from 'ajv';
-import addFormats from 'ajv-formats';
 import { ConfigurationError, ERROR_CODES } from '../utils/errors.js';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -88,14 +93,10 @@ class ConfigManager {
       process.env.COPYTREE_NO_VALIDATE !== 'true' &&
       process.env.NODE_ENV !== 'test';
 
-    // Initialize AJV validator
-    this.ajv = new Ajv({
-      allErrors: true,
-      removeAdditional: false,
-      strict: false,
-      coerceTypes: true,
-    });
-    addFormats(this.ajv);
+    // AJV is built on demand — see `loadSchema()`. Constructing it here meant
+    // every run paid for the validator, the format extensions, the schema read
+    // and the schema compile, including the runs that never validate anything.
+    this.ajv = null;
 
     this.schema = null;
     this.validate = null;
@@ -154,21 +155,25 @@ class ConfigManager {
   }
 
   async _doLoadConfiguration() {
-    // 1. Load schema for validation
-    await this.loadSchema();
-
-    // 2. Load default configuration files
+    // 1. Load default configuration files
     if (this.enabledSources.includes('defaults')) {
       await this.loadDefaults();
     }
 
-    // 3. Load user configuration overrides
+    // 2. Load user configuration overrides
     if (this.enabledSources.includes('user')) {
       await this.loadUserConfig();
     }
 
-    // 4. Validate final configuration if enabled
-    if (this.validationEnabled) {
+    // 3. Validate the final configuration, when there is anything to validate.
+    //
+    // Schema validation exists to catch bad *user* input. With no user config
+    // file and no environment overrides, the merged result is exactly the
+    // defaults that shipped inside this package — so validating re-proves, on
+    // every single invocation, something the test suite already proves once.
+    // The cost is a schema read, an Ajv construction and a schema compile.
+    if (this.validationEnabled && this._hasUntrustedConfig()) {
+      await this.loadSchema();
       this.validateConfig();
     }
 
@@ -245,8 +250,8 @@ class ConfigManager {
         // same object, so assigning it directly made `set()` on one instance
         // mutate the defaults every other instance would go on to read — which
         // defeats the isolation that makes concurrent copy() calls safe.
-        this.config[configName] = _.cloneDeep(configData);
-        this.defaultConfig[configName] = _.cloneDeep(configData);
+        this.config[configName] = cloneDeep(configData);
+        this.defaultConfig[configName] = cloneDeep(configData);
         loaded++;
       } catch (error) {
         this._recordLoadError(configName, error);
@@ -286,10 +291,10 @@ class ConfigManager {
         }
 
         // Store user config for provenance tracking
-        this.userConfig[configName] = _.cloneDeep(userConfigData);
+        this.userConfig[configName] = cloneDeep(userConfigData);
 
         // Deep merge with existing config
-        this.config[configName] = _.merge({}, this.config[configName] || {}, userConfigData);
+        this.config[configName] = merge({}, this.config[configName] || {}, userConfigData);
         loaded++;
       } catch (error) {
         this._recordLoadError(`user:${configName}`, error);
@@ -332,10 +337,10 @@ class ConfigManager {
    * @returns {*} Configuration value
    */
   get(path, defaultValue) {
-    // Plain dotted keys, which is nearly all of them, are walked directly.
-    // `_.get` re-parses the path string on every call, and hot paths ask for the
-    // same handful of keys once per file. Anything with brackets or a non-string
-    // path still goes through lodash so the full accessor grammar keeps working.
+    // Plain dotted keys, which is nearly all of them, are walked directly
+    // against a cache of pre-split segments, because hot paths ask for the same
+    // handful of keys once per file. Anything with brackets or a non-string path
+    // goes through the general accessor, which re-parses but is rare.
     if (typeof path === 'string' && !path.includes('[')) {
       const segments = SEGMENT_CACHE.get(path) ?? cacheSegments(path);
       let current = this.config;
@@ -346,7 +351,7 @@ class ConfigManager {
       return current === undefined ? defaultValue : current;
     }
 
-    return _.get(this.config, path, defaultValue);
+    return pathGet(this.config, path, defaultValue);
   }
 
   /**
@@ -355,7 +360,7 @@ class ConfigManager {
    * @param {*} value - Value to set
    */
   set(path, value) {
-    _.set(this.config, path, value);
+    pathSet(this.config, path, value);
   }
 
   /**
@@ -364,7 +369,7 @@ class ConfigManager {
    * @returns {boolean}
    */
   has(path) {
-    return _.has(this.config, path);
+    return pathHas(this.config, path);
   }
 
   /**
@@ -372,7 +377,7 @@ class ConfigManager {
    * @returns {Object} All configuration (deep copy)
    */
   all() {
-    return _.cloneDeep(this.config);
+    return cloneDeep(this.config);
   }
 
   /**
@@ -387,9 +392,25 @@ class ConfigManager {
   }
 
   /**
-   * Load and compile JSON schema
+   * Whether anything outside the packaged defaults contributed to the config.
+   *
+   * @returns {boolean} True when a user config file or env override was applied
+   * @private
+   */
+  _hasUntrustedConfig() {
+    return (
+      this.userConfigLoaded ||
+      Object.keys(this.userConfig).length > 0 ||
+      Object.keys(this.envOverrides).length > 0
+    );
+  }
+
+  /**
+   * Load and compile the JSON schema, once.
    */
   async loadSchema() {
+    if (this.validate) return;
+
     try {
       const schemaPath = path.join(this.configPath, 'schema.json');
 
@@ -401,6 +422,22 @@ class ConfigManager {
           ...this.schema,
           $id: `${this.schema.$id || 'copytree-config'}-${Date.now()}`,
         };
+
+        // Imported here rather than at module scope: `ajv` and `ajv-formats`
+        // together are a measurable share of CLI startup, and a run with no
+        // user configuration to check never reaches this point.
+        const [{ default: Ajv }, { default: addFormats }] = await Promise.all([
+          import('ajv'),
+          import('ajv-formats'),
+        ]);
+
+        this.ajv = new Ajv({
+          allErrors: true,
+          removeAdditional: false,
+          strict: false,
+          coerceTypes: true,
+        });
+        addFormats(this.ajv);
 
         this.validate = this.ajv.compile(uniqueSchema);
       } else {
@@ -595,8 +632,8 @@ class ConfigManager {
     }
 
     // Get the value from user config at this path
-    const userValue = _.get(this.userConfig, path);
-    return userValue !== undefined && _.isEqual(userValue, value);
+    const userValue = pathGet(this.userConfig, path);
+    return userValue !== undefined && isEqual(userValue, value);
   }
 
   /**

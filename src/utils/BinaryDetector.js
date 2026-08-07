@@ -1,5 +1,5 @@
 // src/utils/BinaryDetector.js
-import fs from 'fs-extra';
+import fs from './fsx.js';
 import path from 'path';
 import copytreeDefaults from '../../config/copytree.js';
 

@@ -1,4 +1,5 @@
-import { scan, pickForwardedStats } from './scan.js';
+import { scan } from './scan.js';
+import { summaryStats } from './resultStats.js';
 import { format } from './format.js';
 import { ValidationError, ERROR_CODES, isAbortError } from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
@@ -6,7 +7,7 @@ import { buildManifest } from '../utils/manifest.js';
 import { buildEstimates } from '../utils/estimate.js';
 import { versionFor } from '../utils/outputVersion.js';
 import { PIPELINE_STAGES } from '../utils/ProgressTracker.js';
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 import path from 'path';
 import Clipboard from '../utils/clipboard.js';
 
@@ -360,40 +361,6 @@ export async function copy(basePath, options = {}) {
   }
 
   return result;
-}
-
-/**
- * Fold the scan summary into the shape `result.stats` exposes.
- *
- * Shared with `copyStream()` so the two entry points cannot drift on which
- * numbers they surface.
- *
- * @param {Object|null} summary - Summary emitted by the scan, if any
- * @param {Array<Object>} files - Selected files
- * @returns {Object} Stats fragment
- */
-export function summaryStats(summary, files) {
-  if (!summary) {
-    return {
-      noFilesMatched: files.length === 0,
-      excluded: { total: 0, byReason: {} },
-    };
-  }
-
-  return {
-    noFilesMatched: summary.noFilesMatched,
-    excluded: summary.excluded,
-    ...(summary.truncated
-      ? {
-          truncated: true,
-          truncatedCount: summary.truncatedCount,
-          truncatedBy: summary.truncatedBy,
-        }
-      : { truncated: false }),
-    ...(summary.budgetExceeded ? { budgetExceeded: true } : {}),
-    ...(summary.scope ? { scope: summary.scope } : {}),
-    ...pickForwardedStats(summary),
-  };
 }
 
 export default copy;

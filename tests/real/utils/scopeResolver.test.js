@@ -4,7 +4,7 @@ import { resolveScope } from '../../../src/utils/scopeResolver.js';
 import { ERROR_CODES } from '../../../src/utils/errors.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 /**
  * Build a small tree, including a directory whose name is full of glob

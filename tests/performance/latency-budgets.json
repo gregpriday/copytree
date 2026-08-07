@@ -1,0 +1,33 @@
+{
+  "_comment": "End-to-end CLI latency budgets: shell to prompt, including Node startup. Distinct from budgets.json, which bounds walker throughput and memory. These are ceilings on what a person waits for, set roughly 35% above the measured median on the reference machine so ordinary scheduling noise does not fail a build while a real regression still does.",
+  "_reference": "Apple Silicon laptop, local SSD, Node 26. Recalibrate with --json on the target hardware before enforcing in CI.",
+  "regressionThresholdPercent": 5,
+  "scenarios": {
+    "version": {
+      "p50Ms": 46,
+      "description": "Process start and module graph only. Answered before Commander is built, so this rises the moment anything is added to the entry point's static imports."
+    },
+    "empty": {
+      "p50Ms": 112,
+      "description": "Startup plus configuration, no traversal."
+    },
+    "tiny-100": {
+      "p50Ms": 131,
+      "description": "The common interactive case: select, load, format, write."
+    },
+    "tiny-100-display": {
+      "p50Ms": 128,
+      "description": "Same work, delivered to stdout."
+    },
+    "tiny-100-tree": {
+      "p50Ms": 112,
+      "description": "Selection and tree rendering, no file contents."
+    },
+    "tiny-100-dry": {
+      "p50Ms": 110,
+      "description": "Selection only. The floor for anything that walks the tree."
+    }
+  },
+  "_measured": "Clean medians on the reference machine at the time of writing: version 34, empty 82, tiny-100 97, display 95, only-tree 83, dry-run 81 ms. Budgets sit ~35% above these.",
+  "_noise": "Check the reported mad (median absolute deviation) before believing a delta. On an idle machine it is ~1-2 ms; a mad above ~5 ms means something else was running and the medians are not comparable. On a machine that will not go quiet, use latency-ab.bench.js instead — it compares two checkouts in interleaved pairs, so shared load cancels out."
+}

@@ -5,10 +5,10 @@
 
 import path from 'path';
 import os from 'os';
-import fs from 'fs-extra';
+import fs from '../../../src/utils/fsx.js';
 
 // Mock fs-extra locally for this test
-jest.mock('fs-extra');
+jest.mock('../../../src/utils/fsx.js');
 
 // Mock logger to avoid import.meta issues
 jest.mock('../../../src/utils/logger.js', () => ({

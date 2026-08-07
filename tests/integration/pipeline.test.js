@@ -1,5 +1,5 @@
 // Unmock fs-extra for integration tests
-jest.unmock('fs-extra');
+jest.unmock('../../src/utils/fsx.js');
 jest.unmock('fast-glob');
 
 // Static imports for Node.js modules

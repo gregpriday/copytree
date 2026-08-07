@@ -10,6 +10,14 @@ class ProfileFilterStage extends Stage {
   }
 
   async process(input) {
+    // With neither list populated the filter admits every file, so the only
+    // effect of running it is a full pass over the selection and a rebuilt
+    // array. That is the default case for a plain `copytree`.
+    if (this.exclude.length === 0 && this.filter.length === 0) {
+      this.log('No filter patterns, skipping', 'debug');
+      return input;
+    }
+
     this.log('Applying filters', 'debug');
     const startTime = Date.now();
 

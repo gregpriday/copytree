@@ -1,7 +1,6 @@
 import Stage from '../Stage.js';
 import { ERROR_CODES, FileSystemError, ValidationError } from '../../utils/errors.js';
 import { Transform } from 'stream';
-// const { create } = require('xmlbuilder2'); // Currently unused
 import path from 'path';
 import { pathToFileURL } from 'url';
 import {
@@ -110,7 +109,7 @@ class StreamingOutputStage extends Stage {
       return { stream: this.outputStream || process.stdout, owned: false };
     }
 
-    const { default: fs } = await import('fs-extra');
+    const { default: fs } = await import('../../utils/fsx.js');
     const resolved = path.resolve(this.outputPath);
 
     try {
@@ -231,10 +230,25 @@ class StreamingOutputStage extends Stage {
           ? file.modified.toISOString()
           : new Date(file.modified).toISOString()
         : null;
+      // Hash what is being emitted, not what is on disk.
+      //
+      // The order here is load-bearing, and it used to be the other way round.
+      // By this point content has been through redaction and transformation, so
+      // a file whose credentials the secrets guard replaced was published beside
+      // the digest of its *unredacted* original — which is enough to confirm a
+      // guess at the removed bytes, and defeats the redaction entirely. It also
+      // meant every streamed file was reopened and reread purely to hash it,
+      // serialized inside the per-file transform.
+      //
+      // Disk remains the fallback for the one case with no content to hash:
+      // `--only-tree`-shaped entries and binaries carried as a placeholder.
       let sha = null;
       try {
-        if (file.absolutePath) sha = await hashFile(file.absolutePath, 'sha256');
-        else if (typeof file.content === 'string') sha = hashContent(file.content, 'sha256');
+        if (typeof file.content === 'string') {
+          sha = hashContent(file.content, 'sha256');
+        } else if (file.absolutePath) {
+          sha = await hashFile(file.absolutePath, 'sha256', { size: file.size });
+        }
       } catch (_e) {
         // Ignore hash computation errors
       }

@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fs from '../utils/fsx.js';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';

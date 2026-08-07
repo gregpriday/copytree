@@ -5,7 +5,7 @@ import { ProfileError } from '../../../src/utils/errors.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
 // Unmock fs-extra for these tests since we're using real filesystem operations
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 describe('FolderProfileLoader', () => {
   describe('discover()', () => {

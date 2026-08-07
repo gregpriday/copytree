@@ -1,5 +1,4 @@
-import chalk from 'chalk';
-import ora from 'ora';
+import chalk from './ansi.js';
 import stripAnsi from 'strip-ansi';
 import { config } from '../config/ConfigManager.js';
 import { EventEmitter } from 'events';
@@ -45,8 +44,6 @@ class Logger extends EventEmitter {
       useInkEvents: options.useInkEvents || false,
       ...options,
     };
-
-    this.spinner = null;
   }
 
   // ─── Effective option getters ─────────────────────────────────────────────
@@ -350,92 +347,15 @@ class Logger extends EventEmitter {
   }
 
   // ─── Spinner methods ──────────────────────────────────────────────────────
-
-  /**
-   * Start a spinner with a message.
-   * Spinners are suppressed in JSON format and when not writing to a TTY.
-   */
-  startSpinner(message) {
-    if (this.options.useInkEvents) {
-      this.emit('progress', { type: 'start', message, timestamp: Date.now() });
-      return;
-    }
-
-    // Suppress spinner when format is json, silent, or when the stream is not a TTY
-    if (
-      this._effectiveFormat !== 'text' ||
-      !this._shouldLog('info') ||
-      !this._getOutputStream().isTTY
-    ) {
-      return;
-    }
-
-    this.stopSpinner();
-    this.spinner = ora({ text: message, color: 'blue' }).start();
-  }
-
-  /**
-   * Update spinner text.
-   */
-  updateSpinner(message) {
-    if (this.options.useInkEvents) {
-      this.emit('progress', { type: 'update', message, timestamp: Date.now() });
-      return;
-    }
-
-    if (this.spinner && this._getOutputStream().isTTY) {
-      this.spinner.text = message;
-    }
-  }
-
-  /**
-   * Stop spinner with success.
-   */
-  succeedSpinner(message) {
-    if (this.options.useInkEvents) {
-      this.emit('progress', { type: 'success', message, timestamp: Date.now() });
-      return;
-    }
-
-    if (this.spinner) {
-      this.spinner.succeed(message || this.spinner.text);
-      this.spinner = null;
-    }
-  }
-
-  /**
-   * Stop spinner with failure.
-   */
-  failSpinner(message) {
-    if (this.options.useInkEvents) {
-      this.emit('progress', { type: 'error', message, timestamp: Date.now() });
-      return;
-    }
-
-    if (this.spinner) {
-      this.spinner.fail(message || this.spinner.text);
-      this.spinner = null;
-    }
-  }
-
-  /**
-   * Stop spinner without status.
-   */
-  stopSpinner() {
-    if (this.options.useInkEvents) {
-      this.emit('progress', { type: 'stop', timestamp: Date.now() });
-      return;
-    }
-
-    if (this.spinner) {
-      this.spinner.stop();
-      const stream = this._getOutputStream();
-      if (stream.isTTY) {
-        stream.write('\r\x1b[2K');
-      }
-      this.spinner = null;
-    }
-  }
+  //
+  // Removed. The logger used to own a spinner (via `ora`), from before the run
+  // reporter took over the terminal. Nothing called any of it, but importing
+  // `ora` still cost ~20 ms on every single invocation of the CLI — including
+  // `copytree --version`, which draws nothing at all.
+  //
+  // Progress display now belongs to `ui/feedback/Reporter.js`, which drives one
+  // line with an interval and plain escape codes, and knows about `--quiet`,
+  // `--no-color`, the log level and whether stdout is carrying the document.
 
   // ─── Miscellaneous display helpers ────────────────────────────────────────
 

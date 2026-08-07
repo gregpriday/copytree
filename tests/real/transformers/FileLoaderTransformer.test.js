@@ -3,7 +3,7 @@ import path from 'path';
 import FileLoaderTransformer from '../../../src/transforms/transformers/FileLoaderTransformer.js';
 import { withTempDir } from '../../helpers/tempfs.js';
 
-jest.unmock('fs-extra');
+jest.unmock('../../../src/utils/fsx.js');
 
 function makeConfig(overrides = {}) {
   return {
