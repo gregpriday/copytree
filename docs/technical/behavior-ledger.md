@@ -9,6 +9,41 @@ The rule this exists to enforce: **do not approve a changed golden file because
 
 ---
 
+## Unreleased (CLI output pass)
+
+One controller and one terminal reporter replaced the two copy implementations
+(an Ink component for the default path, `commands/copy.js` for `--stream` and
+`--profile`). Most of what changed is feedback on stderr, which no golden
+covers. These four changed the documents themselves.
+
+### Streamed output carries the same metadata as buffered output
+
+**`<ct:profile>` / `"profile"` now appear in streamed XML and JSON.** The
+streaming path passed the profile under a key nothing read (`profileConfig`,
+where every stage reads `profile`), so a streamed document silently omitted a
+field its buffered equivalent has always had. Parity fix, not a new field: both
+`copytree-xml@1` and `copytree-json@1` already specified it.
+
+**`<ct:format>` / `"format"` now appear in streamed XML, JSON and NDJSON.**
+Buffered output has always carried the format version; streamed output did not,
+so a consumer checking for a schema change read nothing from a streamed document
+and concluded nothing had changed — the exact failure the version exists to
+prevent. Additive within the existing major versions.
+
+**A named folder profile is serialized by name.** `buildProfileFromCliOptions`
+stored it only under `_folderProfile`, while the formatters read `profile.name`,
+so every document said `default` regardless of which profile ran.
+
+### `--dry-run` no longer writes anything
+
+A dry run built the full pipeline and skipped only *delivery*, so `--dry-run
+--stream` wrote the whole document to stdout and `--dry-run --stream -o
+existing.xml` truncated that file — while reporting "No content was read and no
+output was written". The pipeline now stops after selection, which also means a
+preview no longer reads file contents, runs transformers or scans for secrets.
+Its token count is an estimate rather than a measurement, as it was before the
+output stage was reachable from this path.
+
 ## Unreleased (embedder feedback pass)
 
 Reported against the pre-release by the embedding application, running the SDK

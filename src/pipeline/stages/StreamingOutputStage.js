@@ -1,5 +1,5 @@
 import Stage from '../Stage.js';
-import { ERROR_CODES, ValidationError } from '../../utils/errors.js';
+import { ERROR_CODES, FileSystemError, ValidationError } from '../../utils/errors.js';
 import { Transform } from 'stream';
 // const { create } = require('xmlbuilder2'); // Currently unused
 import path from 'path';
@@ -13,6 +13,7 @@ import {
 } from '../../utils/markdown.js';
 import { hashFile, hashContent } from '../../utils/fileHash.js';
 import { escapeXmlAttribute, escapeXmlText } from '../../utils/helpers.js';
+import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
 
 /**
  * Streaming output stage for handling large outputs
@@ -29,7 +30,14 @@ class StreamingOutputStage extends Stage {
     this.fatal = true;
     const raw = (options.format || 'xml').toString().toLowerCase();
     this.format = raw === 'md' ? 'markdown' : raw;
-    this.outputStream = options.outputStream || process.stdout;
+    // A destination *path* rather than an open stream. Opening it during stage
+    // assembly meant the file was created — and an existing one truncated —
+    // before discovery had even run, and minutes before this stage attached an
+    // error listener, so a bad path surfaced as an uncaught EventEmitter error
+    // instead of a reported failure. The stream is now opened in `process()`,
+    // after the format has been validated, with its error handling in place.
+    this.outputPath = options.outputPath || null;
+    this.outputStream = options.outputStream || null;
     this.addLineNumbers =
       options.addLineNumbers ??
       options.withLineNumbers ??
@@ -42,34 +50,39 @@ class StreamingOutputStage extends Stage {
     this.log(`Streaming output as ${this.format}`, 'debug');
     const startTime = Date.now();
 
-    // Create transform stream
+    // Build the transform first: an unknown format must fail before anything
+    // has been created on disk.
     const transformStream = this.createTransformStream(input);
 
-    // For file outputs, wait until the destination stream flushes to disk.
-    const shouldWaitForOutputStream =
-      this.outputStream &&
-      this.outputStream !== process.stdout &&
-      this.outputStream !== process.stderr;
-    const outputStreamFinished = shouldWaitForOutputStream
-      ? new Promise((resolve, reject) => {
-          this.outputStream.once('finish', resolve);
-          this.outputStream.once('error', reject);
-        })
-      : Promise.resolve();
+    const { stream: destination, owned } = await this.openDestination();
 
-    // Connect to output stream
-    transformStream.pipe(this.outputStream);
+    try {
+      // For file outputs, wait until the destination flushes to disk.
+      const outputStreamFinished = owned
+        ? new Promise((resolve, reject) => {
+            destination.once('finish', resolve);
+            destination.once('error', reject);
+          })
+        : Promise.resolve();
 
-    // Process files through stream
-    await this.streamFiles(input, transformStream);
+      transformStream.pipe(destination);
 
-    // Wait for stream to finish
-    await new Promise((resolve, reject) => {
-      transformStream.on('finish', resolve);
-      transformStream.on('error', reject);
-    });
+      const streamed = new Promise((resolve, reject) => {
+        transformStream.on('finish', resolve);
+        transformStream.on('error', reject);
+      });
 
-    await outputStreamFinished;
+      // Raced, not awaited in sequence: a destination that fails mid-write —
+      // a full disk, a closed pipe — rejects while `streamFiles` is still
+      // feeding it, and awaiting the writes first would hang until the source
+      // ran dry before anyone looked at the error.
+      await Promise.all([this.streamFiles(input, transformStream), streamed, outputStreamFinished]);
+    } catch (error) {
+      // Only destroy what this stage opened. A caller's stream, and stdout,
+      // outlive the run and are not ours to close.
+      if (owned) destination.destroy();
+      throw error;
+    }
 
     this.log(`Streamed output in ${this.getElapsedTime(startTime)}`, 'info');
 
@@ -79,6 +92,47 @@ class StreamingOutputStage extends Stage {
       streamed: true,
       outputFormat: this.format,
     };
+  }
+
+  /**
+   * Open the destination, as late as possible and with errors attached.
+   *
+   * Waiting for `open` is what turns a missing directory or a permission
+   * problem into a rejection this stage can report, rather than an error event
+   * with no listener that takes the process down.
+   *
+   * @returns {Promise<{stream: NodeJS.WritableStream, owned: boolean}>} The
+   *   destination, and whether this stage is responsible for closing it
+   * @private
+   */
+  async openDestination() {
+    if (!this.outputPath) {
+      return { stream: this.outputStream || process.stdout, owned: false };
+    }
+
+    const { default: fs } = await import('fs-extra');
+    const resolved = path.resolve(this.outputPath);
+
+    try {
+      await fs.ensureDir(path.dirname(resolved));
+
+      const stream = fs.createWriteStream(resolved);
+      await new Promise((resolve, reject) => {
+        stream.once('open', resolve);
+        stream.once('error', reject);
+      });
+
+      return { stream, owned: true };
+    } catch (error) {
+      // Typed, so the reporter can name the file and the operation instead of
+      // falling through to "CopyTree could not complete the operation".
+      throw new FileSystemError(
+        `write ${resolved}: ${error.message}`,
+        resolved,
+        'write the output file',
+        { code: error.code },
+      );
+    }
   }
 
   createTransformStream(input) {
@@ -122,7 +176,7 @@ class StreamingOutputStage extends Stage {
 
     // Header and front matter
     stream.write('---\n');
-    stream.write('format: copytree-md@1\n');
+    stream.write(`format: ${OUTPUT_FORMAT_VERSIONS.markdown}\n`);
     stream.write('tool: copytree\n');
     stream.write(`generated: ${escapeYamlScalar(new Date().toISOString())}\n`);
     stream.write(`base_path: ${escapeYamlScalar(input.basePath)}\n`);
@@ -270,6 +324,11 @@ class StreamingOutputStage extends Stage {
 
     // Write metadata
     stream.write('  <ct:metadata>\n');
+    // Versioned, and in the same position as the buffered formatter's. Without
+    // it a streamed document was indistinguishable from an unversioned one, so
+    // a consumer checking for a schema change read nothing and concluded
+    // nothing had changed — the exact failure the version exists to prevent.
+    stream.write(`    <ct:format>${OUTPUT_FORMAT_VERSIONS.xml}</ct:format>\n`);
     stream.write(`    <ct:generated>${new Date().toISOString()}</ct:generated>\n`);
     stream.write(`    <ct:fileCount>${input.files.length}</ct:fileCount>\n`);
     stream.write(`    <ct:totalSize>${this.calculateTotalSize(input.files)}</ct:totalSize>\n`);
@@ -366,6 +425,7 @@ class StreamingOutputStage extends Stage {
     stream.write('{\n');
     stream.write(`  "directory": ${JSON.stringify(input.basePath)},\n`);
     stream.write('  "metadata": {\n');
+    stream.write(`    "format": ${JSON.stringify(OUTPUT_FORMAT_VERSIONS.json)},\n`);
     stream.write(`    "generated": "${new Date().toISOString()}",\n`);
     stream.write(`    "fileCount": ${input.files.length},\n`);
     stream.write(`    "totalSize": ${this.calculateTotalSize(input.files)}`);
@@ -480,6 +540,7 @@ class StreamingOutputStage extends Stage {
         metadataWritten = true;
         const metadata = {
           type: 'metadata',
+          format: OUTPUT_FORMAT_VERSIONS.ndjson,
           directory: input.basePath,
           generated: new Date().toISOString(),
           fileCount: files.length,
@@ -551,6 +612,7 @@ class StreamingOutputStage extends Stage {
         metadataWritten = true;
         const metadata = {
           type: 'metadata',
+          format: OUTPUT_FORMAT_VERSIONS.ndjson,
           directory: input.basePath,
           generated: new Date().toISOString(),
           fileCount: files.length,

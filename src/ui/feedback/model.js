@@ -171,6 +171,17 @@ export function classifyWarnings(result = {}, extra = {}) {
     });
   }
 
+  // A stage that failed and carried on changed the answer. Recording it is
+  // what stops `--changed <bad-ref>` from copying an entire repository and
+  // exiting 0 with nothing to distinguish it from the diff that was asked for.
+  for (const degradation of stats.degradations || []) {
+    warnings.push({
+      code: WARNING_CODES.STAGE_RECOVERED,
+      message: degradation.message,
+      data: { stage: degradation.stage },
+    });
+  }
+
   const fsErrors = extra.fsErrors || {};
   const fsFailed = (fsErrors.failed || 0) + (fsErrors.permanent || 0);
   if (fsFailed > 0) {

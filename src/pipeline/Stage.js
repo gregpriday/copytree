@@ -269,6 +269,37 @@ class Stage {
   }
 
   /**
+   * Record that this stage could not do what it was asked, but carried on.
+   *
+   * A stage that swallows its own failure and returns its input unchanged
+   * answers a different question than the one that was asked — `--changed
+   * <bad-ref>` returned the entire repository instead of a diff, and the run
+   * exited 0 without a word. In CI that is a two-hundred-thousand-token context
+   * where a small one was expected, and nothing to notice it by.
+   *
+   * Degrading is still the right call for most of these; going silent is not.
+   * The reporter turns these into warnings on the completion line.
+   *
+   * @param {Object} input - The stage input being passed through
+   * @param {string} message - What could not be done, in user terms
+   * @returns {Object} `input` with the degradation recorded on its stats
+   */
+  degrade(input, rawMessage) {
+    // First line only. A git failure arrives with several lines of the
+    // command's own advice attached, and pasting that into a status line buries
+    // the sentence that matters underneath it.
+    const message = String(rawMessage).split('\n')[0].trim();
+    this.log(rawMessage, 'debug');
+    return {
+      ...input,
+      stats: {
+        ...(input?.stats || {}),
+        degradations: [...(input?.stats?.degradations || []), { stage: this.name, message }],
+      },
+    };
+  }
+
+  /**
    * Get elapsed time since a start time
    * @param {number} startTime - Start time from Date.now()
    * @returns {string} - Formatted elapsed time
