@@ -65,7 +65,7 @@ describe('createRunPipeline', () => {
     expect(addLog).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'success',
-        message: expect.stringContaining('Completed stage'),
+        message: expect.stringContaining('Completed:'),
       }),
     );
 

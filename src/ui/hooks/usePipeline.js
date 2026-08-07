@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext.js';
+import { stageLabel } from '../utils/stageLabels.js';
 
 // Kept as a plain factory (not itself a hook) so listener wiring is
 // unit-testable without rendering a React tree.
@@ -37,32 +38,32 @@ export const createRunPipeline = (updateState, addLog) => {
     const handleStageStart = (data) => {
       const progress = (data.index / pipeline.stages.length) * 100;
       debouncedUpdateState({
-        currentStage: data.stage,
+        currentStage: stageLabel(data.stage),
         progress,
         isLoading: true,
       });
       addLog({
         type: 'info',
-        message: `Starting stage: ${data.stage}`,
+        message: `Starting: ${stageLabel(data.stage)}`,
       });
     };
 
     const handleStageComplete = (data) => {
       const progress = ((data.index + 1) / pipeline.stages.length) * 100;
       debouncedUpdateState({
-        currentStage: data.stage,
+        currentStage: stageLabel(data.stage),
         progress,
       });
       addLog({
         type: 'success',
-        message: `Completed stage: ${data.stage}`,
+        message: `Completed: ${stageLabel(data.stage)}`,
       });
     };
 
     const handleStageError = (data) => {
       addLog({
         type: 'error',
-        message: `Error in stage ${data.stage}: ${data.error.message}`,
+        message: `Error while ${stageLabel(data.stage).toLowerCase()}: ${data.error.message}`,
       });
     };
 
@@ -105,13 +106,13 @@ export const createRunPipeline = (updateState, addLog) => {
     const handleStageLog = (data) => {
       addLog({
         type: data.level === 'debug' ? 'info' : data.level,
-        message: `[${data.stage}] ${data.message}`,
+        message: `[${stageLabel(data.stage)}] ${data.message}`,
       });
     };
 
     const handleStageProgress = (data) => {
       debouncedUpdateState({
-        currentStage: data.message || data.stage,
+        currentStage: data.message || stageLabel(data.stage),
         progress: data.progress,
       });
     };
@@ -126,7 +127,7 @@ export const createRunPipeline = (updateState, addLog) => {
     const handleFileBatch = (data) => {
       addLog({
         type: 'success',
-        message: `[${data.stage}] Processed ${data.count} files (latest: ${data.lastFile})`,
+        message: `[${stageLabel(data.stage)}] Processed ${data.count} files (latest: ${data.lastFile})`,
       });
     };
 
