@@ -1,4 +1,5 @@
 import Stage from '../Stage.js';
+import { ERROR_CODES, ValidationError } from '../../utils/errors.js';
 import { Transform } from 'stream';
 // const { create } = require('xmlbuilder2'); // Currently unused
 import path from 'path';
@@ -20,6 +21,12 @@ import { escapeXmlAttribute, escapeXmlText } from '../../utils/helpers.js';
 class StreamingOutputStage extends Stage {
   constructor(options = {}) {
     super(options);
+    // Fatal for the same reason OutputFormattingStage is: recovering past a
+    // failure to produce the document means reporting success with no document,
+    // or with a different one than was asked for. Without this the pipeline
+    // continued and the real "Unknown format: foo" was replaced downstream by a
+    // generic "No output generated".
+    this.fatal = true;
     const raw = (options.format || 'xml').toString().toLowerCase();
     this.format = raw === 'md' ? 'markdown' : raw;
     this.outputStream = options.outputStream || process.stdout;
@@ -89,7 +96,10 @@ class StreamingOutputStage extends Stage {
       return this.createSARIFStream(input);
     }
 
-    throw new Error(`Unknown streaming format: ${this.format}`);
+    throw new ValidationError(`Unknown streaming format: ${this.format}`, 'format', this.format, {
+      code: ERROR_CODES.INVALID_FORMAT,
+      value: this.format,
+    });
   }
 
   createMarkdownStream(input) {

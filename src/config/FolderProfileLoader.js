@@ -1,7 +1,7 @@
 import fs from 'fs-extra';
 import path from 'path';
 import yaml from 'js-yaml';
-import { ConfigurationError } from '../utils/errors.js';
+import { ProfileError } from '../utils/errors.js';
 
 /**
  * FolderProfileLoader - Lightweight profile loader for folder-level configuration
@@ -40,7 +40,7 @@ class FolderProfileLoader {
    * Searches for .copytree-<name>* files in priority order
    * @param {string} name - Profile name
    * @returns {Promise<FolderProfile>}
-   * @throws {ConfigurationError} If profile not found
+   * @throws {ProfileError} If profile not found
    */
   async loadNamed(name) {
     const extensions = ['.yml', '.yaml', '.json', ''];
@@ -52,17 +52,17 @@ class FolderProfileLoader {
       }
     }
 
-    throw new ConfigurationError(`Profile not found: ${name}`, 'FolderProfileLoader', {
-      name,
-      searchPath: this.cwd,
-    });
+    // A named profile that does not exist is a profile error, not a broken
+    // configuration: the config is fine, the name is wrong. The distinction
+    // decides which remediation the CLI offers.
+    throw new ProfileError(`Profile not found: ${name}`, name, { searchPath: this.cwd });
   }
 
   /**
    * Load profile from specific file
    * @param {string} filePath - Path to profile file
    * @returns {Promise<FolderProfile>}
-   * @throws {ConfigurationError} If file cannot be parsed
+   * @throws {ProfileError} If file cannot be parsed
    */
   async load(filePath) {
     try {
@@ -85,9 +85,9 @@ class FolderProfileLoader {
 
       return this.validate(data, filePath);
     } catch (error) {
-      throw new ConfigurationError(
+      throw new ProfileError(
         `Failed to load profile from ${filePath}: ${error.message}`,
-        'FolderProfileLoader',
+        filePath,
         { filePath, originalError: error.message },
       );
     }
@@ -102,11 +102,10 @@ class FolderProfileLoader {
    */
   validate(data, filePath) {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      throw new ConfigurationError(
-        `Invalid profile data: must be an object`,
-        'FolderProfileLoader',
-        { filePath, data },
-      );
+      throw new ProfileError(`Invalid profile data: must be an object`, filePath, {
+        filePath,
+        data,
+      });
     }
 
     // Normalize include patterns

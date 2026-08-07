@@ -3,4 +3,3 @@
 {"type":"file","path":"README.md","size": <SIZE>,"modified":"<TIMESTAMP>","isBinary":false,"encoding":"utf8","content":"# Test Project\n"}
 {"type":"file","path":"src/test.js","size": <SIZE>,"modified":"<TIMESTAMP>","isBinary":false,"encoding":"utf8","content":"export function test() {\n  return 42;\n}\n"}
 {"type":"summary","fileCount":3,"totalSize":77,"processedAt":"<TIMESTAMP>"}
-🖥️ 3 files [<MEMORY>] displayed to terminal

@@ -372,8 +372,14 @@ class Pipeline extends EventEmitter {
               continue; // Continue with recovered result
             }
           } catch (handlerError) {
-            // Handler failed, continue with original handling
-            this.context.logger.warn(
+            // Handler failed, continue with original handling.
+            //
+            // Logged at debug, not warn: when the stage is fatal the original
+            // error is about to be rethrown and reported properly, and a
+            // handler that declined to recover is a detail of that one failure
+            // rather than a second thing that went wrong. Saying it twice, in
+            // two different vocabularies, makes the real message harder to find.
+            this.context.logger.debug(
               `Recovery handler for ${stageName} failed: ${handlerError.message}`,
             );
             // Use original issue instead of handler issue

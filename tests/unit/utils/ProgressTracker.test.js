@@ -63,7 +63,12 @@ describe('ProgressTracker', () => {
 
       pipeline.emit('pipeline:start', {});
       expect(updates.length).toBe(1);
-      expect(updates[0]).toEqual({ percent: 0, message: 'Starting...', stage: 'unknown' });
+      expect(updates[0]).toEqual({
+        percent: 0,
+        message: 'Starting...',
+        stage: 'unknown',
+        phase: 'prepare',
+      });
     });
   });
 
@@ -79,7 +84,12 @@ describe('ProgressTracker', () => {
 
     it('emits 0% on pipeline:start', () => {
       pipeline.emit('pipeline:start', {});
-      expect(updates[0]).toEqual({ percent: 0, message: 'Starting...', stage: 'unknown' });
+      expect(updates[0]).toEqual({
+        percent: 0,
+        message: 'Starting...',
+        stage: 'unknown',
+        phase: 'prepare',
+      });
     });
 
     it('emits 100% on pipeline:complete', () => {

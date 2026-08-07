@@ -236,6 +236,132 @@ class SecretsDetectedError extends CopyTreeError {
 }
 
 /**
+ * Turn an error into something a person can act on.
+ *
+ * Built from `error.code`, never from matching the message text: the codes are
+ * the stable contract and the messages are not. A good error answers three
+ * questions — what happened, which value caused it, and what to do next — and
+ * the third is the one the previous `Error: … / Code: …` pair never answered.
+ *
+ * @param {Error} error - The error to describe
+ * @param {Object} [context] - Extra facts worth naming
+ * @param {string} [context.basePath] - Project root, for scope errors
+ * @returns {{status: string, title: string, subject: string|null, suggestion: string|null,
+ *   code: string, details: Object}} A renderable description
+ */
+function describeError(error, context = {}) {
+  const code = error?.code || 'UNKNOWN_ERROR';
+  const details = error?.details || {};
+  const describe = (title, subject, suggestion) => ({
+    status: 'error',
+    title,
+    subject: subject ?? null,
+    suggestion: suggestion ?? null,
+    code,
+    details,
+  });
+
+  switch (code) {
+    case ERROR_CODES.PATH_NOT_FOUND:
+      return describe(
+        'Path not found',
+        details.path || error.path || null,
+        'Check the path or run copytree from the project root',
+      );
+
+    case ERROR_CODES.NOT_A_DIRECTORY:
+      return describe(
+        'Not a directory',
+        details.path || error.path || null,
+        'Point copytree at a directory, or use --scope for a single file',
+      );
+
+    case ERROR_CODES.SCOPE_OUTSIDE_ROOT:
+      return describe(
+        'Scope is outside the project',
+        error.scopePath || details.scopePath || null,
+        context.basePath
+          ? `Choose a path inside ${context.basePath}`
+          : 'Choose a path inside the project',
+      );
+
+    case ERROR_CODES.SYMLINK_OUTSIDE_ROOT:
+      return describe(
+        'Symlink points outside the project',
+        details.path || null,
+        'Exclude the symlink, or re-run with --follow-symlinks off',
+      );
+
+    case ERROR_CODES.INVALID_OPTION:
+      // The message is already the problem statement — "Invalid --size-gate
+      // value 'large'" — so it is the title, not the remediation. Errors that
+      // know a concrete next step attach it as `details.suggestion`.
+      return describe(error.message, null, details.suggestion || null);
+
+    case ERROR_CODES.INVALID_FORMAT:
+      return describe(
+        'Unknown format',
+        details.value || details.format || null,
+        'Choose xml, markdown, json, ndjson, sarif or tree',
+      );
+
+    case ERROR_CODES.CONFIG_INVALID:
+    case 'CONFIG_ERROR':
+      return describe(
+        'CopyTree configuration is invalid',
+        details.configKey || null,
+        'Run copytree config:validate for details',
+      );
+
+    case ERROR_CODES.SECRETS_DETECTED: {
+      const count = error.secretsCount || 0;
+      return describe(
+        `Output not created — ${count} possible ${count === 1 ? 'secret' : 'secrets'} found`,
+        null,
+        'Write a safe report with --secrets-report report.json',
+      );
+    }
+
+    case ERROR_CODES.NO_FILES_MATCHED:
+      return describe(
+        'No files matched',
+        null,
+        'Check --scope, --filter and ignore rules; use --dry-run --explain for details',
+      );
+
+    case ERROR_CODES.ABORTED:
+      return describe('Cancelled', null, null);
+
+    case 'FILESYSTEM_ERROR': {
+      const permission = /EACCES|EPERM|permission/i.test(error.message || '');
+      return describe(
+        error.operation ? `Could not ${error.operation}` : 'Filesystem error',
+        error.path || details.path || null,
+        permission
+          ? 'Permission denied; check the file permissions or exclude the path'
+          : error.message,
+      );
+    }
+
+    case 'PROFILE_ERROR':
+      // The message already names the profile and what went wrong with it, so
+      // it is the problem statement; only the remediation needs adding.
+      return describe(
+        error.message,
+        null,
+        'Check the profile name, or run without -p to use auto-discovery',
+      );
+
+    default:
+      return describe(
+        'CopyTree could not complete the operation',
+        error?.message || null,
+        'Run again with --verbose for diagnostic details',
+      );
+  }
+}
+
+/**
  * Handle errors consistently
  */
 function handleError(error, options = {}) {
@@ -359,5 +485,6 @@ export {
   ERROR_CODES,
   createAbortError,
   isAbortError,
+  describeError,
   handleError,
 };

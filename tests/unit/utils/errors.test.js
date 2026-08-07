@@ -9,6 +9,10 @@ let CopyTreeError,
   ValidationError,
   PipelineError,
   InstructionsError,
+  SecretsDetectedError,
+  ScopeError,
+  ERROR_CODES,
+  describeError,
   handleError;
 
 beforeAll(async () => {
@@ -24,6 +28,10 @@ beforeAll(async () => {
     ValidationError,
     PipelineError,
     InstructionsError,
+    SecretsDetectedError,
+    ScopeError,
+    ERROR_CODES,
+    describeError,
     handleError,
   } = errorsModule);
 });
@@ -263,5 +271,68 @@ describe('Error Classes', () => {
       expect(mockExit).not.toHaveBeenCalled();
       mockExit.mockRestore();
     });
+  });
+});
+
+describe('describeError', () => {
+  // Built from `error.code`, never from matching message text: the codes are
+  // the stable contract and the messages are not.
+  test('describes a missing path with a next action', () => {
+    const error = new CopyTreeError('Path does not exist: /x', ERROR_CODES.PATH_NOT_FOUND, {
+      path: './x',
+    });
+
+    expect(describeError(error)).toMatchObject({
+      status: 'error',
+      title: 'Path not found',
+      subject: './x',
+      suggestion: 'Check the path or run copytree from the project root',
+      code: ERROR_CODES.PATH_NOT_FOUND,
+    });
+  });
+
+  test('names the project root when a scope escapes it', () => {
+    const error = new ScopeError('outside', ERROR_CODES.SCOPE_OUTSIDE_ROOT, '../shared');
+    const described = describeError(error, { basePath: '/home/greg/project' });
+
+    expect(described.subject).toBe('../shared');
+    expect(described.suggestion).toBe('Choose a path inside /home/greg/project');
+  });
+
+  test('lists the valid formats when one is unknown', () => {
+    const error = new ValidationError('Unknown output format: yaml', 'format', 'yaml', {
+      code: ERROR_CODES.INVALID_FORMAT,
+      value: 'yaml',
+    });
+
+    expect(describeError(error).suggestion).toBe(
+      'Choose xml, markdown, json, ndjson, sarif or tree',
+    );
+  });
+
+  test('offers a safe report when secrets stop the run', () => {
+    const error = new SecretsDetectedError('secrets found', [{}, {}, {}]);
+    const described = describeError(error);
+
+    expect(described.title).toContain('3 possible secrets found');
+    expect(described.suggestion).toContain('--secrets-report');
+  });
+
+  test('keeps an option error as its own problem statement', () => {
+    const error = new ValidationError("Invalid --max-files value 'x'", 'max-files', 'x', {
+      code: ERROR_CODES.INVALID_OPTION,
+      suggestion: 'Use a positive integer',
+    });
+
+    expect(describeError(error).title).toBe("Invalid --max-files value 'x'");
+    expect(describeError(error).suggestion).toBe('Use a positive integer');
+  });
+
+  // An unrecognised error still has to answer "what do I do now".
+  test('falls back to a generic description with a diagnostic step', () => {
+    const described = describeError(new Error('kaboom'));
+
+    expect(described.title).toBe('CopyTree could not complete the operation');
+    expect(described.suggestion).toBe('Run again with --verbose for diagnostic details');
   });
 });

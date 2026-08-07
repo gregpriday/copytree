@@ -10,23 +10,18 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-import { Command, InvalidArgumentError } from 'commander';
+import { Command, InvalidArgumentError, Option } from 'commander';
 import { readFileSync } from 'fs';
 import { logger } from '../src/utils/logger.js';
 
 /**
  * Load the terminal UI on first use.
  *
- * React, Ink, and the App component are only needed by commands that actually
- * render. They used to be pulled in at module load: React statically, and Ink
- * plus the App tree by a fire-and-forget async block at the top of the file.
- * That made every invocation pay for the UI, including `--stream`, `--display`,
- * and `--help`, none of which render anything.
- *
- * The eager load was also racy. Nothing awaited it, so a command handler could
- * reach `render` before it was assigned; every call site already had to guard
- * with `if (!render || !App)` and import again. That guard is now the only path,
- * which makes the load both lazy and properly ordered.
+ * Only the configuration commands render a persistent multi-line interface;
+ * `copy` does not, and no longer loads React or Ink at all. One progress line
+ * and one completion line never needed a component tree, a virtual DOM or a
+ * reconciler — and routing them through one made the successful clipboard path
+ * finish without printing anything, because the frame was never queued.
  *
  * @returns {Promise<{render: Function, App: Function, React: Object}>} UI entry points
  */
@@ -89,6 +84,15 @@ program
   .description(
     'Copy directory structure to XML (default) or Markdown/JSON/NDJSON/SARIF/tree with customizable filters',
   )
+  // The default destination is the one thing a new user cannot guess from the
+  // flag list, because it is the behaviour you get by passing nothing.
+  .addHelpText(
+    'after',
+    '\nBy default CopyTree writes a temporary file and copies its file reference,\n' +
+      'so pasting into an agent hands over a file to read rather than inline context.\n' +
+      'Use --clipboard for the text itself, --output to save, --display to print,\n' +
+      'or --stream for large outputs and CI.\n',
+  )
   .option('-p, --folder-profile <name>', 'Use folder profile by name (.copytree-<name>.*)')
   .option('--profile <type>', 'Enable performance profiling: cpu, heap, all')
   .option('--profile-dir <dir>', 'Profile output directory (default: .profiles)')
@@ -101,7 +105,8 @@ program
     'Output format: xml, markdown|md, json, ndjson, sarif, tree (default: xml)',
   )
   .option('-i, --display', 'Display output to console')
-  .option('-v, --verbose', 'Show per-stage progress logs and a run summary')
+  .option('-v, --verbose', 'Show run detail: phases, selection summary, size and duration')
+  .option('-q, --quiet', 'Suppress progress and completion output; errors still go to stderr')
   .option('-S, --stream', 'Stream output')
   .option('--dry-run', 'Show what would be copied without doing it')
   .option('-l, --head <n>', 'Limit to first N files')
@@ -116,7 +121,13 @@ program
   .option('--no-folder-profile', 'Skip auto-discovery of a .copytree.yml folder profile')
   // Reference output is the default. Accepted so existing muscle memory and
   // scripts keep working; it selects the behaviour they would get anyway.
-  .option('-r, --as-reference', 'No-op: writing a file reference is the default')
+  // Hidden from help, where it would read as a choice rather than a leftover.
+  .addOption(
+    new Option(
+      '-r, --as-reference',
+      'Legacy no-op: writing a file reference is the default',
+    ).hideHelp(),
+  )
   .option('-s, --sort <by>', 'Sort files by: path, size, modified, name, extension, depth')
   .option('--sort-order <order>', 'Sort direction: asc (default) or desc', (val) => {
     if (!['asc', 'desc'].includes(val)) {
@@ -231,20 +242,10 @@ program
       }
     }
 
-    // When streaming or profiling, skip UI and run command directly
-    if (options.stream || options.profile) {
-      const copyCommand = (await import('../src/commands/copy.js')).default;
-      try {
-        await copyCommand(targetPath || '.', options);
-        process.exit(0);
-      } catch (error) {
-        console.error(error.message);
-        process.exit(1);
-      }
-      return;
-    }
-
-    await renderCommand('copy', targetPath || '.', options);
+    // Every copy mode — default, streaming, profiling, dry run — goes through
+    // one controller. There is no second path that could report differently.
+    const copyCommand = (await import('../src/commands/copy.js')).default;
+    await copyCommand(targetPath || '.', options);
   });
 
 // 9. Config validate command
@@ -283,5 +284,23 @@ program
 
 // 12. Install copytree command - REMOVED
 // This command has been removed as all directories are auto-created on first use.
+
+/**
+ * Ctrl+C is a decision, not a fault.
+ *
+ * Node's default SIGINT handling kills the process outright, which skips `exit`
+ * listeners — so a run interrupted mid-spinner would leave the cursor hidden
+ * and the live line half-drawn. Claiming the signal here lets the terminal be
+ * put back the way it was found, and reports the outcome as what it is: a
+ * cancellation, in the neutral status, with no stack trace.
+ */
+process.on('SIGINT', () => {
+  if (process.stderr.isTTY) {
+    process.stderr.write('\r\x1b[2K\x1b[?25h');
+  }
+  process.stderr.write(`${process.stderr.isTTY ? '○' : '-'} Cancelled\n`);
+  // 130 is the conventional "terminated by SIGINT" status.
+  process.exit(130);
+});
 
 program.parse(process.argv);

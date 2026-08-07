@@ -1,10 +1,36 @@
 import Pipeline from '../pipeline/Pipeline.js';
 import TransformerRegistry from '../transforms/TransformerRegistry.js';
 import { logger } from '../utils/logger.js';
-import { CommandError, handleError } from '../utils/errors.js';
+import {
+  CommandError,
+  CopyTreeError,
+  ERROR_CODES,
+  ValidationError,
+  describeError,
+  isAbortError,
+} from '../utils/errors.js';
 import { config } from '../config/ConfigManager.js';
 import Clipboard from '../utils/clipboard.js';
-import { resolveDestination, writeReferenceFile } from '../utils/outputDestination.js';
+import {
+  describeDestination,
+  normalizeFormat,
+  resolveDestination,
+  validateDestinationOptions,
+  writeReferenceFile,
+} from '../utils/outputDestination.js';
+import { createReporter } from '../ui/feedback/Reporter.js';
+import { PHASES, plural } from '../ui/feedback/messages.js';
+import {
+  buildCancelledModel,
+  buildCompletionModel,
+  buildDryRunModel,
+  buildEmptyModel,
+  buildFailureModel,
+  buildNotices,
+  buildSelectionSummary,
+  classifyWarnings,
+} from '../ui/feedback/model.js';
+import ProgressTracker from '../utils/ProgressTracker.js';
 import fs from 'fs-extra';
 import path from 'path';
 import GitHubUrlHandler from '../services/GitHubUrlHandler.js';
@@ -29,218 +55,507 @@ try {
 }
 
 /**
- * Main copy command implementation
- * Copies directory structure and file contents to XML/JSON format
+ * Run a copy, then say what happened.
+ *
+ * This is the only implementation of "copy this directory". It used to be one
+ * of two: the CLI rendered an Ink component that ran its own pipeline, resolved
+ * its own destination, computed its own metrics and wrote its own completion
+ * text, while `--stream` and `--profile` came through here. The two drifted in
+ * every way two implementations of the same thing can — different wording,
+ * different icons, different byte counts, and a clipboard path that could
+ * finish without printing anything at all.
+ *
+ * The shape is now: run the pipeline, deliver the output, build one structured
+ * model of what happened, hand it to one reporter. The reporter decides how a
+ * terminal, a log file or a JSON consumer should see it.
+ *
+ * @param {string} [targetPath='.'] - Directory, or GitHub URL, to copy
+ * @param {Object} [options={}] - Parsed CLI options
+ * @returns {Promise<Object|undefined>} The pipeline result, when one was produced
  */
 async function copyCommand(targetPath = '.', options = {}) {
   const startTime = Date.now();
+  const reporter = createReporter(reporterOptionsFor(options));
 
-  // Start performance profiler if --profile flag is set.
-  // Profiler.start() rolls back (disconnects) on partial failure, so no resource
-  // leak if startup throws — the error propagates to bin/copytree.js for exit(1).
   let profiler = null;
-  if (options.profile) {
-    profiler = new Profiler({
-      type: options.profile,
-      profileDir: options.profileDir || '.profiles',
-    });
-    await profiler.start();
-  }
-
+  // Held outside the try so a scope error can be told which root it escaped.
+  let basePath = null;
   try {
-    // Reset filesystem error tracking at start
     resetFsErrors();
-
-    // Apply logging configuration from CLI options (level, format, color).
-    // This must run before any logger calls so the options take effect.
-    // In stream or profiling mode we force logs to stderr (standard Unix practice)
-    // so stdout is never polluted by log lines regardless of config.
-    {
-      const logOptions = {};
-      if (options.logLevel !== undefined) logOptions.level = options.logLevel;
-      if (options.logFormat !== undefined) logOptions.format = options.logFormat;
-      if (options.color === false) logOptions.colorize = 'never';
-      if (options.stream || options.profile) logOptions.destination = 'stderr';
-      if (Object.keys(logOptions).length > 0) {
-        logger.configure(logOptions);
-      }
+    applyLoggingOptions(options);
+    // The effective level depends on config files and COPYTREE_LOG_LEVEL, not
+    // only on the flags, so it can only be read after the options are applied.
+    // `--quiet` still wins outright.
+    if (!options.quiet) {
+      reporter.setLevel(effectiveReporterLevel());
     }
 
-    // Start with initializing message
-    logger.startSpinner('Initializing');
+    // Contradictory destinations are rejected before any work happens. Silent
+    // precedence — quietly doing one of the two things asked for — is the wrong
+    // answer to a contradiction the user is the only one who can resolve.
+    validateDestinationOptions(options);
 
-    // Ensure configuration is loaded before proceeding
+    reporter.start({
+      target: targetPath,
+      format: normalizeFormat(options.format),
+      destination: resolveDestination(options),
+      dryRun: Boolean(options.dryRun),
+    });
+    reporter.phase(PHASES.PREPARE);
+
+    if (options.profile) {
+      // Profiler.start() rolls back (disconnects) on partial failure, so a
+      // throw during startup leaks nothing.
+      profiler = new Profiler({
+        type: options.profile,
+        profileDir: options.profileDir || '.profiles',
+      });
+      await profiler.start();
+    }
+
     await config().loadConfiguration();
 
-    // 1. Validate and resolve path
-    let basePath;
-    if (GitHubUrlHandler.isGitHubUrl(targetPath)) {
-      // For GitHub URLs, clone/update the repository and get the local path
-      logger.updateSpinner('Cloning GitHub repository');
-      const githubHandler = new GitHubUrlHandler(targetPath);
-      basePath = await githubHandler.getFiles();
-      logger.info(`Using GitHub repository: ${targetPath}`);
-    } else {
-      basePath = path.resolve(targetPath);
-      if (!(await fs.pathExists(basePath))) {
-        throw new CommandError(`Path does not exist: ${basePath}`, 'copy');
-      }
-    }
-
-    // 2. Build configuration from CLI options and defaults, anchored at the target
+    basePath = await resolveBasePath(targetPath, reporter);
     const profileConfig = await buildProfileFromCliOptions(options, basePath);
 
-    // 3. Update to processing
-    logger.updateSpinner('Processing files');
+    const result = await runPipeline({ basePath, profileConfig, options, startTime, reporter });
 
-    // 4. Initialize pipeline with stages
-    const pipeline = new Pipeline({
-      continueOnError: true,
-      emitProgress: true,
-    });
-
-    // Setup pipeline stages
-    const stages = await setupPipelineStages(basePath, profileConfig, options);
-    pipeline.through(stages);
-
-    // 5. Execute pipeline
-    const result = await pipeline.process({
-      basePath,
-      profileConfig,
-      options,
-      startTime,
-      version: pkg.version,
-    });
-
-    // 6a. Stop profiler and write report
     if (profiler) {
-      const duration = Date.now() - startTime;
-      const savedTimestamp = profiler.timestamp; // capture before stop (avoids brittle filename parsing)
-      let profileFiles = {};
-      try {
-        profileFiles = await profiler.stop();
-      } catch (_err) {
-        // Profiler stop failure is non-fatal
-      } finally {
-        profiler = null; // prevent double-stop if subsequent code throws
-      }
-
-      const pipelineStats = pipeline.getStats();
-      const reportPath = await writeProfilingReport({
-        profileDir: options.profileDir || '.profiles',
-        timestamp: savedTimestamp,
-        duration,
-        version: pkg.version,
-        command: `copytree ${[targetPath, '--profile', options.profile].filter(Boolean).join(' ')}`,
-        files: {
-          total: result.files?.length ?? 0,
-          processed: result.files?.filter((f) => f !== null).length ?? 0,
-          excluded: result.stats?.excludedFiles ?? 0,
-        },
-        memory: process.memoryUsage(),
-        perStageTimings: pipelineStats.perStageTimings || {},
-        perStageMetrics: pipelineStats.perStageMetrics || {},
-        profileFiles,
+      profiler = await finishProfiling(profiler, {
+        result,
+        options,
+        targetPath,
+        startTime,
+        reporter,
       });
-
-      logger.options.silent = false;
-      logger.success(`Profile report saved: ${reportPath}`);
-      if (profileFiles.cpu) logger.info(`CPU profile: ${profileFiles.cpu}`);
-      if (profileFiles.heap) logger.info(`Heap profile: ${profileFiles.heap}`);
     }
 
-    // 6. Write secrets report if requested
-    if (options.secretsReport && result.stats?.secretsGuard?.report) {
-      const reportPath = options.secretsReport === '-' ? null : path.resolve(options.secretsReport);
+    await writeSecretsReport(result, options, reporter);
 
-      if (reportPath) {
-        await fs.ensureDir(path.dirname(reportPath));
-        await fs.writeJson(reportPath, result.stats.secretsGuard.report, { spaces: 2 });
-        logger.info(`Secrets report written to ${reportPath}`);
-      } else {
-        // Write to stdout
-        console.log(JSON.stringify(result.stats.secretsGuard.report, null, 2));
-      }
-    }
+    const delivery = options.dryRun
+      ? null
+      : await deliverOutput(result, options, basePath, reporter);
 
-    // 7. Prepare output
-    let outputResult;
-    if (!options.dryRun) {
-      outputResult = await prepareOutput(result, options);
-    }
+    const fsErrors = getFsErrorSummary();
+    const warnings = classifyWarnings(result, { delivery, fsErrors });
+    const notices = buildNotices(result);
+    reportRun({ reporter, result, options, delivery, warnings, notices, startTime });
 
-    // 8. Stop spinner before showing final result
-    logger.stopSpinner();
-
-    // 9. Display final output
-    if (!options.dryRun && outputResult) {
-      await displayOutput(outputResult, options, basePath);
-    } else if (options.dryRun) {
-      logger.info('🔍 Dry run mode - no files were processed.');
-      const included = result.files.filter((f) => f !== null);
-      const totalSize = included.reduce((sum, file) => sum + (file.size || 0), 0);
-      const { estimatedTokens } = buildEstimates(included, {
-        format: options.format,
-        onlyTree: options.onlyTree,
-        addLineNumbers: options.withLineNumbers,
-      });
-
-      logger.info(
-        `${included.length} files [${logger.formatBytes(totalSize)}, ~${formatCount(estimatedTokens)} tokens] would be processed`,
-      );
-
-      reportExclusions(result, options);
-    }
-
-    // 10. Show summary if requested
-    if (options.info) {
-      showSummary(result, startTime);
-    }
-
-    // 11. Show filesystem error summary
-    const fsSummary = getFsErrorSummary();
-    if (
-      fsSummary.totalRetries > 0 ||
-      fsSummary.succeededAfterRetry > 0 ||
-      fsSummary.failed > 0 ||
-      fsSummary.permanent > 0
-    ) {
-      logger.info('\nFilesystem Operations Summary:');
-      if (fsSummary.totalRetries > 0) {
-        logger.info(`  Total retries: ${fsSummary.totalRetries}`);
-      }
-      if (fsSummary.succeededAfterRetry > 0) {
-        logger.success(`  Succeeded after retry: ${fsSummary.succeededAfterRetry}`);
-      }
-      if (fsSummary.failed > 0) {
-        logger.warn(`  Failed after retries: ${fsSummary.failed}`);
-      }
-      if (fsSummary.permanent > 0) {
-        logger.error(`  Permanent errors: ${fsSummary.permanent}`);
-      }
-    }
-
-    // 12. Exit with error if --fail-on-fs-errors and there are failures
-    if (options.failOnFsErrors && (fsSummary.failed > 0 || fsSummary.permanent > 0)) {
-      logger.error(
-        `\nExiting with error due to filesystem failures (use --fail-on-fs-errors to control this behavior)`,
-      );
+    // `--fail-on-fs-errors` turns a degraded run into a failed one. It changes
+    // the exit code, not the reporting: the warning is already on screen.
+    if (options.failOnFsErrors && (fsErrors.failed > 0 || fsErrors.permanent > 0)) {
       process.exitCode = 1;
     }
+
+    return result;
   } catch (error) {
-    // Ensure profiler is stopped and disconnected on error
     if (profiler) {
       try {
         await profiler.stop();
       } catch (_stopErr) {
-        // Ignore stop errors during error handling
+        // A profiler that will not stop must not replace the real error.
       }
     }
-    logger.stopSpinner();
-    handleError(error, {
-      exit: true,
-      verbose: options.verbose || config().get('app.verboseErrors', false),
+
+    // A user pressing Ctrl+C is not a failure, and printing a red error with a
+    // stack for it is a small lie about what happened.
+    if (isAbortError(error)) {
+      reporter.complete(buildCancelledModel());
+      process.exitCode = 130;
+      return undefined;
+    }
+
+    const description = describeError(error, { basePath: basePath || process.cwd() });
+    reporter.fail(buildFailureModel(description));
+    if (options.verbose || config().get('app.verboseErrors', false)) {
+      logger.debug(
+        JSON.stringify(
+          error instanceof CopyTreeError
+            ? error.toJSON()
+            : { message: error.message, stack: error.stack },
+        ),
+      );
+    }
+    process.exitCode = 1;
+    return undefined;
+  } finally {
+    reporter.close();
+  }
+}
+
+/**
+ * Translate CLI options into reporter configuration.
+ *
+ * @param {Object} options - Parsed CLI options
+ * @returns {Object} Reporter options
+ */
+function reporterOptionsFor(options = {}) {
+  return {
+    // Feedback always goes to stderr, whatever the destination. That is what
+    // keeps `copytree --display --format json | jq` valid while still showing
+    // progress, and it removes the reason the old UI had to suppress itself
+    // whenever the document shared stdout.
+    stream: process.stderr,
+    verbose: Boolean(options.verbose),
+    quiet: Boolean(options.quiet),
+    // `silent` is a severity, not a format: rendering failures as JSON when
+    // nobody asked for JSON is as wrong as not rendering them at all.
+    level: options.logFormat === 'silent' ? 'error' : 'info',
+    format: options.logFormat === 'json' ? 'json' : 'text',
+    color: options.color === false ? 'never' : 'auto',
+    context: {
+      format: normalizeFormat(options.format),
+      destination: resolveDestination(options),
+    },
+  };
+}
+
+/**
+ * The reporter's severity floor, taken from the logger's effective settings.
+ *
+ * Read from the logger rather than from the flags so that config files and
+ * `COPYTREE_LOG_LEVEL` / `COPYTREE_LOG_FORMAT` reach the reporter too. They
+ * previously did not, so `COPYTREE_LOG_FORMAT=silent` left the completion line
+ * on screen while silencing everything around it.
+ *
+ * @returns {'info'|'warn'|'error'} Lowest severity worth reporting
+ */
+function effectiveReporterLevel() {
+  if (logger.isLevelEnabled('info')) return 'info';
+  if (logger.isLevelEnabled('warn')) return 'warn';
+  return 'error';
+}
+
+/**
+ * Apply CLI logging options to the shared logger.
+ *
+ * Logs are pinned to stderr for every destination, not only for `--stream`:
+ * stdout belongs to the requested document and nothing else.
+ *
+ * @param {Object} options - Parsed CLI options
+ */
+function applyLoggingOptions(options) {
+  const logOptions = { destination: 'stderr' };
+  if (options.logLevel !== undefined) logOptions.level = options.logLevel;
+  if (options.logFormat !== undefined) logOptions.format = options.logFormat;
+  if (options.color === false) logOptions.colorize = 'never';
+  logger.configure(logOptions);
+}
+
+/**
+ * Resolve the directory to copy, cloning first when given a GitHub URL.
+ *
+ * @param {string} targetPath - Path or GitHub URL
+ * @param {import('../ui/feedback/Reporter.js').Reporter} reporter - Run reporter
+ * @returns {Promise<string>} Absolute base path
+ */
+async function resolveBasePath(targetPath, reporter) {
+  if (GitHubUrlHandler.isGitHubUrl(targetPath)) {
+    reporter.note(`Cloning ${targetPath}`);
+    const githubHandler = new GitHubUrlHandler(targetPath);
+    return githubHandler.getFiles();
+  }
+
+  const basePath = path.resolve(targetPath);
+  if (!(await fs.pathExists(basePath))) {
+    throw new CopyTreeError(`Path does not exist: ${basePath}`, ERROR_CODES.PATH_NOT_FOUND, {
+      path: targetPath,
     });
+  }
+  return basePath;
+}
+
+/**
+ * Assemble and run the pipeline, forwarding progress to the reporter.
+ *
+ * `ProgressTracker` is the only normalization layer between pipeline events and
+ * the screen. It already guarantees stable stage ids and monotonic progress;
+ * the UI used to compute a second, different answer from the same events, and
+ * the two disagreed often enough to show progress running backwards.
+ *
+ * @returns {Promise<Object>} Pipeline result
+ */
+async function runPipeline({ basePath, profileConfig, options, startTime, reporter }) {
+  const pipeline = new Pipeline({ continueOnError: true, emitProgress: true });
+  const stages = await setupPipelineStages(basePath, profileConfig, options);
+  pipeline.through(stages);
+
+  const tracker = new ProgressTracker({
+    totalStages: stages.length,
+    onProgress: (progress) => reporter.progress(progress),
+  });
+  tracker.attach(pipeline);
+
+  pipeline.on('stage:recover', (data) => {
+    reporter.recovery({
+      stage: data.stage,
+      message: `Continued past a failure in ${data.stage}: ${data.originalError?.message ?? 'unknown error'}`,
+    });
+  });
+
+  const result = await pipeline.process({
+    basePath,
+    // `profile` is the key the stages actually read — the formatter takes the
+    // profile name for the document's metadata from it. This used to be passed
+    // as `profileConfig` here and as `profile` from the UI, so `--stream` XML
+    // silently omitted the `<ct:profile>` element that a non-streamed run
+    // included. Nothing read `profileConfig` at all.
+    profile: profileConfig,
+    options,
+    startTime,
+    version: pkg.version,
+  });
+
+  result.pipelineStats = pipeline.getStats();
+  return result;
+}
+
+/**
+ * Stop the profiler and write its report.
+ *
+ * @returns {Promise<null>} Always null, so the caller cannot double-stop
+ */
+async function finishProfiling(profiler, { result, options, targetPath, startTime, reporter }) {
+  const duration = Date.now() - startTime;
+  const savedTimestamp = profiler.timestamp; // captured before stop, so no filename parsing
+  let profileFiles = {};
+  try {
+    profileFiles = await profiler.stop();
+  } catch (_err) {
+    // A profiler that fails to stop must not fail the copy it was measuring.
+  }
+
+  const pipelineStats = result.pipelineStats || {};
+  const reportPath = await writeProfilingReport({
+    profileDir: options.profileDir || '.profiles',
+    timestamp: savedTimestamp,
+    duration,
+    version: pkg.version,
+    command: `copytree ${[targetPath, '--profile', options.profile].filter(Boolean).join(' ')}`,
+    files: {
+      total: result.files?.length ?? 0,
+      processed: result.files?.filter((f) => f !== null).length ?? 0,
+      excluded: result.stats?.excludedFiles ?? 0,
+    },
+    memory: process.memoryUsage(),
+    perStageTimings: pipelineStats.perStageTimings || {},
+    perStageMetrics: pipelineStats.perStageMetrics || {},
+    profileFiles,
+  });
+
+  reporter.note(`Profile report saved: ${reportPath}`);
+  if (profileFiles.cpu) reporter.note(`CPU profile: ${profileFiles.cpu}`);
+  if (profileFiles.heap) reporter.note(`Heap profile: ${profileFiles.heap}`);
+  return null;
+}
+
+/**
+ * Write the secrets report, when one was requested.
+ *
+ * With `-` the report is the requested payload and belongs on stdout; to a file
+ * it is a side effect and only the path is worth mentioning.
+ */
+async function writeSecretsReport(result, options, reporter) {
+  if (!options.secretsReport || !result.stats?.secretsGuard?.report) return;
+
+  if (options.secretsReport === '-') {
+    // stdout carries one document. If it is already carrying the requested
+    // output, a second JSON blob appended to it is not a report — it is a
+    // corrupt stream that neither consumer can parse.
+    if (describeDestination(resolveDestination(options)).writesPayloadToStdout) {
+      throw new ValidationError(
+        'Cannot write the secrets report to stdout while the output is also going there',
+        'secrets-report',
+        '-',
+        {
+          code: ERROR_CODES.INVALID_OPTION,
+          suggestion: 'Write the report to a file, or drop --display / --stream',
+        },
+      );
+    }
+    process.stdout.write(`${JSON.stringify(result.stats.secretsGuard.report, null, 2)}\n`);
+    return;
+  }
+
+  const reportPath = path.resolve(options.secretsReport);
+  await fs.ensureDir(path.dirname(reportPath));
+  await fs.writeJson(reportPath, result.stats.secretsGuard.report, { spaces: 2 });
+  reporter.note(`Secrets report written to ${reportPath}`);
+}
+
+/**
+ * Put the output where it was asked to go.
+ *
+ * Delivery returns a description of what actually happened rather than printing
+ * anything, so a fallback — the clipboard was unavailable, the output went to a
+ * temp file — is one fact the reporter can fold into a single headline instead
+ * of three lines that read as unrelated.
+ *
+ * @returns {Promise<{requested: string, actual: string, status: string, path?: string,
+ *   fallbackUsed: boolean, cause?: string}>} Delivery result
+ */
+async function deliverOutput(result, options, basePath, reporter) {
+  const requested = resolveDestination(options);
+  reporter.phase(PHASES.DELIVER, { destination: requested });
+
+  if (result.streamed) {
+    return {
+      requested: 'stream',
+      actual: 'stream',
+      status: 'success',
+      path: options.output ? path.resolve(options.output) : undefined,
+      fallbackUsed: false,
+    };
+  }
+
+  const output = result.output;
+  if (!output) {
+    throw new CommandError('No output generated', 'copy');
+  }
+
+  if (requested === 'reference') {
+    const tempFile = await writeReferenceFile(output, basePath, options.format);
+    try {
+      await Clipboard.copyFileReference(tempFile);
+      return {
+        requested,
+        actual: 'reference',
+        status: 'success',
+        path: tempFile,
+        fallbackUsed: false,
+      };
+    } catch (error) {
+      return {
+        requested,
+        actual: 'file',
+        status: 'warning',
+        path: tempFile,
+        fallbackUsed: true,
+        cause: error.message,
+      };
+    }
+  }
+
+  if (requested === 'file') {
+    const outputPath = path.resolve(options.output);
+    await fs.ensureDir(path.dirname(outputPath));
+    await fs.writeFile(outputPath, output, 'utf8');
+    await Clipboard.revealInFinder(outputPath);
+    return { requested, actual: 'file', status: 'success', path: outputPath, fallbackUsed: false };
+  }
+
+  if (requested === 'display' || requested === 'stream') {
+    // The document, and only the document, on stdout.
+    process.stdout.write(output.endsWith('\n') ? output : `${output}\n`);
+    return { requested, actual: requested, status: 'success', fallbackUsed: false };
+  }
+
+  try {
+    await Clipboard.copyText(output);
+    return { requested, actual: 'clipboard', status: 'success', fallbackUsed: false };
+  } catch (error) {
+    const tempFile = await writeReferenceFile(output, basePath, options.format);
+    await Clipboard.revealInFinder(tempFile);
+    return {
+      requested,
+      actual: 'file',
+      status: 'warning',
+      path: tempFile,
+      fallbackUsed: true,
+      cause: error.message,
+    };
+  }
+}
+
+/**
+ * Turn a finished run into one model and hand it to the reporter.
+ */
+function reportRun({ reporter, result, options, delivery, warnings, notices = [], startTime }) {
+  const included = (result.files || []).filter((f) => f !== null);
+  const stats = {
+    files: included.length,
+    outputBytes: result.output
+      ? Buffer.byteLength(result.output, 'utf8')
+      : result.stats?.outputSize,
+    estimatedTokens:
+      result.stats?.estimatedTokens ??
+      buildEstimates(included, {
+        format: options.format,
+        onlyTree: options.onlyTree,
+        addLineNumbers: options.withLineNumbers,
+        ...(result.output ? { actualChars: result.output.length } : {}),
+      }).estimatedTokens,
+    durationMs: Date.now() - startTime,
+  };
+
+  if (options.verbose) {
+    emitVerboseSummary(reporter, result, stats);
+  }
+
+  if (options.dryRun) {
+    // Detail first, verdict last: the completion line is the summary of what
+    // came before it, so printing it above the explanation reads backwards.
+    if (options.explain) emitExplainDetail(reporter, result);
+    reporter.complete(
+      buildDryRunModel({ stats, warnings, explain: options.explain, verbose: options.verbose }),
+    );
+    return;
+  }
+
+  if (included.length === 0) {
+    reporter.complete(buildEmptyModel({ warnings }));
+    return;
+  }
+
+  reporter.complete(
+    buildCompletionModel({ delivery, stats, warnings, notices, verbose: options.verbose }),
+  );
+}
+
+/**
+ * The verbose run detail: what was selected, what was not, and how long it took.
+ *
+ * This is where the non-material categories belong. Four thousand ignored
+ * entries is reassuring once you asked to see it, and alarming if it appears
+ * uninvited on every run.
+ */
+function emitVerboseSummary(reporter, result, stats) {
+  const rows = buildSelectionSummary(result);
+  reporter.note(`Selected ${plural(stats.files, 'file')}`);
+  for (const row of rows) {
+    reporter.note(`${row.value} ${row.label}`);
+  }
+
+  const secrets = result.stats?.secretsGuard;
+  if (secrets?.enabled && !secrets.planOnly) {
+    reporter.note(`Checked ${plural(stats.files, 'file')} for secrets`);
+  }
+
+  // Per-stage timings name stage classes, which is engineering diagnostics
+  // rather than run detail — `--verbose` is for the user, `--log-level debug`
+  // is for us. The distinction is the whole reason both exist.
+  const timings = result.pipelineStats?.perStageTimings || {};
+  for (const [stage, ms] of Object.entries(timings)) {
+    logger.debug(`${stage} took ${logger.formatDuration(ms)}`);
+  }
+}
+
+/**
+ * `--explain`: the individual rule that excluded each of the largest entries,
+ * and the ignore file and line it came from.
+ */
+function emitExplainDetail(reporter, result) {
+  const excluded = result.exclusionReport?.toJSON?.() ?? result.stats?.excluded;
+  if (!excluded?.largest?.length) return;
+
+  reporter.note('Largest exclusions:', { always: true });
+  for (const entry of excluded.largest) {
+    const source = entry.ruleSource ? ` (${entry.ruleSource})` : '';
+    const rule = entry.rule ? ` [${entry.rule}]` : '';
+    reporter.note(
+      `  ${entry.path} — ${logger.formatBytes(entry.size)} — ${entry.reason}${rule}${source}`,
+      { always: true },
+    );
   }
 }
 
@@ -259,15 +574,20 @@ function parseExtensions(extStr) {
     .filter(Boolean)
     .map((e) => (e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`));
   if (exts.length === 0) {
-    throw new CommandError(
-      `Invalid --ext value '${extStr}'. Provide at least one extension, e.g., .js,.ts`,
-    );
+    throw new ValidationError(`Invalid --ext value '${extStr}'`, 'ext', extStr, {
+      code: ERROR_CODES.INVALID_OPTION,
+      suggestion: 'Provide at least one extension, e.g. .js,.ts',
+    });
   }
   return exts;
 }
 
 /**
- * Parse a human-readable size string to bytes, throwing a CommandError on invalid input.
+ * Parse a human-readable size string to bytes.
+ *
+ * Raised as `INVALID_OPTION` rather than a generic command failure, so the
+ * reporter can print the offending flag and a concrete example instead of
+ * "CopyTree could not complete the operation".
  *
  * @param {string} sizeStr - Size string (e.g., '1KB', '10MB')
  * @param {string} flagName - Flag name for error messages
@@ -277,9 +597,10 @@ function parseSizeOption(sizeStr, flagName) {
   try {
     return parseSize(sizeStr);
   } catch {
-    throw new CommandError(
-      `Invalid --${flagName} value '${sizeStr}'. Use a format like 1KB, 500B, 10MB, 1GB.`,
-    );
+    throw new ValidationError(`Invalid --${flagName} value '${sizeStr}'`, flagName, sizeStr, {
+      code: ERROR_CODES.INVALID_OPTION,
+      suggestion: 'Use a value such as 256KB, 10MB or 1GB',
+    });
   }
 }
 
@@ -339,6 +660,11 @@ async function buildProfileFromCliOptions(options, basePath) {
   // Build profile-like configuration object from CLI options, folder profile, and defaults
   // Precedence: CLI > folder profile > config defaults
   const profileConfig = {
+    // The formatters read `profile.name` for the document's metadata. Only
+    // `_folderProfile` carried it, so every run — named profile or not — was
+    // serialized as `<ct:profile>default</ct:profile>`.
+    name: folderProfile?.name || 'default',
+
     // Include patterns
     // CLI filter takes highest priority, then folder profile, then default to all files
     include: options.filter
@@ -544,6 +870,18 @@ async function setupPipelineStages(basePath, profile, options) {
     );
   }
 
+  // A dry run stops here. Everything below either reads file contents or emits
+  // a document, and a preview does neither.
+  //
+  // Skipping only the *delivery* was not enough, and the gap was not academic:
+  // with `--stream` the output stage wrote the whole document to stdout, and
+  // `--dry-run --stream -o existing.xml` truncated that file — while the run
+  // reported "No content was read and no output was written". A preview that
+  // overwrites a file is worse than no preview.
+  if (options.dryRun) {
+    return stages;
+  }
+
   // 8. File Loading Stage (skip if --only-tree)
   if (!options.onlyTree) {
     const { default: FileLoadingStage } = await import('../pipeline/stages/FileLoadingStage.js');
@@ -663,206 +1001,9 @@ async function setupPipelineStages(basePath, profile, options) {
   return stages;
 }
 
-/**
- * Report what did not make it into the run, and why.
- *
- * "Why isn't my file here?" should be a glance, not a bisect of `.gitignore`.
- * Aggregate counts are always available; `--explain` adds the individual rule
- * and the ignore file and line it came from.
- *
- * @param {Object} result - Pipeline result
- * @param {Object} options - CLI options
- */
-function reportExclusions(result, options) {
-  // Read the live report, not `stats.excluded`. That field is serialized during
-  // discovery, before the budget, dedupe and character-limit stages have had a
-  // chance to drop anything, so it is a snapshot of an early moment rather than
-  // the final accounting.
-  const excluded = result.exclusionReport?.toJSON() ?? result.stats?.excluded;
-  if (!excluded || excluded.total === 0) return;
-
-  const counts = Object.entries(excluded.byReason)
-    .filter(([, count]) => count > 0)
-    .sort((a, b) => b[1] - a[1])
-    .map(([reason, count]) => `${count} ${reason}`)
-    .join(', ');
-
-  logger.info(`${excluded.total} excluded: ${counts}`);
-
-  if (result.stats?.truncated) {
-    logger.warn(
-      `Truncated: ${result.stats.truncatedCount} file(s) dropped by ${result.stats.truncatedBy}`,
-    );
-  }
-
-  if (!options.explain || !excluded.largest?.length) return;
-
-  logger.info('\nLargest exclusions:');
-  for (const entry of excluded.largest) {
-    const source = entry.ruleSource ? ` (${entry.ruleSource})` : '';
-    const rule = entry.rule ? ` [${entry.rule}]` : '';
-    logger.info(
-      `  ${entry.path} — ${logger.formatBytes(entry.size)} — ${entry.reason}${rule}${source}`,
-    );
-  }
-}
-
-/**
- * Format a count with thousands separators, abbreviating large values.
- * @param {number} value - Count to format
- * @returns {string} Human-readable count
- */
-function formatCount(value) {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
-  return String(value);
-}
-
-/**
- * Prepare output but don't display yet
- */
-async function prepareOutput(result, options) {
-  // If streaming was used, output has already been handled
-  if (result.streamed) {
-    const fileCount = result.files.filter((f) => f !== null).length;
-    const totalSize = result.files
-      .filter((f) => f !== null)
-      .reduce((sum, file) => sum + (file.size || 0), 0);
-
-    return {
-      type: 'streamed',
-      fileCount,
-      totalSize,
-      outputPath: options.output,
-    };
-  }
-
-  const output = result.output;
-
-  if (!output) {
-    throw new CommandError('No output generated', 'copy');
-  }
-
-  // Calculate output size
-  const outputSize = Buffer.byteLength(output, 'utf8');
-  const fileCount = result.files.filter((f) => f !== null).length;
-
-  return {
-    type: 'normal',
-    output,
-    outputSize,
-    fileCount,
-  };
-}
-
-/**
- * Display the final output after Listr has cleared
- */
-async function displayOutput(outputResult, options, basePath) {
-  const { type, output, outputSize, fileCount, totalSize, outputPath } = outputResult;
-
-  if (type === 'streamed') {
-    if (outputPath) {
-      logger.success(
-        `Streamed ${fileCount} files [${logger.formatBytes(totalSize)}] to ${path.resolve(outputPath)}`,
-      );
-    } else {
-      logger.success(`Streamed ${fileCount} files [${logger.formatBytes(totalSize)}]`);
-    }
-    return;
-  }
-
-  // Where the output goes. `reference` is the default: write a temp file and
-  // put its path on the clipboard, so pasting into an agent hands over a file
-  // to read rather than a few hundred kilobytes of inline context.
-  const destination = resolveDestination(options);
-
-  if (destination === 'reference') {
-    const tempFile = await writeReferenceFile(output, basePath, options.format);
-
-    try {
-      await Clipboard.copyFileReference(tempFile);
-      logger.success(
-        `Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${path.basename(tempFile)}`,
-      );
-    } catch (_error) {
-      logger.warn('Failed to copy reference to clipboard');
-      logger.info(`Output saved to: ${tempFile}`);
-      logger.info(`${fileCount} files [${logger.formatBytes(outputSize)}]`);
-    }
-    return;
-  }
-
-  if (destination === 'file') {
-    const outputPath = path.resolve(options.output);
-    await fs.ensureDir(path.dirname(outputPath));
-    await fs.writeFile(outputPath, output, 'utf8');
-    logger.success(
-      `Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to ${outputPath}`,
-    );
-
-    // Reveal in Finder on macOS
-    await Clipboard.revealInFinder(outputPath);
-  } else if (destination === 'display') {
-    // Display to console
-    console.log(output);
-    logger.success(`Displayed ${fileCount} files [${logger.formatBytes(outputSize)}]`);
-  } else if (destination === 'stream') {
-    // Stream to stdout (shouldn't reach here if streaming was properly used)
-    process.stdout.write(output);
-  } else {
-    // --clipboard: the output text itself, not a reference to it.
-    try {
-      await Clipboard.copyText(output);
-      logger.success(`Copied ${fileCount} files [${logger.formatBytes(outputSize)}] to clipboard`);
-    } catch (_error) {
-      // If clipboard fails, save to temporary file
-      const tempFile = await writeReferenceFile(output, basePath, options.format);
-      logger.warn(`Failed to copy to clipboard. Output saved to: ${tempFile}`);
-      logger.info(`${fileCount} files [${logger.formatBytes(outputSize)}]`);
-
-      // Reveal in Finder on macOS
-      await Clipboard.revealInFinder(tempFile);
-    }
-  }
-}
-
-/**
- * Show summary information
- */
-function showSummary(result, startTime) {
-  const duration = Date.now() - startTime;
-  const stats = result.stats || {};
-
-  console.log('\n📊 Summary:');
-  console.log(`  Files processed: ${result.files.length}`);
-
-  // Calculate total size from files
-  const totalSize = result.files.reduce((sum, file) => sum + (file.size || 0), 0);
-  console.log(`  Total size: ${logger.formatBytes(totalSize)}`);
-  console.log(`  Output size: ${logger.formatBytes(result.outputSize || 0)}`);
-  console.log(`  Duration: ${logger.formatDuration(duration)}`);
-
-  if (stats.excludedFiles > 0) {
-    console.log(`  Excluded files: ${stats.excludedFiles}`);
-  }
-
-  // Show secrets guard stats if present
-  if (stats.secretsGuard) {
-    const sg = stats.secretsGuard;
-    console.log(
-      `  🔒 Secrets Guard: ${sg.filesExcluded || 0} files excluded, ${sg.secretsRedacted || 0} redactions, ${sg.secretsFound || 0} findings`,
-    );
-  }
-
-  if (result.errors && result.errors.length > 0) {
-    console.log(`  Errors: ${result.errors.length}`);
-  }
-}
-
-// Exported so the Ink UI shares this exact profile builder and stage list.
-// Two implementations of "which files get selected" is the defect this whole
-// module is meant to eliminate; the UI must not grow its own.
-export { buildProfileFromCliOptions, setupPipelineStages };
+// Exported so the programmatic API and the tests share this exact profile
+// builder and stage list. Two implementations of "which files get selected" is
+// the defect this module exists to prevent.
+export { buildProfileFromCliOptions, setupPipelineStages, deliverOutput, reportRun };
 
 export default copyCommand;

@@ -221,16 +221,24 @@ class Stage {
   }
 
   /**
-   * Emit progress update for current stage
+   * Emit progress update for current stage.
+   *
+   * `detail` carries concrete counts — `{ completed, total, item }` — because
+   * "Converting documents… 3/8" is a number the reader can trust, where a
+   * percentage of one stage inside a fourteen-stage pipeline is not. A stage
+   * that knows its own denominator should always pass it.
+   *
    * @param {number} progress - Progress percentage (0-100)
-   * @param {string} message - Optional progress message
+   * @param {string} [message] - Optional progress message
+   * @param {{completed?: number, total?: number, item?: string}} [detail] - Concrete counts
    */
-  emitProgress(progress, message) {
+  emitProgress(progress, message, detail = {}) {
     if (this.pipeline) {
       this.pipeline.emit('stage:progress', {
         stage: this.name,
         progress,
         message,
+        ...detail,
         timestamp: Date.now(),
       });
     }

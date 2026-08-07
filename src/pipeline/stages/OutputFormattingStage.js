@@ -1,4 +1,5 @@
 import Stage from '../Stage.js';
+import { ERROR_CODES, ValidationError } from '../../utils/errors.js';
 import XMLFormatter from '../formatters/XMLFormatter.js';
 import MarkdownFormatter from '../formatters/MarkdownFormatter.js';
 import NDJSONFormatter from '../formatters/NDJSONFormatter.js';
@@ -39,7 +40,10 @@ class OutputFormattingStage extends Stage {
    * @throws {Error} Always
    */
   async handleError(error, _input) {
-    this.log(`Output formatting failed: ${error.message}`, 'error');
+    // Debug, not error: this stage is fatal, so the error is rethrown and
+    // reported once by the run reporter with a remediation attached. Logging it
+    // here as well printed the same failure twice in two different formats.
+    this.log(`Output formatting failed: ${error.message}`, 'debug');
     throw error;
   }
 
@@ -92,7 +96,10 @@ class OutputFormattingStage extends Stage {
         break;
       }
       default:
-        throw new Error(`Unknown output format: ${this.format}`);
+        throw new ValidationError(`Unknown output format: ${this.format}`, 'format', this.format, {
+          code: ERROR_CODES.INVALID_FORMAT,
+          value: this.format,
+        });
     }
 
     this.log(`Formatted output in ${this.getElapsedTime(startTime)}`, 'info');

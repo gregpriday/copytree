@@ -227,6 +227,21 @@ class Logger extends EventEmitter {
     }
   }
 
+  /**
+   * Whether messages at `level` would currently be written.
+   *
+   * Public because the run reporter needs the same answer for its own output:
+   * `--log-level error` and `COPYTREE_LOG_FORMAT=silent` mean "only tell me
+   * about failures", and a completion line that ignored that would be the one
+   * piece of chrome nothing could turn off.
+   *
+   * @param {string} level - Log level to test
+   * @returns {boolean} True when the level passes the current filters
+   */
+  isLevelEnabled(level) {
+    return this._shouldLog(level);
+  }
+
   // ─── Runtime reconfiguration ──────────────────────────────────────────────
 
   /**

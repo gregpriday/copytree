@@ -56,6 +56,33 @@ Stages set `this.fatal = true` to opt out of that recovery, and the pipeline ret
 
 `OutputFormattingStage` in particular no longer answers a formatting failure by emitting a different format. A caller who asked for XML and received JSON has a parse failure on output that reported success.
 
+### Terminal output belongs to the reporter
+
+No stage writes to a terminal. Stages emit events — `stage:progress` carries
+`{ completed, total, item }` alongside its percentage — and a single reporter
+(`src/ui/feedback/Reporter.js`) decides whether any of it is drawn, and how.
+
+This is a hard boundary, learned from breaking it. `TransformStage` used to
+manage a multi-line display of its own: clearing lines, moving the cursor and
+writing filenames straight to `process.stdout`. That collided with the spinner
+and with Ink, corrupted `--display` and `--stream` output by sharing their
+stream, and silently ignored `--no-color`, `--quiet` and the log level, none of
+which it knew about.
+
+The feedback layer is four small modules with no pipeline knowledge:
+
+| Module | Responsibility |
+|--------|----------------|
+| `ui/feedback/glyphs.js` | The status vocabulary, and what the terminal can render |
+| `ui/feedback/messages.js` | Every user-facing string, and the user-facing phase model |
+| `ui/feedback/model.js` | Structured completion, warning and failure models |
+| `ui/feedback/Reporter.js` | Rendering: TTY, plain, verbose, NDJSON, quiet |
+
+`ProgressTracker` is the only normalization layer between pipeline events and
+the screen: it maps stage class names to stable ids, groups those ids into the
+handful of phases a person actually distinguishes, and guarantees progress never
+runs backwards.
+
 ### Exclusion Accounting
 
 `FileDiscoveryStage` creates an `ExclusionReport` and threads it through the pipeline on `input.exclusionReport`. Any stage that drops a file records it with a stable reason key from `EXCLUSION_REASONS` (see `src/utils/exclusionReport.js`).

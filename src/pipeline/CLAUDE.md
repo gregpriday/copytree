@@ -16,9 +16,19 @@
 ## Event Emission Rules
 
 **MUST emit** (via base class helpers):
-- Use `this.emitProgress(percent, message)` for progress updates
+- Use `this.emitProgress(percent, message, { completed, total, item })` for progress
+  updates — pass concrete counts whenever the stage knows its denominator, since
+  that is what the CLI renders
 - Use `this.emitFileEvent(filePath, action)` for file operations (auto-throttled)
 - Use `this.log(message, level)` for stage logging
+
+**MUST NOT** write to `process.stdout` or `process.stderr`, move the cursor,
+clear lines, or drive a spinner. The terminal belongs to the run reporter; a
+stage that draws its own output collides with it, corrupts `--display` and
+`--stream`, and ignores `--no-color`, `--quiet` and the log level.
+
+Log a fatal stage's own failure at `debug`, not `error`: the error is rethrown
+and reported once, with a remediation, by the reporter.
 
 **Event contract** (Pipeline emits automatically):
 - `stage:start` - When stage begins
