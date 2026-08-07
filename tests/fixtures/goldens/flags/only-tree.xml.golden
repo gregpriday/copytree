@@ -6,15 +6,15 @@
     <ct:fileCount>3</ct:fileCount>
     <ct:totalSize>77</ct:totalSize>
     <ct:profile>default</ct:profile>
-    <ct:directoryStructure>├── src/
-</ct:directory>
-  </ct:files>
+    <ct:directoryStructure>├── index.js
+└── README.md
+├── src/
+│   └── test.js</ct:directoryStructure>
+    <ct:instructions name="default"><![CDATA[This XML document represents the directory structure and contents of a project, which you will analyze to answer user questions. Reference files using @ followed by the relative path from the project root (e.g., @README.md, @src/app.js). The @ notation must not be enclosed in backticks. For example, always write "...in the file @app/page.tsx..." and never "...in the file `@app/page.tsx`...". You can also reference directories with @directory/path to instruct the agent to examine multiple files.]]></ct:instructions>
   </ct:metadata>
+  <ct:files>
     <ct:file path="@index.js" size="22" modified="<TIMESTAMP>"></ct:file>
     <ct:file path="@README.md" size="15" modified="<TIMESTAMP>"></ct:file>
     <ct:file path="@src/test.js" size="40" modified="<TIMESTAMP>"></ct:file>
-  <ct:files>
-    <ct:instructions name="default"><![CDATA[This XML document represents the directory structure and contents of a project, which you will analyze to answer user questions. Reference files using @ followed by the relative path from the project root (e.g., @README.md, @src/app.js). The @ notation must not be enclosed in backticks. For example, always write "...in the file @app/page.tsx..." and never "...in the file `@app/page.tsx`...". You can also reference directories with @directory/path to instruct the agent to examine multiple files.]]></ct:instructions>
-├── index.js
-└── README.md</ct:directoryStructure>
-│   └── test.js
+  </ct:files>
+</ct:directory>

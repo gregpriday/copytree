@@ -177,14 +177,43 @@ describe('GitFilterStage', () => {
       });
     });
 
-    it('should handle git errors gracefully', async () => {
+    // Carrying on is right — a directory that is not a repository should not
+    // stop a copy. Doing it silently is not: the caller asked for a subset and
+    // received everything, and nothing about the run said so.
+    it('passes every file through when git filtering fails, and records why', async () => {
       mockGitUtils.getModifiedFiles.mockRejectedValue(new Error('Git command failed'));
       stage = new GitFilterStage({ modified: true, basePath: '/project' });
       const input = createTestInput();
 
-      // The stage should catch errors and return original input
       const result = await stage.process(input);
-      expect(result).toBe(input); // Should return unchanged input on error
+
+      expect(result.files).toBe(input.files);
+      expect(result.stats.degradations).toHaveLength(1);
+      expect(result.stats.degradations[0]).toMatchObject({ stage: 'GitFilterStage' });
+      expect(result.stats.degradations[0].message).toContain('--modified could not be applied');
+      expect(result.stats.degradations[0].message).toContain('Git command failed');
+    });
+
+    it('names the ref that could not be resolved', async () => {
+      mockGitUtils.getChangedFiles.mockRejectedValue(new Error('unknown revision'));
+      stage = new GitFilterStage({ changed: 'no-such-ref', basePath: '/project' });
+
+      const result = await stage.process(createTestInput());
+
+      expect(result.stats.degradations[0].message).toContain('--changed no-such-ref');
+    });
+
+    // A multi-line git error must not drag its advice block into a status line.
+    it('keeps only the first line of the underlying error', async () => {
+      mockGitUtils.getModifiedFiles.mockRejectedValue(
+        new Error("fatal: bad revision\nUse '--' to separate paths from revisions"),
+      );
+      stage = new GitFilterStage({ modified: true, basePath: '/project' });
+
+      const result = await stage.process(createTestInput());
+
+      expect(result.stats.degradations[0].message).toContain('fatal: bad revision');
+      expect(result.stats.degradations[0].message).not.toContain("Use '--'");
     });
 
     it('should handle path normalization correctly', async () => {
@@ -269,9 +298,11 @@ describe('GitFilterStage', () => {
       stage = new GitFilterStage({ modified: true, basePath: '/project' });
       const input = createTestInput();
 
-      // Should catch the error and return original input
+      // Files pass through untouched, and the reason is recorded rather than
+      // discarded.
       const result = await stage.process(input);
-      expect(result).toBe(input);
+      expect(result.files).toBe(input.files);
+      expect(result.stats.degradations).toHaveLength(1);
     });
   });
 

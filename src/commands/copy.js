@@ -276,7 +276,15 @@ async function resolveBasePath(targetPath, reporter) {
  * @returns {Promise<Object>} Pipeline result
  */
 async function runPipeline({ basePath, profileConfig, options, startTime, reporter }) {
-  const pipeline = new Pipeline({ continueOnError: true, emitProgress: true });
+  const pipeline = new Pipeline({
+    continueOnError: true,
+    emitProgress: true,
+    // Stage logs go through the same silence the reporter observes. Without
+    // this a `--quiet` run still leaked stage warnings, and on a TTY they were
+    // written straight over the reporter's live line, since only the reporter
+    // knows to erase it first.
+    quiet: reporter.quiet,
+  });
   const stages = await setupPipelineStages(basePath, profileConfig, options);
   pipeline.through(stages);
 
@@ -968,19 +976,15 @@ async function setupPipelineStages(basePath, profile, options) {
   if (options.stream || (profile.options?.streaming ?? false)) {
     const { default: StreamingOutputStage } =
       await import('../pipeline/stages/StreamingOutputStage.js');
-    const fsSync = await import('fs');
-
-    let outputStream = process.stdout;
-    if (options.output) {
-      outputStream = fsSync.createWriteStream(path.resolve(options.output));
-    }
 
     stages.push(
       new StreamingOutputStage({
         format: outputFormat,
         addLineNumbers: options.withLineNumbers || profile.output?.addLineNumbers,
         prettyPrint: profile.output?.prettyPrint ?? true,
-        outputStream,
+        // The path, not an open stream: the stage opens it once it is about to
+        // write, so assembling the pipeline never touches the filesystem.
+        outputPath: options.output || null,
       }),
     );
   } else {

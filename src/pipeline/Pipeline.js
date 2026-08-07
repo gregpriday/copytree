@@ -368,7 +368,20 @@ class Pipeline extends EventEmitter {
                 originalError: error,
                 recoveredResult,
               });
-              result = recoveredResult;
+              // Recorded on the result, not only emitted. An event is available
+              // to whoever is listening at the time; this has to survive to the
+              // end of the run, because "the output is not what you asked for"
+              // is a fact about the result rather than a moment during it.
+              result = {
+                ...recoveredResult,
+                stats: {
+                  ...(recoveredResult.stats || {}),
+                  degradations: [
+                    ...(recoveredResult.stats?.degradations || []),
+                    { stage: stageName, message: `${stageName} failed: ${error.message}` },
+                  ],
+                },
+              };
               continue; // Continue with recovered result
             }
           } catch (handlerError) {

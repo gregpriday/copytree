@@ -207,46 +207,68 @@ function normalizeGitData(content) {
 }
 
 /**
- * Sort tree output lines for deterministic comparison
+ * Sort the directory-tree block for deterministic comparison.
  *
- * Only sorts the tree structure lines, preserving header/footer
+ * The tree's sibling order depends on filesystem enumeration, which differs
+ * between platforms, so it is sorted before comparison. Only the tree block is:
+ * the previous implementation took every line from the first tree glyph to the
+ * last non-empty line and sorted all of it, which in XML and Markdown output
+ * meant the closing tags and every `<ct:file>` element were swept in and
+ * reordered too. The resulting goldens were not valid XML — `</ct:directory>`
+ * landed third, `<ct:files>` closed before it opened — so they could not detect
+ * a structural regression, which is the one thing they exist for.
  *
- * @param {string} output - Tree output
- * @returns {string} Sorted output
+ * The block is now the maximal run of consecutive tree lines. Whatever precedes
+ * the first glyph (an opening tag) and follows the last entry (a closing tag)
+ * belongs to the line's position, not to the entry, so it stays put while the
+ * entries between them move.
+ *
+ * @param {string} output - Output containing a directory tree
+ * @returns {string} Output with the tree block sorted
  */
 function sortTreeOutput(output) {
   const lines = output.split('\n');
-  const headerEndIndex = lines.findIndex((line) => line.match(/^[├└│]/));
+  const TREE_GLYPH = /[├└│]/;
 
-  if (headerEndIndex === -1) {
-    // No tree structure found, return as-is
-    return output;
+  const start = lines.findIndex((line) => TREE_GLYPH.test(line));
+  if (start === -1) return output;
+
+  // Extend only while lines are themselves tree lines. A line whose first
+  // non-whitespace character is not a tree glyph ends the block.
+  let end = start;
+  while (end + 1 < lines.length && /^\s*[├└│]/.test(lines[end + 1])) {
+    end += 1;
   }
 
-  const header = lines.slice(0, headerEndIndex);
-  const treeLines = lines.slice(headerEndIndex);
+  const first = lines[start];
+  const prefix = first.slice(0, first.search(TREE_GLYPH));
 
-  // Separate tree lines from footer (empty lines at end)
-  let footerStartIndex = treeLines.length;
-  for (let i = treeLines.length - 1; i >= 0; i--) {
-    if (treeLines[i].trim() !== '') {
-      footerStartIndex = i + 1;
-      break;
-    }
-  }
+  // A closing tag on the final entry's line is part of the container, not the
+  // entry, so it must not travel with it when the entries are reordered.
+  const last = lines[end];
+  const suffixAt = last.indexOf('<');
+  const suffix = suffixAt === -1 ? '' : last.slice(suffixAt);
 
-  const tree = treeLines.slice(0, footerStartIndex);
-  const footer = treeLines.slice(footerStartIndex);
+  const entries = lines.slice(start, end + 1).map((line, index) => {
+    let entry = line;
+    if (index === 0) entry = entry.slice(prefix.length);
+    if (index === end - start && suffix) entry = entry.slice(0, entry.length - suffix.length);
+    return entry;
+  });
 
-  // Sort tree lines (preserving indentation structure)
-  const sorted = tree.sort((a, b) => {
-    // Extract the file/folder name without tree characters
+  entries.sort((a, b) => {
     const cleanA = a.replace(/^[├└│─\s]+/, '').trim();
     const cleanB = b.replace(/^[├└│─\s]+/, '').trim();
     return cleanA.localeCompare(cleanB);
   });
 
-  return [...header, ...sorted, ...footer].join('\n');
+  const sorted = entries.map((entry, index) => {
+    if (index === 0) return prefix + entry;
+    if (index === entries.length - 1) return entry + suffix;
+    return entry;
+  });
+
+  return [...lines.slice(0, start), ...sorted, ...lines.slice(end + 1)].join('\n');
 }
 
 /**

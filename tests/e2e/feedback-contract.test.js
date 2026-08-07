@@ -146,6 +146,67 @@ describe('feedback contract', () => {
     expect(stderr).toContain('Unknown format: foo');
   }, 30000);
 
+  // A stage that fails and carries on answers a different question than the one
+  // asked. In CI this was a whole-repository context where a diff was expected,
+  // with a zero exit and nothing to notice it by.
+  test('a stage that failed and continued is reported, not swallowed', async () => {
+    const { code, stderr } = await runCli(
+      [PROJECT, '--changed', 'definitely-not-a-ref', '--display'],
+      speaking,
+    );
+
+    expect(code).toBe(0);
+    expect(stderr).toContain('with warnings');
+    expect(stderr).toContain('--changed definitely-not-a-ref could not be applied');
+    // The git advice block that follows the message must not come with it.
+    expect(stderr).not.toContain("Use '--' to separate paths");
+  }, 30000);
+
+  test('a destination that cannot be written names the file and the operation', async () => {
+    const { code, stderr } = await runCli(
+      [PROJECT, '--stream', '--output', '/definitely-not-writable/out.xml'],
+      speaking,
+    );
+
+    expect(code).not.toBe(0);
+    expect(stderr).toContain('Could not write the output file');
+    expect(stderr).toContain('/definitely-not-writable/out.xml');
+  }, 30000);
+
+  // Opening the destination during stage assembly truncated an existing file
+  // before discovery had even run.
+  test('a failure before writing leaves an existing --output file untouched', async () => {
+    const target = path.join(os.tmpdir(), `copytree-untouched-${process.pid}.xml`);
+    fs.writeFileSync(target, 'PRESERVE ME');
+
+    const { code } = await runCli(
+      [PROJECT, '--stream', '--format', 'foo', '--output', target],
+      speaking,
+    );
+
+    expect(code).not.toBe(0);
+    expect(fs.readFileSync(target, 'utf8')).toBe('PRESERVE ME');
+    fs.unlinkSync(target);
+  }, 30000);
+
+  // A streamed document with no version is indistinguishable from an
+  // unversioned one, so a consumer checking for a schema change sees nothing.
+  test.each([
+    ['xml', '<ct:format>copytree-xml@1</ct:format>'],
+    ['json', '"format": "copytree-json@1"'],
+    ['ndjson', '"format":"copytree-ndjson@1"'],
+    ['markdown', 'format: copytree-md@1'],
+  ])(
+    'streamed %s carries its format version',
+    async (format, marker) => {
+      const { code, stdout } = await runCli([PROJECT, '--stream', '--format', format], speaking);
+
+      expect(code).toBe(0);
+      expect(stdout).toContain(marker);
+    },
+    30000,
+  );
+
   test('an empty selection is a valid outcome, not a failure', async () => {
     const { code, stderr } = await runCli(
       [PROJECT, '--filter', 'nothing-matches-this-*', '--display'],

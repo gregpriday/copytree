@@ -104,6 +104,7 @@ describe('Clipboard', () => {
     beforeEach(() => setPlatform('darwin'));
 
     it('uses spawnSync with osascript (no shell layer)', async () => {
+      spawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
       await Clipboard.copyFileReference('/Users/test/output.xml');
 
       expect(spawnSync).toHaveBeenCalledTimes(1);
@@ -113,6 +114,43 @@ describe('Clipboard', () => {
         ['-e', expect.stringContaining('POSIX file "/Users/test/output.xml"')],
         expect.objectContaining({ stdio: 'pipe' }),
       );
+    });
+
+    // `spawnSync` does not throw when the child exits non-zero, so the result
+    // had to be inspected and was not: a denied automation permission or a
+    // headless session left the clipboard untouched while the run reported
+    // "File reference copied".
+    it('falls back to text when osascript exits non-zero', async () => {
+      spawnSync.mockReturnValue({ status: 1, stderr: 'execution error: not allowed' });
+      const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValue(undefined);
+
+      await Clipboard.copyFileReference('/Users/test/output.xml');
+
+      expect(spy).toHaveBeenCalledWith('/Users/test/output.xml');
+      spy.mockRestore();
+    });
+
+    it('falls back to text when osascript cannot be spawned', async () => {
+      spawnSync.mockReturnValue({ error: new Error('ENOENT'), status: null });
+      const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValue(undefined);
+
+      await Clipboard.copyFileReference('/Users/test/output.xml');
+
+      expect(spy).toHaveBeenCalledWith('/Users/test/output.xml');
+      spy.mockRestore();
+    });
+
+    // The fallback has to be able to fail too, or `deliverOutput` never learns
+    // that nothing reached the clipboard and reports a success that did not
+    // happen.
+    it('rejects when the text fallback also fails', async () => {
+      spawnSync.mockReturnValue({ status: 1, stderr: 'nope' });
+      const spy = jest.spyOn(Clipboard, 'copyText').mockRejectedValue(new Error('no clipboard'));
+
+      await expect(Clipboard.copyFileReference('/Users/test/output.xml')).rejects.toThrow(
+        'no clipboard',
+      );
+      spy.mockRestore();
     });
 
     it('escapes double quotes for AppleScript', async () => {

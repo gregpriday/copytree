@@ -78,6 +78,21 @@ A warning is reserved for the cases where the guard could *not* do its job: a
 finding it failed to redact (the credential is still in the output), or a file it
 could not scan and therefore excluded.
 
+### Steps that failed but did not stop the run
+
+Some stages degrade rather than fail. A directory that is not a Git repository,
+or a `--changed` ref that does not resolve, leaves the files unfiltered instead
+of aborting the copy — but the result is then a whole-project context where a
+diff was asked for, so it is reported:
+
+```text
+⚠ Displayed 612 files with warnings — ~184k tokens
+  --changed no-such-ref could not be applied, so no files were filtered by git status: …
+```
+
+The exit code stays 0, because output was produced. Use `--quiet` if a script
+should ignore this, and read the warning if a human should not.
+
 ## Command Options
 
 ### Profile Options

@@ -116,10 +116,15 @@ class GitFilterStage extends Stage {
         },
       };
     } catch (error) {
-      this.log(`Git filtering error: ${error.message}`, 'error');
-
-      // Continue without git filtering on error
-      return input;
+      // Carrying on is right — a directory that is not a repository, or a git
+      // binary that is missing, should not stop a copy. Doing it silently is
+      // not: the caller asked for a subset and received everything, at a size
+      // and token count nothing about the run distinguished from success.
+      const asked = this.modified ? '--modified' : `--changed ${this.changed}`;
+      return this.degrade(
+        input,
+        `${asked} could not be applied, so no files were filtered by git status: ${error.message}`,
+      );
     }
   }
 }

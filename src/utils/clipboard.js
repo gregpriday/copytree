@@ -88,7 +88,25 @@ class Clipboard {
         const script = `set aFile to POSIX file "${escapedFilePath}"
 tell app "Finder" to set the clipboard to aFile`;
 
-        spawnSync('osascript', ['-e', script], { encoding: 'utf8', stdio: 'pipe' });
+        const result = spawnSync('osascript', ['-e', script], {
+          encoding: 'utf8',
+          stdio: 'pipe',
+          timeout: 2000,
+        });
+
+        // `spawnSync` does not throw when the child exits non-zero, so the
+        // result had to be inspected and was not. A headless session, a denied
+        // automation permission or a Finder that will not answer all left the
+        // clipboard untouched while the run reported "File reference copied" —
+        // the user pastes, gets whatever was there before, and has no reason to
+        // suspect this command. The Linux branch above already checks both.
+        if (result?.error || (result && result.status !== 0)) {
+          const reason =
+            result.error?.message ||
+            (result.stderr || '').trim() ||
+            `osascript exited with code ${result.status}`;
+          throw new Error(reason);
+        }
       } catch (error) {
         logger.debug('Failed to copy file reference, falling back to text:', error.message);
         // Fallback to copying path as text
