@@ -88,11 +88,7 @@ const ValidationDetails = ({ details, command }) => {
   return React.createElement(
     Box,
     { flexDirection: 'column', marginTop: 1 },
-    React.createElement(
-      Text,
-      { bold: true, color: 'yellow' },
-      command === 'profile:validate' ? 'Profile Details:' : 'Configuration Details:',
-    ),
+    React.createElement(Text, { bold: true, color: 'yellow' }, 'Configuration Details:'),
     React.createElement(
       Box,
       { marginLeft: 2, flexDirection: 'column', marginTop: 1 },
@@ -125,8 +121,6 @@ const ValidationView = ({ successMessage, type }) => {
       try {
         if (type === 'cache') {
           await runCacheValidation();
-        } else if (command === 'profile:validate') {
-          await runProfileValidation();
         } else if (command === 'config:validate') {
           await runConfigValidation();
         }
@@ -188,105 +182,6 @@ const ValidationView = ({ successMessage, type }) => {
       success: true,
       message: `Cache cleared! Total entries removed: ${totalCleared}`,
       details: { totalCleared },
-    });
-    setIsCompleted(true);
-    setCurrentStep(-1);
-  };
-
-  const runProfileValidation = async () => {
-    const { default: ProfileLoader } = await import('../../profiles/ProfileLoader.js');
-    const { ProfileError } = await import('../../utils/errors.js');
-
-    const profileName = options.profile || options.args?.[0] || 'default';
-    const profileLoader = new ProfileLoader();
-    let loadedProfile;
-    const validationWarnings = [];
-
-    const validationSteps = [
-      { name: 'Load profile', details: '' },
-      { name: 'Check profile structure', details: '' },
-      { name: 'Validate configuration', details: '' },
-    ];
-
-    setSteps(validationSteps);
-
-    // Step 1: Load profile
-    setCurrentStep(0);
-    try {
-      loadedProfile = await profileLoader.load(profileName, {});
-      validationSteps[0] = {
-        name: 'Load profile',
-        status: 'success',
-        details: 'Profile loaded successfully',
-      };
-    } catch (profileError) {
-      validationSteps[0] = {
-        name: 'Load profile',
-        status: 'error',
-        details: 'Failed to load profile',
-      };
-      setSteps([...validationSteps]);
-      throw profileError;
-    }
-    setSteps([...validationSteps]);
-
-    // Step 2: Check structure
-    setCurrentStep(1);
-    validationSteps[1] = {
-      name: 'Check profile structure',
-      status: 'success',
-      details: 'Profile structure is valid',
-    };
-    setSteps([...validationSteps]);
-
-    // Step 3: Validate configuration
-    setCurrentStep(2);
-
-    // Check for warnings
-    if (!loadedProfile.description) {
-      validationWarnings.push('No description provided');
-    }
-    if (!loadedProfile.version) {
-      validationWarnings.push('No version specified');
-    }
-    if (loadedProfile.include && loadedProfile.include.length === 0) {
-      validationWarnings.push('Include patterns list is empty');
-    }
-    if (loadedProfile.options?.maxFileSize && loadedProfile.options.maxFileSize < 1024) {
-      validationWarnings.push('maxFileSize is very small (< 1KB)');
-    }
-    if (loadedProfile.options?.maxFileCount && loadedProfile.options.maxFileCount < 10) {
-      validationWarnings.push('maxFileCount is very low (< 10)');
-    }
-
-    validationSteps[2] = {
-      name: 'Validate configuration',
-      status: validationWarnings.length > 0 ? 'warning' : 'success',
-      details:
-        validationWarnings.length > 0
-          ? `${validationWarnings.length} warnings found`
-          : 'No issues found',
-    };
-    setSteps([...validationSteps]);
-
-    setWarnings(validationWarnings);
-    setValidationResult({
-      success: true,
-      message:
-        validationWarnings.length === 0
-          ? 'Profile is valid with no issues'
-          : `Profile is valid with ${validationWarnings.length} warning(s)`,
-      details:
-        options.verbose || options.show
-          ? {
-              name: loadedProfile.name,
-              description: loadedProfile.description || 'N/A',
-              version: loadedProfile.version || 'N/A',
-              source: loadedProfile._source,
-              includePatterns: loadedProfile.include?.join(', ') || 'None',
-              excludePatterns: loadedProfile.exclude?.join(', ') || 'None',
-            }
-          : null,
     });
     setIsCompleted(true);
     setCurrentStep(-1);
@@ -454,11 +349,6 @@ const ValidationView = ({ successMessage, type }) => {
       Box,
       { flexDirection: 'column' },
       React.createElement(Text, { color: 'red', bold: true }, '✗ Validation Failed'),
-      React.createElement(
-        Text,
-        { color: 'red' },
-        command === 'profile:validate' ? 'Failed to load profile' : error,
-      ),
       React.createElement(Text, { color: 'red' }, error),
     );
   }
@@ -476,11 +366,7 @@ const ValidationView = ({ successMessage, type }) => {
     React.createElement(
       Text,
       { bold: true, color: 'yellow' },
-      type === 'cache'
-        ? 'Cache Clearing Progress:'
-        : command === 'profile:validate'
-          ? `Validating profile: ${options.profile || options.args?.[0] || 'default'}`
-          : 'Validating CopyTree Configuration',
+      type === 'cache' ? 'Cache Clearing Progress:' : 'Validating CopyTree Configuration',
     ),
     React.createElement(Box, { marginTop: 1 }, null),
     ...steps.map((step, index) =>

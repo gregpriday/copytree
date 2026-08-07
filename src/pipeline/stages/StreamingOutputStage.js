@@ -1,7 +1,6 @@
 import Stage from '../Stage.js';
 import { ERROR_CODES, FileSystemError, ValidationError } from '../../utils/errors.js';
 import { Transform } from 'stream';
-// const { create } = require('xmlbuilder2'); // Currently unused
 import path from 'path';
 import { pathToFileURL } from 'url';
 import {
