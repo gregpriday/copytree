@@ -1,6 +1,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { logger } from '../utils/logger.js';
+import { isAbortError } from '../utils/errors.js';
 
 // `execFile`, not `exec`: version detection does not need a shell, and starting
 // one is a second process plus a round of command-string parsing on a path the
@@ -225,7 +226,7 @@ class GitleaksAdapter {
       // A cancellation is the caller's decision, not a scanner failure. Turning
       // it into one would open the circuit, fall back to the built-in scanner,
       // and mark the run degraded — for a run that is being abandoned anyway.
-      if (error?.name === 'AbortError' || error?.code === 'ABORT_ERR') throw error;
+      if (isAbortError(error)) throw error;
 
       // Anything else is operational — a spawn failure, an unparseable exit
       // code, a timeout. It will recur for every remaining file, so the circuit

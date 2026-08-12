@@ -131,6 +131,7 @@ export const EXCLUSION_LABELS = Object.freeze({
   globalGitignore: 'ignored by your global gitignore',
   gitInfoExclude: 'ignored by .git/info/exclude',
   binaryExtension: 'binary files',
+  binaryPolicy: 'binary files dropped by policy',
   scopeFilter: 'outside the requested scope',
   configExclude: 'excluded by default configuration',
   optionExclude: 'excluded by --exclude',

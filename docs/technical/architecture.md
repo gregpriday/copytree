@@ -336,13 +336,13 @@ The pipeline emits comprehensive events for monitoring, debugging, and integrati
 ```typescript
 // Pipeline lifecycle events
 'pipeline:start' => {
-  input: any;              // Initial pipeline input
+  inputCount: number;      // Files carried by the initial input
   stages: number;          // Total number of stages
   options: PipelineOptions; // Pipeline configuration
 }
 
 'pipeline:complete' => {
-  result: any;             // Final pipeline output
+  resultCount: number;     // Files carried by the final output
   stats: PipelineStats;    // Complete pipeline statistics
 }
 
@@ -359,13 +359,12 @@ The pipeline emits comprehensive events for monitoring, debugging, and integrati
 'stage:start' => {
   stage: string;           // Stage name
   index: number;           // Stage position in pipeline
-  input: any;              // Input data for this stage
+  inputCount: number;      // Files carried into this stage
 }
 
 'stage:complete' => {
   stage: string;           // Stage name
   index: number;           // Stage position in pipeline
-  output: any;             // Stage output data
   duration: number;        // Execution time in milliseconds
   inputSize: number;       // Input data size metric
   outputSize: number;      // Output data size metric
@@ -386,6 +385,31 @@ The pipeline emits comprehensive events for monitoring, debugging, and integrati
   recoveredResult: any;    // Result returned by error handler
 }
 ```
+
+### Events carry metadata, never payloads
+
+No lifecycle event carries the pipeline input or output. They used to: an
+`onEvent` listener saw every file's content from every stage, including content
+that had not yet reached the secrets guard, so an embedder that logged events
+wrote unredacted credentials to its own logs while CopyTree reported that the
+export had been redacted. `scan()` forwards these events verbatim to a caller's
+`onEvent`, which is what made it an exposure rather than an inefficiency.
+
+Raw values are available on `stage:debug`, emitted only when something is
+listening:
+
+```typescript
+'stage:debug' => {
+  stage: string;
+  index: number;
+  phase: 'start' | 'complete';
+  input?: any;             // On 'start'
+  output?: any;            // On 'complete'
+}
+```
+
+`stage:debug` is diagnostic, not part of the stable event contract, and is not
+forwarded by the SDK.
 
 ### Progress and Monitoring Events
 

@@ -1,6 +1,7 @@
 import Stage from '../Stage.js';
 import { assertFormat, buildDocument, serialize } from '../../formatters/index.js';
 import { openAtomicWriteStream } from '../../utils/atomicWrite.js';
+import { onceAny } from '../../utils/streamEvents.js';
 
 /**
  * Write the document to its destination as it is produced.
@@ -104,10 +105,20 @@ class StreamingOutputStage extends Stage {
     for await (const chunk of serialize(document)) {
       this.signal?.throwIfAborted();
       if (destination.write(chunk)) continue;
-      await new Promise((resolve, reject) => {
-        destination.once('drain', resolve);
-        destination.once('error', reject);
-      });
+      // `close` as well: a destination torn down mid-write emits `close` and
+      // never `drain`, and a waiter on the other two would hang forever. The
+      // helper also detaches whichever listeners did not fire — this loop runs
+      // once per backpressure cycle, so leaking one listener per cycle is a
+      // listener leak proportional to the size of the export.
+      await onceAny(
+        destination,
+        {
+          drain: 'resolve',
+          error: 'reject',
+          close: () => new Error('output stream closed before the export finished'),
+        },
+        { signal: this.signal },
+      );
     }
   }
 }

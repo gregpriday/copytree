@@ -47,7 +47,6 @@ export default async function explainCommand(request, context = {}) {
     root,
     request,
     config: cfg,
-    onWarning: (message) => feedback.write(message, { level: 'warn' }),
     retention: { mode: 'all', maxEntries: cfg.get('copytree.exclusionReport.maxEntries', 100000) },
   });
 

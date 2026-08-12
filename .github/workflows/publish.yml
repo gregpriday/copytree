@@ -8,6 +8,15 @@ on:
 permissions:
   contents: read
 
+# One publish at a time. Two tag pushes in quick succession would otherwise race
+# for the same registry state: both read `latest`, both decide a dist-tag from
+# it, and the second overwrites the first's decision. `cancel-in-progress` is
+# deliberately false — a half-finished publish must be allowed to finish and
+# create its release rather than being killed between the two.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
 jobs:
   # One job, on purpose.
   #
@@ -54,8 +63,12 @@ jobs:
       - name: Install from the lockfile
         run: npm ci
 
-      - name: Upgrade npm for OIDC trusted publishing
-        run: npm install -g npm@latest
+      # Pinned, not `@latest`. Publishing is the single most consequential
+      # thing this repository does, and floating the tool that performs it means
+      # every release depends on whatever npm shipped that morning. Raise this
+      # deliberately, in a PR, having watched a release candidate go out on it.
+      - name: Install the pinned npm for OIDC trusted publishing
+        run: npm install -g npm@11.17.0
 
       # The complete gate: lint, formatting, generated-document drift,
       # documentation links, types, dead code, the full suite with coverage,
@@ -93,16 +106,28 @@ jobs:
         id: disttag
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Any SemVer prerelease — anything after the first `-` — must never
-          # become `latest` by default. Matching a list of known identifiers
-          # (alpha/beta/rc/next) let `1.0.0-preview.1` and `1.0.0-canary` fall
-          # through into the stable path.
-          case "$VERSION" in
-            *-*)
+          # Whether this is a prerelease is decided by the same SemVer
+          # implementation that decides the dist-tag, not by a shell glob. The
+          # glob was `case "$VERSION" in *-*)`, which calls `1.2.3+build-7` a
+          # prerelease: build metadata may legally contain a hyphen, so a
+          # perfectly ordinary stable release would have gone out under `next`.
+          # The exit code is checked explicitly rather than with a bare `if`:
+          # 0 means prerelease, 1 means stable, and 2 means the version did not
+          # parse at all. A bare `if` treats 2 the same as 1 and walks into the
+          # stable branch, which is the one place a release decision must never
+          # be made from an unrecognised string.
+          set +e
+          node scripts/dist-tag.js --is-prerelease "$VERSION"
+          IS_PRERELEASE=$?
+          set -e
+
+          if [ "$IS_PRERELEASE" -eq 0 ]; then
               echo "tag=next" >> "$GITHUB_OUTPUT"
               echo "prerelease=true" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
+          elif [ "$IS_PRERELEASE" -ne 1 ]; then
+              echo "::error::$VERSION is not a version this release process recognises"
+              exit 1
+          else
               # A registry lookup that *fails* must not read as "nothing is
               # published" — that would let a network blip move `latest`
               # backwards. Only a genuine 404 means the package is new;
@@ -117,19 +142,18 @@ jobs:
                   exit 1
                 fi
               fi
-              HIGHEST="$(printf '%s\n%s\n' "$VERSION" "$LATEST" | sort -V | tail -1)"
-              if [ "$HIGHEST" != "$VERSION" ]; then
-                # Publishing below the current latest is either a deliberate
-                # hotfix to an older line or a mistake. Either way it must not
-                # silently move `latest` backwards for every installer.
-                echo "::warning::$VERSION is below the published latest ($LATEST); publishing under the 'hotfix' tag"
-                echo "tag=hotfix" >> "$GITHUB_OUTPUT"
-              else
-                echo "tag=latest" >> "$GITHUB_OUTPUT"
+              # `sort -V` used to decide this. GNU version sort is not SemVer:
+              # it ranks `1.0.0-beta.1` above `1.0.0`, so the first stable
+              # release would have gone out under `hotfix` while a beta kept
+              # `latest`. `scripts/dist-tag.js` implements the real precedence
+              # rules and is unit-tested against the cases that differ.
+              TAG="$(node scripts/dist-tag.js "$VERSION" "$LATEST")"
+              if [ "$TAG" = 'hotfix' ]; then
+                echo "::warning::$VERSION does not exceed the published latest ($LATEST); publishing under the 'hotfix' tag"
               fi
+              echo "tag=$TAG" >> "$GITHUB_OUTPUT"
               echo "prerelease=false" >> "$GITHUB_OUTPUT"
-              ;;
-          esac
+          fi
 
       # Publishes the exact file that was just packed and verified, rather than
       # re-packing from the working tree.

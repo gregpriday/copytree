@@ -114,6 +114,7 @@ secretsGuard:
   redactionMode: typed
   failOnSecrets: false
   maxFileBytes: 1000000
+  # exclude (default) | scan | fail
   oversizePolicy: exclude
   exclude:
     # Additional patterns beyond the defaults

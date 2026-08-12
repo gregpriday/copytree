@@ -87,7 +87,7 @@ export default async function ignoreCommand(request, context = {}) {
  * @param {Object} config - Configuration manager
  * @returns {Promise<{baseline: Object, attributed: Object, effective: Object}>} All three
  */
-async function buildBaselineAndEffective(root, request, config, onWarning) {
+async function buildBaselineAndEffective(root, request, config) {
   // The baseline deliberately drops everything CopyTree-specific: no
   // `.copytreeignore`, no profile, no CLI excludes, no aggregate budgets. What
   // is left is exactly the set of areas an author might want to exclude.
@@ -119,7 +119,6 @@ async function buildBaselineAndEffective(root, request, config, onWarning) {
     retention: { mode: 'counts' },
     skipCopytreeIgnore: true,
     secretsPolicy: 'off',
-    onWarning,
   });
 
   // The baseline again, with `.copytreeignore` and nothing else. The difference
@@ -140,7 +139,6 @@ async function buildBaselineAndEffective(root, request, config, onWarning) {
     request,
     config,
     retention: { mode: 'counts' },
-    onWarning,
   });
 
   return { baseline, attributed, effective };
@@ -164,12 +162,7 @@ async function ignoreContext(request, context) {
   const root = resolved.root;
   request = resolved.request;
 
-  const { baseline, attributed, effective } = await buildBaselineAndEffective(
-    root,
-    request,
-    cfg,
-    (message) => feedback.write(message, { level: 'warn' }),
-  );
+  const { baseline, attributed, effective } = await buildBaselineAndEffective(root, request, cfg);
 
   const report = request.report;
   const aggregates = aggregate(baseline.selected, {
@@ -287,12 +280,7 @@ async function ignoreCheck(request, context) {
 
   const ignorePath = path.join(root, '.copytreeignore');
   const parsed = await readIgnoreFile(ignorePath);
-  const { baseline, attributed, effective } = await buildBaselineAndEffective(
-    root,
-    request,
-    cfg,
-    (message) => feedback.write(message, { level: 'warn' }),
-  );
+  const { baseline, attributed, effective } = await buildBaselineAndEffective(root, request, cfg);
 
   const analysis = analyseIgnoreFile({
     root,
@@ -468,12 +456,7 @@ async function ignoreInit(request, context) {
   // Validate what was just written, and say what it does. A starter file that
   // silently removes source is exactly the failure this command should catch.
   const parsed = await readIgnoreFile(ignorePath);
-  const { baseline, attributed, effective } = await buildBaselineAndEffective(
-    root,
-    request,
-    cfg,
-    (message) => feedback.write(message, { level: 'warn' }),
-  );
+  const { baseline, attributed, effective } = await buildBaselineAndEffective(root, request, cfg);
   const analysis = analyseIgnoreFile({
     root,
     ignorePath,

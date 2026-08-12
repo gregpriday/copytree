@@ -7,10 +7,16 @@
  * format carries a version string in its header and the delimiters are treated
  * as a compatibility surface.
  *
- * Bump the minor part for additive changes (a new optional field). Bump the
- * major part for anything that would break a parser written against the
- * previous version: renamed or removed fields, changed delimiters, changed
- * nesting.
+ * **The identifier is a single integer: a major schema family, and nothing
+ * else.** Additive changes — a new optional field, a new stats key — do not
+ * change it, because a parser written against `copytree-xml@1` still works.
+ * Bump the integer for anything that would break such a parser: renamed or
+ * removed fields, changed delimiters, changed nesting.
+ *
+ * This used to say "bump the minor part for additive changes", which described
+ * a `major.minor` scheme that no emitted identifier has ever used. A consumer
+ * reading that and pinning `copytree-xml@1.0` would have been matching against
+ * a string CopyTree does not produce.
  *
  * @readonly
  * @enum {string}

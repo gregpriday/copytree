@@ -1,4 +1,9 @@
-import { isRetryableFsError } from './errors.js';
+// One abort error for the whole codebase. This module used to mint its own with
+// `code: 'ABORT_ERR'` and no `name`, so `isAbortError()` — which the pipeline,
+// the CLI and the scanner all consult — did not recognise a cancellation that
+// happened during a retried filesystem operation, and it was reported as an
+// ordinary I/O failure with exit code 1 instead of 130.
+import { createAbortError, isRetryableFsError } from './errors.js';
 
 /**
  * Execute a filesystem operation with exponential backoff retry logic
@@ -22,12 +27,6 @@ export async function withFsRetry(operation, options = {}) {
     onRetry = () => {},
     signal,
   } = options;
-
-  const createAbortError = () => {
-    const abortError = new Error('Operation aborted');
-    abortError.code = 'ABORT_ERR';
-    return abortError;
-  };
 
   let attempt = 0;
 

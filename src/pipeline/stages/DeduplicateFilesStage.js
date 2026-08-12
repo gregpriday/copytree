@@ -9,6 +9,12 @@ import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 class DeduplicateFilesStage extends Stage {
   constructor(options = {}) {
     super(options);
+    // Fatal. This stage only exists in the pipeline when the caller passed
+    // `--dedupe`, so its failure means a requested transformation of the
+    // selection did not happen. Returning the duplicates unchanged is a
+    // different result than the one asked for, and nothing in the output says
+    // so.
+    this.fatal = true;
     // SHA-256, not MD5. This hash is the sole identity test for "these two
     // files are the same", and a collision here silently deletes a file from
     // the context. MD5 collisions are cheap to construct on purpose, so a
@@ -34,15 +40,6 @@ class DeduplicateFilesStage extends Stage {
   _hasSyntheticContent(file) {
     if (file.binaryCategory === 'structure-only') return true;
     return Boolean(file.isBinary) && file.encoding !== 'base64';
-  }
-
-  /**
-   * Handle errors during deduplication - return files unchanged
-   */
-  async handleError(error, input) {
-    this.log(`Deduplication failed: ${error.message}, returning files unchanged`, 'warn');
-    // Return input unchanged if deduplication fails
-    return input;
   }
 
   /**

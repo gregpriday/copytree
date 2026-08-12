@@ -351,12 +351,19 @@ describe('NDJSON Formatter', () => {
     });
 
     it('concatenates to exactly the buffered document', async () => {
+      // `reproducible: true`, because the two sides build their documents
+      // independently and each stamps `generated` and `processedAt` from the
+      // clock. When those two `new Date()` calls landed either side of a
+      // millisecond boundary the assertion failed on a timestamp — a flake
+      // that says nothing about chunking, which is what this test is for.
+      const options = { format: 'ndjson', reproducible: true };
+
       let streamed = '';
-      for await (const chunk of serialize(buildDocument(input, { format: 'ndjson' }))) {
+      for await (const chunk of serialize(buildDocument(input, options))) {
         streamed += chunk;
       }
 
-      expect(streamed).toBe(await ndjsonFormatter().format(input));
+      expect(streamed).toBe(await ndjsonFormatter({ reproducible: true }).format(input));
     });
   });
 

@@ -75,8 +75,24 @@ describe('fatal versus recoverable stages', () => {
     expect(new SecretsGuardStage().fatal).toBe(true);
     expect(new OutputFormattingStage().fatal).toBe(true);
 
-    // Sorting can degrade to unsorted output without misrepresenting anything.
-    expect(new SortFilesStage({ sortBy: 'path' }).fatal).toBe(false);
+    // Sorting is fatal too, and the comment that used to sit here — "sorting
+    // can degrade to unsorted output without misrepresenting anything" — was
+    // wrong. Sort runs immediately before `BudgetStage`, so the order it
+    // establishes decides *which files survive* a `--max-files` or
+    // `--max-total-size` cut. Falling back to filesystem enumeration order
+    // returns a different selection than the caller described, reports
+    // success, and returns a different one again on the next machine.
+    expect(new SortFilesStage({ sortBy: 'path' }).fatal).toBe(true);
+  });
+
+  test('an unknown sort key is refused rather than silently sorted by path', async () => {
+    const { default: SortFilesStage } =
+      await import('../../../src/pipeline/stages/SortFilesStage.js');
+
+    const stage = new SortFilesStage({ sortBy: 'mtime' });
+    await expect(stage.process({ files: [{ path: 'b.js' }, { path: 'a.js' }] })).rejects.toThrow(
+      /Unknown sort key/,
+    );
   });
 
   test('output formatting does not answer a failure with a different format', async () => {

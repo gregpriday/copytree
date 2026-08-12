@@ -38,11 +38,17 @@ describe('Pipeline Event Contract', () => {
       expect(startEvents).toHaveLength(1);
 
       const startData = startEvents[0].data;
+      // Counts, not payloads. These events used to carry `input` and `output`
+      // — the whole selection, with every file's content on it — so any
+      // embedder that attached a logger to `onEvent` was serializing the
+      // repository, and a third-party listener saw more than the run it was
+      // observing. `stage:debug` carries the raw values for whoever needs them.
       expect(startData).toMatchObject({
-        input: expect.any(Object),
+        inputCount: expect.any(Number),
         stages: expect.any(Number),
         options: expect.any(Object),
       });
+      expect(startData.input).toBeUndefined();
     });
 
     it('emits pipeline:complete with output and metrics', async () => {
@@ -58,7 +64,7 @@ describe('Pipeline Event Contract', () => {
 
       const completeData = completeEvents[0].data;
       expect(completeData).toMatchObject({
-        result: expect.any(Object),
+        resultCount: expect.any(Number),
         stats: expect.objectContaining({
           startTime: expect.any(Number),
           endTime: expect.any(Number),
@@ -101,8 +107,9 @@ describe('Pipeline Event Contract', () => {
         expect(event.data).toMatchObject({
           stage: expect.any(String), // Stage name is a string
           index: expect.any(Number),
-          input: expect.any(Object),
+          inputCount: expect.any(Number),
         });
+        expect(event.data.input).toBeUndefined();
       });
     });
 
@@ -119,9 +126,10 @@ describe('Pipeline Event Contract', () => {
         expect(event.data).toMatchObject({
           stage: expect.any(String), // Stage name is a string
           index: expect.any(Number),
-          output: expect.any(Object),
+          outputSize: expect.any(Number),
           duration: expect.any(Number),
         });
+        expect(event.data.output).toBeUndefined();
 
         // Always carried, null unless memory measurement was requested.
         expect(event.data).toHaveProperty('memoryUsage');
@@ -166,19 +174,25 @@ describe('Pipeline Event Contract', () => {
       const stageEvents = collector.getEvents('stage:complete');
       expect(stageEvents.length).toBeGreaterThan(0);
 
-      // Verify context is actually included in the stage output
+      // The raw values live on the opt-in `stage:debug` channel now.
       for (const event of stageEvents) {
         expect(event).toHaveProperty('data');
-        expect(event.data).toHaveProperty('output');
-        // Context should be propagated through the pipeline
-        expect(event.data.output).toHaveProperty('context');
-        expect(event.data.output.context).toBeDefined();
-        // Verify it contains the expected config and profile
-        expect(event.data.output.context).toHaveProperty('config');
-        expect(event.data.output.context).toHaveProperty('profile');
-        expect(event.data.output.context.config).toEqual({ test: true });
-        expect(event.data.output.context.profile).toEqual({ name: 'test' });
+        expect(event.data.output).toBeUndefined();
+        expect(event.data.outputSize).toEqual(expect.any(Number));
       }
+    });
+
+    it('carries the raw values on the opt-in stage:debug channel', async () => {
+      const pipeline = createTestPipeline([new MockStage('test-stage')]);
+      const debugEvents = [];
+      pipeline.on('stage:debug', (data) => debugEvents.push(data));
+
+      const context = { config: { test: true }, profile: { name: 'test' } };
+      await pipeline.process({ files: [], context });
+
+      const completed = debugEvents.filter((event) => event.phase === 'complete');
+      expect(completed.length).toBeGreaterThan(0);
+      expect(completed[0].output.context).toEqual(context);
     });
   });
 
@@ -383,8 +397,9 @@ describe('Pipeline Event Contract', () => {
       expect(recoverEvents[0].data).toMatchObject({
         stage: 'error-stage',
         originalError: expect.any(Error),
-        recoveredResult: expect.any(Object),
+        recoveredCount: expect.any(Number),
       });
+      expect(recoverEvents[0].data.recoveredResult).toBeUndefined();
 
       const completeEvents = collector.getEvents('stage:complete');
       // Only 2 stages complete: good-stage and recovery-stage
@@ -464,7 +479,7 @@ describe('Pipeline Event Contract', () => {
       await pipeline.process(originalInput);
 
       const startEvent = collector.getEvents('pipeline:start')[0];
-      expect(startEvent.data.input).toEqual(inputCopy);
+      expect(startEvent.data.inputCount).toBe(inputCopy.files.length);
     });
   });
 });

@@ -17,6 +17,27 @@ global.console = {
   debug: jest.fn(),
 };
 
+// Re-arm the global filesystem mock before every test.
+//
+// `resetMocks: true` strips every mock implementation between tests, including
+// the ones a `jest.mock` factory installed at module-registry time. The result
+// was that `fs.readFile` resolved to `undefined` throughout the `mocked`
+// project, so anything that actually read a file was operating on nothing —
+// visible only as swallowed errors. Declared in `tests/setup-global-mocks.js`;
+// applied here, where `beforeEach` exists.
+beforeEach(() => {
+  const registered = globalThis.__COPYTREE_FSX_MOCK__;
+  if (!registered) return;
+
+  const { mock, defaults } = registered;
+  for (const [name, [kind, value]] of Object.entries(defaults)) {
+    if (!jest.isMockFunction(mock[name])) continue;
+    if (kind === 'resolve') mock[name].mockResolvedValue(value);
+    else if (kind === 'return') mock[name].mockReturnValue(value);
+    else mock[name].mockImplementation(value);
+  }
+});
+
 // Add custom matchers if needed
 expect.extend({
   toBeValidPath(received) {

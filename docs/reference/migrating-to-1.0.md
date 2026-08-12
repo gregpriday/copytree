@@ -58,6 +58,34 @@ discarded without a word.
 `maxFileSize: "10485760"` used to be quietly converted to a number. It is now
 rejected. Write numbers as numbers.
 
+### The binary policy enum lost `load` and `omit`
+
+`copytree.binaryFileAction` and `copytree.binaryPolicy.<category>` accept
+`skip`, `comment`, `placeholder` and `base64`. `load` and `omit` validated
+cleanly and then behaved as `placeholder`, which makes a closed enum a promise
+the code did not keep. If you set either, choose the behaviour you actually
+wanted; `--binary omit` on the command line is unchanged and still maps to
+`skip`.
+
+The packaged defaults also drop `binaryPolicy.text: 'load'`. That map is
+consulted only for files classified as binary, so the text category never
+reached it: the entry documented a policy no code path could apply.
+
+### `secretsGuard.oversizePolicy` is `exclude | scan | fail`
+
+The schema previously accepted `exclude | include | warn` while the
+implementation branched on `exclude | scan | fail` and `SECURITY.md` documented
+the latter — so following the security guide produced a configuration the
+validator rejected. The documented spelling won. `include` and `warn` were never
+implemented and both would have emitted unscanned content.
+
+### The schema must be present under `strict`
+
+A missing or uncompilable `config/schema.json` used to disable validation and
+carry on. An SDK caller using `strict: true` now gets
+`ERR_CONFIG_SCHEMA_UNAVAILABLE`, because a packaging defect that removes the
+schema should stop a release rather than quietly weaken it.
+
 ### `ConfigManager.migrateConfig()` was removed
 
 It printed `not implemented yet` and returned its input unchanged. The migration
@@ -157,6 +185,65 @@ a null check, it never ran; add a `catch` if you were relying on it.
 
 `getAll()` never existed — the method is `getAllTransformers()`.
 
+### Error codes all come from `ERROR_CODES`
+
+Nine error classes carried bare strings that were in no registry and no
+TypeScript union, while the documentation told you to switch on `error.code`.
+If you match any of these, update the value:
+
+| Was                  | Now                   |
+| -------------------- | --------------------- |
+| `FILESYSTEM_ERROR`   | `ERR_FILESYSTEM`      |
+| `GIT_ERROR`          | `ERR_GIT`             |
+| `VALIDATION_ERROR`   | `ERR_VALIDATION`      |
+| `CONFIG_ERROR`       | `ERR_CONFIG_INVALID`  |
+| `PROFILE_ERROR`      | `ERR_PROFILE_INVALID` |
+| `TRANSFORM_ERROR`    | `ERR_TRANSFORM`       |
+| `PIPELINE_ERROR`     | `ERR_PIPELINE_STAGE`  |
+| `COMMAND_ERROR`      | `ERR_COMMAND_FAILED`  |
+| `INSTRUCTIONS_ERROR` | `ERR_INSTRUCTIONS`    |
+
+New codes: `ERR_PERMISSION_DENIED` (a path that exists but cannot be read, which
+used to be reported as `ERR_PATH_NOT_FOUND`), `ERR_BUDGET_ENFORCEMENT`,
+`ERR_CONFIG_SCHEMA_UNAVAILABLE` and `ERR_OUTPUT_WRITE`. Exit-code mapping is
+unchanged in kind: usage and configuration errors still exit 2, operational
+failures 1, policy failures 3, cancellation 130.
+
+### Pipeline events carry counts, not payloads
+
+`stage:start` and `stage:complete` no longer include `input` / `output`, and
+`pipeline:start` / `pipeline:complete` / `stage:recover` no longer include
+`input` / `result` / `recoveredResult`. They carry `inputCount`, `outputSize`,
+`resultCount`, `recoveredCount` and the existing timing and memory fields.
+
+This closes a real exposure rather than tidying a payload: `scan()` forwards
+every event to an `onEvent` callback, so an application that logged events was
+serializing every file's content — including content that had not yet been
+through the secrets guard. If you need the raw values, listen for `stage:debug`,
+which is emitted only when something is listening and is explicitly diagnostic
+rather than stable.
+
+### `--strict` fails on a degraded run
+
+A degradation means the run finished but not as asked: a Git selector that could
+not be applied, a transform that failed and left its file unchanged, a scanner
+that had to fall back to the built-in patterns. `--strict` is documented as
+"enable every applicable policy-failure check" and did not read that list. It
+does now, and exits 3.
+
+### `toJSON()` no longer includes the stack
+
+`error.toJSON()` — which is also what `JSON.stringify(error)` calls — returns
+`name`, `message`, `code`, `details` and `timestamp`. The stack named absolute
+paths on the machine that ran the command, and `details` on a configuration
+failure used to carry the entire effective configuration. Use `toDebugJSON()`
+where you want both.
+
+### A `Pipeline` is immutable once it has run
+
+`through()` throws after the first `process()`. Stages added afterwards were
+pushed onto the list, never instantiated, and never executed — silently.
+
 ### Declarations no longer require `@types/node`
 
 `content` is typed `string | Uint8Array | null` rather than `string | Buffer |
@@ -185,6 +272,18 @@ notice.
   existing export or leaves half a document at the destination. This covers the
   copy itself — buffered, streamed and the temporary reference file — not
   ancillary writes such as `config migrate`.
+- **A run that cannot do what you asked now fails.** Budget enforcement,
+  sorting and deduplication each used to answer an internal error by returning
+  their input unchanged, so `--max-total-size 2MB` could exit 0 having produced
+  far more than that, and `--sort modified --max-files 20` could return twenty
+  arbitrary files. A file that cannot be read is no longer exported with
+  `[Error loading file: ...]` as its body. A `.copytree.yml` that is present and
+  will not parse stops the run instead of being skipped with a warning.
+- **`.copytree/<name>.yml` profiles resolve.** The documented directory layout
+  was never implemented — only `.copytree-<name>.yml` beside it was — and the
+  `.copytree/` directory itself was being opened as a profile file on every run.
+- **`maxBase64Size` and `secretsGuard.gitleaks.*` take effect.** Both were
+  public, documented, schema-validated configuration that nothing read.
 - **Ctrl+C cancels rather than exits.** The first signal aborts the operation so
   writers, child processes and temporary files unwind; a second forces exit.
 

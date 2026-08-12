@@ -106,11 +106,9 @@ export async function resolveTarget(request, hooks = {}) {
  *
  * @param {string} root - Project root
  * @param {Object} selection - Canonical selection request
- * @param {Object} [hooks={}] - Optional callbacks
- * @param {Function} [hooks.onWarning] - Called when a discovered profile is unusable
  * @returns {Promise<SelectionProfile>} Effective profile
  */
-export async function loadSelectionProfile(root, selection, { onWarning } = {}) {
+export async function loadSelectionProfile(root, selection) {
   const empty = {
     name: 'default',
     source: null,
@@ -133,13 +131,16 @@ export async function loadSelectionProfile(root, selection, { onWarning } = {}) 
     // automatic one rather than replacing it, so a `.copytree.yml` holding the
     // project's shared rules is not silently discarded the moment someone
     // passes `--profile api`.
-    // A broken auto-discovered profile is not fatal — a project should still be
-    // copyable — but it is not nothing either: the author wrote rules that are
-    // not in force, and saying nothing is how they stay that way.
-    const discovered = await loader.discover().catch((error) => {
-      onWarning?.(`Ignoring ${error.details?.filePath ?? '.copytree.yml'}: ${error.message}`);
-      return null;
-    });
+    // A *missing* auto-discovered profile is optional by definition. A present
+    // but malformed one is not the same thing, and used to be treated as if it
+    // were: the run warned and continued with no project profile at all.
+    //
+    // A checked-in `.copytree.yml` is the repository's statement about what may
+    // and may not leave it. Ignoring it can include generated files, drop
+    // intended force-includes, or export data the author wrote a rule to
+    // exclude — and every user of that repository gets the wrong answer
+    // silently. A file the author wrote and got wrong is worth stopping for.
+    const discovered = await loader.discover();
     const named = selection.profileName ? await loader.loadNamed(selection.profileName) : null;
 
     if (!discovered && !named) return empty;
@@ -162,13 +163,12 @@ export async function loadSelectionProfile(root, selection, { onWarning } = {}) 
       transformers: { ...(discovered?.transformers ?? {}), ...(named?.transformers ?? {}) },
     };
   } catch (error) {
-    // A profile named by hand must exist. A discovered one is optional by
-    // definition, so a broken auto-discovered file degrades to no profile.
-    if (!selection.profileName) return empty;
     // Only a genuinely missing profile becomes "profile not found". A profile
     // that exists and is malformed keeps its own message, which names the file
     // and the offending field.
     if (error instanceof ProfileError && error.details?.notFound === true) {
+      // Auto-discovery finding nothing is the ordinary case, not a failure.
+      if (!selection.profileName) return empty;
       throw new ValidationError(
         `Profile not found: ${selection.profileName}`,
         'profile',
@@ -379,9 +379,8 @@ export async function buildSelectionPlan({
   onProgress = null,
   skipCopytreeIgnore = false,
   secretsPolicy = null,
-  onWarning = null,
 }) {
-  const profile = await loadSelectionProfile(root, request.selection, { onWarning });
+  const profile = await loadSelectionProfile(root, request.selection);
   const budgets = resolveBudgets(request, profile, config);
   const effectiveSecretsPolicy =
     secretsPolicy ??

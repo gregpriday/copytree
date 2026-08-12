@@ -197,16 +197,51 @@ describe('Error Classes', () => {
       });
     });
 
-    test('all error classes should have correct error codes', () => {
-      expect(new CommandError('test', 'cmd').code).toBe('COMMAND_ERROR');
-      expect(new ConfigurationError('test', 'config').code).toBe('CONFIG_ERROR');
-      expect(new FileSystemError('test', '/path', 'op').code).toBe('FILESYSTEM_ERROR');
-      expect(new ProfileError('test', 'profile').code).toBe('PROFILE_ERROR');
-      expect(new TransformError('test', 'transformer', '/file').code).toBe('TRANSFORM_ERROR');
-      expect(new GitError('test', 'status').code).toBe('GIT_ERROR');
-      expect(new ValidationError('test', 'field', 'value').code).toBe('VALIDATION_ERROR');
-      expect(new PipelineError('test', 'stage').code).toBe('PIPELINE_ERROR');
-      expect(new InstructionsError('test', 'instructions').code).toBe('INSTRUCTIONS_ERROR');
+    test('every error class carries a code from the public registry', () => {
+      // These used to be bare `COMMAND_ERROR`-style strings that appeared in no
+      // registry and in no TypeScript union, while the docs told consumers to
+      // switch on `error.code`. A code outside the union is a code a typed
+      // consumer cannot write a case for.
+      const thrown = [
+        new CommandError('test', 'cmd'),
+        new ConfigurationError('test', 'config'),
+        new FileSystemError('test', '/path', 'op'),
+        new ProfileError('test', 'profile'),
+        new TransformError('test', 'transformer', '/file'),
+        new GitError('test', 'status'),
+        new ValidationError('test', 'field', 'value'),
+        new PipelineError('test', 'stage'),
+        new InstructionsError('test', 'instructions'),
+      ];
+
+      const registry = new Set(Object.values(ERROR_CODES));
+      for (const error of thrown) {
+        expect(registry.has(error.code)).toBe(true);
+      }
+
+      expect(new CommandError('test', 'cmd').code).toBe(ERROR_CODES.COMMAND_FAILED);
+      expect(new ConfigurationError('test', 'config').code).toBe(ERROR_CODES.CONFIG_INVALID);
+      expect(new FileSystemError('test', '/path', 'op').code).toBe(ERROR_CODES.FILESYSTEM);
+      expect(new ProfileError('test', 'profile').code).toBe(ERROR_CODES.PROFILE_INVALID);
+      expect(new TransformError('test', 't', '/f').code).toBe(ERROR_CODES.TRANSFORM);
+      expect(new GitError('test', 'status').code).toBe(ERROR_CODES.GIT);
+      expect(new ValidationError('test', 'f', 'v').code).toBe(ERROR_CODES.VALIDATION);
+      expect(new PipelineError('test', 'stage').code).toBe(ERROR_CODES.PIPELINE_STAGE);
+      expect(new InstructionsError('test', 'i').code).toBe(ERROR_CODES.INSTRUCTIONS);
+    });
+
+    test('toJSON withholds the stack and toDebugJSON supplies it', () => {
+      // `toJSON()` is what a logging integration and `JSON.stringify(error)`
+      // both reach for, and a stack names absolute paths on the machine that
+      // ran the command.
+      const error = new FileSystemError('test', '/path', 'op', {
+        cause: new Error('underlying'),
+      });
+
+      expect(error.toJSON().stack).toBeUndefined();
+      expect(error.toJSON().details.cause).toBeUndefined();
+      expect(error.toDebugJSON().stack).toContain('FileSystemError');
+      expect(error.toDebugJSON().cause).toContain('underlying');
     });
   });
 

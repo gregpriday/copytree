@@ -1,5 +1,6 @@
 import Stage from '../Stage.js';
 import path from 'path';
+import { ValidationError } from '../../utils/errors.js';
 import {
   comparatorFor as stringComparatorFor,
   compareCollated,
@@ -36,6 +37,23 @@ function compareCodeUnits(a, b) {
   if (a === b) return 0;
   return a < b ? -1 : 1;
 }
+
+/**
+ * The sort keys this stage implements.
+ *
+ * Duplicated from `SORT_KEYS` in `src/cli/schema.js` rather than imported: that
+ * module is the CLI's declarative surface and a pipeline stage has no business
+ * depending on it. `tests/unit/pipeline/stages/SortFilesStage.test.js` asserts
+ * the two lists agree, so the duplication cannot drift silently.
+ */
+export const IMPLEMENTED_SORT_KEYS = Object.freeze([
+  'path',
+  'size',
+  'modified',
+  'name',
+  'extension',
+  'depth',
+]);
 
 /**
  * Read a file's comparable path.
@@ -76,6 +94,15 @@ class SortFilesStage extends Stage {
       this.sortBy = sortBy; // 'path', 'size', 'modified', 'name', 'extension'
       this.order = order; // 'asc' or 'desc'
     }
+
+    // Fatal. Sorting looks cosmetic and is not: it runs immediately before
+    // `BudgetStage`, so the order it establishes decides *which files survive*
+    // a `--max-files` or `--max-total-size` cut. Falling back to filesystem
+    // enumeration order after a failed sort means `--sort modified --order desc
+    // --max-files 20` quietly returns twenty arbitrary files instead of the
+    // twenty most recent — a different selection, reported as success, and
+    // different again on the next machine.
+    this.fatal = true;
 
     // `process()` narrows this to the ASCII comparator once it has seen the
     // paths. The general form is the default so a comparator called directly —
@@ -120,15 +147,6 @@ class SortFilesStage extends Stage {
   }
 
   /**
-   * Handle errors during sorting - return unsorted files
-   */
-  async handleError(error, input) {
-    this.log(`Sorting failed: ${error.message}, returning files unsorted`, 'warn');
-    // Return input unchanged if sorting fails
-    return input;
-  }
-
-  /**
    * Resolve the comparison function for a sort key.
    * @param {string} sortBy - Sort key
    * @returns {(a: Object, b: Object) => number} Comparator
@@ -146,8 +164,17 @@ class SortFilesStage extends Stage {
       case 'depth':
         return (a, b) => this.compareByDepth(a, b);
       case 'path':
-      default:
         return (a, b) => this.compareByPath(a, b);
+      default:
+        // Not a silent fall-through to path order. An SDK caller who passes
+        // `sort: 'mtime'` asked for something this stage does not implement,
+        // and answering with a different order under a budget hands back a
+        // different selection than the one they described.
+        throw new ValidationError(
+          `Unknown sort key: ${JSON.stringify(sortBy)}. Expected one of ${IMPLEMENTED_SORT_KEYS.join(', ')}`,
+          'sortBy',
+          sortBy,
+        );
     }
   }
 

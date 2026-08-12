@@ -92,6 +92,7 @@ export type ExclusionReason =
   | 'filterPattern'
   | 'testExclude'
   | 'binaryExtension'
+  | 'binaryPolicy'
   | 'sizeGate'
   | 'totalSizeBudget'
   | 'fileCountBudget'
@@ -1480,7 +1481,24 @@ export type ErrorCode =
   | 'ERR_DEPRECATED_OPTION'
   | 'ERR_PROFILE_NOT_FOUND'
   | 'ERR_POLICY_FAILURE'
-  | 'ERR_IGNORE_INVALID';
+  | 'ERR_IGNORE_INVALID'
+  // Operational codes. These are thrown by the typed error classes
+  // (`FileSystemError`, `GitError`, `TransformError`, ...) which previously
+  // carried untyped `FILESYSTEM_ERROR`-style values that appeared in no union,
+  // so a TypeScript consumer had no case to write for the failures most likely
+  // to actually happen.
+  | 'ERR_FILESYSTEM'
+  | 'ERR_PERMISSION_DENIED'
+  | 'ERR_PIPELINE_STAGE'
+  | 'ERR_TRANSFORM'
+  | 'ERR_GIT'
+  | 'ERR_PROFILE_INVALID'
+  | 'ERR_INSTRUCTIONS'
+  | 'ERR_COMMAND_FAILED'
+  | 'ERR_BUDGET_ENFORCEMENT'
+  | 'ERR_CONFIG_SCHEMA_UNAVAILABLE'
+  | 'ERR_OUTPUT_WRITE'
+  | 'ERR_VALIDATION';
 
 export const ERROR_CODES: Readonly<Record<string, ErrorCode>>;
 

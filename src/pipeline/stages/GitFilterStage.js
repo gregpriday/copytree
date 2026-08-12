@@ -72,8 +72,16 @@ class GitFilterStage extends Stage {
             { basePath: this.basePath },
           );
         }
-        this.log('Not a git repository, skipping git status', 'warn');
-        return input;
+        // Recorded, not just logged. `--git-status` was asked for and is not
+        // being delivered, which is the same fact the `catch` below records —
+        // this branch just reaches it by a different route, and used to say so
+        // only in a log line that `--quiet` suppresses and `--strict` cannot
+        // see.
+        return this.degrade(
+          input,
+          `${this.askedFor()} needs a Git repository, and ${this.basePath} is not one, ` +
+            `so no git status was attached`,
+        );
       }
 
       let filteredFiles = input.files;

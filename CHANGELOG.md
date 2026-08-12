@@ -44,7 +44,116 @@ Full upgrade notes: [docs/reference/migrating-to-1.0.md](docs/reference/migratin
 - The published declarations required `@types/node` without depending on it, so
   they did not compile in a strict consumer project.
 
+- **A failure in a stage that decides what gets emitted now fails the run.**
+  Budget enforcement, sorting and deduplication each answered an internal error
+  by returning their input unchanged, so `--max-total-size 2MB` could exit 0
+  having produced far more than 2MB, and `--sort modified --max-files 20` could
+  return twenty arbitrary files instead of the twenty most recent. All three are
+  fatal, and a requested transform that fails at the stage level no longer
+  skips every conversion silently.
+- **A file that cannot be read is no longer exported as its own error message.**
+  `FileLoadingStage` wrote `[Error loading file: EACCES ...]` into the file's
+  body, which no consumer can distinguish from source text that happens to
+  contain that sentence: the path appeared in the tree, the run exited 0, and an
+  agent read the failure as code. The read failure now propagates as
+  `ERR_FILESYSTEM`. A failed *transform* keeps the original content rather than
+  replacing it with an error string, and reports `stats.transformFailures`.
+- **A stage's lifecycle hooks are enforced.** `onInit`, `beforeRun` and
+  `validate` failures were logged as warnings — and after a failed `validate()`
+  the pipeline still called `process()` with the input it had just declared
+  invalid, which makes a validator a logging function. All three are now fatal
+  regardless of `continueOnError`. `afterRun` remains non-fatal, because it runs
+  after the output already exists, but records a structured degradation.
+- **A malformed `.copytree.yml` stops the run.** A missing auto-discovered
+  profile is optional by definition; one that is present and will not parse is
+  not the same thing. Warning and continuing meant every user of a repository
+  silently got a selection its author had not described.
+- **A `.copytree/` directory is no longer opened as a profile file.** Profile
+  discovery matched the bare name `.copytree` against directory entries without
+  checking they were files, so every project using the documented
+  `.copytree/<name>.yml` layout hit `EISDIR` on every run — invisible only
+  because a broken discovered profile was warned about and skipped. Named
+  profiles in `.copytree/<name>.yml` also now resolve, which README, the docs
+  index and the usage guide had all documented and no code implemented.
+- **`maxBase64Size` is enforced.** The `base64` binary policy read files of any
+  size and inflated them by a third, despite the ceiling being a public,
+  documented, schema-validated configuration key.
+- **`secretsGuard.gitleaks.*` reaches the scanner.** `binaryPath`, `configPath`,
+  `extraArgs` and `logLevel` are all declared in the schema and none of them
+  were passed to the adapter, so a custom Gitleaks build or ruleset was
+  accepted, validated, and ignored. `maxFileBytes: 0` also now means what it
+  says instead of silently becoming the 5MB default.
+- **Configuration validation cannot switch itself off.** A missing or
+  uncompilable `config/schema.json` used to disable validation, turning a
+  packaging defect into weaker correctness; under `strict` it now raises
+  `ERR_CONFIG_SCHEMA_UNAVAILABLE`. Validation also ran in no test, because
+  `NODE_ENV === 'test'` disabled it — so the suite proved that invalid
+  configuration was accepted.
+- **`--strict` sees degradations.** It is documented as "enable every
+  applicable policy-failure check" and did not read the one signal that means
+  "the output is not what you requested". A degraded run now exits 3. Two
+  degradations that were invisible even to that list are now recorded: a
+  Gitleaks downgrade, which sat only in `stats.secretsGuard.degraded`; and
+  `--git-status` outside a Git repository, which was only logged.
+- **A Git status failure is no longer indistinguishable from "nothing
+  changed".** `GitUtils.getFileStatuses()` answered any Git failure with `{}`,
+  which the annotation path reads as every file being unmodified — so
+  `--git-status` produced a document that looked exactly like a clean tree.
+- **Pipeline events no longer carry file content.** `stage:start` and
+  `stage:complete` emitted the entire pipeline input and output, and `scan()`
+  forwards every event to an embedder's `onEvent` — so an application that
+  logged events wrote unredacted credentials to its own logs while CopyTree
+  reported that the export had been redacted. The events carry counts and
+  metrics; the raw values moved to an opt-in `stage:debug` channel. This was
+  pinned in the test suite as a known gap and is now closed.
+- **Cache entries cannot collide or be read back truncated.** Cache filenames
+  were the key with every unsupported character replaced by `_`, which is not
+  injective: `a/b`, `a:b` and `a b` shared one file, and for the transform cache
+  that means emitting one file's converted content in place of another's.
+  Filenames are now a full digest, entries are written atomically, a corrupt
+  entry is discarded and recomputed, and `ttl: 0` means immediate expiry rather
+  than 24 hours.
+- **Backpressure no longer leaks stream listeners.** Waiting on `drain` or
+  `error` with `once()` leaves whichever lost the race attached, so a large
+  export to a slow pipe accumulated thousands of dead handlers. One `onceAny`
+  helper detaches all of them and also watches for `close`, which an aborted
+  stream emits instead of `drain`.
+- A cancellation raised inside a retried filesystem operation was reported as an
+  ordinary I/O failure with exit code 1: it carried `code: 'ABORT_ERR'` and no
+  `name`, which `isAbortError()` does not recognise.
+- `--scope` entries that are themselves symlinks were rejected even under
+  `--follow-symlinks`, because the option never reached the scope resolver.
+- `copytree --version > file` could write an empty file: the fast path called
+  `process.exit()` without waiting for a redirected stdout to flush.
+
 ### Changed — breaking
+- **Public error codes come from one registry.** `FileSystemError`, `GitError`,
+  `ValidationError`, `ProfileError`, `TransformError`, `PipelineError`,
+  `CommandError`, `ConfigurationError` and `InstructionsError` carried bare
+  strings — `GIT_ERROR`, `FILESYSTEM_ERROR` — that appeared in no registry and
+  in no TypeScript union, while the documentation told consumers to switch on
+  `error.code`. They now use `ERR_GIT`, `ERR_FILESYSTEM`, `ERR_VALIDATION`,
+  `ERR_PROFILE_INVALID`, `ERR_TRANSFORM`, `ERR_PIPELINE_STAGE`,
+  `ERR_COMMAND_FAILED`, `ERR_CONFIG_INVALID` and `ERR_INSTRUCTIONS`, all
+  declared in `ERROR_CODES` and in the `ErrorCode` union. New codes:
+  `ERR_PERMISSION_DENIED`, `ERR_BUDGET_ENFORCEMENT`,
+  `ERR_CONFIG_SCHEMA_UNAVAILABLE` and `ERR_OUTPUT_WRITE`.
+- **`error.toJSON()` no longer includes the stack.** It is what a logging
+  integration and `JSON.stringify(error)` both reach for, and a stack names
+  absolute paths on the machine that ran the command. `toDebugJSON()` supplies
+  it on request. A configuration validation failure also no longer carries the
+  entire effective configuration in `details`.
+- **`config/schema.json` accepts only the values that are implemented.** The
+  binary policy enum drops `load` and `omit`, which validated cleanly and then
+  behaved as `placeholder`; `secretsGuard.oversizePolicy` becomes
+  `exclude | scan | fail`, which is what the implementation has always branched
+  on and what `SECURITY.md` has always documented — the previous
+  `exclude | include | warn` meant following the security guide produced a
+  config the validator rejected. An unrecognised binary policy is now reported
+  rather than reinterpreted, and an unknown `--sort` key is refused rather than
+  silently sorted by path.
+- A `Pipeline` is immutable once it has run; `through()` throws rather than
+  accepting stages it would never instantiate.
 
 - **The package root exports 35 values instead of 47.** Extension points moved to
   `copytree/advanced`: `Pipeline`, `Stage`, `TransformerRegistry`,
@@ -80,6 +189,13 @@ Full upgrade notes: [docs/reference/migrating-to-1.0.md](docs/reference/migratin
 - `docs/reference/environment.md`, replacing a `.env.example` that advertised a
   Gemini API key and an AI cache, none of which any shipped code reads.
 - `docs/reference/migrating-to-1.0.md`.
+- `scripts/dist-tag.js`, replacing `sort -V` in the publish workflow. GNU
+  version sort is not SemVer and ranks `1.0.0-beta.1` above `1.0.0`, so the
+  first stable release would have gone out under `hotfix` while a beta kept
+  `latest`. Unit-tested against the cases the two disagree on.
+- The npm used to publish is pinned rather than `@latest`, the publish workflow
+  takes a concurrency group, and CI tests the exact declared minimum Node
+  (22.12.0) alongside 22 and 24.
 
 ### Security
 

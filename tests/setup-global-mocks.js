@@ -239,76 +239,77 @@ jest.mock('clipboardy', () => {
   return mock;
 });
 
-// Mock fs-extra (comprehensive mock with all functions)
+// Mock `src/utils/fsx.js`.
+//
+// The mock surface is derived from the real module rather than hand-listed, so
+// the two cannot diverge. The old list did both kinds of diverging at once: it
+// declared thirteen names the real module does not export — `unlink`, `copy`,
+// `move`, `outputFile`, `mkdtempSync` and friends, left over from when this
+// wrapped `fs-extra` — so a test could exercise, and pass against, an API that
+// does not exist in production; and it omitted sixteen that the real module
+// does export, so any code path reaching one of those got `undefined`.
+//
+// Defaults are declared as data rather than baked into `jest.fn()` calls,
+// because `resetMocks: true` strips implementations before every test — even
+// the one passed to `jest.fn(impl)`. Without re-arming, `fs.readFile` resolved
+// to `undefined` in every test in this project, and `FileLoadingStage` was
+// handed nothing to classify. That went unnoticed for as long as it did only
+// because the stage used to swallow the resulting `TypeError` into an
+// `[Error loading file: ...]` string and carry on.
+//
+// `tests/setup.js` re-applies the table in a `beforeEach`.
 jest.mock('../src/utils/fsx.js', () => {
-  const pathExists = jest.fn().mockResolvedValue(true);
-  const stat = jest.fn().mockResolvedValue({ isDirectory: () => true });
-  const writeFile = jest.fn().mockResolvedValue();
-  const createWriteStream = jest.fn(() => ({
-    write: jest.fn(),
-    end: jest.fn((cb) => cb?.()),
-  }));
-  const ensureDir = jest.fn().mockResolvedValue();
-  const ensureDirSync = jest.fn();
-  const readFile = jest.fn().mockResolvedValue('');
-  const readdir = jest.fn().mockResolvedValue([]);
-  const remove = jest.fn().mockResolvedValue();
-  const readFileSync = jest.fn().mockReturnValue('');
-  const writeFileSync = jest.fn();
-  const existsSync = jest.fn().mockReturnValue(false);
-  const removeSync = jest.fn();
-  const mkdtempSync = jest.fn().mockReturnValue('/tmp/test-temp-dir');
-  const readdirSync = jest.fn().mockReturnValue([]);
-  const rmSync = jest.fn();
-  const readJson = jest.fn().mockResolvedValue({});
-  const readJsonSync = jest.fn().mockReturnValue({});
-  const writeJson = jest.fn().mockResolvedValue();
-  const writeJsonSync = jest.fn();
-  const copy = jest.fn().mockResolvedValue();
-  const copySync = jest.fn();
-  const move = jest.fn().mockResolvedValue();
-  const moveSync = jest.fn();
-  const emptyDir = jest.fn().mockResolvedValue();
-  const emptyDirSync = jest.fn();
-  const outputFile = jest.fn().mockResolvedValue();
-  const outputFileSync = jest.fn();
-  const outputJson = jest.fn().mockResolvedValue();
-  const outputJsonSync = jest.fn();
-  const unlink = jest.fn().mockResolvedValue();
+  const actual = jest.requireActual('../src/utils/fsx.js');
 
-  const mock = {
-    pathExists,
-    stat,
-    writeFile,
-    createWriteStream,
-    ensureDir,
-    ensureDirSync,
-    readFile,
-    readdir,
-    remove,
-    readFileSync,
-    writeFileSync,
-    existsSync,
-    removeSync,
-    mkdtempSync,
-    readdirSync,
-    rmSync,
-    readJson,
-    readJsonSync,
-    writeJson,
-    writeJsonSync,
-    copy,
-    copySync,
-    move,
-    moveSync,
-    emptyDir,
-    emptyDirSync,
-    outputFile,
-    outputFileSync,
-    outputJson,
-    outputJsonSync,
-    unlink,
+  const defaults = {
+    pathExists: ['resolve', true],
+    stat: ['resolve', { isDirectory: () => true }],
+    lstat: ['resolve', { isDirectory: () => true, isSymbolicLink: () => false }],
+    statSync: ['return', { isDirectory: () => true }],
+    writeFile: ['resolve', undefined],
+    createWriteStream: ['impl', () => ({ write: () => {}, end: (cb) => cb?.() })],
+    ensureDir: ['resolve', undefined],
+    ensureDirSync: ['return', undefined],
+    mkdir: ['resolve', undefined],
+    mkdirSync: ['return', undefined],
+    // A Buffer, not a string: the one-argument form of `readFile` returns
+    // bytes, and the binary detector reads `.length` off them.
+    readFile: ['impl', (_path, encoding) => Promise.resolve(encoding ? '' : Buffer.alloc(0))],
+    readFileSync: ['impl', (_path, encoding) => (encoding ? '' : Buffer.alloc(0))],
+    readdir: ['resolve', []],
+    readdirSync: ['return', []],
+    remove: ['resolve', undefined],
+    removeSync: ['return', undefined],
+    rm: ['resolve', undefined],
+    rmSync: ['return', undefined],
+    rmdir: ['resolve', undefined],
+    rename: ['resolve', undefined],
+    renameSync: ['return', undefined],
+    writeFileSync: ['return', undefined],
+    existsSync: ['return', false],
+    readJson: ['resolve', {}],
+    readJsonSync: ['return', {}],
+    writeJson: ['resolve', undefined],
+    utimesSync: ['return', undefined],
+    realpath: ['impl', (target) => Promise.resolve(target)],
+    realpathSync: ['impl', (target) => target],
   };
+
+  // Classes are functions too, so `typeof value === 'function'` would have
+  // replaced `fs.Dirent` and `fs.Stats` with `jest.fn()` — and a mocked
+  // constructor is not something an `instanceof` check or a `new` call can use.
+  // A class is distinguishable by having a prototype with more than just
+  // `constructor` on it, but naming them is clearer than sniffing for them.
+  const passThrough = new Set(['Dirent', 'Stats']);
+
+  const mock = {};
+  for (const [name, value] of Object.entries(actual.default ?? actual)) {
+    mock[name] = typeof value === 'function' && !passThrough.has(name) ? jest.fn() : value;
+  }
+
+  // Read back by `tests/setup.js`. A plain global rather than an import,
+  // because `setupFiles` run before the module registry a test can import from.
+  globalThis.__COPYTREE_FSX_MOCK__ = { mock, defaults };
 
   mock.default = mock;
   return mock;

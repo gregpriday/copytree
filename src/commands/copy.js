@@ -139,9 +139,7 @@ export default async function copyCommand(request, context = {}) {
     root = resolved.root;
     request = resolved.request;
 
-    const profile = await loadSelectionProfile(root, request.selection, {
-      onWarning: (message) => reporter.warn({ code: 'PROFILE_IGNORED', message }),
-    });
+    const profile = await loadSelectionProfile(root, request.selection, {});
 
     // A profile's `options.format` has to be resolved before anything reads the
     // format: it decides whether content stages run at all (`tree` never loads
@@ -832,6 +830,26 @@ function enforcePolicies({ request, result, delivery, fsErrors, stats }) {
     throw new PolicyError('Filesystem operations failed after retries', '--fail-on-fs-errors', {
       suggestion: 'Check permissions on the reported paths, or drop --fail-on-fs-errors',
     });
+  }
+
+  // Under --strict, a degraded run is not a successful one.
+  //
+  // A degradation says the run finished but not as asked: a Git selector that
+  // could not be applied, a transform that failed and left its file unchanged,
+  // a scanner that had to fall back. Each is reported on the completion line,
+  // and `--strict` is documented as "enable every applicable policy-failure
+  // check" — so leaving the one signal that means "the output is not what you
+  // requested" out of it made the flag narrower than its own description.
+  const degradations = result.stats?.degradations ?? [];
+  if (security.strict && degradations.length > 0) {
+    throw new PolicyError(
+      degradations.length === 1
+        ? degradations[0].message
+        : `${degradations.length} parts of the run did not do what was asked: ` +
+            degradations.map((entry) => entry.message).join('; '),
+      '--strict',
+      { suggestion: 'Address the reported degradations, or drop --strict' },
+    );
   }
 
   // Under --strict a clipboard fallback stops being a degraded success. It is

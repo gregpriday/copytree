@@ -416,7 +416,7 @@ describe('error-message standard', () => {
   });
 
   test('a Git failure reports one line, not the whole advice block', async () => {
-    const { describeError, GitError } = await import('../../../src/utils/errors.js');
+    const { describeError, GitError, ERROR_CODES } = await import('../../../src/utils/errors.js');
 
     const description = describeError(
       new GitError(
@@ -427,7 +427,7 @@ describe('error-message standard', () => {
 
     expect(description.subject).toBe('fatal: bad revision');
     expect(description.suggestion).toBeTruthy();
-    expect(description.code).toBe('GIT_ERROR');
+    expect(description.code).toBe(ERROR_CODES.GIT);
   });
 });
 

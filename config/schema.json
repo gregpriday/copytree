@@ -439,10 +439,10 @@
           "type": "string",
           "enum": [
             "exclude",
-            "include",
-            "warn"
+            "scan",
+            "fail"
           ],
-          "description": "What to do with a file larger than maxFileBytes"
+          "description": "What to do with a file larger than maxFileBytes: leave it out (default), scan it anyway, or fail the run"
         },
         "gitleaks": {
           "type": "object",
@@ -475,10 +475,8 @@
     },
     "binaryPolicyValue": {
       "type": "string",
-      "description": "What to do with a binary or document file",
+      "description": "What to do with a binary or document file: drop it (skip), emit a format-appropriate comment, emit the placeholder text, or inline it as base64",
       "enum": [
-        "load",
-        "omit",
         "skip",
         "comment",
         "placeholder",

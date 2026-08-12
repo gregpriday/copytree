@@ -120,8 +120,11 @@ Selection, budgets and rendering.
 | `fs.retryAttempts` / `retryDelay` / `maxDelay` | integer  | 3 / 100 / 2000               | Transient I/O retry                         |
 | `discovery.parallelEnabled`                    | boolean  | false                        | Parallel directory traversal                |
 
-Binary policies are `load`, `omit`, `skip`, `comment`, `placeholder` and
-`base64`.
+Binary policies are `skip`, `comment`, `placeholder` and `base64`.
+
+> **`load` and `omit` were removed from the schema.** Both validated cleanly and
+> then behaved as `placeholder`, which makes a closed enum a promise the code
+> did not keep. The CLI's `--binary omit` is unchanged and still maps to `skip`.
 
 > **`convert` was removed.** It advertised document conversion that did not
 > exist — no converter was ever registered — and its only effect was to load a

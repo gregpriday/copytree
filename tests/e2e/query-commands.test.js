@@ -887,7 +887,7 @@ describe('content-free modes still apply safety policy', () => {
 });
 
 describe('profile diagnostics', () => {
-  test('a broken auto-discovered profile is reported, not swallowed', async () => {
+  test('a broken auto-discovered profile fails the run', async () => {
     const project = mkdtempSync(path.join(os.tmpdir(), 'copytree-badauto-'));
     writeFileSync(path.join(project, 'a.js'), 'a\n');
     writeFileSync(path.join(project, '.copytree.yml'), 'options:\n  fromat: xml\n');
@@ -897,9 +897,11 @@ describe('profile diagnostics', () => {
         env: { COPYTREE_LOG_LEVEL: 'info' },
       });
 
-      // The project is still copyable; the author is still told their rules
-      // are not in force.
-      expect(code).toBe(0);
+      // A `.copytree.yml` that is present and wrong is not the same as one
+      // that is absent. Warning and continuing meant every user of the
+      // repository silently got a selection the author did not describe — so
+      // the malformed file stops the run and names the offending key.
+      expect(code).toBe(2);
       expect(stderr).toContain('Unknown profile option');
       expect(stderr).toContain('fromat');
     } finally {
@@ -930,7 +932,7 @@ describe('profile diagnostics reach every command', () => {
     ['ignore check', ['ignore', 'check']],
     ['ignore context', ['ignore', 'context']],
   ])(
-    '%s reports a profile it had to reject',
+    '%s rejects a profile it cannot read, rather than ignoring it',
     async (_name, command) => {
       const project = mkdtempSync(path.join(os.tmpdir(), 'copytree-warn-'));
       writeFileSync(path.join(project, 'a.js'), 'a\n');
@@ -941,7 +943,11 @@ describe('profile diagnostics reach every command', () => {
           env: { COPYTREE_LOG_LEVEL: 'info' },
         });
 
-        expect(code).toBe(0);
+        // Every command shares one selection engine, so every command has to
+        // reach the same verdict about the same malformed profile. A preview
+        // that succeeds where the copy fails is the split this engine exists
+        // to prevent.
+        expect(code).toBe(2);
         expect(stderr).toContain('Unknown profile option');
       } finally {
         rmSync(project, { recursive: true, force: true });

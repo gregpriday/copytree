@@ -2,6 +2,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import FileLoadingStage from '../../../../src/pipeline/stages/FileLoadingStage.js';
 import { withTempDir } from '../../../helpers/tempfs.js';
+import { ERROR_CODES } from '../../../../src/utils/errors.js';
+import { EXCLUSION_REASONS } from '../../../../src/utils/exclusionReport.js';
 
 jest.unmock('../../../../src/utils/fsx.js');
 
@@ -259,26 +261,182 @@ describe('FileLoadingStage (real)', () => {
     });
   });
 
-  test('returns binary loading error object when base64 read fails', async () => {
+  // An unreadable file used to come back with `content: '[Error loading file:
+  // ...]'`. That is indistinguishable, to every consumer, from a source file
+  // that happens to contain the sentence: the path appears in the tree, the
+  // body looks like text, and the run exits 0. The stage is fatal, so the
+  // failure propagates instead.
+  test('throws rather than encoding a failed base64 read as content', async () => {
+    const stage = new FileLoadingStage();
+
+    await expect(
+      stage.loadBinaryAsBase64(
+        { path: 'missing.bin', absolutePath: '/definitely/missing.bin' },
+        { category: 'other', name: 'RAW' },
+      ),
+    ).rejects.toThrow(/ENOENT|no such file/i);
+  });
+
+  test('throws rather than encoding a failed text read as content', async () => {
+    const stage = new FileLoadingStage();
+
+    await expect(
+      stage.loadFileContent({
+        path: 'missing.txt',
+        absolutePath: '/definitely/missing.txt',
+      }),
+    ).rejects.toMatchObject({
+      code: ERROR_CODES.FILESYSTEM,
+      path: '/definitely/missing.txt',
+      operation: 'read',
+    });
+  });
+
+  test('replaces an over-ceiling base64 file with a placeholder instead of inlining it', async () => {
+    // Base64 inflates by a third on top of the raw bytes, and `maxBase64Size`
+    // is a public configuration key that nothing enforced.
     const stage = new FileLoadingStage();
     const result = await stage.loadBinaryAsBase64(
-      { path: 'missing.bin', absolutePath: '/definitely/missing.bin' },
+      { path: 'huge.bin', absolutePath: '/definitely/missing.bin', size: 10_000 },
       { category: 'other', name: 'RAW' },
+      null,
+      1_000,
     );
 
     expect(result.isBinary).toBe(true);
-    expect(result.error).toBeDefined();
-    expect(result.content).toContain('Error loading binary file');
+    expect(result.encoding).not.toBe('base64');
+    expect(result.content).toContain('too large to inline');
   });
 
-  test('returns file loading error object when text read fails', async () => {
+  test('bounds base64 by the bytes actually read, not only by discovery metadata', async () => {
+    // `file.size` comes from a stat taken at discovery: absent for a file
+    // classified by extension alone, and stale for one that grew since. The
+    // pre-read check avoids the read; this is the check that actually holds.
     const stage = new FileLoadingStage();
-    const result = await stage.loadFileContent({
-      path: 'missing.txt',
-      absolutePath: '/definitely/missing.txt',
+    // A stale `size` of 10 that passes the pre-read check, against 4096 bytes
+    // actually present.
+    const result = await stage.loadBinaryAsBase64(
+      { path: 'grew.bin', absolutePath: '/nope/grew.bin', size: 10 },
+      { category: 'other', name: 'RAW' },
+      Buffer.alloc(4096),
+      1_000,
+    );
+
+    expect(result.encoding).not.toBe('base64');
+    expect(result.content).toContain('too large to inline');
+  });
+
+  test('rejects a binary policy the schema no longer accepts', async () => {
+    const stage = new FileLoadingStage();
+
+    // `load` and `omit` were in the schema's enum and fell through to
+    // `placeholder`, so a closed enum quietly meant something other than what
+    // it said.
+    expect(() =>
+      stage.handleBinaryFile({ path: 'a.bin' }, { category: 'other' }, 'load', {}),
+    ).toThrow(/Unknown binary policy/);
+
+    // And it stays a ValidationError through `loadFileContent`, rather than
+    // being rewrapped as "Failed to read <path>" — which would blame the file
+    // for a configuration mistake and send the reader to check permissions on
+    // something perfectly readable.
+    jest.spyOn(stage, 'resolveSettings').mockReturnValue({
+      structureOnly: [],
+      detectOptions: {},
+      binaryPolicy: { image: 'load' },
+      binaryAction: 'placeholder',
     });
 
-    expect(result.error).toBeDefined();
-    expect(result.content).toContain('Error loading file');
+    await expect(
+      stage.loadFileContent({ path: 'a.png', absolutePath: '/nope/a.png', size: 1 }),
+    ).rejects.toThrow(/Unknown binary policy/);
+  });
+
+  test('emits a comment stub for the comment policy', async () => {
+    const stage = new FileLoadingStage();
+    const result = stage.handleBinaryFile(
+      { path: 'a.png' },
+      { category: 'image', name: 'PNG' },
+      'comment',
+      {},
+    );
+
+    expect(result).toMatchObject({
+      content: '',
+      isBinary: true,
+      excluded: true,
+      excludedReason: 'image',
+      binaryCategory: 'image',
+    });
+  });
+});
+
+describe('the skip binary policy', () => {
+  it('drops the file and accounts for it rather than leaving a null in the array', async () => {
+    // `handleBinaryFile` returns `null` for `skip` (`--binary omit`), and those
+    // nulls used to travel the rest of the pipeline: every later stage and both
+    // formatters had to remember to step around them, and the consumers that
+    // forgot dereferenced null. Dropping them here also means the file is
+    // still accounted for, instead of vanishing from the exclusion report.
+    const stage = new FileLoadingStage();
+    stage._config = {
+      get: (key, fallback) => (key === 'copytree.binaryFileAction' ? 'skip' : fallback),
+      set: () => {},
+      has: () => false,
+      all: () => ({}),
+    };
+
+    const added = [];
+    const result = await stage.process({
+      files: [{ path: 'a.png', absolutePath: '/nope/a.png', size: 12 }],
+      exclusionReport: { add: (entry) => added.push(entry) },
+    });
+
+    expect(result.files).toEqual([]);
+    expect(added).toEqual([
+      expect.objectContaining({ path: 'a.png', reason: EXCLUSION_REASONS.BINARY_POLICY }),
+    ]);
+  });
+
+  it('records a size of zero for a skipped file whose size is unknown', async () => {
+    const stage = new FileLoadingStage();
+    stage._config = {
+      get: (key, fallback) => (key === 'copytree.binaryFileAction' ? 'skip' : fallback),
+      set: () => {},
+      has: () => false,
+      all: () => ({}),
+    };
+
+    const added = [];
+    await stage.process({
+      files: [{ path: 'a.png', absolutePath: '/nope/a.png' }],
+      exclusionReport: { add: (entry) => added.push(entry) },
+    });
+
+    expect(added[0].size).toBe(0);
+  });
+});
+
+describe('cancellation', () => {
+  it('propagates an abort instead of reporting it as an unreadable file', async () => {
+    // A cancelled run is the caller's decision, not an I/O failure. Wrapping it
+    // in a `FileSystemError` would report exit 1 for something that should be
+    // 130, and would name a file that is perfectly readable.
+    const stage = new FileLoadingStage();
+    const abort = Object.assign(new Error('Operation aborted'), { name: 'AbortError' });
+
+    jest.spyOn(stage, 'handleBinaryFile').mockImplementation(() => {
+      throw abort;
+    });
+    jest.spyOn(stage, 'resolveSettings').mockReturnValue({
+      structureOnly: [],
+      detectOptions: {},
+      binaryPolicy: {},
+      binaryAction: 'placeholder',
+    });
+
+    await expect(
+      stage.loadFileContent({ path: 'a.png', absolutePath: '/nope/a.png', size: 1 }),
+    ).rejects.toBe(abort);
   });
 });

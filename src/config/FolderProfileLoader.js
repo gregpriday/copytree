@@ -82,17 +82,62 @@ class FolderProfileLoader {
   async _find(base) {
     let entries;
     try {
-      entries = await fs.readdir(this.cwd);
+      entries = await fs.readdir(this.cwd, { withFileTypes: true });
     } catch {
       // An unreadable directory has no profile in it, which is the same answer
       // as an empty one for every caller here.
       return null;
     }
 
-    const present = new Set(entries);
+    // Files only. `EXTENSIONS` includes the empty string, so a bare `.copytree`
+    // matched — and `.copytree/` is the documented *directory* for named
+    // profiles (`.copytree/api.yml`). Every project using one had its
+    // directory opened as a profile file, which failed with `EISDIR`. The
+    // failure was invisible only because a broken discovered profile used to
+    // be warned about and skipped.
+    const present = new Set(
+      entries
+        .filter((entry) => entry.isFile() || entry.isSymbolicLink())
+        .map((entry) => entry.name),
+    );
     for (const ext of EXTENSIONS) {
       const name = `${base}${ext}`;
       if (present.has(name)) return path.join(this.cwd, name);
+    }
+
+    return null;
+  }
+
+  /**
+   * Find a named profile inside a `.copytree/` directory.
+   *
+   * `README.md`, `docs/index.md` and `docs/usage/basic-usage.md` have all
+   * documented `.copytree/my-profile.yml` with `--profile my-profile` since
+   * before 1.0, and the loader only ever looked for `.copytree-my-profile.yml`
+   * beside it. Anyone following the documentation got "Profile not found" for
+   * a file that was exactly where they were told to put it.
+   *
+   * @param {string} name - Profile name
+   * @returns {Promise<string|null>} Absolute path, or null when absent
+   * @private
+   */
+  async _findInProfileDir(name) {
+    const dir = path.join(this.cwd, '.copytree');
+
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return null;
+    }
+
+    const present = new Set(
+      entries.filter((entry) => entry.isFile() || entry.isSymbolicLink()).map((e) => e.name),
+    );
+    // The extensionless form is excluded here on purpose: inside a directory of
+    // profiles, a bare `api` file is more likely to be something else.
+    for (const ext of EXTENSIONS.filter(Boolean)) {
+      if (present.has(`${name}${ext}`)) return path.join(dir, `${name}${ext}`);
     }
 
     return null;
@@ -116,7 +161,8 @@ class FolderProfileLoader {
    * @throws {ProfileError} If profile not found
    */
   async loadNamed(name) {
-    const filePath = await this._find(`.copytree-${name}`);
+    const filePath =
+      (await this._find(`.copytree-${name}`)) ?? (await this._findInProfileDir(name));
     if (filePath) return this.load(filePath);
 
     // A named profile that does not exist is a profile error, not a broken
@@ -341,7 +387,11 @@ class FolderProfileLoader {
    * @returns {Promise<boolean>}
    */
   async exists(name = null) {
-    return (await this._find(name ? `.copytree-${name}` : '.copytree')) !== null;
+    if (!name) return (await this._find('.copytree')) !== null;
+    return (
+      (await this._find(`.copytree-${name}`)) !== null ||
+      (await this._findInProfileDir(name)) !== null
+    );
   }
 }
 

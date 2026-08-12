@@ -53,7 +53,6 @@ export default async function planCommand(request, context = {}) {
     request,
     config: cfg,
     retention,
-    onWarning: (message) => feedback.write(message, { level: 'warn' }),
   });
 
   const model = buildPlanModel(plan, request, { reproducible: report.reproducible });

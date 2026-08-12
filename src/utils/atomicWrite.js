@@ -23,7 +23,8 @@
 import path from 'path';
 import { randomBytes } from 'crypto';
 import fs from './fsx.js';
-import { FileSystemError } from './errors.js';
+import { ERROR_CODES, FileSystemError } from './errors.js';
+import { onceAny } from './streamEvents.js';
 
 /** How long to wait for a destroyed stream to emit `close` before giving up. */
 const CLOSE_GRACE_MS = 2000;
@@ -58,7 +59,12 @@ function writeFailure(error, destination) {
     `write ${destination}: ${error.message}`,
     destination,
     'write the output file',
-    { code: error.code },
+    // The public code is `ERR_OUTPUT_WRITE`; the platform errno is kept beside
+    // it as data. They are different vocabularies — `ENOENT` is not in
+    // `ERROR_CODES`, has no exit-code mapping and no remediation — and putting
+    // the errno in `code` left the reporter with nothing to say beyond "run
+    // again with --verbose".
+    { code: ERROR_CODES.OUTPUT_WRITE, errno: error.code },
   );
 }
 
@@ -132,10 +138,22 @@ export async function openAtomicWriteStream(destination, options = {}) {
     // collision means something else created it first — which is the case worth
     // refusing rather than truncating.
     stream = fs.createWriteStream(temporaryPath, { mode: PRIVATE_FILE_MODE, flags: 'wx' });
-    await new Promise((resolve, reject) => {
-      stream.once('open', resolve);
-      stream.once('error', reject);
-    });
+
+    // One error listener for the whole life of the stream, attached before
+    // anything can fail. Node turns an `error` event with no listener into an
+    // uncaught exception that takes the process down, and this stream emits
+    // one *after* it is finished with: destroying it while a write is still in
+    // flight — which is exactly what `abort()` does — surfaces
+    // `ERR_STREAM_DESTROYED` a tick later, when no per-await handler is
+    // attached any more.
+    //
+    // This used to be covered by accident. The open handshake attached
+    // `once('error', reject)` and, because `once` only detaches the listener
+    // that fired, that rejector stayed on the stream forever and swallowed the
+    // late error by rejecting an already-settled promise. Relying on a leaked
+    // listener to keep the process alive is not a mechanism; this is.
+    stream.on('error', () => {});
+    await onceAny(stream, { open: 'resolve', error: 'reject' });
   } catch (error) {
     await discard(temporaryPath);
     throw writeFailure(error, resolved);
@@ -197,20 +215,10 @@ export async function openAtomicWriteStream(destination, options = {}) {
       // `close` as well as `drain` and `error`. An abort destroys the stream,
       // which emits `close` and never `drain` — a waiter listening for the
       // other two would hang for the rest of the process's life.
-      await new Promise((resolve, reject) => {
-        const done = (fn, value) => {
-          stream.off('drain', onDrain);
-          stream.off('error', onError);
-          stream.off('close', onClose);
-          fn(value);
-        };
-        const onDrain = () => done(resolve);
-        const onError = (error) => done(reject, error);
-        const onClose = () => done(reject, new Error('atomic write stream closed while writing'));
-
-        stream.once('drain', onDrain);
-        stream.once('error', onError);
-        stream.once('close', onClose);
+      await onceAny(stream, {
+        drain: 'resolve',
+        error: 'reject',
+        close: () => new Error('atomic write stream closed while writing'),
       });
     },
 
@@ -225,11 +233,9 @@ export async function openAtomicWriteStream(destination, options = {}) {
       options.signal?.removeEventListener('abort', onAbort);
 
       try {
-        await new Promise((resolve, reject) => {
-          stream.once('finish', resolve);
-          stream.once('error', reject);
-          stream.end();
-        });
+        const flushed = onceAny(stream, { finish: 'resolve', error: 'reject' });
+        stream.end();
+        await flushed;
 
         // Re-checked after the flush and before the rename. Marking the writer
         // settled closed the abort path, so without this an abort raised while

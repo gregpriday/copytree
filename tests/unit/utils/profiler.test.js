@@ -8,6 +8,7 @@ import { jest } from '@jest/globals';
 import path from 'path';
 import os from 'os';
 import fs from '../../../src/utils/fsx.js';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { Profiler, writeProfilingReport } from '../../../src/utils/profiler.js';
 
 // ─── Mock session factory ─────────────────────────────────────────────────────
@@ -33,9 +34,25 @@ function makeMockSession(overrides = {}) {
   };
 }
 
+// Real directories, removed afterwards. These are created on disk because
+// `Profiler.start()` writes into them; leaving them behind would accumulate one
+// per test run, forever.
+const tmpDirs = [];
+
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'profiler-test-'));
+  // `node:fs`, not `src/utils/fsx.js`. This called `fs.mkdtempSync` from the
+  // fsx wrapper, which does not export it: the test passed only because the
+  // global mock declared a name the real module lacks.
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'profiler-test-'));
+  tmpDirs.push(dir);
+  return dir;
 }
+
+afterAll(() => {
+  for (const dir of tmpDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 // ─── Profiler constructor ─────────────────────────────────────────────────────
 

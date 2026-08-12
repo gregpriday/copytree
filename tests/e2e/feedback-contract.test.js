@@ -175,7 +175,9 @@ describe('feedback contract', () => {
     expect(code).toBe(1);
     expect(stdout).toBe('');
     expect(stderr).toContain('Git selection failed');
-    expect(stderr).toContain('[GIT_ERROR]');
+    // `ERR_GIT`, from the public registry. It used to be a bare `GIT_ERROR`
+    // that appeared in no registry and in no TypeScript union.
+    expect(stderr).toContain('[ERR_GIT]');
   }, 30000);
 
   // Attaching status is polish: its absence changes no selection, so it

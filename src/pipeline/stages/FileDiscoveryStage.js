@@ -191,7 +191,15 @@ class FileDiscoveryStage extends Stage {
     // Resolve the scope selection before walking so path errors surface early.
     const scopePaths =
       this.scope.length > 0
-        ? (await resolveScope(this.basePath, this.scope)).map((entry) => entry.absolutePath)
+        ? // `followSymlinks` has to reach the resolver too. Without it, a
+          // `--scope` entry that is itself a symlink was rejected even when the
+          // caller had asked for links to be followed, so scoped traversal and
+          // full-tree traversal disagreed about the same link.
+          (
+            await resolveScope(this.basePath, this.scope, {
+              followSymlinks: this.options.followSymlinks === true,
+            })
+          ).map((entry) => entry.absolutePath)
         : null;
 
     // Determine if parallel traversal is enabled

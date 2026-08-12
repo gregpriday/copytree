@@ -1,65 +1,4 @@
 /**
- * Base error class for CopyTree
- */
-class CopyTreeError extends Error {
-  constructor(message, code = 'UNKNOWN_ERROR', details = {}) {
-    super(message);
-    this.name = 'CopyTreeError';
-    this.code = code;
-    this.details = details;
-    this.timestamp = new Date().toISOString();
-
-    // Capture stack trace
-    Error.captureStackTrace(this, this.constructor);
-  }
-
-  toJSON() {
-    return {
-      name: this.name,
-      message: this.message,
-      code: this.code,
-      details: this.details,
-      timestamp: this.timestamp,
-      stack: this.stack,
-    };
-  }
-}
-
-/**
- * Command execution error
- */
-class CommandError extends CopyTreeError {
-  constructor(message, command, details = {}) {
-    super(message, 'COMMAND_ERROR', { command, ...details });
-    this.name = 'CommandError';
-    this.command = command;
-  }
-}
-
-/**
- * File system error
- */
-class FileSystemError extends CopyTreeError {
-  constructor(message, path, operation, details = {}) {
-    super(message, 'FILESYSTEM_ERROR', { path, operation, ...details });
-    this.name = 'FileSystemError';
-    this.path = path;
-    this.operation = operation;
-  }
-}
-
-/**
- * Configuration error
- */
-class ConfigurationError extends CopyTreeError {
-  constructor(message, configKey, details = {}) {
-    super(message, details.code || 'CONFIG_ERROR', { configKey, ...details });
-    this.name = 'ConfigurationError';
-    this.configKey = configKey;
-  }
-}
-
-/**
  * Stable, machine-readable error codes.
  *
  * These are part of the public API. Consumers switch on `error.code` to pick a
@@ -112,7 +51,132 @@ const ERROR_CODES = Object.freeze({
   POLICY_FAILURE: 'ERR_POLICY_FAILURE',
   /** An ignore file could not be read or parsed */
   IGNORE_INVALID: 'ERR_IGNORE_INVALID',
+
+  // The codes below were, until 1.0, thrown as bare screaming-snake strings
+  // (`FILESYSTEM_ERROR`, `GIT_ERROR`, ...) that appeared in no registry and in
+  // no TypeScript union, while the documentation told consumers to switch on
+  // `error.code`. A code that is not in the published union is a code a typed
+  // consumer cannot handle.
+
+  /** A filesystem operation failed: read, stat, write, or rename */
+  FILESYSTEM: 'ERR_FILESYSTEM',
+  /** A path exists but could not be accessed (`EACCES`, `EPERM`) */
+  PERMISSION_DENIED: 'ERR_PERMISSION_DENIED',
+  /** A pipeline stage failed, or its lifecycle contract was broken */
+  PIPELINE_STAGE: 'ERR_PIPELINE_STAGE',
+  /** A requested transformation failed */
+  TRANSFORM: 'ERR_TRANSFORM',
+  /** A Git operation failed */
+  GIT: 'ERR_GIT',
+  /** A profile was found but could not be read or was malformed */
+  PROFILE_INVALID: 'ERR_PROFILE_INVALID',
+  /** The instructions block could not be loaded */
+  INSTRUCTIONS: 'ERR_INSTRUCTIONS',
+  /** A command could not be carried out */
+  COMMAND_FAILED: 'ERR_COMMAND_FAILED',
+  /** Budget enforcement itself failed; the budget could not be applied */
+  BUDGET_ENFORCEMENT: 'ERR_BUDGET_ENFORCEMENT',
+  /** The packaged configuration schema is missing or will not compile */
+  CONFIG_SCHEMA_UNAVAILABLE: 'ERR_CONFIG_SCHEMA_UNAVAILABLE',
+  /** The output could not be written to its destination */
+  OUTPUT_WRITE: 'ERR_OUTPUT_WRITE',
+  /** A value failed validation and has no more specific code */
+  VALIDATION: 'ERR_VALIDATION',
 });
+
+/**
+ * Base error class for CopyTree
+ */
+class CopyTreeError extends Error {
+  constructor(message, code = 'UNKNOWN_ERROR', details = {}) {
+    super(message);
+    this.name = 'CopyTreeError';
+    this.code = code;
+
+    // `cause` is lifted out of `details` onto the error itself, where the
+    // language already defines what it means. Left in `details` it travels
+    // through `toJSON()` into whatever a caller logs, carrying another error's
+    // stack with it.
+    const { cause, ...safeDetails } = details || {};
+    if (cause !== undefined) this.cause = cause;
+    this.details = safeDetails;
+    this.timestamp = new Date().toISOString();
+
+    // Capture stack trace
+    Error.captureStackTrace(this, this.constructor);
+  }
+
+  /**
+   * The serialization a caller gets by default.
+   *
+   * No stack. `toJSON()` is what a logging integration, a `--log-format json`
+   * consumer and `JSON.stringify(error)` all reach for, and a stack trace names
+   * absolute paths on the machine that ran the command. It is diagnostic
+   * information, not part of the error contract, so it has to be asked for by
+   * name — see {@link toDebugJSON}.
+   *
+   * @returns {Object} Safe, structured error
+   */
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      code: this.code,
+      details: this.details,
+      timestamp: this.timestamp,
+    };
+  }
+
+  /**
+   * The full serialization, including the stack and the underlying cause.
+   *
+   * For a debug log the operator has opted into. Never emitted by the default
+   * error path.
+   *
+   * @returns {Object} Diagnostic error
+   */
+  toDebugJSON() {
+    return {
+      ...this.toJSON(),
+      stack: this.stack,
+      ...(this.cause ? { cause: String(this.cause?.stack || this.cause) } : {}),
+    };
+  }
+}
+
+/**
+ * Command execution error
+ */
+class CommandError extends CopyTreeError {
+  constructor(message, command, details = {}) {
+    super(message, details.code || ERROR_CODES.COMMAND_FAILED, { command, ...details });
+    this.name = 'CommandError';
+    this.command = command;
+  }
+}
+
+/**
+ * File system error
+ */
+class FileSystemError extends CopyTreeError {
+  constructor(message, path, operation, details = {}) {
+    super(message, details.code || ERROR_CODES.FILESYSTEM, { path, operation, ...details });
+    this.name = 'FileSystemError';
+    this.path = path;
+    this.operation = operation;
+  }
+}
+
+/**
+ * Configuration error
+ */
+class ConfigurationError extends CopyTreeError {
+  constructor(message, configKey, details = {}) {
+    super(message, details.code || ERROR_CODES.CONFIG_INVALID, { configKey, ...details });
+    this.name = 'ConfigurationError';
+    this.configKey = configKey;
+  }
+}
 
 /**
  * Exit codes, as a stable contract.
@@ -150,10 +214,10 @@ const USAGE_ERROR_CODES = new Set([
   ERROR_CODES.NOT_A_DIRECTORY,
   ERROR_CODES.SCOPE_OUTSIDE_ROOT,
   ERROR_CODES.CONFIG_INVALID,
+  ERROR_CODES.CONFIG_SCHEMA_UNAVAILABLE,
   ERROR_CODES.IGNORE_INVALID,
-  'PROFILE_ERROR',
-  'VALIDATION_ERROR',
-  'CONFIG_ERROR',
+  ERROR_CODES.PROFILE_INVALID,
+  ERROR_CODES.VALIDATION,
 ]);
 
 /**
@@ -199,7 +263,7 @@ class PolicyError extends CopyTreeError {
  */
 class ValidationError extends CopyTreeError {
   constructor(message, field, value, details = {}) {
-    super(message, details.code || 'VALIDATION_ERROR', { field, value, ...details });
+    super(message, details.code || ERROR_CODES.VALIDATION, { field, value, ...details });
     this.name = 'ValidationError';
     this.field = field;
     this.value = value;
@@ -252,7 +316,7 @@ function isAbortError(error) {
  */
 class PipelineError extends CopyTreeError {
   constructor(message, stage, details = {}) {
-    super(message, 'PIPELINE_ERROR', { stage, ...details });
+    super(message, details.code || ERROR_CODES.PIPELINE_STAGE, { stage, ...details });
     this.name = 'PipelineError';
     this.stage = stage;
   }
@@ -263,7 +327,7 @@ class PipelineError extends CopyTreeError {
  */
 class TransformError extends CopyTreeError {
   constructor(message, transformer, file, details = {}) {
-    super(message, 'TRANSFORM_ERROR', { transformer, file, ...details });
+    super(message, details.code || ERROR_CODES.TRANSFORM, { transformer, file, ...details });
     this.name = 'TransformError';
     this.transformer = transformer;
     this.file = file;
@@ -275,7 +339,7 @@ class TransformError extends CopyTreeError {
  */
 class GitError extends CopyTreeError {
   constructor(message, operation, details = {}) {
-    super(message, 'GIT_ERROR', { operation, ...details });
+    super(message, details.code || ERROR_CODES.GIT, { operation, ...details });
     this.name = 'GitError';
     this.operation = operation;
   }
@@ -286,7 +350,7 @@ class GitError extends CopyTreeError {
  */
 class ProfileError extends CopyTreeError {
   constructor(message, profile, details = {}) {
-    super(message, 'PROFILE_ERROR', { profile, ...details });
+    super(message, details.code || ERROR_CODES.PROFILE_INVALID, { profile, ...details });
     this.name = 'ProfileError';
     this.profile = profile;
   }
@@ -297,7 +361,7 @@ class ProfileError extends CopyTreeError {
  */
 class InstructionsError extends CopyTreeError {
   constructor(message, instructionsName, details = {}) {
-    super(message, 'INSTRUCTIONS_ERROR', { instructionsName, ...details });
+    super(message, details.code || ERROR_CODES.INSTRUCTIONS, { instructionsName, ...details });
     this.name = 'InstructionsError';
     this.instructionsName = instructionsName;
   }
@@ -430,7 +494,6 @@ function describeError(error, context = {}) {
       );
 
     case ERROR_CODES.CONFIG_INVALID:
-    case 'CONFIG_ERROR':
       return describe(
         'CopyTree configuration is invalid',
         details.configKey || null,
@@ -487,7 +550,32 @@ function describeError(error, context = {}) {
     case ERROR_CODES.ABORTED:
       return describe('Cancelled', null, null);
 
-    case 'FILESYSTEM_ERROR': {
+    case ERROR_CODES.CONFIG_SCHEMA_UNAVAILABLE:
+      return describe(
+        'The packaged configuration schema could not be loaded',
+        details.schemaPath || null,
+        'Reinstall copytree; the package appears to be incomplete',
+      );
+
+    case ERROR_CODES.PERMISSION_DENIED:
+      return describe(
+        'Permission denied',
+        error.path || details.path || null,
+        'Check the file permissions, or exclude the path',
+      );
+
+    case ERROR_CODES.OUTPUT_WRITE:
+      return describe(
+        'Could not write the output file',
+        error.path || details.path || null,
+        details.errno === 'ENOENT'
+          ? 'Check that the destination directory exists'
+          : details.errno === 'EACCES' || details.errno === 'EPERM'
+            ? 'Check the destination permissions, or choose another path'
+            : firstLine(error.message),
+      );
+
+    case ERROR_CODES.FILESYSTEM: {
       const permission = /EACCES|EPERM|permission/i.test(error.message || '');
       return describe(
         error.operation ? `Could not ${error.operation}` : 'Filesystem error',
@@ -498,7 +586,7 @@ function describeError(error, context = {}) {
       );
     }
 
-    case 'GIT_ERROR':
+    case ERROR_CODES.GIT:
       // Git's stderr carries an advice block, and on some machines a toolchain
       // warning above it. The first line is the failure; the rest is noise in a
       // status line, and is available under --debug.
@@ -508,7 +596,7 @@ function describeError(error, context = {}) {
         'Check the ref exists and that this directory is a Git repository',
       );
 
-    case 'PROFILE_ERROR':
+    case ERROR_CODES.PROFILE_INVALID:
       // The message already names the profile and what went wrong with it, so
       // it is the problem statement; only the remediation needs adding.
       return describe(
@@ -588,9 +676,18 @@ export const RETRYABLE_ERROR_CODES = [
  */
 export const NON_RETRYABLE_ERROR_CODES = [
   'INVALID_REQUEST',
-  'PERMISSION_DENIED',
-  'VALIDATION_ERROR',
-  'CONFIG_ERROR',
+  // Registry values, not the bare `VALIDATION_ERROR`-style strings these error
+  // classes used to carry. Left unmigrated, `categorizeError()` would answer
+  // `unknown` for a validation or configuration failure — the two most
+  // obviously permanent errors there are — and a caller branching on that
+  // answer would retry them.
+  ERROR_CODES.PERMISSION_DENIED,
+  ERROR_CODES.VALIDATION,
+  ERROR_CODES.CONFIG_INVALID,
+  ERROR_CODES.CONFIG_SCHEMA_UNAVAILABLE,
+  ERROR_CODES.INVALID_OPTION,
+  ERROR_CODES.PROFILE_NOT_FOUND,
+  ERROR_CODES.PROFILE_INVALID,
 ];
 
 /**

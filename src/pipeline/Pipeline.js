@@ -1,7 +1,56 @@
 import { EventEmitter } from 'events';
 import { ConfigManager } from '../config/ConfigManager.js';
-import { ValidationError, isAbortError } from '../utils/errors.js';
+import { PipelineError, ValidationError, isAbortError } from '../utils/errors.js';
 import { logger as defaultLogger } from '../utils/logger.js';
+
+/**
+ * Marks an error as a lifecycle-contract failure rather than a processing one.
+ *
+ * A Symbol key, so it never reaches a serialized error or a log line —
+ * `JSON.stringify` and `Object.keys` both skip symbol properties. It is a
+ * routing decision inside this file, not part of the public error shape.
+ */
+const LIFECYCLE_FAILURE = Symbol('copytree.lifecycleFailure');
+
+/**
+ * Tag an error as a lifecycle failure.
+ * @param {Error} error - Error to tag
+ * @returns {Error} The same error
+ */
+function asLifecycleFailure(error) {
+  error[LIFECYCLE_FAILURE] = true;
+  return error;
+}
+
+/**
+ * Whether an error came from a lifecycle hook or a validator.
+ * @param {Error} error - Error to test
+ * @returns {boolean} True for a lifecycle-contract failure
+ */
+function isLifecycleFailure(error) {
+  return error?.[LIFECYCLE_FAILURE] === true;
+}
+
+/**
+ * A content key for a degradation record, for deduplication.
+ *
+ * @param {{stage?: string, code?: string, message?: string}} entry - Degradation
+ * @returns {string} Stable key
+ */
+function degradationKey(entry) {
+  return `${entry?.stage ?? ''}\u0000${entry?.code ?? ''}\u0000${entry?.message ?? ''}`;
+}
+
+/**
+ * How many files a pipeline value carries, for an event payload.
+ *
+ * @param {*} value - Pipeline input or output
+ * @returns {number} File count, or 1 for a non-collection value
+ */
+function countOf(value) {
+  if (Array.isArray(value)) return value.length;
+  return value?.files?.length ?? 1;
+}
 
 class Pipeline extends EventEmitter {
   /**
@@ -20,6 +69,13 @@ class Pipeline extends EventEmitter {
 
     this.stages = [];
     this.stageInstances = []; // Track instantiated stages for lifecycle hooks
+    // Tracked separately from `stageInstances.length`, which a failed `onInit`
+    // used to leave partially populated and therefore truthy. `_initializing`
+    // closes the window between the first `await` inside `_initializeStages()`
+    // and the flag being set, during which a stage could still be appended and
+    // would then be instantiated as part of the run already under way.
+    this._initialized = false;
+    this._initializing = false;
 
     // Store config instance if provided, otherwise will be created during init
     this._configInstance = options.config || null;
@@ -82,6 +138,19 @@ class Pipeline extends EventEmitter {
    * @returns {Pipeline} - Returns this for chaining
    */
   through(stages) {
+    // A pipeline is immutable once it has been initialized. `_initializeStages()`
+    // returns early when `stageInstances` is populated, so a stage added after
+    // the first run was pushed onto `this.stages` and then never instantiated,
+    // never initialized, and never executed — silently. Adding stages to a
+    // running pipeline has no legitimate use here, and failing to notice that
+    // they did nothing is much worse than being told they cannot be added.
+    if (this._initialized || this._initializing) {
+      throw new PipelineError(
+        'Cannot add stages to a pipeline that has already run',
+        'Pipeline.through',
+      );
+    }
+
     if (!Array.isArray(stages)) {
       stages = [stages];
     }
@@ -97,17 +166,44 @@ class Pipeline extends EventEmitter {
    * @private
    */
   async _initializeStages() {
-    if (this.stageInstances.length > 0) {
-      // Already initialized
-      return;
-    }
+    if (this._initialized) return;
+    this._initializing = true;
 
+    try {
+      await this._buildStages();
+      this._initialized = true;
+    } finally {
+      // Cleared whether or not initialization succeeded. Left set on a failure
+      // it would wedge the pipeline permanently: `_initialized` stays false, so
+      // nothing is runnable, and `_initializing` stays true, so nothing can be
+      // added either.
+      this._initializing = false;
+    }
+  }
+
+  /**
+   * Instantiate every stage and run its `onInit`.
+   *
+   * Split from `_initializeStages()` so the `_initializing` flag can be cleared
+   * in one `finally` regardless of how this returns.
+   *
+   * @private
+   */
+  async _buildStages() {
     // Create isolated config instance if not provided
     if (!this._configInstance) {
       this._configInstance = await ConfigManager.create();
     }
     // Update context with config instance
     this.context.config = this._configInstance;
+
+    // Built into a local array and committed only once every `onInit` has
+    // succeeded. Pushing directly onto `this.stageInstances` meant a failed
+    // `onInit` left a partial prefix behind — and because the early return
+    // above keyed off that array being non-empty, a second `process()` call
+    // skipped initialization entirely and ran the prefix, reporting success
+    // for a pipeline that was missing most of its stages.
+    const instances = [];
 
     // Instantiate all stages and call onInit hooks
     for (let i = 0; i < this.stages.length; i++) {
@@ -134,20 +230,32 @@ class Pipeline extends EventEmitter {
         stageInstance.pipeline = this;
       }
 
-      this.stageInstances.push(stageInstance);
+      instances.push(stageInstance);
 
-      // Call onInit hook if it exists
+      // Call onInit hook if it exists.
+      //
+      // Fatal, unconditionally. `onInit` is where a stage resolves its
+      // configuration, compiles its patterns, opens its scanner and decides what
+      // it is going to do. A stage that failed to initialize and then ran anyway
+      // is a stage running on defaults nobody asked for, which is precisely the
+      // "looks complete, is not" outcome this pipeline exists to avoid. It used
+      // to be a warning.
       if (typeof stageInstance.onInit === 'function') {
+        const stageName = this._getStageName(Stage, i);
         try {
           await stageInstance.onInit(this.context);
         } catch (error) {
-          // Log initialization error but don't fail pipeline creation
-          this.context.logger.warn(
-            `Stage ${this._getStageName(Stage, i)} onInit hook failed: ${error.message}`,
+          if (isAbortError(error)) throw error;
+          throw new PipelineError(
+            `Stage ${stageName} failed to initialize: ${error.message}`,
+            stageName,
+            { cause: error },
           );
         }
       }
     }
+
+    this.stageInstances = instances;
   }
 
   /**
@@ -185,7 +293,7 @@ class Pipeline extends EventEmitter {
     this.stats.averageStageTime = 0;
 
     this.emit('pipeline:start', {
-      input,
+      inputCount: countOf(input),
       stages: this.stages.length,
       options: this.options,
     });
@@ -202,7 +310,7 @@ class Pipeline extends EventEmitter {
       this.stats.endTime = Date.now();
 
       this.emit('pipeline:complete', {
-        result,
+        resultCount: countOf(result),
         stats: this.getStats(),
       });
 
@@ -238,11 +346,20 @@ class Pipeline extends EventEmitter {
         // duration of one stage rather than the whole pipeline.
         this.options.signal?.throwIfAborted();
 
+        // Metadata, not the payload. This event used to carry `input` — which
+        // is the entire selection, with every file's content on it. Any
+        // embedder that attached a logger to `onEvent` was serializing the
+        // whole repository, and a third-party listener saw more than the run
+        // it was observing. `stage:debug` carries the raw values for anyone
+        // who genuinely needs them.
         this.emit('stage:start', {
           stage: stageName,
           index: i,
-          input: result,
+          inputCount: countOf(result),
         });
+        if (this.listenerCount('stage:debug') > 0) {
+          this.emit('stage:debug', { stage: stageName, index: i, phase: 'start', input: result });
+        }
 
         const processMethod = stageInstance.process || stageInstance;
 
@@ -250,39 +367,46 @@ class Pipeline extends EventEmitter {
           throw new Error(`Stage ${stageName} does not have a process method`);
         }
 
-        // Call beforeRun hook if it exists
+        // Call beforeRun hook if it exists.
+        //
+        // Fatal, like `onInit` and for the same reason: it runs before the
+        // output exists, so its failure can change what the output is.
         if (typeof stageInstance.beforeRun === 'function') {
           try {
             await stageInstance.beforeRun(result);
           } catch (hookError) {
-            this.context.logger.warn(
-              `Stage ${stageName} beforeRun hook failed: ${hookError.message}`,
+            if (isAbortError(hookError)) throw hookError;
+            throw asLifecycleFailure(
+              new PipelineError(
+                `Stage ${stageName} beforeRun hook failed: ${hookError.message}`,
+                stageName,
+                { cause: hookError },
+              ),
             );
-            // Continue processing - hook failures shouldn't stop pipeline
           }
         }
 
-        // Validate input before processing if validate method exists
+        // Validate input before processing if validate method exists.
+        //
+        // Always fatal. `continueOnError` used to downgrade this to a warning
+        // and then call `process()` with the very input that had just been
+        // declared invalid — which makes `validate()` a logging function rather
+        // than a precondition. A validator that cannot stop the thing it
+        // validates is not worth having.
         if (typeof stageInstance.validate === 'function') {
           try {
             await stageInstance.validate(result);
           } catch (error) {
-            const validationError =
+            if (isAbortError(error)) throw error;
+            throw asLifecycleFailure(
               error instanceof ValidationError
                 ? error
                 : new ValidationError(
                     `Stage validation failed: ${error.message}`,
                     stageName,
                     result,
-                  );
-
-            if (this.options.continueOnError && !stageInstance.fatal) {
-              this.context.logger.warn(
-                `[Pipeline] Validation warning in ${stageName}: ${validationError.message}`,
-              );
-            } else {
-              throw validationError;
-            }
+                  ),
+            );
           }
         }
 
@@ -327,25 +451,37 @@ class Pipeline extends EventEmitter {
         // Update totals
         this.stats.totalStageTime += stageDuration;
 
-        // Call afterRun hook if it exists
+        result = output;
+
+        // Call afterRun hook if it exists.
+        //
+        // The one hook that is *not* fatal, and deliberately so: it runs after
+        // `process()` has already produced its output, so nothing it does can
+        // change what that output contains. Failing the run over a metrics or
+        // cleanup hook would discard a correct result. It is still recorded as
+        // a degradation rather than logged and forgotten — the line between
+        // "not fatal" and "not worth mentioning" is where silent failure lives.
         if (typeof stageInstance.afterRun === 'function') {
           try {
-            await stageInstance.afterRun(output);
+            await stageInstance.afterRun(result);
           } catch (hookError) {
+            if (isAbortError(hookError)) throw hookError;
             this.context.logger.warn(
               `Stage ${stageName} afterRun hook failed: ${hookError.message}`,
             );
-            // Continue processing - hook failures shouldn't stop pipeline
+            result = this._recordDegradation(result, {
+              stage: stageName,
+              code: 'STAGE_AFTER_RUN_FAILED',
+              message: `${stageName} afterRun hook failed: ${hookError.message}`,
+            });
           }
         }
 
-        result = output;
         this.stats.stagesCompleted++;
 
         this.emit('stage:complete', {
           stage: stageName,
           index: i,
-          output: result,
           // Enhanced timing and metrics data
           duration: stageDuration,
           inputSize,
@@ -353,6 +489,14 @@ class Pipeline extends EventEmitter {
           memoryUsage: this.stats.perStageMetrics[stageName].memoryUsage,
           timestamp: stageEnd,
         });
+        if (this.listenerCount('stage:debug') > 0) {
+          this.emit('stage:debug', {
+            stage: stageName,
+            index: i,
+            phase: 'complete',
+            output: result,
+          });
+        }
       } catch (error) {
         // Cancellation is not a stage failure and is never recoverable: the
         // caller asked the run to stop, so stop. Without this, `continueOnError`
@@ -360,6 +504,17 @@ class Pipeline extends EventEmitter {
         // cancel into a stream of spurious recovery warnings.
         if (isAbortError(error)) {
           this.stats.endTime = Date.now();
+          this.emit('stage:error', { stage: stageName, index: i, error });
+          throw error;
+        }
+
+        // A broken precondition is not a stage failure that recovery can
+        // reason about. `handleError()` exists to answer "processing did not
+        // work"; it has nothing useful to say about "the input was invalid" or
+        // "setup did not happen", and letting `continueOnError` step over
+        // either is how a validator became a logging function.
+        if (isLifecycleFailure(error)) {
+          this.stats.stagesFailed++;
           this.emit('stage:error', { stage: stageName, index: i, error });
           throw error;
         }
@@ -386,22 +541,41 @@ class Pipeline extends EventEmitter {
                 stage: stageName,
                 index: i,
                 originalError: error,
-                recoveredResult,
+                recoveredCount: countOf(recoveredResult),
               });
               // Recorded on the result, not only emitted. An event is available
               // to whoever is listening at the time; this has to survive to the
               // end of the run, because "the output is not what you asked for"
               // is a fact about the result rather than a moment during it.
-              result = {
-                ...recoveredResult,
-                stats: {
-                  ...(recoveredResult.stats || {}),
-                  degradations: [
-                    ...(recoveredResult.stats?.degradations || []),
-                    { stage: stageName, message: `${stageName} failed: ${error.message}` },
-                  ],
+              // `carriedOver` is the degradations recorded *before* this
+              // stage. A `handleError()` is free to build a fresh result rather
+              // than spreading its input, and several do — which silently
+              // erased every degradation an earlier stage had recorded, so a
+              // run could recover twice and report only the second.
+              const previous = Array.isArray(result?.stats?.degradations)
+                ? result.stats.degradations
+                : [];
+              // Compared by content, not by identity. A `handleError()` that
+              // rebuilds its degradation entries — spreading them, or mapping
+              // over the list — produces equal-but-distinct objects, and an
+              // identity check would carry every one of them over a second
+              // time.
+              const alreadyPresent = new Set(
+                (recoveredResult?.stats?.degradations || []).map(degradationKey),
+              );
+              const carriedOver = previous.filter(
+                (entry) => !alreadyPresent.has(degradationKey(entry)),
+              );
+
+              result = this._recordDegradation(
+                recoveredResult,
+                {
+                  stage: stageName,
+                  code: error.code || 'STAGE_RECOVERED',
+                  message: `${stageName} failed: ${error.message}`,
                 },
-              };
+                carriedOver,
+              );
               continue; // Continue with recovered result
             }
           } catch (handlerError) {
@@ -473,6 +647,51 @@ class Pipeline extends EventEmitter {
     }
 
     return Array.isArray(input) ? results : results[0];
+  }
+
+  /**
+   * Append a structured degradation record to a pipeline result.
+   *
+   * One shape, one place. A degradation says the run completed but not as
+   * asked. Callers branch on `stats.degradations.length`; `--strict` turns a
+   * non-empty list into a policy failure.
+   *
+   * @private
+   * @param {Object} result - Stage output to annotate
+   * @param {{stage: string, code: string, message: string}} degradation - What could not be done
+   * @returns {Object} `result` with the degradation recorded on its stats
+   */
+  _recordDegradation(result, degradation, carriedOver = []) {
+    // Only a plain object carries stats. A stage is free to return an array or
+    // a scalar — `_processParallel` passes arrays through, and the Laravel-style
+    // `send().through()` form imposes no shape at all — and spreading one of
+    // those into an object literal silently replaced the value with
+    // `{ stats: ... }`. Losing the result to record a note about the result is
+    // the wrong trade; the degradation is logged instead.
+    // A genuinely plain object, checked by prototype. `typeof x === 'object'`
+    // is also true of a Buffer, a Date, a Map and every class instance, and
+    // spreading one of those into an object literal throws away its prototype
+    // and its internal state — so a stage returning a Buffer would have had it
+    // silently replaced by `{ stats: ... }`.
+    // The null check comes first: `Object.getPrototypeOf(undefined)` throws,
+    // and a stage returning `undefined` with a failing `afterRun` would have
+    // replaced the degradation with a TypeError.
+    const isObject = typeof result === 'object' && result !== null;
+    const prototype = isObject ? Object.getPrototypeOf(result) : undefined;
+    const isPlainObject = isObject && (prototype === Object.prototype || prototype === null);
+
+    if (!isPlainObject) {
+      this.context.logger.warn(`${degradation.stage}: ${degradation.message}`);
+      return result;
+    }
+
+    return {
+      ...result,
+      stats: {
+        ...(result.stats || {}),
+        degradations: [...carriedOver, ...(result.stats?.degradations || []), degradation],
+      },
+    };
   }
 
   /**

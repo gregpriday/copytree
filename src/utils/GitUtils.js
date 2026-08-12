@@ -221,8 +221,16 @@ class GitUtils {
 
       return statusMap;
     } catch (error) {
-      this.logger.warn(`Failed to get file statuses: ${error.message}`);
-      return {};
+      // Rethrown as a typed error, not swallowed into `{}`. An empty map is
+      // indistinguishable from "every file is unmodified", so `GitFilterStage`
+      // attached no status, recorded no degradation, and the run reported
+      // success — the caller asked for `--git-status` and got a document that
+      // looked exactly like one where nothing had changed. The stage's own
+      // `catch` turns this into a visible degradation, and `--strict` refuses
+      // it.
+      throw new GitError(`Failed to get file statuses: ${error.message}`, 'getFileStatuses', {
+        cause: error,
+      });
     }
   }
 

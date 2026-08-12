@@ -99,16 +99,44 @@ describe('GitFilterStage', () => {
       expect(mockGitUtils.getModifiedFiles).not.toHaveBeenCalled();
     });
 
-    // Annotation is polish: its absence changes no selection, so it degrades.
-    it('skips annotation when --git-status is used outside a repository', async () => {
+    // Annotation is polish: its absence changes no selection, so it degrades
+    // rather than failing — but it is *recorded* as a degradation, not merely
+    // logged. `--git-status` was asked for and is not being delivered, and a
+    // log line is suppressed by `--quiet` and invisible to `--strict`.
+    it('records a degradation when --git-status is used outside a repository', async () => {
       mockGitUtils.isGitRepository.mockResolvedValue(false);
       stage = new GitFilterStage({ gitStatus: true });
       const input = createTestInput();
 
       const result = await stage.process(input);
 
-      expect(result).toBe(input);
+      expect(result.files).toBe(input.files);
+      expect(result.stats.degradations).toEqual([
+        expect.objectContaining({
+          stage: 'GitFilterStage',
+          message: expect.stringContaining('needs a Git repository'),
+        }),
+      ]);
       expect(mockGitUtils.getModifiedFiles).not.toHaveBeenCalled();
+    });
+
+    it('degrades rather than silently attaching no status when git status fails', async () => {
+      // `GitUtils.getFileStatuses()` used to answer a Git failure with `{}`,
+      // which is indistinguishable from "every file is unmodified": the stage
+      // attached no status, recorded nothing, and the run reported success
+      // for a document that looked exactly like one where nothing had changed.
+      mockGitUtils.getFileStatuses.mockRejectedValue(new Error('git exploded'));
+      stage = new GitFilterStage({ gitStatus: true });
+      const input = createTestInput();
+
+      const result = await stage.process(input);
+
+      expect(result.stats.degradations).toEqual([
+        expect.objectContaining({
+          stage: 'GitFilterStage',
+          message: expect.stringContaining('no git status was attached'),
+        }),
+      ]);
     });
 
     it('should filter files by modified status', async () => {

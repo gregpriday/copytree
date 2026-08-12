@@ -99,12 +99,18 @@ describe('BudgetStage', () => {
     expect(await stage.process(input)).toBe(input);
   });
 
-  it('passes files through rather than failing the run on error', async () => {
+  it('fails the run rather than passing files through when enforcement breaks', async () => {
     const stage = new BudgetStage({ maxFileCount: 1 });
-    const input = makeInput(makeFiles([1, 2]));
 
-    const recovered = await stage.handleError(new Error('boom'), input);
-    expect(recovered).toBe(input);
+    // Marked fatal, and with no `handleError` to recover through. A budget
+    // that disengages on error is a budget that stops binding exactly when
+    // something has already gone wrong, and the caller is told nothing:
+    // `--max-total-size 2MB` would exit 0 having produced far more than 2MB.
+    expect(stage.fatal).toBe(true);
+    expect(Object.hasOwn(BudgetStage.prototype, 'handleError')).toBe(false);
+
+    const input = makeInput(makeFiles([1, 2]));
+    await expect(stage.handleError(new Error('boom'), input)).rejects.toThrow('boom');
   });
 
   describe('validate', () => {

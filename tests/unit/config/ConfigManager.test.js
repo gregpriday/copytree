@@ -26,8 +26,10 @@ describe('ConfigManager', () => {
     jest.clearAllMocks();
     originalEnv = { ...process.env };
 
-    // Mock file system operations
-    fs.mkdtempSync.mockReturnValue('/mocked-temp');
+    // Mock file system operations. `mkdtempSync` used to be armed here too, and
+    // is not on `src/utils/fsx.js` at all — it was a leftover from when this
+    // wrapped `fs-extra`, and the mock declared it anyway, so the test armed
+    // and asserted an API production does not have.
     fs.existsSync.mockReturnValue(false);
     fs.ensureDirSync.mockImplementation(() => {});
     fs.readdirSync.mockReturnValue([]);

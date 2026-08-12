@@ -44,7 +44,6 @@ export default async function inspectCommand(request, context = {}) {
     root,
     request,
     config: cfg,
-    onWarning: (message) => feedback.write(message, { level: 'warn' }),
     retention: { mode: 'counts' },
     skipCopytreeIgnore: report.withoutCopytreeignore === true,
   });

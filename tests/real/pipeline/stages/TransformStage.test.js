@@ -89,8 +89,14 @@ describe('TransformStage (real)', () => {
     expect(result.files[0].content).toBe('transformed content');
     expect(result.files[1]).toEqual(input.files[1]);
     expect(result.files[2]).toEqual(input.files[2]);
-    expect(result.files[3].error).toBe('boom');
-    expect(result.files[3].content).toContain('[Transform error: boom]');
+    // The original content survives a failed transform. Substituting
+    // `[Transform error: boom]` destroyed the very content the transform was
+    // meant to improve, in a form no consumer could tell from source text.
+    expect(result.files[3].content).toBe('d');
+    expect(result.files[3].transformed).toBe(false);
+    expect(result.files[3].transformError).toBe('boom');
+    expect(result.stats.transformFailures).toEqual([{ path: 'd.txt', message: 'boom' }]);
+    expect(result.stats.degradations).toHaveLength(1);
   });
 
   test('uses cached heavy transform results and skips transform invocation', async () => {
@@ -168,22 +174,22 @@ describe('TransformStage (real)', () => {
     expect(result.stats.transformErrors).toBe(0);
   });
 
-  test('handleError recovers for recoverable errors and rethrows non-recoverable ones', async () => {
+  test('is fatal at the stage level rather than skipping every requested transform', async () => {
+    // Per-file failures degrade inside `transformFiles()`, which is where
+    // resilience belongs. A failure that escapes that loop is structural, and
+    // the old recovery answered it by silently skipping every conversion and
+    // reporting success — through a `_isRecoverableError()` heuristic that
+    // matched by substring, so any message merely mentioning `ETIMEDOUT`
+    // counted as recoverable.
     const stage = new TransformStage({ cache: makeCache() });
+
+    expect(stage.fatal).toBe(true);
+    expect(Object.hasOwn(TransformStage.prototype, 'handleError')).toBe(false);
+
     const input = { files: [{ path: 'a' }, { path: 'b' }], stats: { discoveredCount: 2 } };
-
-    const recovered = await stage.handleError(
-      new TransformError('transform failed', 't', 'a'),
-      input,
-    );
-
-    expect(recovered.stats.transformedCount).toBe(0);
-    expect(recovered.stats.transformErrors).toBe(2);
-    expect(recovered.stats.recoveredFromError).toBe(true);
-
-    await expect(stage.handleError(new Error('totally fatal'), input)).rejects.toThrow(
-      'totally fatal',
-    );
+    await expect(
+      stage.handleError(new TransformError('transform failed', 't', 'a'), input),
+    ).rejects.toThrow('transform failed');
   });
 
   test('getTransformerForFile honors enable flags and noCache mode', () => {

@@ -1,7 +1,7 @@
 import Stage from '../Stage.js';
 import { CacheService } from '../../services/CacheService.js';
 import { generateTransformCacheKey } from '../../utils/fileHash.js';
-import { TransformError } from '../../utils/errors.js';
+import { ERROR_CODES, TransformError, isAbortError } from '../../utils/errors.js';
 import { CANDIDATE_EXTENSIONS } from '../../transforms/TransformerRegistry.js';
 import path from 'path';
 import appConfig from '../../../config/app.js';
@@ -22,6 +22,18 @@ class TransformStage extends Stage {
     this.force = options.force === true;
     this.cacheEnabled = options.cacheEnabled ?? true;
     this._cache = options.cache ?? null;
+
+    // Fatal at the stage level. Per-file transform failures are caught,
+    // reported and degraded inside `transformFiles()`, which is where
+    // resilience belongs; a failure that escapes that loop is structural — the
+    // registry could not be built, the cache is broken, a batch flush threw —
+    // and the old recovery answered it by silently skipping *every* requested
+    // conversion and reporting success.
+    //
+    // Its `_isRecoverableError()` heuristic was also matched by substring, so
+    // any error whose message merely mentioned `ETIMEDOUT` was treated as
+    // recoverable regardless of what had actually gone wrong.
+    this.fatal = true;
   }
 
   /**
@@ -152,6 +164,9 @@ class TransformStage extends Stage {
     const reportProgress = hasHeavyTransformers && activeTransforms > 0;
     let activeFiles = [];
     let completedCount = 0;
+    // Which files failed, not just how many. A count tells a caller something
+    // went wrong; the paths tell them what to look at.
+    const transformFailures = [];
 
     // Pre-index filesToTransform by file for O(1) lookup instead of O(n)
     const transformMap = new Map(filesToTransform.map((info) => [info.file, info]));
@@ -223,6 +238,8 @@ class TransformStage extends Stage {
 
           return file;
         } catch (error) {
+          if (isAbortError(error)) throw error;
+
           errorCount++;
           this.log(`Failed to transform ${file.path}: ${error.message}`, 'warn');
 
@@ -232,12 +249,17 @@ class TransformStage extends Stage {
             reportTransformProgress();
           }
 
-          return {
-            ...file,
-            content: `[Transform error: ${error.message}]`,
-            error: error.message,
-            transformed: false,
-          };
+          // The original file, not `[Transform error: ...]` in place of its
+          // content. Substituting the error message destroyed the very content
+          // the transform was supposed to improve, and did it in a form
+          // indistinguishable from source text — so a failed conversion left
+          // the export claiming a file whose body was an error string.
+          //
+          // Keeping the original is a degradation, and is recorded as one:
+          // `transformErrors` and `transformFailures` reach the caller, and
+          // `--strict` refuses the run.
+          transformFailures.push({ path: file.path, message: error.message });
+          return { ...file, transformed: false, transformError: error.message };
         }
       }),
     );
@@ -272,61 +294,24 @@ class TransformStage extends Stage {
         ...input.stats,
         transformedCount: transformCount,
         transformErrors: errorCount,
+        ...(transformFailures.length > 0
+          ? {
+              transformFailures,
+              degradations: [
+                ...(input.stats?.degradations || []),
+                {
+                  stage: this.name,
+                  code: ERROR_CODES.TRANSFORM,
+                  message:
+                    `${transformFailures.length} ` +
+                    `${transformFailures.length === 1 ? 'file' : 'files'} could not be ` +
+                    `transformed and were emitted unchanged`,
+                },
+              ],
+            }
+          : {}),
       },
     };
-  }
-
-  /**
-   * Handle errors during transformation with recovery mechanism
-   *
-   * This implementation provides graceful recovery for transformation failures,
-   * particularly useful for AI-powered transformers that may fail intermittently.
-   *
-   * @param {Error} error - Error that occurred during transformation
-   * @param {Object} input - Input data containing files to transform
-   * @returns {Promise<Object>} - Recovered result with error logging
-   */
-  async handleError(error, input) {
-    this.log(`Transform stage encountered error: ${error.message}`, 'warn');
-
-    // Check if this is a recoverable error type
-    const isRecoverable = this._isRecoverableError(error);
-
-    if (isRecoverable && input && input.files) {
-      this.log('Attempting recovery by skipping transformation for affected files', 'info');
-
-      // Return input with transformation skipped but files preserved
-      return {
-        ...input,
-        stats: {
-          ...input.stats,
-          transformedCount: 0,
-          transformErrors: input.files.length,
-          recoveredFromError: true,
-        },
-      };
-    }
-
-    // If not recoverable, rethrow the error
-    throw error;
-  }
-
-  /**
-   * Check if an error is recoverable for transformation stage
-   * @private
-   */
-  _isRecoverableError(error) {
-    // Recoverable errors include transformation failures, network issues, etc.
-    const recoverableTypes = [
-      'TransformError',
-      'ENOTFOUND', // Network errors
-      'ETIMEDOUT', // Timeout errors
-      'ECONNRESET', // Connection reset
-    ];
-
-    return recoverableTypes.some(
-      (type) => error.name === type || error.code === type || error.message.includes(type),
-    );
   }
 
   getTransformerForFile(file) {

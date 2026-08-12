@@ -68,6 +68,7 @@ describe('OS-specific file reference copy', () => {
       // Finder cannot hang a copy. On a loaded parallel run the stub is
       // occasionally killed before it writes its log, which makes this test
       // about scheduling rather than about the command it is checking.
+      //
       COPYTREE_CLIPBOARD_TIMEOUT_MS: '30000',
     };
 
@@ -158,5 +159,11 @@ describe('OS-specific file reference copy', () => {
     }
 
     throw new Error(`Unsupported platform for this test: ${process.platform}`);
-  }, 30000);
+    // Twice the clipboard budget above, deliberately. When the two were equal a
+    // run that spent the whole clipboard budget failed as "Exceeded timeout of
+    // 30000 ms", which says nothing about the clipboard and sends the reader
+    // looking for a slow test rather than a wedged helper. Spawning a
+    // freshly-written script is genuinely slow under some sandboxes and
+    // security tooling, so the headroom is not theoretical.
+  }, 60000);
 });

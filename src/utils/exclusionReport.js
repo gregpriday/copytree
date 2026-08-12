@@ -38,6 +38,8 @@ export const EXCLUSION_REASONS = Object.freeze({
   TEST_EXCLUDE: 'testExclude',
   /** Known-binary extension, excluded from content */
   BINARY_EXTENSION: 'binaryExtension',
+  /** Dropped entirely by the `skip` binary policy (`--binary omit`) */
+  BINARY_POLICY: 'binaryPolicy',
   /** Larger than the hard size gate, never opened */
   SIZE_GATE: 'sizeGate',
   /** Dropped because the total size budget was exhausted */

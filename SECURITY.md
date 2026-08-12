@@ -4,11 +4,15 @@
 
 Security updates are provided for the latest release only.
 
-| Version    | Supported          | Notes                             |
-| ---------- | ------------------ | --------------------------------- |
-| Latest 1.x | :white_check_mark: | Fixes ship in a new patch release |
-| Older 1.x  | :x:                | Upgrade to the latest 1.x         |
-| 0.x        | :x:                | Upgrade to 1.x                    |
+| Version      | Supported          | Notes                              |
+| ------------ | ------------------ | ---------------------------------- |
+| Latest 0.x   | :white_check_mark: | Fixes ship in a new patch release  |
+| Older 0.x    | :x:                | Upgrade to the latest 0.x          |
+
+This table describes the released package, which is currently `0.x`. It moves to
+`1.x` in the same commit that sets the version to `1.0.0` — not before. Telling
+people to "upgrade to 1.x" while the only published versions are `0.x` sends
+them looking for a release that does not exist.
 
 **This is a deliberately narrow promise.** CopyTree is maintained by one person.
 A stated LTS window with backports to previous majors would be a commitment that
@@ -122,7 +126,7 @@ When using CopyTree:
 2. **Configuration**: Review custom profiles and configuration files before use
 3. **Output**: Review generated output before sharing, especially with AI tools
 4. **Binary Files**: Be cautious with binary file handling in sensitive projects
-5. **Secrets Detection**: Use `--secrets-guard` (enabled by default) to prevent accidental secret exposure
+5. **Secrets Detection**: On by default (`--secrets redact`). Use `--secrets fail` to refuse the export outright when a credential is found, or `--secrets off` to disable the guard. (`--secrets-guard` is the deprecated spelling and is hidden from help.)
 
 ## Known Limitations
 

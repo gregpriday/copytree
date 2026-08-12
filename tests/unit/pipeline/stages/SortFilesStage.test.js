@@ -253,3 +253,18 @@ describe('SortFilesStage', () => {
     });
   });
 });
+
+describe('the implemented sort keys match the ones the CLI advertises', () => {
+  it('keeps the two lists in step', async () => {
+    // `IMPLEMENTED_SORT_KEYS` is duplicated in the stage rather than imported
+    // from `src/cli/schema.js`, because a pipeline stage has no business
+    // depending on the CLI's declarative surface. This is the assertion that
+    // stops the duplication drifting: a key the CLI accepts and the stage does
+    // not now throws at runtime rather than sorting by path.
+    const { IMPLEMENTED_SORT_KEYS } =
+      await import('../../../../src/pipeline/stages/SortFilesStage.js');
+    const { SORT_KEYS } = await import('../../../../src/cli/schema.js');
+
+    expect([...IMPLEMENTED_SORT_KEYS].sort()).toEqual([...SORT_KEYS].sort());
+  });
+});

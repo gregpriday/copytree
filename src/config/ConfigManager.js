@@ -113,11 +113,13 @@ class ConfigManager {
     this.userConfigLoaded = false;
     this.loadErrors = [];
 
-    // Check if validation should be disabled via options or environment
-    this.validationEnabled =
-      !options.noValidate &&
-      process.env.COPYTREE_NO_VALIDATE !== 'true' &&
-      process.env.NODE_ENV !== 'test';
+    // Check if validation should be disabled via options or environment.
+    //
+    // `NODE_ENV === 'test'` used to be on this list, which meant the schema was
+    // never exercised in the one environment built to exercise it: the suite
+    // proved that invalid configuration was accepted. Tests that genuinely need
+    // a partial or deliberately-invalid config pass `noValidate: true`.
+    this.validationEnabled = !options.noValidate && process.env.COPYTREE_NO_VALIDATE !== 'true';
 
     // AJV is built on demand — see `loadSchema()`. Constructing it here meant
     // every run paid for the validator, the format extensions, the schema read
@@ -511,7 +513,26 @@ class ConfigManager {
     try {
       const schemaPath = path.join(this.configPath, 'schema.json');
 
-      if (await fs.pathExists(schemaPath)) {
+      if (!(await fs.pathExists(schemaPath))) {
+        // Under strict, an unavailable schema is a packaging failure, not a
+        // reason to stop checking. The schema is closed on purpose: it is the
+        // promise that every accepted key means something. Silently switching
+        // validation off if `config/schema.json` goes missing turns a build
+        // defect into weaker correctness, exactly where a loud failure was
+        // wanted.
+        if (this.strict) {
+          throw new ConfigurationError(
+            'The packaged configuration schema is missing, so configuration cannot be validated',
+            'schema',
+            { code: ERROR_CODES.CONFIG_SCHEMA_UNAVAILABLE, schemaPath },
+          );
+        }
+        this._warn('Configuration schema not found. Validation disabled.');
+        this.validationEnabled = false;
+        return;
+      }
+
+      {
         this.schema = await fs.readJson(schemaPath);
 
         // Create a unique schema ID to avoid conflicts
@@ -542,11 +563,16 @@ class ConfigManager {
         addFormats(this.ajv);
 
         this.validate = this.ajv.compile(uniqueSchema);
-      } else {
-        this._warn('Configuration schema not found. Validation disabled.');
-        this.validationEnabled = false;
       }
     } catch (error) {
+      if (error?.code === ERROR_CODES.CONFIG_SCHEMA_UNAVAILABLE) throw error;
+      if (this.strict) {
+        throw new ConfigurationError(
+          `The packaged configuration schema could not be compiled: ${error.message}`,
+          'schema',
+          { code: ERROR_CODES.CONFIG_SCHEMA_UNAVAILABLE, cause: error },
+        );
+      }
       this._warn(`Failed to load configuration schema: ${error.message}`);
       this.validationEnabled = false;
     }
@@ -567,20 +593,30 @@ class ConfigManager {
         .map((err) => {
           const path = err.instancePath || '(root)';
           const message = err.message;
-          const value = err.data !== undefined ? ` (got: ${JSON.stringify(err.data)})` : '';
+          // Scalars only. An `additionalProperties` failure at the root reports
+          // `err.data` as the entire configuration object, so rendering it
+          // unconditionally put the whole effective config — every path, token
+          // and credential in it — into the error message.
+          const scalar = err.data === null || typeof err.data !== 'object';
+          const value =
+            scalar && err.data !== undefined ? ` (got: ${JSON.stringify(err.data)})` : '';
           return `${path}: ${message}${value}`;
         })
         .join('; ');
 
-      throw new ConfigurationError(
-        `Configuration validation failed: ${errors}`,
-        'SCHEMA_VALIDATION_ERROR',
-        {
-          validationErrors: this.validate.errors,
-          schemaVersion: this.schemaVersion,
-          config: this.config,
-        },
-      );
+      throw new ConfigurationError(`Configuration validation failed: ${errors}`, 'schema', {
+        // Only what identifies the rejected value. The whole effective
+        // configuration used to travel here, and `toJSON()` publishes
+        // `details` — so any consumer that logged a validation failure logged
+        // every path, token and setting the user had configured.
+        validationErrors: this.validate.errors.map((err) => ({
+          instancePath: err.instancePath || '',
+          keyword: err.keyword,
+          message: err.message,
+          params: err.params,
+        })),
+        schemaVersion: this.schemaVersion,
+      });
     }
   }
 

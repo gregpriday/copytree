@@ -25,7 +25,11 @@ import { VERSION } from '../src/version.js';
 // extra` is a mistake, and Commander gives a better account of it than this
 // would.
 if (process.argv.length === 3 && (process.argv[2] === '--version' || process.argv[2] === '-V')) {
-  process.stdout.write(`${VERSION}\n`);
+  // Awaited rather than written-and-exited. `process.exit()` terminates
+  // immediately, and when stdout is a pipe or a file rather than a TTY the
+  // write may not have reached the OS yet — so `copytree --version > f` could
+  // produce an empty file. The callback fires once the data is flushed.
+  await new Promise((resolve) => process.stdout.write(`${VERSION}\n`, resolve));
   process.exit(0);
 }
 

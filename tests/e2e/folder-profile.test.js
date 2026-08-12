@@ -114,18 +114,18 @@ describe('Folder Profile E2E Tests', () => {
     expect(filePaths).not.toContain('index.js');
   });
 
-  it('continues without profile when auto-discovered profile is malformed', async () => {
+  it('refuses to run when the auto-discovered profile is malformed', async () => {
     await fs.writeFile(path.join(testProjectDir, '.copytree.yml'), 'invalid: yaml: syntax:');
 
     const outputFile = path.join(testProjectDir, 'output.json');
     const { exitCode } = runCopytree(`-r --format json -o "${outputFile}" --stream`);
-    expect(exitCode).toBe(0);
 
-    const output = await fs.readJson(outputFile);
-    const filePaths = output.files.map((f) => f.path);
-
-    expect(filePaths).toContain('index.js');
-    expect(filePaths).toContain('README.md');
+    // Exporting the whole project because the project's own exclusion rules
+    // would not parse is the worst available answer: the author wrote those
+    // rules to keep something out, and nothing in a successful export says
+    // they were skipped.
+    expect(exitCode).toBe(2);
+    expect(await fs.pathExists(outputFile)).toBe(false);
   });
 
   it('supports --only-tree with streamed file output', async () => {

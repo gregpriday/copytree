@@ -43,7 +43,11 @@ class SecretsGuardStage extends Stage {
     super(options);
     // Skipping this stage emits unredacted credentials with a success exit code.
     this.fatal = true;
-    this.gitleaks = new GitleaksAdapter(options.gitleaks || {});
+    // Built in `_resolveSettings()`, not here: the adapter's binary path,
+    // config path and extra arguments are public, schema-declared
+    // configuration, and the base class's config proxy returns only defaults
+    // until `onInit()` supplies the real instance.
+    this.gitleaks = null;
     this.useGitleaks = false;
     // Which scanner to use is decided on the first file that has bytes to scan,
     // not at construction — see `_resolveScanner()`.
@@ -77,8 +81,11 @@ class SecretsGuardStage extends Stage {
     this.redactInline = options.redactInline ?? this.config.get('secretsGuard.redactInline', true);
     this.redactionMode =
       options.redactionMode || this.config.get('secretsGuard.redactionMode', 'typed');
+    // `??`, not `||`. The schema allows a minimum of 0, and `maxFileBytes: 0`
+    // — "scan nothing; treat every file as unscannable" — silently became the
+    // 5MB default, which is the opposite policy.
     this.maxFileBytes =
-      options.maxFileBytes || this.config.get('secretsGuard.maxFileBytes', 5_000_000);
+      options.maxFileBytes ?? this.config.get('secretsGuard.maxFileBytes', 5_000_000);
     this.failOnSecrets =
       options.failOnSecrets ?? this.config.get('secretsGuard.failOnSecrets', false);
 
@@ -87,6 +94,17 @@ class SecretsGuardStage extends Stage {
     // default and has to be asked for by name.
     this.oversizePolicy =
       options.oversizePolicy || this.config.get('secretsGuard.oversizePolicy', 'exclude');
+
+    // The external scanner's public configuration, from the operation's own
+    // ConfigManager. `secretsGuard.gitleaks.binaryPath`, `configPath`,
+    // `extraArgs` and `logLevel` are all declared in the schema, and none of
+    // them reached the adapter: a user pointing CopyTree at a custom Gitleaks
+    // build or ruleset had it accepted, validated, and ignored.
+    this.gitleaks = new GitleaksAdapter({
+      ...this.config.get('secretsGuard.gitleaks', {}),
+      ...(options.gitleaks || {}),
+    });
+    this._scannerResolved = false;
 
     // Dry runs carry no content, so nothing can be *scanned*. The exclusions
     // this stage applies are not all content-based, though: the secret-prone
@@ -334,6 +352,25 @@ class SecretsGuardStage extends Stage {
       findings: [...(input.findings || []), ...findings],
       stats: {
         ...(input.stats || {}),
+        // The scanner downgrade also goes in the general degradation list, not
+        // only in the nested `secretsGuard.degraded`. `--strict` reads the
+        // list, and "the credential scanner you asked for failed and a weaker
+        // one finished the run" is the single degradation most worth refusing
+        // a run over — it was the one the flag could not see.
+        ...(this._degradation
+          ? {
+              degradations: [
+                ...(input.stats?.degradations || []),
+                {
+                  stage: this.name,
+                  code: 'SECRET_SCANNER_DEGRADED',
+                  message:
+                    `${this._degradation.from} failed, so the rest of this run was scanned ` +
+                    `by the ${this._degradation.to} scanner: ${this._degradation.reason}`,
+                },
+              ],
+            }
+          : {}),
         secretsGuard: {
           enabled: true,
           // Nothing was scanned in a plan, and nothing was scanned when every

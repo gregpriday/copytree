@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import os from 'os';
 import { config } from '../config/ConfigManager.js';
 import { logger } from '../utils/logger.js';
+import { writeFileAtomic } from '../utils/atomicWrite.js';
 
 /**
  * Simple file-based cache service
@@ -112,9 +113,21 @@ class CacheService {
         const filePath = this.getCacheFilePath(fullKey);
 
         if (await fs.pathExists(filePath)) {
-          const data = await fs.readJson(filePath);
+          // A cache entry that will not parse is a corrupt entry, not a reason
+          // to fail: delete it and recompute. Left in place it would be re-read
+          // and re-thrown on every subsequent run.
+          let data;
+          try {
+            data = await fs.readJson(filePath);
+          } catch (parseError) {
+            this.logger.debug(
+              `Discarding unreadable cache entry ${filePath}: ${parseError.message}`,
+            );
+            await fs.remove(filePath).catch(() => {});
+            return defaultValue;
+          }
 
-          if (data.expires > Date.now()) {
+          if (data?.expires > Date.now()) {
             this.logger.debug(`Cache hit (file): ${key}`);
             // Store in memory cache for faster access
             this.memoryCache.set(fullKey, data);
@@ -147,7 +160,10 @@ class CacheService {
     }
 
     const fullKey = this.generateKey(key);
-    const expires = Date.now() + (ttl || this.defaultTtl) * 1000;
+    // `??`, not `||`. `ttl: 0` means "expire immediately", and `||` turned it
+    // into the 24-hour default — the opposite instruction.
+    const effectiveTtl = ttl ?? this.defaultTtl;
+    const expires = Date.now() + effectiveTtl * 1000;
 
     const cacheItem = {
       key: fullKey,
@@ -157,14 +173,18 @@ class CacheService {
     };
 
     try {
-      // Store in memory cache
-      this.memoryCache.set(fullKey, cacheItem);
-
-      // Store in file cache
+      // File first, then memory. The order matters: writing memory first meant
+      // a failed or interrupted disk write left this process serving an entry
+      // no other process could see, and disagreeing with what is on disk.
       if (this.driver === 'file') {
         const filePath = this.getCacheFilePath(fullKey);
         await fs.ensureDir(path.dirname(filePath));
-        await fs.writeJson(filePath, cacheItem, { spaces: 2 });
+        // Atomic. A plain write that is interrupted — a crash, a full disk, a
+        // second process writing the same key — leaves truncated JSON that the
+        // next `get()` cannot parse. Renaming a complete temporary file over
+        // the destination means a reader sees either the old entry or the new
+        // one, never half of either.
+        await writeFileAtomic(filePath, JSON.stringify(cacheItem, null, 2));
 
         // Garbage collection
         if (Math.random() < this.gcProbability) {
@@ -172,7 +192,9 @@ class CacheService {
         }
       }
 
-      this.logger.debug(`Cache set: ${key} (TTL: ${ttl || this.defaultTtl}s)`);
+      this.memoryCache.set(fullKey, cacheItem);
+
+      this.logger.debug(`Cache set: ${key} (TTL: ${effectiveTtl}s)`);
       return true;
     } catch (error) {
       this.logger.error(`Cache set error: ${error.message}`);
@@ -411,9 +433,16 @@ class CacheService {
    * @private
    */
   getCacheFilePath(key) {
-    // Sanitize key for filesystem
-    const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
-    return path.join(this.cachePath, safeKey + this.extension);
+    // A digest, not a sanitized key. Replacing every unsupported character
+    // with `_` is not injective: `a/b` and `a:b` and `a b` all became `a_b`,
+    // so three distinct cache entries collided on one file and each read back
+    // whichever had been written last. For a transform cache that means
+    // emitting one file's converted content in place of another's.
+    //
+    // The full SHA-256 is used rather than a prefix: a cache filename is not a
+    // place to spend collision resistance to save 48 characters.
+    const digest = crypto.createHash('sha256').update(key).digest('hex');
+    return path.join(this.cachePath, digest + this.extension);
   }
 
   /**

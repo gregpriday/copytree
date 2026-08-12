@@ -1,5 +1,10 @@
 import Pipeline from '../pipeline/Pipeline.js';
-import { ValidationError, ERROR_CODES, createAbortError } from '../utils/errors.js';
+import {
+  ValidationError,
+  FileSystemError,
+  ERROR_CODES,
+  createAbortError,
+} from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
 import { ProgressTracker } from '../utils/ProgressTracker.js';
 import { ExclusionReport } from '../utils/exclusionReport.js';
@@ -200,10 +205,31 @@ export async function* scan(basePath, options = {}) {
   // pipeline consults process.cwd(), so an embedder whose cwd is elsewhere
   // (an app bundle, a worker thread) gets the same answer.
   const resolvedPath = path.resolve(basePath);
-  if (!(await fs.pathExists(resolvedPath))) {
-    throw new ValidationError(`Path does not exist: ${resolvedPath}`, 'scan', basePath, {
-      code: ERROR_CODES.PATH_NOT_FOUND,
-    });
+  // `stat()` rather than `pathExists()`, so the *reason* survives. A directory
+  // the user cannot read is not a directory that does not exist: the
+  // remediation is different (`chmod`, not "check the path"), and reporting one
+  // as the other sends people looking for a typo that is not there.
+  try {
+    await fs.stat(resolvedPath);
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') {
+      throw new ValidationError(`Path does not exist: ${resolvedPath}`, 'scan', basePath, {
+        code: ERROR_CODES.PATH_NOT_FOUND,
+      });
+    }
+    if (error?.code === 'EACCES' || error?.code === 'EPERM') {
+      throw new FileSystemError(`Permission denied: ${resolvedPath}`, resolvedPath, 'stat', {
+        code: ERROR_CODES.PERMISSION_DENIED,
+        cause: error,
+        errno: error.code,
+      });
+    }
+    throw new FileSystemError(
+      `Could not read ${resolvedPath}: ${error.message}`,
+      resolvedPath,
+      'stat',
+      { cause: error, errno: error?.code },
+    );
   }
 
   // Check for abort signal

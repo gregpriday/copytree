@@ -1,5 +1,6 @@
 import Stage from '../Stage.js';
 import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
+import { ValidationError } from '../../utils/errors.js';
 
 /**
  * BudgetStage - Enforces `maxFileCount` and `maxTotalSize`.
@@ -27,6 +28,13 @@ import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 class BudgetStage extends Stage {
   constructor(options = {}) {
     super(options);
+    // Fatal. A budget is a direct instruction about how large the result may
+    // be, and this stage used to answer a failure by returning every file
+    // untouched — so `--max-total-size 2MB` could exit 0 having produced 40MB.
+    // A safety control that disengages exactly when the subsystem enforcing it
+    // is already in an unexpected state is worse than no control at all,
+    // because the caller believes it held.
+    this.fatal = true;
     this.maxFileCount = normalizeLimit(options.maxFileCount);
     this.maxTotalSize = normalizeLimit(options.maxTotalSize);
   }
@@ -153,21 +161,12 @@ class BudgetStage extends Stage {
     };
   }
 
-  /**
-   * Budgets must never fail a run. If enforcement throws, pass the files through
-   * untouched rather than losing the whole context.
-   */
-  async handleError(error, input) {
-    this.log(`Budget enforcement failed: ${error.message}, passing files through`, 'warn');
-    return input;
-  }
-
   validate(input) {
     if (!input || typeof input !== 'object') {
-      throw new Error('Input must be an object');
+      throw new ValidationError('Input must be an object', 'BudgetStage', input);
     }
     if (!Array.isArray(input.files)) {
-      throw new Error('Input must have a files array');
+      throw new ValidationError('Input must have a files array', 'BudgetStage', input);
     }
     return true;
   }

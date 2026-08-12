@@ -285,7 +285,7 @@ export default {
   },
 
   // Binary policy per category (overrides binaryFileAction)
-  // Options: load | omit | skip | comment | placeholder | base64
+  // Options: skip | comment | placeholder | base64
   binaryPolicy: {
     image: 'comment', // Images: show comment placeholder
     video: 'comment', // Video: show comment placeholder
@@ -311,7 +311,11 @@ export default {
     // export instead of appearing as placeholders.
     document: 'placeholder',
     other: 'comment', // Unknown binaries: show comment placeholder
-    text: 'load', // Text files: load normally
+    // `text: 'load'` used to sit here. This map is consulted only for files
+    // that were classified as binary, so the text category never reached it:
+    // the entry documented a policy that no code path could apply, and `load`
+    // was in the schema's enum for its sake alone. Text files are read because
+    // they are text, not because of a policy key.
   },
 
   // Template strings for binary file comments
