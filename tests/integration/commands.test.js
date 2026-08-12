@@ -13,6 +13,11 @@ import { withTempDir, settleFs } from '../helpers/tempfs.js';
 // Jest/Babel compatibility: construct the test directory path
 const __dirname = path.join(process.cwd(), 'tests/integration');
 
+/** The version the package actually declares, so the CLI can be held to it. */
+const pkgVersion = JSON.parse(
+  readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'),
+).version;
+
 /**
  * A HOME of this suite's own.
  *
@@ -157,7 +162,12 @@ output:
       const { stdout, exitCode } = await runCommand(`node "${cliPath}" --version`);
 
       expect(exitCode).toBe(0);
-      expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
+      // Full SemVer, not just `X.Y.Z`. The narrower pattern meant no
+      // prerelease could ever pass this test, so the first `1.0.0-rc.1` tag
+      // failed the release gate on the version string itself.
+      expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/);
+      // And it is the version actually being shipped.
+      expect(stdout.trim()).toBe(pkgVersion);
     });
   });
 

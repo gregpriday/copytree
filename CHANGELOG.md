@@ -2,9 +2,25 @@
 
 ## [Unreleased]
 
-A contract-hardening pass toward 1.0. Little new capability; a deliberate
-narrowing of what CopyTree promises, so that what remains is true, tested and
-provable from the published tarball.
+## [1.0.0-rc.1] - 2026-08-12
+
+The first release candidate for 1.0. A contract-hardening pass: little new
+capability, and a deliberate narrowing of what CopyTree promises, so that what
+remains is true, tested and provable from the published tarball.
+
+**This is a prerelease, published under the `next` dist-tag.** `npm install
+copytree` still resolves to the current stable line; install it deliberately
+with `npm install copytree@next`.
+
+Two things stand between this and `1.0.0`, and neither is a code change:
+
+- **Nothing here has run on Windows.** This candidate adds filesystem
+  primitives whose behaviour is platform-specific — atomic rename over an
+  existing file, exclusive `wx` creation, unlinking a file with an open
+  handle, `mkdir`-based locks, Git worktrees. All of it was tested on macOS.
+- **This is the first release the publish workflow has ever performed.** A
+  release process that has not been rehearsed is a hypothesis, which is
+  precisely why the rehearsal is happening on a prerelease tag.
 
 Full upgrade notes: [docs/reference/migrating-to-1.0.md](docs/reference/migrating-to-1.0.md).
 
