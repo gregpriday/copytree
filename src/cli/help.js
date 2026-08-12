@@ -15,6 +15,7 @@ import {
   COMMAND_GROUPS,
   COMMAND_SCHEMA_VERSION,
   commandByPath,
+  groupSummary,
   longFlagOf,
   optionsOf,
   subcommandsOf,
@@ -39,21 +40,61 @@ const ROOT_COPY_OPTION_IDS = [
   'verbose',
 ];
 
-/** Commands root help lists, in order, with the label it lists them under. */
-const ROOT_COMMAND_ROWS = [
-  ['copy [path]', 'Explicit form of the default copy operation'],
-  ['plan [path]', 'Preview selected files without reading contents'],
-  ['inspect [path]', 'Inspect structure, rules, profile and budgets'],
-  ['explain <entry...>', 'Explain why paths are included or excluded'],
-  ['ignore context [path]', 'Build context for authoring .copytreeignore'],
-  ['ignore check [path]', 'Validate ignore rules and show their effect'],
-  ['ignore init [path]', 'Print or write a conservative starter file'],
-  ['config show|validate', 'Inspect or validate configuration'],
-  ['cache status|clear|gc', 'Inspect or manage caches'],
-  ['doctor', 'Check CopyTree, clipboard, Git and converters'],
-  ['completion <shell>', 'Generate shell completion code'],
-  ['debug profile [path]', 'Capture CPU and/or heap profiles'],
-];
+/**
+ * The command rows root help lists, derived from the schema.
+ *
+ * Previously a hardcoded array, which drifted the moment `config migrate` was
+ * added: the schema grew a command and the help screen did not mention it.
+ * That is the one failure this whole design exists to prevent, so the list is
+ * computed and a contract test asserts every command appears.
+ *
+ * A group whose subcommands are collapsed shows one row — `cache
+ * status|clear|gc`. A group that is not collapsed shows a row per subcommand,
+ * because the ignore workflow is the sequence a new reader most needs to see.
+ *
+ * @returns {Array<[string, string]>} `[invocation, summary]` rows, in schema order
+ */
+function rootCommandRows() {
+  const rows = [];
+  const collapsed = new Set();
+
+  for (const command of COMMANDS) {
+    if (command.hidden || command.rootHelp === false) continue;
+
+    const [parent] = command.path;
+    const group = COMMAND_GROUPS[parent];
+    const children = subcommandsOf(parent);
+
+    if (group?.collapse && children.length > 0) {
+      if (collapsed.has(parent)) continue;
+      collapsed.add(parent);
+      rows.push([
+        `${parent} ${children.map((child) => child.path.at(-1)).join('|')}`,
+        group.summary,
+      ]);
+      continue;
+    }
+
+    rows.push([`${command.path.join(' ')}${positionalSuffix(command)}`, command.summary]);
+  }
+
+  return rows;
+}
+
+/**
+ * The positional placeholders a command takes, as they appear in help.
+ * @param {import('./schema.js').CommandSpec} command - Command spec
+ * @returns {string} e.g. ` [path]`, or an empty string
+ */
+function positionalSuffix(command) {
+  const positionals = (command.positionals || [])
+    .map((positional) => {
+      const label = positional.variadic ? `${positional.name}...` : positional.name;
+      return positional.required ? `<${label}>` : `[${label}]`;
+    })
+    .join(' ');
+  return positionals ? ` ${positionals}` : '';
+}
 
 /**
  * Pad a column to a width, without trailing spaces on empty text.
@@ -98,7 +139,8 @@ export function renderRootHelp() {
   const byId = new Map(optionsOf(copy).map((option) => [option.id, option]));
   const rootOptions = ROOT_COPY_OPTION_IDS.map((id) => byId.get(id)).filter(Boolean);
   const optionWidth = flagWidth(rootOptions);
-  const commandWidth = ROOT_COMMAND_ROWS.reduce((w, [name]) => Math.max(w, name.length), 0);
+  const commandRows = rootCommandRows();
+  const commandWidth = commandRows.reduce((w, [name]) => Math.max(w, name.length), 0);
 
   const lines = [
     'CopyTree — package a project as structured context for an AI agent',
@@ -118,7 +160,7 @@ export function renderRootHelp() {
     '  copytree plan .              Preview the exact final export',
     '',
     'Commands:',
-    ...ROOT_COMMAND_ROWS.map(([name, summary]) => `  ${pad(name, commandWidth)}  ${summary}`),
+    ...commandRows.map(([name, summary]) => `  ${pad(name, commandWidth)}  ${summary}`),
     '',
     'Common copy options:',
     ...rootOptions.map((option) => optionLine(option, optionWidth)),
@@ -236,7 +278,7 @@ export function renderGroupHelp(parent) {
   const children = subcommandsOf(parent);
   const width = children.reduce((w, c) => Math.max(w, c.path.join(' ').length), 0);
   const lines = [
-    `copytree ${parent} — ${COMMAND_GROUPS[parent] ?? 'Subcommands'}`,
+    `copytree ${parent} — ${groupSummary(parent)}`,
     '',
     'Usage:',
     `  copytree ${parent} <subcommand> [options]`,

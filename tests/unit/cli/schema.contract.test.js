@@ -203,6 +203,39 @@ describe('help rendering', () => {
     expect(help).toContain('copytree plan .');
   });
 
+  // The root command list was hardcoded once, and drifted the moment a command
+  // was added: `config migrate` existed for a day without appearing anywhere a
+  // reader would look. It is derived now, and this is what keeps it derived.
+  test('root help reaches every command in the schema', () => {
+    const help = renderRootHelp();
+
+    for (const command of COMMANDS) {
+      if (command.hidden || command.rootHelp === false) continue;
+
+      const [parent] = command.path;
+      const group = COMMAND_GROUPS[parent];
+
+      if (group?.collapse && subcommandsOf(parent).length > 0) {
+        // Collapsed groups name every subcommand in one row.
+        expect(help).toContain(
+          `${parent} ${subcommandsOf(parent)
+            .map((c) => c.path.at(-1))
+            .join('|')}`,
+        );
+      } else {
+        expect(help).toContain(command.path.join(' '));
+      }
+    }
+  });
+
+  test('a command excluded from root help is reachable another way', () => {
+    for (const command of COMMANDS) {
+      if (command.rootHelp !== false) continue;
+      // `help` is not listed as a row, but the footer says how to reach it.
+      expect(renderRootHelp()).toContain(`copytree ${command.path[0]} --format json`);
+    }
+  });
+
   test('root help shows no deprecated spellings', () => {
     const help = renderRootHelp();
     for (const row of deprecationTable()) {
@@ -332,6 +365,21 @@ describe('generated documentation', () => {
 
     // Documentation drift is a build failure, not a review finding.
     expect(onDisk).toBe(renderReference());
+  });
+
+  // The drift check compares the file with the generator, so a generator bug
+  // survives it: regenerate, both agree, and the reference reads
+  // "[object Object]". This is the check on the generator itself.
+  test('the reference renders no placeholder or undefined text', async () => {
+    const { renderReference } = await import('../../../src/cli/docs.js');
+    const reference = renderReference();
+
+    expect(reference).not.toContain('[object Object]');
+    expect(reference).not.toContain('undefined');
+    for (const parent of Object.keys(COMMAND_GROUPS)) {
+      if (subcommandsOf(parent).length === 0) continue;
+      expect(reference).toContain(COMMAND_GROUPS[parent].summary);
+    }
   });
 
   test('the reference documents every visible command and no hidden one', async () => {

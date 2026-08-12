@@ -1525,6 +1525,9 @@ const DEBUG_PROFILE_COMMAND = {
 const HELP_COMMAND = {
   id: 'help',
   path: ['help'],
+  // Not listed among the commands in root help: the footer already tells the
+  // reader how to reach it, and a "help" row in a help screen is noise.
+  rootHelp: false,
   summary: 'Show help for CopyTree or one of its commands',
   handler: 'commands/help.js',
   positionals: [{ name: 'command', required: false, variadic: true, description: 'Command path' }],
@@ -1581,11 +1584,26 @@ export const COMMANDS = Object.freeze([
  * subcommands instead of failing.
  */
 export const COMMAND_GROUPS = Object.freeze({
-  ignore: 'Author, validate and start a .copytreeignore',
-  config: 'Inspect or validate configuration',
-  cache: 'Inspect or manage caches',
-  debug: 'Developer diagnostics',
+  ignore: {
+    summary: 'Author, validate and start a .copytreeignore',
+    // Listed subcommand by subcommand in root help. This is the workflow the
+    // CLI is built around, and collapsing it to `ignore context|check|init`
+    // would hide the one sequence a new reader most needs to see.
+    collapse: false,
+  },
+  config: { summary: 'Inspect, validate or migrate configuration', collapse: true },
+  cache: { summary: 'Inspect or manage caches', collapse: true },
+  debug: { summary: 'Developer diagnostics', collapse: false },
 });
+
+/**
+ * The summary line for a parent token.
+ * @param {string} parent - Parent token
+ * @returns {string} Summary
+ */
+export function groupSummary(parent) {
+  return COMMAND_GROUPS[parent]?.summary ?? `${parent} subcommands`;
+}
 
 /**
  * Every top-level token the parser treats as a command rather than a path.

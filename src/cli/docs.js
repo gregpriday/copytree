@@ -11,6 +11,7 @@ import {
   COMMANDS,
   COMMAND_GROUPS,
   deprecationTable,
+  groupSummary,
   REMOVED_COPY_OPTIONS,
   subcommandsOf,
 } from './schema.js';
@@ -108,9 +109,9 @@ export function renderReference() {
     '|---|---|',
   ];
 
-  for (const [parent, summary] of Object.entries(COMMAND_GROUPS)) {
+  for (const parent of Object.keys(COMMAND_GROUPS)) {
     if (subcommandsOf(parent).length === 0) continue;
-    lines.push(`| \`copytree ${parent} <subcommand>\` | ${cell(summary)} |`);
+    lines.push(`| \`copytree ${parent} <subcommand>\` | ${cell(groupSummary(parent))} |`);
   }
   for (const command of COMMANDS) {
     if (command.hidden) continue;

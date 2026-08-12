@@ -8,7 +8,7 @@
  */
 
 import { Command, Option } from 'commander';
-import { COMMANDS, COMMAND_GROUPS, FORMAT_ALIASES, subcommandsOf } from './schema.js';
+import { COMMANDS, FORMAT_ALIASES, groupSummary, subcommandsOf } from './schema.js';
 import { parserFor } from './parsers.js';
 import { renderCommandHelp, renderGroupHelp, renderRootHelp } from './help.js';
 import { VERSION } from '../version.js';
@@ -87,9 +87,7 @@ export function buildProgram(hooks = {}) {
 
     const name = spec.path[0];
     if (!groups.has(name)) {
-      const group = program
-        .command(name)
-        .description(COMMAND_GROUPS[name] ?? `${name} subcommands`);
+      const group = program.command(name).description(groupSummary(name));
       group.helpInformation = () => renderGroupHelp(name);
       // A bare `copytree ignore` lists what it can do rather than failing.
       group.action(() => {

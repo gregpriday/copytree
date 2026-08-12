@@ -30,7 +30,7 @@ copytree plan .              # preview the exact final export
 | Command | Summary |
 |---|---|
 | `copytree ignore <subcommand>` | Author, validate and start a .copytreeignore |
-| `copytree config <subcommand>` | Inspect or validate configuration |
+| `copytree config <subcommand>` | Inspect, validate or migrate configuration |
 | `copytree cache <subcommand>` | Inspect or manage caches |
 | `copytree debug <subcommand>` | Developer diagnostics |
 | `copytree copy` | Explicit form of the default copy operation |
