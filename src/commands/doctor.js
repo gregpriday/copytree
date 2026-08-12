@@ -172,15 +172,25 @@ async function checkWritableDirectories(add) {
     // the thing it is checking, and would leave state behind on a machine
     // someone ran `doctor` on precisely because they did not trust it.
     if (!(await fs.pathExists(dir))) {
-      const parent = path.dirname(dir);
-      const parentWritable = await isWritable(parent);
+      // The nearest ancestor that exists, not just the immediate parent.
+      // `~/.copytree/cache` is absent on a fresh install and so is
+      // `~/.copytree`, and probing a directory that does not exist always
+      // fails to write — so `copytree doctor` told everyone who ran it
+      // straight after `npm install -g copytree` that their installation was
+      // broken, and exited 3. A check that cries wolf on a healthy machine is
+      // worse than no check, because this one exists to be trusted.
+      //
+      // What actually has to be true is what `mkdir -p` needs: the deepest
+      // existing ancestor is writable.
+      const anchor = await nearestExistingAncestor(dir);
+      const anchorWritable = await isWritable(anchor);
       add(
         name,
-        parentWritable ? 'pass' : 'fail',
-        parentWritable
-          ? `absent, and ${parent} is writable — it will be created on first use`
-          : `absent, and ${parent} is not writable`,
-        parentWritable ? null : 'Grant write access, or set a writable HOME',
+        anchorWritable ? 'pass' : 'fail',
+        anchorWritable
+          ? `absent, and ${anchor} is writable — it will be created on first use`
+          : `absent, and ${anchor} is not writable`,
+        anchorWritable ? null : 'Grant write access, or set a writable HOME',
       );
       continue;
     }
@@ -193,6 +203,28 @@ async function checkWritableDirectories(add) {
       writable ? null : 'Grant write access, or set a writable HOME',
     );
   }
+}
+
+/**
+ * The deepest ancestor of a path that exists on disk.
+ *
+ * `mkdir -p` creates every missing level, so the question "can this directory
+ * be created" is really "is the deepest thing that already exists writable".
+ *
+ * @param {string} dir - Directory that does not exist
+ * @returns {Promise<string>} Nearest existing ancestor, at worst the filesystem root
+ */
+async function nearestExistingAncestor(dir) {
+  let current = path.dirname(dir);
+
+  // `path.dirname('/')` is `/`, so the root terminates the walk.
+  while (!(await fs.pathExists(current))) {
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+
+  return current;
 }
 
 /**

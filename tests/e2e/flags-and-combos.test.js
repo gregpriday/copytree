@@ -61,8 +61,13 @@ describe('Flags and combinations', () => {
 
       const gitEnv = getGitEnv();
 
-      // Initialize Git repo
-      execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
+      // `-b main`, not a bare `git init`. The branch name otherwise comes from
+      // whatever `init.defaultBranch` the machine happens to set, and the
+      // golden file below records it: this passed on a developer machine
+      // configured for `main` and failed on a CI runner that still defaults to
+      // `master`. A test that creates its own repository should name its own
+      // branch.
+      execSync('git init -b main', { cwd: tmpDir, stdio: 'pipe' });
       execSync('git config user.name copytree-bot', { cwd: tmpDir, stdio: 'pipe' });
       execSync('git config user.email bot@example.com', { cwd: tmpDir, stdio: 'pipe' });
 
