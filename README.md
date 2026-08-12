@@ -30,24 +30,36 @@ copytree --clipboard
 # Save to file
 copytree -o project-structure.xml
 
-# Display tree structure only (no file contents)
-copytree -t
-copytree --only-tree
+# Structure and metadata, without file bodies
+copytree --no-content
 
 # Copy from GitHub repository
 copytree https://github.com/user/repo
 
-# Display in terminal
-copytree --display
+# Write the export to stdout
+copytree --stdout
 
-# Note: Destination behavior
-# - default (no flags): writes a temp file and copies its path to the clipboard,
-#   so pasting into an agent hands over a file to read rather than inline context
+# Note: destination behaviour — exactly one of these
+# - default (no flags): writes a temp file and copies a file reference, so pasting
+#   into an agent hands over a file to read rather than inline context
 # - -y/--clipboard: copies the output text itself
-# - --display: prints to terminal
-# - -o/--output: writes to a file
-# - -S/--stream: streams to stdout/file (best for large outputs or CI)
+# - --stdout:       writes the export to stdout
+# - -o/--output:    writes the export to a file
+# - --reference:    the default, stated explicitly
 ```
+
+## 🔎 Understand a project before you copy it
+
+Four read-only commands answer the questions a copy cannot:
+
+```bash
+copytree plan .                      # exactly which files, in what order, at what size
+copytree inspect .                   # structure, active rules, effective profile and budgets
+copytree explain docs/README.md      # why one path is in, or out, down to the rule and line
+copytree ignore context .            # a content-free inventory for authoring .copytreeignore
+```
+
+None of them read file contents, write an export, or touch the clipboard.
 
 ## 🎯 Why CopyTree?
 
@@ -71,27 +83,31 @@ copytree --display
 
 ## 🔧 Frequently Used Flags
 
-- `--format <xml|json|markdown|tree>` – Output format (default: **xml**)
-- `--scope <path...>` – Copy only these paths (literal, not globs), with root-anchored ignore rules
-- `-t, --only-tree` – Tree structure only (no file contents)
-- `-i, --display` – Print to terminal instead of clipboard
-- `-v, --verbose` – Show run detail: phases, selection summary, size and duration
+Repeatable options take one value per occurrence: `--include a --include b`.
+
+- `--format <xml|markdown|json|ndjson|sarif|tree>` – Output format (default: **xml**)
+- `--profile <name>` – Use a file-selection profile; `--no-profile` skips auto-discovery
+- `--scope <path>` – Copy only this literal path (not a glob), with root-anchored ignore rules
+- `--include <glob>` – Narrow the selection; a file must match at least one
+- `-x, --exclude <pattern>` – Add a Git-style exclusion rule
+- `--force-include <glob>` – Override ordinary excludes and the size gate
+- `--no-content` – Structure and metadata, without file bodies
+- `--stdout` – Write the export to stdout
+- `-v, --verbose` – Show run detail: selection summary, size and duration
 - `-q, --quiet` – Say nothing about a successful run; failures still go to stderr
 - `-y, --clipboard` – Copy the output text itself, instead of a file reference
-- `-S, --stream` – Stream output to stdout/file (ideal for large projects or CI)
-- `-x, --exclude <pattern...>` – Exclude glob patterns
-- `-C, --char-limit <n>` – Character budget across all file content
 - `--size-gate <size>` / `--no-size-gate` – Per-file size gate, applied before opening (default 256KB)
-- `--max-total-size <size>` / `--max-files <n>` – Bound the whole context
-- `--explain` – Report which rule excluded each file, and where that rule came from
-- `--with-line-numbers` – Add line numbers to file contents
-- `--info` – Include file metadata (size, modified date)
-- `--show-size` – Show file sizes in output
-- `--with-git-status` – Include git status for each file
-- `--no-folder-profile` – Skip auto-discovery of a `.copytree.yml` folder profile
-- `--always <pattern...>` – Force include specific patterns (the only thing that lifts the size gate)
-- `--dedupe` – Remove duplicate files
-- `--sort <path|size|modified|name|extension>` – Sort files (also decides which survive a budget)
+- `--max-total-size <size>` / `--max-files <n>` / `--max-chars <n>` – Bound the whole context
+- `--line-numbers` – Add line numbers to text content
+- `--git-status` – Attach Git status to selected files
+- `--binary <default|omit|comment|placeholder|base64|convert>` – Binary/document policy
+- `--secrets <redact|fail|off>` – Secret policy (default: **redact**)
+- `--dedupe` – Remove content-identical files
+- `--sort <path|size|modified|name|extension|depth>` / `--order <asc|desc>` – Selection order,
+  which also decides which files survive a budget
+
+Full reference: [docs/cli/copytree-reference.md](docs/cli/copytree-reference.md), generated from the
+command schema. `copytree help --format json` emits the same schema for machines.
 
 ## 🍳 Common Recipes
 
@@ -105,14 +121,14 @@ copytree -c main
 copytree --changed main
 
 # Include JS/TS files, exclude node_modules
-copytree -f "*.js" -f "*.ts" --exclude "node_modules"
+copytree --include "**/*.js" --include "**/*.ts" --exclude "node_modules"
 
 # Copy GitHub folder to XML
 copytree https://github.com/user/repo/tree/main/src -o repo-src.xml
 
-# Stream output (great for CI or large projects)
-copytree -S --format markdown > output.md
-copytree --stream --format json | jq .
+# Send the export to stdout (great for CI or a pipe)
+copytree --stdout --format markdown > output.md
+copytree --stdout --format json | jq .
 
 # One folder, but with the whole repository's ignore rules
 copytree --scope src/panels/file-browser
@@ -122,15 +138,14 @@ copytree --scope "src/[draft]" package.json
 
 # Bound the context, and keep the recently-touched files when it bites
 # (budgets keep the head of the sorted list, so ask for newest-first)
-copytree --max-total-size 2MB --sort modified --sort-order desc
+copytree --max-total-size 2MB --sort modified --order desc
 
-# Dry run (preview without copying), with the reason each file was dropped
-copytree --dry-run
-copytree --dry-run --explain
+# Preview the exact selection, with the reason each file was dropped
+copytree plan .
+copytree plan . --explain
 
-# Show only tree structure (no file contents)
-copytree -t
-copytree --only-tree
+# Structure only, no file bodies
+copytree --no-content
 
 # Different output formats
 copytree --format json -o structure.json
@@ -155,10 +170,10 @@ output:
 **Use your profile:**
 ```bash
 # Use a profile by name
-copytree -p my-profile -o summary.md
+copytree --profile my-profile -o summary.md
 
 # A .copytree.yml in the project is auto-discovered; skip it with
-copytree --no-folder-profile
+copytree --no-profile
 ```
 
 ## ⚙️ Configuration
@@ -167,18 +182,28 @@ CopyTree uses hard-coded defaults to keep things simple. Configuration is manage
 
 ### Configuration Files
 
-- **Global**: `~/.copytree/config/`
-- **Project**: `.copytree/config/`
+User preferences are **data, not code**, in the conventional location for your platform:
 
-Example `~/.copytree/config/copytree.js`:
-```javascript
-module.exports = {
-  defaultExclusions: ['node_modules', '.git', 'dist', 'build'],
-  maxFileSize: 10 * 1024 * 1024, // 10MB
-  includeHidden: false,
+- Linux: `$XDG_CONFIG_HOME/copytree/config.yaml` (or `~/.config/copytree/config.yaml`)
+- macOS: `~/Library/Application Support/CopyTree/config.yaml`
+- Windows: `%APPDATA%\CopyTree\config.yaml`
+
+```yaml
+# config.yaml
+copytree:
+  maxFileSize: 10485760   # 10MB
+  includeHidden: false
   respectGitignore: true
-};
 ```
+
+The legacy `~/.copytree/*.js` directory is still read, with a warning. Executing JavaScript from a
+home directory inside a host process is inappropriate for an embedder and unreproducible for
+everyone, so prefer the data file — `copytree config migrate --write` converts an existing setup
+and leaves the legacy directory untouched. Run `copytree config show --sources` to see which file
+each effective value came from, and `copytree config validate` to check them.
+
+Project-specific selection belongs in a profile (`.copytree.yml`) or an ignore file, not in user
+configuration.
 
 ### Ignore Files
 
@@ -235,7 +260,8 @@ if (result.stats.truncated) {
 ```
 
 **Preview before you commit.** A dry run reads nothing and formats nothing, but selects the same
-files, in the same order, under the same budgets as the real run:
+files, in the same order, under the same budgets as the real run — the same guarantee
+`copytree plan` gives on the command line:
 
 ```js
 const plan = await copy(repoRoot, { dryRun: true, config });
@@ -296,32 +322,46 @@ For detailed guides, see the `docs/` directory:
 
 ## 📚 Commands Reference
 
-### Main Commands
-- `copytree [path]` - Copy directory structure
-- `copytree cache:clear` - Clear caches
-- `copytree config:validate` - Validate configuration
-- `copytree config:inspect` - Inspect effective configuration with source provenance (redacts secrets by default)
+| Command | What it does |
+|---|---|
+| `copytree [path]` | Copy, using a file reference by default |
+| `copytree copy [path]` | The explicit form of the default operation |
+| `copytree plan [path]` | Preview the exact selection without reading contents |
+| `copytree inspect [path]` | Inspect structure, rules, profile and budgets |
+| `copytree explain <entry...>` | Explain why paths are included or excluded |
+| `copytree ignore context [path]` | Build context for authoring `.copytreeignore` |
+| `copytree ignore check [path]` | Validate ignore rules and show their effect |
+| `copytree ignore init [path]` | Print or write a conservative starter file |
+| `copytree config show\|validate\|migrate` | Inspect, validate or migrate configuration |
+| `copytree cache status\|clear\|gc` | Inspect or manage caches and reference files |
+| `copytree doctor` | Check CopyTree, clipboard, Git and converters |
+| `copytree completion <shell>` | Generate shell completion code |
+| `copytree debug profile [path]` | Capture CPU and/or heap profiles |
 
-> **Note:** CopyTree automatically creates required directories (e.g., `~/.copytree/cache/`, `~/.copytree/profiles/`) on first use. No manual setup is required.
+The colon spellings (`config:validate`, `cache:clear`) still parse and name their replacement.
+
+> **Note:** CopyTree automatically creates required directories (e.g., `~/.copytree/cache/`) on
+> first use. Temporary reference files land in `<temp>/copytree/<project>/` and are reclaimed by
+> `copytree cache gc` on a seven-day retention policy.
 
 ## 🐛 Troubleshooting
 
 ### Quick Fixes
 
 **Large file errors**
-→ Adjust `COPYTREE_MAX_FILE_SIZE` environment variable
+→ Raise `--size-gate`, or `--force-include` the specific paths you need
 
 **Binary files**
-→ Use `--include-binary` to include binary files; control placeholder/base64 encoding via config
+→ `--binary <default|omit|comment|placeholder|base64|convert>` states the policy explicitly
 
 **Memory issues**
-→ Reduce `COPYTREE_MAX_TOTAL_SIZE` or enable streaming mode with `-S/--stream`
+→ Lower `--max-total-size`, or narrow the run with `--scope`
 
 **Slow performance**
 → Enable caching, add more exclusion patterns
 
 **Profile not found**
-→ Check search paths: project `.copytree/` → user `~/.copytree/profiles/` → built-in `profiles/`
+→ `copytree inspect . --view profile` shows the effective profile and where it was read from
 
 **Git errors**
 → Ensure directory is a git repository with `git status`
@@ -329,18 +369,24 @@ For detailed guides, see the `docs/` directory:
 ### Debug Mode
 
 ```bash
-# Enable verbose logging
-DEBUG=copytree:* copytree /path/to/project
+# Check the installation, clipboard, Git and converters
+copytree doctor
 
-# Performance monitoring
-COPYTREE_PERFORMANCE=true copytree /path/to/project
+# Verbose run detail
+copytree --verbose
 
-# Validate configuration
-copytree config:validate
-copytree config:inspect
+# Inspect, validate or migrate configuration
+copytree config show --sources
+copytree config validate
+copytree config migrate
 
-# Clear cache
-copytree cache:clear
+# Caches and temporary reference files
+copytree cache status
+copytree cache clear
+copytree cache gc
+
+# CPU or heap profiling of a real copy
+copytree debug profile . --type cpu
 ```
 
 For more solutions, see the [Troubleshooting Guide](docs/usage/troubleshooting.md).

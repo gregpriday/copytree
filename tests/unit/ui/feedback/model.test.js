@@ -151,7 +151,9 @@ describe('completion models', () => {
 
     expect(model.status).toBe('error');
     expect(model.headline).toBe('Invalid --size-gate value');
-    expect(model.notes).toEqual(['Use a value such as 256KB, 10MB or 1GB']);
+    // Title, remediation, stable code — the parts a user-facing error owes.
+    expect(model.notes).toEqual(['Use a value such as 256KB, 10MB or 1GB', '[ERR_INVALID_OPTION]']);
+    expect(model.code).toBe(ERROR_CODES.INVALID_OPTION);
   });
 });
 

@@ -17,6 +17,22 @@ function prependPath(binDir, envPath) {
   return `${binDir}${path.delimiter}${envPath || ''}`;
 }
 
+/**
+ * Assert the reference path follows the 1.0 contract on any platform.
+ *
+ * `<temp>/copytree/<project-slug>/<UTC-timestamp>-<short-hash>.<ext>`. Compared
+ * by path components rather than by a slash-bearing regex, so the assertion
+ * means the same thing on Windows.
+ *
+ * @param {string} referencedPath - The path handed to the clipboard
+ */
+function expectReferencePath(referencedPath) {
+  const parts = referencedPath.split(/[\\/]/);
+  expect(parts.at(-2)).toBe('simple-project');
+  expect(parts.at(-3)).toBe('copytree');
+  expect(parts.at(-1)).toMatch(/^\d{4}-\d{2}-\d{2}T[\d-]+Z-[0-9a-f]{8}\.xml$/);
+}
+
 function decodePowerShellEncodedCommand(invocationLine) {
   const match = invocationLine.match(/-EncodedCommand\s+([A-Za-z0-9+/=]+)/);
   if (!match) return null;
@@ -42,6 +58,12 @@ describe('OS-specific file reference copy', () => {
     const env = {
       COPYTREE_TEST_LOG: logFile,
       PATH: prependPath(binDir, process.env.PATH),
+      // Reference files live under the system temp directory, which is shared
+      // with every other test in the run. Giving this one its own keeps the
+      // assertion about the file it wrote, not about whatever survived.
+      TMPDIR: tempDir,
+      TMP: tempDir,
+      TEMP: tempDir,
     };
 
     if (process.platform === 'darwin') {
@@ -62,7 +84,9 @@ describe('OS-specific file reference copy', () => {
       const match = logged.match(/POSIX file "([^"]+\.xml)"/);
       expect(match).not.toBeNull();
       const referencedPath = match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-      expect(path.basename(referencedPath)).toMatch(/^simple-project-\d+\.xml$/);
+      // `<temp>/copytree/<project-slug>/<UTC-timestamp>-<short-hash>.<ext>`
+      expect(referencedPath).toMatch(/\/copytree\/simple-project\//);
+      expect(path.basename(referencedPath)).toMatch(/^\d{4}-\d{2}-\d{2}T[\d-]+Z-[0-9a-f]{8}\.xml$/);
       expect(existsSync(referencedPath)).toBe(true);
       return;
     }
@@ -87,7 +111,7 @@ describe('OS-specific file reference copy', () => {
       const match = decoded.match(/\[void\]\$fc\.Add\('([^']+\.xml)'\)/);
       expect(match).not.toBeNull();
       const referencedPath = match[1].replace(/''/g, "'");
-      expect(path.basename(referencedPath)).toMatch(/^simple-project-\d+\.xml$/);
+      expectReferencePath(referencedPath);
       expect(existsSync(referencedPath)).toBe(true);
       return;
     }
@@ -123,7 +147,7 @@ describe('OS-specific file reference copy', () => {
       const uriMatch = payload.match(/file:\/\/[^\s]+/);
       expect(uriMatch).not.toBeNull();
       const referencedPath = fileURLToPath(uriMatch[0]);
-      expect(path.basename(referencedPath)).toMatch(/^simple-project-\d+\.xml$/);
+      expectReferencePath(referencedPath);
       expect(existsSync(referencedPath)).toBe(true);
       return;
     }

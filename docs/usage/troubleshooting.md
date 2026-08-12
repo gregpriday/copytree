@@ -80,12 +80,12 @@ nvm use 20
 
 1. **Validate configuration**:
    ```bash
-   copytree config:validate
+   copytree config validate
    ```
 
 2. **Inspect effective configuration**:
    ```bash
-   copytree config:inspect
+   copytree config show
    ```
 
 ### Configuration File Not Found
@@ -122,7 +122,7 @@ nvm use 20
 
 2. **Use display mode to verify**:
    ```bash
-   copytree --display
+   copytree --stdout
    ```
 
 3. **Save to file instead**:
@@ -132,7 +132,7 @@ nvm use 20
 
 4. **Use dry-run to check for errors**:
    ```bash
-   copytree --dry-run
+   copytree plan .
    ```
 
 ### Output Too Large
@@ -148,7 +148,7 @@ nvm use 20
 
 2. **Limit content**:
    ```bash
-   copytree --head 100 --char-limit 5000
+   copytree --max-files 100 --max-chars 5000
    ```
 
 3. **Use specific profile**:
@@ -158,7 +158,7 @@ nvm use 20
 
 4. **Stream output**:
    ```bash
-   copytree --stream > project.xml
+   copytree --stdout > project.xml
    ```
 
 ### Wrong Format
@@ -194,7 +194,7 @@ copytree --format tree
 
 3. **Debug file selection**:
    ```bash
-   copytree --dry-run
+   copytree plan .
    ```
 
 4. **Check .copytreeignore**:
@@ -222,7 +222,7 @@ copytree --format tree
 
 3. **Use filters**:
    ```bash
-   copytree --filter "src/**/*.js"
+   copytree --include "src/**/*.js"
    ```
 
 ### Git Integration Not Working
@@ -262,7 +262,7 @@ copytree --format tree
 
 2. **Use filters to limit scope**:
    ```bash
-   copytree --filter "src/**/*.js"
+   copytree --include "src/**/*.js"
    ```
 
 3. **Exclude large directories**:
@@ -279,12 +279,12 @@ copytree --format tree
 
 1. **Stream output**:
    ```bash
-   copytree --stream > output.xml
+   copytree --stdout > output.xml
    ```
 
 2. **Limit files processed**:
    ```bash
-   copytree src/ --head 1000
+   copytree src/ --max-files 1000
    ```
 
 3. **Increase Node.js memory**:
@@ -351,22 +351,22 @@ node --version
 npm --version
 
 # Configuration check
-copytree config:validate
+copytree config validate
 
 # Debug run
-DEBUG=copytree:* copytree --dry-run
+DEBUG=copytree:* copytree plan .
 ```
 
 ### Logs and Cache
 
 ```bash
 # Clear cache (clears all caches by default)
-copytree cache:clear
+copytree cache clear
 
 # Clear specific cache types
-copytree cache:clear --transformations
-copytree cache:clear --git
-copytree cache:clear --profiles
+copytree cache clear --transformations
+copytree cache clear --git
+copytree cache clear --profiles
 
 # Check cache location
 ls -la ~/.copytree/cache/
@@ -391,6 +391,6 @@ ls -la ~/.copytree/cache/
 - Check .gitignore and .copytreeignore
 
 ### "Invalid configuration"
-- Run `copytree config:validate`
+- Run `copytree config validate`
 - Check JSON syntax in config files
 - Ensure all required fields are present

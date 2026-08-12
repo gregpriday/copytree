@@ -4,7 +4,9 @@ export default [
   js.configs.recommended,
   {
     languageOptions: {
-      ecmaVersion: 2021,
+      // `latest` rather than a pinned year: the entry point and the doc
+      // generator use top-level await, which needs ES2022 or later.
+      ecmaVersion: 'latest',
       sourceType: 'module',
       globals: {
         node: true,
@@ -36,16 +38,6 @@ export default [
       'no-console': 'off',
       'comma-dangle': ['error', 'always-multiline'],
       'arrow-parens': ['error', 'always'],
-    },
-  },
-  {
-    files: ['**/*.jsx'],
-    languageOptions: {
-      parserOptions: {
-        ecmaFeatures: {
-          jsx: true,
-        },
-      },
     },
   },
 ];

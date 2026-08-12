@@ -84,6 +84,49 @@ class GitUtils {
   }
 
   /**
+   * Get the files staged for the next commit.
+   *
+   * Distinct from `getModifiedFiles()`, which deliberately folds staged,
+   * unstaged and untracked work together. "What am I about to commit" is a
+   * different question from "what have I touched", and a review workflow wants
+   * the first one.
+   *
+   * @returns {Promise<Array<string>>} POSIX file paths
+   */
+  async getStagedFiles() {
+    const cacheKey = 'staged-files';
+    const cached = this.cache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      if (!(await this.isGitRepository())) {
+        throw new GitError('Not a git repository', 'getStagedFiles');
+      }
+
+      const status = await this.git.status();
+      // `staged` covers modified-and-staged; `created` and `renamed` cover
+      // additions that `staged` alone reports inconsistently across git
+      // versions. `index` is the authoritative per-file index state.
+      const staged = [
+        ...status.staged,
+        ...status.created.filter((file) => status.staged.includes(file)),
+        ...status.renamed.map((entry) => entry.to),
+      ];
+
+      const uniqueFiles = [...new Set(staged)].map((file) => toPosix(file));
+
+      this.cache.set(cacheKey, uniqueFiles);
+      this.logger.logDebug(`Found ${uniqueFiles.length} staged files`);
+
+      return uniqueFiles;
+    } catch (error) {
+      throw new GitError(`Failed to get staged files: ${error.message}`, 'getStagedFiles', {
+        originalError: error,
+      });
+    }
+  }
+
+  /**
    * Get files changed between two refs (commits/branches)
    * @param {string} fromRef - Starting ref (default: HEAD)
    * @param {string} toRef - Ending ref (optional)

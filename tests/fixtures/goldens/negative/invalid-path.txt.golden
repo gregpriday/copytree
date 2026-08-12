@@ -1,2 +1,3 @@
-[error] Path not found: <PROJECT_ROOT>
-  Check the path or run copytree from the project root
+Path not found: <PROJECT_ROOT>
+Check the path or run copytree from the project root
+[ERR_PATH_NOT_FOUND]

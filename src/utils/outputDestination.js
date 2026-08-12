@@ -1,5 +1,6 @@
 import os from 'os';
 import path from 'path';
+import { randomBytes } from 'crypto';
 import fs from './fsx.js';
 import { ERROR_CODES, ValidationError } from './errors.js';
 
@@ -39,34 +40,71 @@ export function extensionForFormat(format) {
 }
 
 /**
+ * Where reference files live.
+ *
+ * Under the system temp directory by default. `COPYTREE_REFERENCE_PATH`
+ * relocates it, which a sandboxed host needs and which lets the retention tests
+ * exercise deletion without pointing at the developer's real temp directory.
+ */
+export const REFERENCE_ROOT =
+  process.env.COPYTREE_REFERENCE_PATH || path.join(os.tmpdir(), 'copytree');
+
+/**
+ * A filesystem-safe slug for the project being copied.
+ * @param {string} [basePath] - Directory being copied
+ * @returns {string} Slug
+ */
+function projectSlug(basePath) {
+  const dirName = basePath ? path.basename(basePath) : 'copytree';
+  return dirName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase() || 'copytree';
+}
+
+/**
  * Build the temp-file path a reference will point at.
  *
- * Named after the directory being copied, because these accumulate in the
- * system temp directory and `copytree-1738xxxxxxx.xml` tells you nothing about
- * which project it came from.
+ * `<temp>/copytree/<project-slug>/<UTC-timestamp>-<short-hash>.<ext>`
+ *
+ * Grouped per project, because these accumulate and `copytree-1738xxxxxxx.xml`
+ * in a shared temp directory says nothing about which project produced it. The
+ * short hash is there because two copies of the same project inside the same
+ * millisecond is not hypothetical when a script loops.
  *
  * @param {string} [basePath] - Directory being copied
  * @param {string} [format] - Output format
  * @returns {string} Absolute temp file path
  */
 export function referenceFilePath(basePath, format) {
-  const dirName = basePath ? path.basename(basePath) : 'copytree';
-  const safeName = dirName.replace(/[^a-zA-Z0-9-_]/g, '-').toLowerCase();
-  const prefix = safeName || 'copytree';
-  return path.join(os.tmpdir(), `${prefix}-${Date.now()}.${extensionForFormat(format)}`);
+  const slug = projectSlug(basePath);
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const suffix = randomBytes(4).toString('hex');
+  return path.join(REFERENCE_ROOT, slug, `${stamp}-${suffix}.${extensionForFormat(format)}`);
 }
 
 /**
  * Write the output to a temp file so its path can be put on the clipboard.
+ *
+ * Written to a sibling name and renamed on success, so a reader who is handed
+ * the path never sees a half-written document; and created 0600, because an
+ * export can contain anything the project contains and the system temp
+ * directory is shared.
+ *
+ * The previous reference is never removed here. An agent may still be reading
+ * it, and reclaiming space is `copytree cache gc`'s job, on a retention policy,
+ * rather than a side effect of the next copy.
+ *
  * @param {string} output - Formatted output
  * @param {string} [basePath] - Directory being copied
  * @param {string} [format] - Output format
  * @returns {Promise<string>} The temp file path
  */
 export async function writeReferenceFile(output, basePath, format) {
-  const tempFile = referenceFilePath(basePath, format);
-  await fs.writeFile(tempFile, output, 'utf8');
-  return tempFile;
+  const target = referenceFilePath(basePath, format);
+  await fs.ensureDir(path.dirname(target));
+
+  const pending = `${target}.partial`;
+  await fs.writeFile(pending, output, { encoding: 'utf8', mode: 0o600 });
+  await fs.rename(pending, target);
+  return target;
 }
 
 /**
@@ -176,6 +214,7 @@ export function describeDestination(destination) {
 }
 
 export default {
+  REFERENCE_ROOT,
   extensionForFormat,
   referenceFilePath,
   writeReferenceFile,

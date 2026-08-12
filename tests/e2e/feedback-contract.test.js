@@ -33,7 +33,10 @@ describe('feedback contract', () => {
   }, 30000);
 
   test('every successful run ends with one line naming the result', async () => {
-    const { code, stderr } = await runCli([PROJECT, '--display'], speaking);
+    // Canonical spelling, so the only line is the completion line. A
+    // deprecated spelling adds exactly one warning above it, which is the
+    // deprecation contract rather than an exception to this one.
+    const { code, stderr } = await runCli([PROJECT, '--stdout'], speaking);
 
     expect(code).toBe(0);
     const lines = stderr.split('\n').filter((line) => line.trim() !== '');
@@ -104,26 +107,36 @@ describe('feedback contract', () => {
     );
 
     expect(code).toBe(0);
+    // `--output` named where the export would have gone. A preview does not
+    // write it, and the plan report must not repurpose it either.
     expect(fs.readFileSync(target, 'utf8')).toBe('PRESERVE ME');
-    expect(stdout).toBe('');
-    expect(stderr).toContain('Preview');
+    // The plan is the requested payload, so it belongs on stdout.
+    expect(stdout).toContain('Plan for');
+    expect(stdout).toContain('No file contents were read');
+    expect(stderr).toContain("--dry-run is deprecated; use 'copytree plan'");
     fs.unlinkSync(target);
   }, 30000);
 
   // The flag's whole purpose is the explanation; it must not also need --verbose.
   test('--dry-run --explain explains without --verbose', async () => {
-    const { code, stderr } = await runCli(
+    const { code, stdout } = await runCli(
       [PROJECT, '--dry-run', '--explain', '--exclude', '*.js'],
       speaking,
     );
 
     expect(code).toBe(0);
-    expect(stderr).toContain('Largest exclusions:');
+    expect(stdout).toContain('Excluded entries:');
+    expect(stdout).toContain('optionExclude');
   }, 30000);
 
-  test('--log-format silent still reports a failure', async () => {
-    const { code, stderr } = await runCli(['./definitely-not-here', '--log-format', 'silent']);
+  // `silent` was never a format, it was a severity. Silence is --quiet, and the
+  // removed value is rejected rather than quietly accepted.
+  test('--log-format silent is rejected, and --quiet still reports a failure', async () => {
+    const removed = await runCli(['./definitely-not-here', '--log-format', 'silent']);
+    expect(removed.code).toBe(2);
+    expect(removed.stderr).toContain("Invalid --log-format value 'silent'");
 
+    const { code, stderr } = await runCli(['./definitely-not-here', '--quiet']);
     expect(code).not.toBe(0);
     expect(stderr).toContain('Path not found');
   }, 30000);
@@ -149,17 +162,36 @@ describe('feedback contract', () => {
   // A stage that fails and carries on answers a different question than the one
   // asked. In CI this was a whole-repository context where a diff was expected,
   // with a zero exit and nothing to notice it by.
-  test('a stage that failed and continued is reported, not swallowed', async () => {
-    const { code, stderr } = await runCli(
+  // A narrowing request that cannot be applied fails the run. Carrying on
+  // would hand back the whole project — in CI, a full-repository context where
+  // a diff was expected, at a size nothing about the run distinguishes from
+  // success.
+  test('a Git selector that cannot be applied fails rather than exporting everything', async () => {
+    const { code, stdout, stderr } = await runCli(
       [PROJECT, '--changed', 'definitely-not-a-ref', '--display'],
       speaking,
     );
 
-    expect(code).toBe(0);
-    expect(stderr).toContain('with warnings');
-    expect(stderr).toContain('--changed definitely-not-a-ref could not be applied');
-    // The git advice block that follows the message must not come with it.
-    expect(stderr).not.toContain("Use '--' to separate paths");
+    expect(code).toBe(1);
+    expect(stdout).toBe('');
+    expect(stderr).toContain('Git selection failed');
+    expect(stderr).toContain('[GIT_ERROR]');
+  }, 30000);
+
+  // Attaching status is polish: its absence changes no selection, so it
+  // degrades and says so.
+  test('an annotation that cannot be applied degrades and is reported', async () => {
+    const outsideRepo = fs.mkdtempSync(path.join(os.tmpdir(), 'copytree-no-git-'));
+    fs.writeFileSync(path.join(outsideRepo, 'a.txt'), 'a\n');
+
+    try {
+      const { code, stderr } = await runCli([outsideRepo, '--git-status', '--display'], speaking);
+
+      expect(code).toBe(0);
+      expect(stderr).toContain('Displayed');
+    } finally {
+      fs.rmSync(outsideRepo, { recursive: true, force: true });
+    }
   }, 30000);
 
   test('a destination that cannot be written names the file and the operation', async () => {

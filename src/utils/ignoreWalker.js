@@ -14,7 +14,7 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import ignore from 'ignore';
+import { createMatcher } from './ignoreMatcher.js';
 import { withFsRetry } from './retryableFs.js';
 import { isRetryableFsError, createAbortError } from './errors.js';
 import { isHardExcluded } from './hardExclusions.js';
@@ -147,10 +147,15 @@ function findMatchingRule(layer, testPath) {
       // unless escaped, and trimming here would make the explanation disagree
       // with the verdict it is explaining.
       if (!raw.trim() || raw.trimStart().startsWith('#')) return;
+      const rule = raw.trim();
       layer._compiled.push({
-        rule: raw.trim(),
+        rule,
         line: index + 1,
-        ig: ignore().add(raw),
+        // A negation never "ignores" anything, so probing it as written would
+        // report that it matched nothing. The pattern it negates is what
+        // decides whether this line had anything to say about the path.
+        ig: createMatcher(rule.startsWith('!') ? rule.slice(1) : raw),
+        negation: rule.startsWith('!'),
       });
     });
   }
@@ -162,6 +167,36 @@ function findMatchingRule(layer, testPath) {
     }
   }
   return match;
+}
+
+/**
+ * Every individual rule in a layer that matches a path, in file order.
+ *
+ * `findMatchingRule` answers "which rule decided this", which is what a verdict
+ * needs. A trace needs more: an ignore file that excludes `*.log` and then
+ * re-includes `!keep.log` made two decisions about `keep.log`, and showing only
+ * the net result hides the half of the story a reader is trying to find.
+ *
+ * @param {Object} layer - Ignore layer with a `rules` array
+ * @param {string} testPath - Path relative to the layer base
+ * @returns {Array<{rule: string, line: number, negation: boolean}>} Matching rules
+ */
+function findAllMatchingRules(layer, testPath) {
+  if (!Array.isArray(layer.rules) || layer.rules.length === 0) return [];
+
+  // Reuses the same per-rule compilation `findMatchingRule` builds and caches.
+  findMatchingRule(layer, testPath);
+
+  const matches = [];
+  for (const entry of layer._compiled ?? []) {
+    if (!entry.ig.ignores(testPath)) continue;
+    matches.push({
+      rule: entry.rule,
+      line: entry.line,
+      negation: entry.rule.startsWith('!'),
+    });
+  }
+  return matches;
 }
 
 /**
@@ -322,7 +357,7 @@ async function layersForDirectory(dir, ignoreFileNames, useCache, present = null
     if (rules.length === 0) continue;
     layers.push({
       base: dir,
-      ig: ignore().add(rules),
+      ig: createMatcher(rules),
       kind: kindForIgnoreFile(fileName),
       source: ignoreFilePath,
       rules,
@@ -402,13 +437,13 @@ function withoutRulesBlocking(layer, chain) {
   const kept = layer.rules.filter((raw) => {
     const trimmed = raw.trim();
     if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('!')) return true;
-    const single = ignore().add(raw);
+    const single = createMatcher(raw);
     return !targets.some((target) => single.ignores(target));
   });
 
   if (kept.length === layer.rules.length) return layer;
 
-  return { ...layer, ig: ignore().add(kept), rules: kept, _compiled: undefined };
+  return { ...layer, ig: createMatcher(kept), rules: kept, _compiled: undefined };
 }
 
 /**
@@ -430,6 +465,8 @@ function withoutRulesBlocking(layer, chain) {
  * @param {Array} initialLayers - Config and caller layers, always applied
  * @param {boolean} [bypass=false] - Neutralize the ignore-file rules blocking this entry
  * @param {boolean} [bypassConfig=false] - Also neutralize the config-exclude rules blocking it
+ * @param {Array} [finalLayers=[]] - Highest-precedence layers, evaluated after
+ *   every per-directory ignore file
  * @returns {Promise<{layers: Array, prunedAt: string|null}>} Layers, and the
  *   ancestor that a full walk would have pruned (null when reachable)
  */
@@ -441,6 +478,7 @@ async function buildScopeContext(
   initialLayers = [],
   bypass = false,
   bypassConfig = false,
+  finalLayers = [],
 ) {
   const dirs = ancestorDirs(root, absPath);
   // Everything between the root and the selection, inclusive: these are the
@@ -461,8 +499,9 @@ async function buildScopeContext(
 
   for (let i = 0; i < dirs.length; i++) {
     // The root is the anchor and is always entered. Every directory below it
-    // has to survive the rules accumulated above it, exactly as in a full walk.
-    if (i > 0 && isIgnored(dirs[i], root, layers, true).ignored) {
+    // has to survive the rules accumulated above it, exactly as in a full walk —
+    // including the final layers, which outrank everything.
+    if (i > 0 && isIgnored(dirs[i], root, [...layers, ...finalLayers], true).ignored) {
       prunedAt = dirs[i];
       break;
     }
@@ -489,6 +528,10 @@ async function buildScopeContext(
  * @param {boolean} [options.followSymlinks=false] - Whether to follow symbolic links
  * @param {boolean} [options.explain=false] - Include explanation for each decision
  * @param {Array} [options.initialLayers=[]] - Pre-existing ignore layers (e.g., config excludes)
+ * @param {Array} [options.finalLayers=[]] - Layers evaluated after every nested ignore file, so
+ *   they outrank a negation written deep in the tree. Profile and CLI exclusions live here:
+ *   they are the caller's last word, and a `!` in some subdirectory's `.copytreeignore` should
+ *   not be able to undo `--exclude`.
  * @param {Object} [options.config] - Configuration object for retry settings
  * @param {boolean} [options.cache=false] - Enable in-memory caching of parsed ignore rules.
  *   When true, ignore files are read once and cached for the lifetime of the process.
@@ -503,6 +546,8 @@ async function buildScopeContext(
  *   excluded by a separate layer and is never overridable.
  * @param {Function} [options.onExclude] - Called with `{path, size, reason, rule, ruleSource, isDirectory}`
  *   for every excluded entry
+ * @param {Function} [options.onIgnoreFile] - Called with each nested ignore layer as it is read,
+ *   so a caller can report which rule sources actually took part
  * @param {AbortSignal} [options.signal] - Abort signal for cancellation
  * @yields {{path: string, stats: fs.Stats, explanation?: Object}} File information
  */
@@ -514,6 +559,7 @@ export async function* walkWithIgnore(root, options = {}) {
     followSymlinks = false,
     explain = false,
     initialLayers = [],
+    finalLayers = [],
     config = {},
     cache = false,
     maxDepth = undefined,
@@ -521,6 +567,7 @@ export async function* walkWithIgnore(root, options = {}) {
     scopeIgnoresIgnoreFiles = false,
     scopeIgnoresConfigExcludes = false,
     onExclude = null,
+    onIgnoreFile = null,
     signal = null,
   } = options;
 
@@ -704,7 +751,19 @@ export async function* walkWithIgnore(root, options = {}) {
     const nextLayers =
       presentIgnoreFiles !== null && presentIgnoreFiles.size === 0
         ? layers
-        : [...layers, ...(await layersForDirectory(dir, ignoreNames, cache, presentIgnoreFiles))];
+        : [
+            ...layers,
+            ...(await layersForDirectory(dir, ignoreNames, cache, presentIgnoreFiles)).map(
+              (layer) => {
+                onIgnoreFile?.(layer);
+                return layer;
+              },
+            ),
+          ];
+
+    // Evaluation sees the final layers last; recursion inherits only `nextLayers`
+    // so they are appended once per decision rather than once per directory.
+    const activeLayers = finalLayers.length > 0 ? [...nextLayers, ...finalLayers] : nextLayers;
 
     // Filter out ignore files themselves to prevent them from appearing in output
     entries = entries.filter((entry) => !suppressedNames.has(entry.name));
@@ -716,7 +775,7 @@ export async function* walkWithIgnore(root, options = {}) {
 
     // One relative path per layer for this directory, reused by every entry in
     // it instead of being recomputed per entry per layer.
-    const prefixes = layerPrefixes(dir, nextLayers);
+    const prefixes = layerPrefixes(dir, activeLayers);
 
     for (const entry of entries) {
       checkAborted();
@@ -753,7 +812,7 @@ export async function* walkWithIgnore(root, options = {}) {
       }
 
       // Check if this path should be ignored
-      const decision = isIgnored(absPath, root, nextLayers, isDir, explain, prefixes, entry.name);
+      const decision = isIgnored(absPath, root, activeLayers, isDir, explain, prefixes, entry.name);
 
       if (isDir) {
         if (decision.ignored) {
@@ -849,6 +908,7 @@ export async function* walkWithIgnore(root, options = {}) {
       initialLayers,
       scopeIgnoresIgnoreFiles,
       scopeIgnoresConfigExcludes,
+      finalLayers,
     );
 
     const entryStat = await statWithRetry(absEntry);
@@ -864,7 +924,7 @@ export async function* walkWithIgnore(root, options = {}) {
           reason: EXCLUSION_REASONS.GITIGNORE,
           rule: `ancestor excluded: ${toPosix(path.relative(root, prunedAt))}`,
         }
-      : isIgnored(absEntry, root, layers, isDir, explain);
+      : isIgnored(absEntry, root, [...layers, ...finalLayers], isDir, explain);
 
     if (decision.ignored) {
       if (isDir) stats.directoriesPruned++;
@@ -919,6 +979,7 @@ export async function testPath(testPath, root, options = {}) {
     config = {},
     cache = false,
     initialLayers = [],
+    finalLayers = [],
     explain = false,
   } = options;
 
@@ -957,9 +1018,102 @@ export async function testPath(testPath, root, options = {}) {
   const layers = [
     ...initialLayers,
     ...(await buildAncestorLayers(root, absPath, ignoreNames, cache)),
+    ...finalLayers,
   ];
 
   return isIgnored(absPath, root, layers, isDirectory, explain);
+}
+
+/**
+ * Every layer verdict for one path, in evaluation order.
+ *
+ * `testPath` answers "is it ignored"; this answers "why", which is a different
+ * and larger question: a path can be excluded by a root `.gitignore`, restored
+ * by a negation two directories down, and excluded again by `--exclude`, and
+ * only the whole sequence explains the outcome.
+ *
+ * @param {string} testPathValue - Path relative to the root
+ * @param {string} root - Root directory
+ * @param {Object} [options={}] - Same shape as {@link testPath}
+ * @returns {Promise<{ignored: boolean, steps: Array<Object>}>} Ordered verdicts
+ */
+export async function tracePath(testPathValue, root, options = {}) {
+  const {
+    ignoreFileName = '.copytreeignore',
+    ignoreFileNames,
+    cache = false,
+    initialLayers = [],
+    finalLayers = [],
+    isDirectory = false,
+  } = options;
+
+  const ignoreNames =
+    Array.isArray(ignoreFileNames) && ignoreFileNames.length > 0
+      ? ignoreFileNames
+      : [ignoreFileName];
+
+  const absPath = path.resolve(root, testPathValue);
+  const layers = [
+    ...initialLayers,
+    ...(await buildAncestorLayers(root, absPath, ignoreNames, cache)),
+    ...finalLayers,
+  ];
+
+  const steps = [];
+  let ignored = false;
+
+  for (const layer of layers) {
+    const relToLayer = toPosix(path.relative(layer.base, absPath));
+    if (relToLayer === '' || isOutside(relToLayer)) continue;
+
+    const candidate = isDirectory && !relToLayer.endsWith('/') ? `${relToLayer}/` : relToLayer;
+    const result = layer.ig.test?.(candidate) ?? {
+      ignored: layer.ig.ignores(candidate),
+      unignored: false,
+    };
+    if (!result.ignored && !result.unignored) continue;
+
+    ignored = result.unignored ? false : true;
+
+    const matches = findAllMatchingRules(layer, candidate);
+    if (matches.length === 0) {
+      steps.push({
+        kind: layer.kind || 'config',
+        source: layer.source || null,
+        reason: reasonForLayerKind(layer.kind),
+        rule: result.unignored ? 'negation' : 'exclude',
+        line: null,
+        verdict: result.unignored ? 'include' : 'exclude',
+      });
+      continue;
+    }
+
+    for (const match of matches) {
+      steps.push({
+        kind: layer.kind || 'config',
+        source: layer.source || null,
+        reason: reasonForLayerKind(layer.kind),
+        rule: match.rule,
+        line: match.line,
+        verdict: match.negation ? 'include' : 'exclude',
+      });
+    }
+  }
+
+  const relToRoot = toPosix(path.relative(root, absPath));
+  if (!ignored && relToRoot && !isOutside(relToRoot) && isHardExcluded(relToRoot)) {
+    ignored = true;
+    steps.push({
+      kind: 'hard-exclude',
+      source: 'builtin:always-excluded',
+      reason: EXCLUSION_REASONS.CONFIG_EXCLUDE,
+      rule: 'builtin:always-excluded',
+      line: null,
+      verdict: 'exclude',
+    });
+  }
+
+  return { ignored, steps };
 }
 
 export {

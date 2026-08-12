@@ -9,6 +9,51 @@ import { ProfileError } from '../utils/errors.js';
 const EXTENSIONS = Object.freeze(['.yml', '.yaml', '.json', '']);
 
 /**
+ * Every key a profile may declare.
+ *
+ * Closed on purpose: an unknown key is almost always a typo or a setting from
+ * a different tool, and silently ignoring it means the author believes a rule
+ * is in force that is not.
+ */
+const KNOWN_PROFILE_KEYS = new Set([
+  'version',
+  'name',
+  // Free text for the author's benefit; carried through so a profile can say
+  // what it is for without being rejected for saying it.
+  'description',
+  'include',
+  'exclude',
+  'forceInclude',
+  'always',
+  'options',
+  // The documented spelling for output settings, merged into `options`.
+  'output',
+  'transformers',
+]);
+
+/**
+ * Option keys a profile may set.
+ *
+ * A misspelt option is a setting the author believes is in force, and the
+ * quietest possible failure: the profile loads, the run succeeds, and the
+ * setting does nothing.
+ */
+const KNOWN_PROFILE_OPTIONS = new Set([
+  'format',
+  'sizeGate',
+  'maxFileSize',
+  'maxTotalSize',
+  'maxFileCount',
+  'charLimit',
+  'maxDepth',
+  'respectGitignore',
+  'includeHidden',
+  'followSymlinks',
+  'addLineNumbers',
+  'prettyPrint',
+]);
+
+/**
  * FolderProfileLoader - Lightweight profile loader for folder-level configuration
  *
  * Supports simple .copytree configuration files in current directory with:
@@ -77,7 +122,10 @@ class FolderProfileLoader {
     // A named profile that does not exist is a profile error, not a broken
     // configuration: the config is fine, the name is wrong. The distinction
     // decides which remediation the CLI offers.
-    throw new ProfileError(`Profile not found: ${name}`, name, { searchPath: this.cwd });
+    throw new ProfileError(`Profile not found: ${name}`, name, {
+      searchPath: this.cwd,
+      notFound: true,
+    });
   }
 
   /**
@@ -111,10 +159,16 @@ class FolderProfileLoader {
 
       return this.validate(data, filePath);
     } catch (error) {
+      // A profile that exists and does not parse is a different failure from
+      // one that is missing, and only the second is fixed by checking the name.
       throw new ProfileError(
         `Failed to load profile from ${filePath}: ${error.message}`,
         filePath,
-        { filePath, originalError: error.message },
+        {
+          filePath,
+          notFound: false,
+          originalError: error.message,
+        },
       );
     }
   }
@@ -132,6 +186,18 @@ class FolderProfileLoader {
         filePath,
         data,
       });
+    }
+
+    // A key nobody reads is a setting the author believes is in effect. Naming
+    // the file and the field is the difference between a one-line fix and an
+    // afternoon wondering why the profile "does nothing".
+    const unknown = Object.keys(data).filter((key) => !KNOWN_PROFILE_KEYS.has(key));
+    if (unknown.length > 0) {
+      throw new ProfileError(
+        `Unknown profile ${unknown.length === 1 ? 'key' : 'keys'} in ${filePath}: ${unknown.join(', ')}`,
+        filePath,
+        { filePath, unknownKeys: unknown, knownKeys: [...KNOWN_PROFILE_KEYS] },
+      );
     }
 
     // Normalize include patterns
@@ -154,24 +220,39 @@ class FolderProfileLoader {
       }
     }
 
-    // Normalize always patterns
-    let always = [];
-    if (data.always) {
-      if (Array.isArray(data.always)) {
-        always = data.always.filter((p) => typeof p === 'string' && p.trim().length > 0);
-      } else if (typeof data.always === 'string' && data.always.trim().length > 0) {
-        always = [data.always];
-      }
+    // Force-include patterns. `forceInclude` is the canonical spelling;
+    // `always` is the original one, still read so existing profiles keep
+    // working, and merged rather than chosen between so a profile carrying both
+    // does not silently lose half of them.
+    const always = [...normalizeList(data.forceInclude), ...normalizeList(data.always)];
+
+    // `options` and the documented `output` block are the same thing; merged
+    // so a profile using either spelling works, and neither is silently
+    // discarded when both are present.
+    const options = {};
+    for (const block of [data.output, data.options]) {
+      if (block && typeof block === 'object' && !Array.isArray(block))
+        Object.assign(options, block);
     }
 
-    // Normalize options
-    const options = {};
-    if (data.options && typeof data.options === 'object' && !Array.isArray(data.options)) {
-      Object.assign(options, data.options);
+    const unknownOptions = Object.keys(options).filter((key) => !KNOWN_PROFILE_OPTIONS.has(key));
+    if (unknownOptions.length > 0) {
+      throw new ProfileError(
+        `Unknown profile ${unknownOptions.length === 1 ? 'option' : 'options'} in ${filePath}: ${unknownOptions.join(', ')}`,
+        filePath,
+        { filePath, notFound: false, unknownOptions, knownOptions: [...KNOWN_PROFILE_OPTIONS] },
+      );
     }
 
     return {
       name: data.name || path.basename(filePath, path.extname(filePath)),
+      ...(typeof data.description === 'string' ? { description: data.description } : {}),
+      transformers:
+        data.transformers && typeof data.transformers === 'object' ? data.transformers : {},
+      // Where it came from, because "which profile is in effect" is a question
+      // both `inspect --view profile` and a confused user need answered by a
+      // path, not by a name that several files could have produced.
+      source: filePath,
       include,
       exclude,
       always,
@@ -262,6 +343,19 @@ class FolderProfileLoader {
   async exists(name = null) {
     return (await this._find(name ? `.copytree-${name}` : '.copytree')) !== null;
   }
+}
+
+/**
+ * Normalize a string-or-array profile field into a clean array.
+ * @param {*} value - Raw field value
+ * @returns {string[]} Non-empty strings
+ */
+function normalizeList(value) {
+  if (Array.isArray(value)) {
+    return value.filter((entry) => typeof entry === 'string' && entry.trim().length > 0);
+  }
+  if (typeof value === 'string' && value.trim().length > 0) return [value];
+  return [];
 }
 
 /**

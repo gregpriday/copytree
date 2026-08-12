@@ -13,7 +13,7 @@ npm run benchmark:all          # every scenario
 npm run benchmark:latency      # cold-CLI latency: what a person waits for
 npm run benchmark:fixtures     # generate fixtures only, then exit
 
-node tests/performance/bench.js --filter DISC          # one domain
+node tests/performance/bench.js --include DISC          # one domain
 node tests/performance/bench.js --all --out after.json # save results
 node tests/performance/bench.js --compare before.json after.json
 ```
@@ -41,7 +41,7 @@ up with an excellent walker behind a slow `require` graph.
 npm run benchmark:latency
 node tests/performance/latency.bench.js --json before.json
 node tests/performance/latency.bench.js --compare before.json
-node tests/performance/latency.bench.js --filter tiny --samples 20
+node tests/performance/latency.bench.js --include tiny --samples 20
 ```
 
 ### When the machine is not idle: `latency-ab`

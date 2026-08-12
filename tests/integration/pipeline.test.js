@@ -13,31 +13,31 @@ import { randomUUID } from 'crypto';
 // Use dynamic imports for modules under test
 let Pipeline,
   FileDiscoveryStage,
-  ProfileFilterStage,
   FileLoadingStage,
   OutputFormattingStage,
-  LimitStage,
   CharLimitStage,
+  SortFilesStage,
+  BudgetStage,
   InstructionsStage;
 
 beforeAll(async () => {
   const pipelineModule = await import('../../src/pipeline/Pipeline.js');
   const fileDiscoveryStageModule = await import('../../src/pipeline/stages/FileDiscoveryStage.js');
-  const profileFilterStageModule = await import('../../src/pipeline/stages/ProfileFilterStage.js');
   const fileLoadingStageModule = await import('../../src/pipeline/stages/FileLoadingStage.js');
   const outputFormattingStageModule =
     await import('../../src/pipeline/stages/OutputFormattingStage.js');
-  const limitStageModule = await import('../../src/pipeline/stages/LimitStage.js');
   const charLimitStageModule = await import('../../src/pipeline/stages/CharLimitStage.js');
+  const sortFilesStageModule = await import('../../src/pipeline/stages/SortFilesStage.js');
+  const budgetStageModule = await import('../../src/pipeline/stages/BudgetStage.js');
   const instructionsStageModule = await import('../../src/pipeline/stages/InstructionsStage.js');
 
   Pipeline = pipelineModule.default;
   FileDiscoveryStage = fileDiscoveryStageModule.default;
-  ProfileFilterStage = profileFilterStageModule.default;
   FileLoadingStage = fileLoadingStageModule.default;
   OutputFormattingStage = outputFormattingStageModule.default;
-  LimitStage = limitStageModule.default;
   CharLimitStage = charLimitStageModule.default;
+  SortFilesStage = sortFilesStageModule.default;
+  BudgetStage = budgetStageModule.default;
   InstructionsStage = instructionsStageModule.default;
 });
 
@@ -86,10 +86,8 @@ describe('Pipeline Integration Tests', () => {
         new FileDiscoveryStage({
           basePath: tempDir,
           patterns: ['**/*.js', '**/*.md'],
+          excludes: ['node_modules/**', '*.spec.js'],
           respectGitignore: false,
-        }),
-        new ProfileFilterStage({
-          exclude: ['node_modules/**', '*.spec.js'],
         }),
       ]);
 
@@ -131,10 +129,8 @@ describe('Pipeline Integration Tests', () => {
         new FileDiscoveryStage({
           basePath: tempDir,
           patterns: ['**/*.js'],
+          excludes: ['*.spec.js'],
           respectGitignore: false,
-        }),
-        new ProfileFilterStage({
-          exclude: ['*.spec.js'],
         }),
         new FileLoadingStage({
           encoding: 'utf8',
@@ -248,16 +244,17 @@ describe('Pipeline Integration Tests', () => {
   // These are better tested at the unit test level
 
   describe('file limits', () => {
-    it('should respect head limit', async () => {
+    // `--head` is gone: after a deterministic sort, `--max-files` is the same
+    // operation with a name that says which files survive.
+    it('should respect the file count budget after sorting', async () => {
       pipeline.through([
         new FileDiscoveryStage({
           basePath: tempDir,
           patterns: ['**/*'],
           respectGitignore: false,
         }),
-        new LimitStage({
-          limit: 2,
-        }),
+        new SortFilesStage({ sortBy: 'path', order: 'asc' }),
+        new BudgetStage({ maxFileCount: 2 }),
       ]);
 
       const result = await pipeline.process({

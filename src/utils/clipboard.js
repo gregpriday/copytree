@@ -119,6 +119,48 @@ tell app "Finder" to set the clipboard to aFile`;
   }
 
   /**
+   * Whether this environment can put a real file reference on the clipboard.
+   *
+   * Reported rather than discovered at copy time, so `copytree doctor` can say
+   * "this will paste as a path, not a file" before someone relies on it. A
+   * false answer is not a failure: the copy still succeeds, and the path is
+   * still on the clipboard as text.
+   *
+   * @returns {{supported: boolean, mechanism: string, detail: string}} Support
+   */
+  static supportsFileReference() {
+    if (process.platform === 'darwin') {
+      return {
+        supported: true,
+        mechanism: 'osascript',
+        detail: 'Finder clipboard via AppleScript',
+      };
+    }
+    if (process.platform === 'win32') {
+      return { supported: true, mechanism: 'powershell', detail: 'SetFileDropList via PowerShell' };
+    }
+    if (process.platform === 'linux') {
+      const method = Clipboard._detectLinuxClipboardMethod('file:///probe');
+      return method
+        ? {
+            supported: true,
+            mechanism: method.tool,
+            detail: `${method.tool} with ${method.args.at(-1)}`,
+          }
+        : {
+            supported: false,
+            mechanism: 'text',
+            detail: 'no display server detected; the path is copied as text',
+          };
+    }
+    return {
+      supported: false,
+      mechanism: 'text',
+      detail: `${process.platform} has no file-reference mechanism; the path is copied as text`,
+    };
+  }
+
+  /**
    * Detect the correct Linux clipboard tool, MIME type, and payload for file references.
    *
    * Desktop environment detection:

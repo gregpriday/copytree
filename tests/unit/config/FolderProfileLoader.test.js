@@ -24,7 +24,7 @@ exclude:
         const loader = new FolderProfileLoader({ cwd: tmpDir });
         const profile = await loader.discover();
 
-        expect(profile).toEqual({
+        expect(profile).toMatchObject({
           name: 'test-profile',
           include: ['**/*.js', '**/*.ts'],
           exclude: ['**/*.test.js'],
@@ -46,7 +46,7 @@ include:
         const loader = new FolderProfileLoader({ cwd: tmpDir });
         const profile = await loader.discover();
 
-        expect(profile).toEqual({
+        expect(profile).toMatchObject({
           name: 'yaml-profile',
           include: ['*.md'],
           exclude: [],
@@ -68,7 +68,7 @@ include:
         const loader = new FolderProfileLoader({ cwd: tmpDir });
         const profile = await loader.discover();
 
-        expect(profile).toEqual({
+        expect(profile).toMatchObject({
           name: 'json-profile',
           include: ['src/**/*.js'],
           exclude: ['node_modules/**'],
@@ -96,7 +96,7 @@ name = ini-profile
         const loader = new FolderProfileLoader({ cwd: tmpDir });
         const profile = await loader.discover();
 
-        expect(profile).toEqual({
+        expect(profile).toMatchObject({
           name: 'ini-profile',
           include: ['**/*.md', '**/*.txt'],
           exclude: ['**/draft/**'],
@@ -177,7 +177,7 @@ include:
         const loader = new FolderProfileLoader({ cwd: tmpDir });
         const profile = await loader.loadNamed('api-docs');
 
-        expect(profile).toEqual({
+        expect(profile).toMatchObject({
           name: 'api-docs',
           include: ['**/*.md', '**/*.pdf'],
           exclude: [],

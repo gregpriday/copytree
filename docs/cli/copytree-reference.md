@@ -1,594 +1,931 @@
 # CopyTree CLI Reference
 
-## Basic Usage
+<!--
+  Generated from src/cli/schema.js by scripts/generate-cli-docs.js.
+  Do not edit by hand: run `node scripts/generate-cli-docs.js` instead.
+-->
+
+CopyTree packages a project as structured context for an AI agent.
 
 ```bash
-copytree [path] [options]
+copytree [path] [options]      # copy, using a file reference by default
+copytree <command> [options]
 ```
 
-**Arguments:**
-- `path` - Directory path or GitHub URL to copy (defaults to current directory)
+With no destination option the export is written to a temporary file and a file
+reference is copied to the clipboard, so pasting into an agent hands over a file
+to read rather than inline context.
 
-## What a Run Prints
-
-A normal run shows one live progress line while it works, then replaces it with
-one line saying what happened:
-
-```text
-📎 File reference copied — 612 files · ~184k tokens
-```
-
-A successful run leads with **where the output went**, because there is nothing
-to warn about and that is the next thing you want to know. Anything else leads
-with the **outcome**:
-
-| Glyph                 | ASCII     | Meaning                                                              |
-| --------------------- | --------- | -------------------------------------------------------------------- |
-| `📎` `📋` `💾` `🖥️` `📡` | `[ok]`    | Succeeded — file reference, clipboard, file, terminal, stream         |
-| `⚠`                   | `[warn]`  | Usable output, but a limit or a fallback changed it                   |
-| `✗`                   | `[error]` | Failed; nothing was produced                                          |
-| `○`                   | `-`       | Nothing to do, or nothing done — preview, empty selection, cancelled  |
-
-Anywhere Unicode is not safe — a redirected stream, `TERM=dumb`, a legacy
-Windows console — every one of these degrades to its ASCII form.
-
-The token estimate is always present, because that is the number that decides
-whether the context will fit.
-
-A run that finishes faster than ~130ms never shows a spinner at all, so short
-commands produce exactly one line.
-
-### stdout and stderr
-
-- **stdout** carries the requested document, and nothing else — XML, Markdown,
-  JSON, NDJSON, SARIF or the tree.
-- **stderr** carries everything addressed to a person: progress, the completion
-  line, warnings, errors and verbose detail.
-
-This is a contract, not a convention. `copytree --display --format json | jq .`
-is valid while the run still reports its progress, and no pipeline stage writes
-to either stream directly.
-
-Under `--log-format json` the feedback becomes NDJSON on stderr — one object per
-line, stable `event` names (`run.start`, `phase.change`, `run.complete`,
-`run.failed`), no ANSI and no emoji.
-
-### Warnings
-
-CopyTree warns only about things that could change whether you trust the output:
-files omitted by a budget or the size gate, content shortened by `--char-limit`,
-unreadable files, a file it could not scan for secrets, a failed conversion, or a
-clipboard fallback.
-
-Routine filtering — `.gitignore`, `node_modules`, your own `--exclude` — is the
-tool working as asked, and is reported only under `--verbose`.
-
-**Redactions are not warnings.** When the secrets guard redacts a match or leaves
-out a secret-prone file, that is the feature working, and its detector is tuned
-to over-match on purpose. Those appear as a calm note under a normal success
-line, naming the files involved:
-
-```text
-📎 File reference copied — 67 files · ~630k tokens
-  3 possible secrets redacted in config.js, server.js and deploy.js
-  1 secret-prone file left out: .env
-```
-
-A warning is reserved for the cases where the guard could *not* do its job: a
-finding it failed to redact (the credential is still in the output), or a file it
-could not scan and therefore excluded.
-
-### Steps that failed but did not stop the run
-
-Some stages degrade rather than fail. A directory that is not a Git repository,
-or a `--changed` ref that does not resolve, leaves the files unfiltered instead
-of aborting the copy — but the result is then a whole-project context where a
-diff was asked for, so it is reported:
-
-```text
-⚠ Displayed 612 files with warnings — ~184k tokens
-  --changed no-such-ref could not be applied, so no files were filtered by git status: …
-```
-
-The exit code stays 0, because output was produced. Use `--quiet` if a script
-should ignore this, and read the warning if a human should not.
-
-## Command Options
-
-### Profile Options
-
-#### `--profile=<name>`, `-p <name>`
-Use a specific profile for file selection. If omitted, CopyTree uses the **default profile**.
-
-**Examples:**
-```bash
-copytree --profile mycustom
-copytree -p mycustom
-```
-
-**Note:** The default profile is automatically used when no profile is specified. Create custom profiles in `~/.copytree/profiles/` or `.copytree/` for project-specific needs.
-
-### Filter Options
-
-#### `--filter=<pattern>`, `-f <pattern>`
-Include files matching glob patterns. Can be used multiple times.
+## Authoring a `.copytreeignore`
 
 ```bash
-copytree --filter "*.js" --filter "*.ts"
-copytree -f "src/**/*.php" -f "tests/**/*.php"
+copytree ignore context .    # a content-free inventory and the active rules
+# create or edit .copytreeignore
+copytree ignore check .      # validate the rules and show what they remove
+copytree plan .              # preview the exact final export
 ```
 
-#### `--modified`, `-m`
-Only include files modified since the last Git commit.
+## Commands
+
+| Command | Summary |
+|---|---|
+| `copytree ignore <subcommand>` | Author, validate and start a .copytreeignore |
+| `copytree config <subcommand>` | Inspect or validate configuration |
+| `copytree cache <subcommand>` | Inspect or manage caches |
+| `copytree debug <subcommand>` | Developer diagnostics |
+| `copytree copy` | Explicit form of the default copy operation |
+| `copytree plan` | Preview selected files without reading contents |
+| `copytree inspect` | Inspect structure, rules, profile and budgets |
+| `copytree explain` | Explain why paths are included or excluded |
+| `copytree ignore context` | Build context for authoring .copytreeignore |
+| `copytree ignore check` | Validate ignore rules and show their effect |
+| `copytree ignore init` | Print or write a conservative starter file |
+| `copytree config show` | Inspect effective configuration with provenance |
+| `copytree config validate` | Validate configuration against the schema |
+| `copytree config migrate` | Convert legacy ~/.copytree configuration into a data file |
+| `copytree cache status` | Report cache contents and location |
+| `copytree cache clear` | Remove cached entries |
+| `copytree cache gc` | Remove expired entries and stale reference files |
+| `copytree doctor` | Check CopyTree, clipboard, Git and converters |
+| `copytree completion` | Generate shell completion code |
+| `copytree debug profile` | Capture CPU and/or heap profiles |
+| `copytree help` | Show help for CopyTree or one of its commands |
+
+## `copytree copy`
+
+Explicit form of the default copy operation
+
+Export a project as structured context. With no destination option the export is written to a temporary file and a file reference is copied to the clipboard, so pasting into an agent hands over a file to read rather than inline context.
 
 ```bash
-copytree --modified
-copytree -m
+copytree copy [path] [options]
+copytree [path] [options]   # the command name is optional
 ```
 
-#### `--changed=<ref>`, `-c <ref>`
-Include files changed since a specific Git reference (commit, branch, or tag).
+| Argument | Meaning | Default |
+|---|---|---|
+| `path` | Directory, file, or GitHub URL | `.` |
+
+#### Destination
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-o, --output <file>` | Write the export to a file (- means stdout) | conflicts: `--stdout`, `--clipboard`, `--reference` |
+| `--stdout` | Write the export to stdout | conflicts: `--output`, `--clipboard`, `--reference` |
+| `-y, --clipboard` | Copy the export text itself, not a file reference | conflicts: `--output`, `--stdout`, `--reference` |
+| `--reference` | Copy a file reference to the clipboard (this is the default) | conflicts: `--output`, `--stdout`, `--clipboard` |
+| `--reveal` | Reveal the written file in the OS file manager | advanced; requires: `--output` or `--reference` |
+
+#### Content
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--format <type>` | Output format: xml, markdown, json, ndjson, sarif, tree | default: `xml` |
+| `--no-content` | Include structure and metadata, but not file bodies |  |
+| `--line-numbers` | Add line numbers to text bodies | advanced |
+| `--binary <policy>` | Binary/document policy: default, omit, comment, placeholder, base64, convert | advanced; default: `default` |
+| `--git-status` | Attach Git status to selected files | advanced |
+| `--metadata` | Include optional rich metadata where the format supports it | advanced |
+| `--no-metadata` | Omit optional metadata; required schema metadata is kept | advanced |
+| `--instructions <name>` | Include a named instruction block | advanced |
+| `--no-instructions` | Omit instruction blocks | advanced |
+| `--reproducible` | Omit timestamps and normalise volatile metadata | advanced |
+
+#### Selection
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--profile <name>` | Use a file-selection profile (.copytree-<name>.yml) |  |
+| `--no-profile` | Skip automatic project-profile discovery |  |
+| `--scope <path>` | Traverse only this literal path | repeatable |
+| `--include <glob>` | Include only matching paths; narrows the profile include set | repeatable |
+| `-x, --exclude <pattern>` | Add a Git-style exclusion rule | repeatable |
+| `--force-include <glob>` | Override ordinary excludes and the size gate | repeatable |
+| `--ext <extension>` | Keep only this extension (ts or .ts) | advanced; repeatable |
+| `--max-depth <n>` | Limit traversal depth from the project root | advanced |
+| `--no-tests` | Exclude conventional test paths | advanced |
+| `-m, --modified` | Select working-tree changes | advanced; conflicts: `--staged`, `--changed` |
+| `--staged` | Select staged changes | advanced; conflicts: `--modified`, `--changed` |
+| `-c, --changed <ref>` | Select files changed since a Git reference | advanced; conflicts: `--modified`, `--staged` |
+| `--dedupe` | Remove content-identical files after loading | advanced |
+| `--scope-include-ignored` | Let --scope entries override the ignore rules that would exclude them | advanced |
+| `--scope-include-default-excluded` | Let --scope entries override built-in exclusions (node_modules). .git never | advanced |
+
+#### Budgets and ordering
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--size-gate <size>` | Per-file gate decided from stat() before opening | advanced; default: `256KB` |
+| `--no-size-gate` | Disable the context size gate (not the hard safety ceiling) | advanced |
+| `--max-total-size <size>` | Limit selected file bytes |  |
+| `--max-files <count>` | Limit selected file count, applied after sorting |  |
+| `--max-chars <count>` | Limit emitted content characters, cut at line boundaries |  |
+| `--sort <by>` | Selection order: path, size, modified, name, extension, depth | advanced; default: `path` |
+| `--order <direction>` | Sort direction: asc or desc | advanced; default: `asc` |
+
+#### Security and failure policy
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--secrets <policy>` | Secret policy: redact, fail, off | advanced; default: `redact` |
+| `--redaction <style>` | Redaction marker style: typed, generic, hash | advanced; default: `typed` |
+| `--secrets-report <file>` | Write a structured findings report (- for stdout) | advanced |
+| `--fail-empty` | Fail when no files are selected | advanced |
+| `--fail-on-truncation` | Fail when a budget omits or truncates requested content | advanced |
+| `--fail-on-fs-errors` | Fail when filesystem work degrades after retries | advanced |
+| `--strict` | Enable every applicable policy-failure check | advanced |
+| `--no-transform-cache` | Bypass the transformation cache | advanced |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Conflicts**
+
+- Exactly one destination: --reference, --clipboard, --stdout or --output.
+- Exactly one Git mode: --modified, --staged or --changed.
+- --reveal requires --output or --reference.
+- --quiet and --verbose cannot be combined.
+
+**Examples**
 
 ```bash
-copytree --changed HEAD~5
-copytree -c main
-copytree --changed v1.0.0
-```
-
-#### `--exclude=<pattern>`, `-x <pattern>`
-Exclude files matching glob patterns. Can be used multiple times.
-
-```bash
-copytree --exclude "**/*.test.js" --exclude "fixtures/**"
-```
-
-### Scope Options
-
-#### `--scope <path...>`
-Copy only these paths. **Literal paths, not globs** — a directory named `src/[draft]` is just a
-path, and there is nothing to escape.
-
-Ignore rules still resolve from the project root: the root `.gitignore`, the root
-`.copytreeignore`, and every nested ignore file between the root and the selection all apply. A
-scoped run selects exactly the files a filtered full run would. Output paths stay relative to the
-project root, so `@`-references handed to an agent still resolve.
-
-Traversal starts at the selection rather than the root, so the cost scales with what you asked for
-instead of with the size of the repository.
-
-```bash
-# One folder, repository rules
-copytree --scope src/panels/file-browser
-
-# Several entries, files as well as directories
-copytree --scope src/panels package.json
-
-# Compose with a filter: TypeScript files under src
-copytree --scope src --filter "**/*.ts"
-```
-
-#### `--scope-include-ignored`
-Let `--scope` entries override the ignore rules that would otherwise exclude them. Off by default,
-so a scoped run keeps the "same set as a full run" guarantee. Use it for the deliberate gesture:
-you navigated into a gitignored folder and want it anyway.
-
-```bash
-copytree --scope build/generated --scope-include-ignored
-```
-
-#### `--scope-include-config-excluded`
-Let `--scope` entries override the *config* exclusions blocking them (`node_modules`, and anything
-in `copytree.globalExcludedDirectories` / `globalExcludedFiles`).
-
-Separate from `--scope-include-ignored` because the two answer different questions: one is "yes, I
-know it's gitignored", the other is "yes, I really do mean `node_modules`". A path excluded by both
-layers needs both flags, which scoping into `node_modules` normally does, since most repositories
-also gitignore it.
-
-`.git` is excluded by a layer neither flag lifts.
-
-```bash
-copytree --scope node_modules/some-package --scope-include-ignored --scope-include-config-excluded
-```
-
-### Output Options
-
-#### `--output[=<file>]`, `-o [<file>]`
-Save output to a file.
-
-```bash
-copytree --output output.xml
-copytree -o output.xml
-```
-
-#### `--display`, `-i`
-Print the output to the terminal instead of writing a file reference.
-
-```bash
-copytree --display
-copytree -i
-```
-
-#### `--verbose`, `-v`
-Show run detail: the phases as they happen, what was selected and what was not,
-and the output size and duration on the completion line. By default a run prints
-only a live progress line and one completion line.
-
-```bash
-copytree --verbose
-copytree -v
-```
-
-`--verbose` is for you; `--log-level debug` is for diagnosing CopyTree itself
-(stage names, timings, cache hits). They are separate on purpose.
-
-#### `--quiet`, `-q`
-Say nothing about a successful run. Progress, the completion line and non-fatal
-warnings are all suppressed; failures still go to stderr and still set a non-zero
-exit code.
-
-```bash
-copytree --quiet -o context.xml
-```
-
-`--log-level error` and `--log-format silent` have the same effect.
-
-#### `--stream`, `-S`
-Stream output without buffering (useful for piping).
-
-```bash
-copytree --stream | less
-copytree -S > project.xml
-```
-
-See `--clipboard` under Content Options for copying the output text itself. The default is a file
-reference: CopyTree writes the output to a temp file and puts that path on the clipboard.
-
-### Format Options
-
-#### `--format=<type>`
-Output format: `xml`, `markdown|md`, `json`, `ndjson`, `sarif`, or `tree`.
-
-**Default:** `xml`
-
-```bash
-copytree --format json
-copytree --format ndjson
-copytree --format sarif
-copytree --format tree
-copytree --format xml  # default
-copytree --format markdown
-```
-
-### Display Control Options
-
-#### `--head=<number>`, `-l <number>`
-Limit to first N files processed.
-
-```bash
-copytree --head 50
-copytree -l 100
-```
-
-#### `--char-limit=<number>`, `-C <number>`
-Character budget across all file content.
-
-Truncation happens at a line boundary and is marked inline
-(`… [truncated 4,213 of 9,001 lines]`), so an agent cannot conclude the file simply ends there.
-When a single line is longer than the remaining budget — a minified bundle, say — the cut is
-mid-line and labelled as such rather than dropping the file. Chunks never end on an unpaired
-UTF-16 surrogate.
-
-```bash
-copytree --char-limit 100000
-copytree -C 50000
-```
-
-### Budget Options
-
-Budgets are applied **after sorting**, so which files survive follows `--sort`. Truncation is
-always reported, never silent: a silently truncated context is worse than an error, because the
-agent answers confidently from a partial repository.
-
-#### `--size-gate=<size>` / `--no-size-gate`
-Hard per-file size gate, applied from `stat()` before anything is opened. Default: **256KB**.
-
-This is not the same as `maxFileSize` (a 10MB memory-safety ceiling) or `--char-limit` (which
-truncates *after* reading). No single 256KB+ file belongs in an agent's context window, and the
-gate exists whether or not truncation is enabled.
-
-Only `--always` and `.copytreeinclude` lift the gate, and the override is reported.
-
-```bash
-copytree --size-gate 64KB
-copytree --no-size-gate            # include large files
-copytree --size-gate 64KB --always "docs/spec.md"
-```
-
-#### `--max-total-size=<size>`
-Total size budget across all selected files.
-
-```bash
-copytree --max-total-size 5MB
-```
-
-#### `--max-files=<number>`
-Maximum number of files to include.
-
-Budgets keep the head of the sorted list and drop the tail, and `--sort` is ascending by default.
-`--sort modified` therefore keeps the *oldest* files; pair it with `--sort-order desc` to keep the
-recently-touched ones.
-
-```bash
-copytree --max-files 500 --sort modified --sort-order desc   # keep the newest 500
-copytree --max-files 500 --sort size                         # keep the 500 smallest
-```
-
-#### `--sort-order <asc|desc>`
-Sort direction (default: `asc`). Decides which end of the list a budget keeps.
-
-#### `--only-tree`, `-t`
-Show only directory structure, no file contents.
-
-```bash
-copytree --only-tree
-copytree -t
-```
-
-### Sorting & Git Status Options
-
-#### `--sort=<by>`, `-s <by>`
-Sort files by: `path`, `size`, `modified`, `name`, or `extension`.
-
-```bash
-copytree --sort modified
-copytree --sort size
-copytree -s name
-```
-
-#### `--with-git-status`
-Include Git status indicators for each file.
-
-```bash
-copytree --with-git-status
-```
-
-#### `--always=<patterns...>`
-Always include these patterns (force-include), even if excluded by profile.
-
-```bash
-copytree --always "*.config.js" --always "config.example.js"
-```
-
-### Content Options
-
-#### `--with-line-numbers`
-Include line numbers in output.
-
-```bash
-copytree --with-line-numbers
-```
-
-#### `--show-size`
-Show file sizes in output.
-
-```bash
-copytree --show-size
-```
-
-#### `--info`
-Show information table with project statistics.
-
-```bash
-copytree --info
-```
-
-#### `--include-binary`
-Include binary files in output (normally excluded).
-
-```bash
-copytree --include-binary
-```
-
-#### `--dedupe`
-Remove duplicate files from output.
-
-```bash
-copytree --dedupe
-```
-
-#### `--clipboard`, `-y`
-Copy the output text itself to the clipboard, rather than a reference to a file
-containing it.
-
-The default is a file reference: CopyTree writes the output to a temp file and
-puts that path on the clipboard, so pasting into an agent hands over a file to
-read instead of a few hundred kilobytes of inline context. Use this when you want
-the text itself, for example to paste into a chat box directly.
-
-```bash
-copytree --clipboard
-copytree -y
-```
-
-#### `--as-reference`, `-r`
-No-op. Writing a file reference is the default, so this flag selects the
-behaviour you would get anyway. Accepted so existing scripts and habits keep
-working.
-
-#### `--no-folder-profile`
-Skip auto-discovery of a `.copytree.yml` (or `.copytree.yaml` / `.copytree.json`)
-profile in the project being copied. Discovery is on by default; a profile named
-explicitly with `-p` takes precedence over a discovered one.
-
-```bash
-copytree --no-folder-profile
-```
-
-#### `--external=<source...>`
-Include external sources (GitHub URLs or local paths).
-
-```bash
-copytree --external https://github.com/user/repo
-```
-
-### Transformation Options
-
-**Note:** Transformers are configured in profiles, not via CLI flags. Built-in transformers include file-loader, binary, and streaming-file-loader.
-
-### Debug & Optimization Options
-
-#### `--dry-run`
-Plan the run without reading or formatting content.
-
-A dry run is a strict prefix of the real run: the same file set, in the same order, under the same
-budgets. It reports the file count, total size, an approximate token count, and what was excluded.
-
-```bash
-copytree --dry-run
-```
-
-```
-Dry run - nothing was read or written.
-Base path: /repo
-221 file(s), 1.42 MB, ~406k tokens
-25 excluded: 19 copytreeignore, 4 gitignore, 1 configExclude, 1 sizeGate
-```
-
-#### `--explain`
-Report which rule excluded each file, with the ignore file and line it came from. Turns "why isn't
-my file here?" from a bisect into a glance.
-
-```bash
-copytree --dry-run --explain
-```
-
-```
-Largest exclusions:
-  package-lock.json — 351.44 KB — sizeGate [sizeGate:262144]
-  CHANGELOG.md — 14.78 KB — copytreeignore [CHANGELOG.md] (/repo/.copytreeignore:20)
-  sub/nested.txt — 2 B — gitignore [nested.txt] (/repo/sub/.gitignore:1)
-```
-
-Aggregate counts are always collected and cost nothing extra. `--explain` adds the per-file detail.
-
-#### `--validate`
-Validate profile syntax without processing files.
-
-```bash
-copytree --validate --profile myprofile
-```
-
-#### `--no-cache`
-Disable caching for AI operations and external sources.
-
-```bash
-copytree --no-cache
-```
-
-#### `--no-validate`
-Disable configuration validation (for testing/debugging).
-
-```bash
-copytree --no-validate
-```
-
-### Instructions Options
-
-#### `--no-instructions`
-Disable including instructions in output.
-
-```bash
-copytree --no-instructions
-```
-
-#### `--instructions=<name>`
-Use custom instructions set (default: default).
-
-```bash
-copytree --instructions custom
-copytree --instructions default
-```
-
-## Exit Codes
-
-- `0` - Success
-- `1` - Profile validation or loading errors
-- `2` - Invalid option combination
-- `3` - File system or Git errors
-
-## Examples
-
-### Basic Usage
-```bash
-# Copy current directory; the clipboard gets a path to the output file
 copytree
-
-# Copy the output text itself instead
-copytree --clipboard
-
-# Copy specific directory
-copytree /path/to/project
-
-# Copy from GitHub
-copytree https://github.com/facebook/react
+copytree src --stdout --format markdown
+copytree . --include "**/*.ts" --exclude "docs/" --max-total-size 2MB
+copytree . -o context.md
 ```
 
-### Using Profiles
+**Machine output**: `copytree-feedback@1`
+
+## `copytree plan`
+
+Preview selected files without reading contents
+
+The side-effect-free answer to "what will CopyTree select, in what order, and which budgets will bind". Reads directory entries, file metadata, and the ignore, profile and configuration files needed to decide. Never reads candidate file contents.
+
 ```bash
-# Uses default profile automatically
-copytree
-
-# Use custom profile
-copytree --profile mycustom
-
-# Preview profile selection
-copytree --profile mycustom --dry-run
+copytree plan [path] [options]
 ```
 
-### Filtering Files
+| Argument | Meaning | Default |
+|---|---|---|
+| `path` | Project root | `.` |
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--format <type>` | Plan report format: text, json, ndjson | default: `text` |
+| `--explain` | Include excluded entries and decision provenance |  |
+| `--all` | Include every candidate entry, not only selected ones | conflicts: `--summary` |
+| `--summary` | Emit the summary only | conflicts: `--all` |
+| `-o, --output <file>` | Save the plan report |  |
+| `--fail-empty` | Exit with a policy failure on an empty plan | advanced |
+| `--fail-on-truncation` | Exit with a policy failure when stat-based budgets omit files | advanced |
+| `--reproducible` | Omit timestamps so the report can be compared byte for byte | advanced |
+
+#### Selection
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--profile <name>` | Use a file-selection profile (.copytree-<name>.yml) |  |
+| `--no-profile` | Skip automatic project-profile discovery |  |
+| `--scope <path>` | Traverse only this literal path | repeatable |
+| `--include <glob>` | Include only matching paths; narrows the profile include set | repeatable |
+| `-x, --exclude <pattern>` | Add a Git-style exclusion rule | repeatable |
+| `--force-include <glob>` | Override ordinary excludes and the size gate | repeatable |
+| `--ext <extension>` | Keep only this extension (ts or .ts) | advanced; repeatable |
+| `--max-depth <n>` | Limit traversal depth from the project root | advanced |
+| `--no-tests` | Exclude conventional test paths | advanced |
+| `-m, --modified` | Select working-tree changes | advanced; conflicts: `--staged`, `--changed` |
+| `--staged` | Select staged changes | advanced; conflicts: `--modified`, `--changed` |
+| `-c, --changed <ref>` | Select files changed since a Git reference | advanced; conflicts: `--modified`, `--staged` |
+| `--scope-include-ignored` | Let --scope entries override the ignore rules that would exclude them | advanced |
+| `--scope-include-default-excluded` | Let --scope entries override built-in exclusions (node_modules). .git never | advanced |
+
+#### Budgets and ordering
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--size-gate <size>` | Per-file gate decided from stat() before opening | advanced; default: `256KB` |
+| `--no-size-gate` | Disable the context size gate (not the hard safety ceiling) | advanced |
+| `--max-total-size <size>` | Limit selected file bytes |  |
+| `--max-files <count>` | Limit selected file count, applied after sorting |  |
+| `--max-chars <count>` | Limit emitted content characters, cut at line boundaries |  |
+| `--sort <by>` | Selection order: path, size, modified, name, extension, depth | advanced; default: `path` |
+| `--order <direction>` | Sort direction: asc or desc | advanced; default: `asc` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Conflicts**
+
+- --summary and --all cannot be combined.
+
+**Examples**
+
 ```bash
-# Pattern matching
-copytree --filter "src/**/*.js" --filter "*.json"
-
-# Git integration
-copytree --modified
-copytree --changed HEAD~5
+copytree plan .
+copytree plan . --explain
+copytree plan . --format json
 ```
 
-### Output Options
+**Machine output**: `copytree-plan@1`
+
+## `copytree inspect`
+
+Inspect structure, rules, profile and budgets
+
+Understand a project and the CopyTree environment. Reads no ordinary file contents; configuration, profile and ignore files are read because they are the subject.
+
 ```bash
-# Save to file (Markdown by default)
-copytree --output project-snapshot.md
-
-# Save as XML
-copytree --output project-snapshot.xml --format xml
-
-# Display in console
-copytree --display
-
-# Different formats
-copytree --format json
-copytree --format tree
+copytree inspect [path] [options]
 ```
 
-### Advanced Usage
+| Argument | Meaning | Default |
+|---|---|---|
+| `path` | Project root | `.` |
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--view <name>` | summary, tree, extensions, rules, profile, budgets or all | default: `summary` |
+| `--depth <n>` | Limit rendered tree depth | default: `4` |
+| `--all-paths` | List all candidate paths rather than aggregates |  |
+| `--format <type>` | Report format: text, markdown, json | default: `text` |
+| `-o, --output <file>` | Save the report |  |
+| `--without-copytreeignore` | Show the candidate state before .copytreeignore is applied | advanced |
+
+#### Selection
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--profile <name>` | Use a file-selection profile (.copytree-<name>.yml) |  |
+| `--no-profile` | Skip automatic project-profile discovery |  |
+| `--scope <path>` | Traverse only this literal path | repeatable |
+| `--include <glob>` | Include only matching paths; narrows the profile include set | repeatable |
+| `-x, --exclude <pattern>` | Add a Git-style exclusion rule | repeatable |
+| `--force-include <glob>` | Override ordinary excludes and the size gate | repeatable |
+| `--ext <extension>` | Keep only this extension (ts or .ts) | advanced; repeatable |
+| `--max-depth <n>` | Limit traversal depth from the project root | advanced |
+| `--no-tests` | Exclude conventional test paths | advanced |
+| `-m, --modified` | Select working-tree changes | advanced; conflicts: `--staged`, `--changed` |
+| `--staged` | Select staged changes | advanced; conflicts: `--modified`, `--changed` |
+| `-c, --changed <ref>` | Select files changed since a Git reference | advanced; conflicts: `--modified`, `--staged` |
+| `--scope-include-ignored` | Let --scope entries override the ignore rules that would exclude them | advanced |
+| `--scope-include-default-excluded` | Let --scope entries override built-in exclusions (node_modules). .git never | advanced |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
 ```bash
-# Combine multiple options
-copytree --profile myproject --modified --output snapshot.md
-
-# Dry run with validation
-copytree --dry-run --validate
-
-# Limit output
-copytree --head 50 --char-limit 100000
-
-# Stream large projects
-copytree --stream | gzip > project.md.gz
+copytree inspect .
+copytree inspect . --view rules
+copytree inspect . --format json
 ```
 
-## Notes
+**Machine output**: `copytree-inspect@1`
 
-- The `--validate` option cannot be combined with output options or filters
-- External sources (GitHub URLs) are cached by default in `~/.copytree/repos/`
-- Use `DEBUG=copytree:*` environment variable for detailed debugging
+## `copytree explain`
+
+Explain why paths are included or excluded
+
+A complete decision trace for one or more root-relative paths, naming the rule, its source file and its line wherever a file-based rule decided the outcome.
+
+```bash
+copytree explain <entry...> [options]
+```
+
+| Argument | Meaning | Default |
+|---|---|---|
+| `entry` | Root-relative paths to trace | — |
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--root <path>` | Project root | default: `.` |
+| `--format <type>` | Report format: text, json | default: `text` |
+| `-o, --output <file>` | Save the report | advanced |
+
+#### Selection
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--profile <name>` | Use a file-selection profile (.copytree-<name>.yml) |  |
+| `--no-profile` | Skip automatic project-profile discovery |  |
+| `--scope <path>` | Traverse only this literal path | repeatable |
+| `--include <glob>` | Include only matching paths; narrows the profile include set | repeatable |
+| `-x, --exclude <pattern>` | Add a Git-style exclusion rule | repeatable |
+| `--force-include <glob>` | Override ordinary excludes and the size gate | repeatable |
+| `--ext <extension>` | Keep only this extension (ts or .ts) | advanced; repeatable |
+| `--max-depth <n>` | Limit traversal depth from the project root | advanced |
+| `--no-tests` | Exclude conventional test paths | advanced |
+| `-m, --modified` | Select working-tree changes | advanced; conflicts: `--staged`, `--changed` |
+| `--staged` | Select staged changes | advanced; conflicts: `--modified`, `--changed` |
+| `-c, --changed <ref>` | Select files changed since a Git reference | advanced; conflicts: `--modified`, `--staged` |
+| `--scope-include-ignored` | Let --scope entries override the ignore rules that would exclude them | advanced |
+| `--scope-include-default-excluded` | Let --scope entries override built-in exclusions (node_modules). .git never | advanced |
+
+#### Budgets and ordering
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--size-gate <size>` | Per-file gate decided from stat() before opening | advanced; default: `256KB` |
+| `--no-size-gate` | Disable the context size gate (not the hard safety ceiling) | advanced |
+| `--max-total-size <size>` | Limit selected file bytes |  |
+| `--max-files <count>` | Limit selected file count, applied after sorting |  |
+| `--max-chars <count>` | Limit emitted content characters, cut at line boundaries |  |
+| `--sort <by>` | Selection order: path, size, modified, name, extension, depth | advanced; default: `path` |
+| `--order <direction>` | Sort direction: asc or desc | advanced; default: `asc` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree explain docs/README.md --root .
+copytree explain src/index.ts tests/index.test.ts --root .
+```
+
+**Machine output**: `copytree-explain@1`
+
+## `copytree ignore context`
+
+Build context for authoring .copytreeignore
+
+A safe, compact, content-free project inventory an agent can use to author .copytreeignore. The candidate baseline deliberately excludes .copytreeignore itself, so the areas you might want to exclude — docs, tests, examples, fixtures — are all visible.
+
+```bash
+copytree ignore context [path] [options]
+```
+
+| Argument | Meaning | Default |
+|---|---|---|
+| `path` | Project root | `.` |
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--format <type>` | Report format: markdown, text, json | default: `markdown` |
+| `--depth <n>` | Tree expansion depth | default: `4` |
+| `--all-paths` | Include every candidate path |  |
+| `--scope <path>` | Limit context to a literal subtree | repeatable |
+| `-o, --output <file>` | Save the report | conflicts: `--reference` |
+| `--reference` | Write a temporary report and copy its file reference | conflicts: `--output` |
+| `--include-current-rules` | Include full current .copytreeignore decision detail | advanced |
+| `--no-hints` | Disable deterministic role hints | advanced |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree ignore context .
+copytree ignore context . --format json
+```
+
+**Machine output**: `copytree-ignore-context@1`
+
+## `copytree ignore check`
+
+Validate ignore rules and show their effect
+
+Validate .copytreeignore syntax and semantics, then show exactly what it removes. Read-only: the file is never rewritten.
+
+```bash
+copytree ignore check [path] [options]
+```
+
+| Argument | Meaning | Default |
+|---|---|---|
+| `path` | Project root | `.` |
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--format <type>` | Report format: text, json | default: `text` |
+| `--strict` | Treat warnings as a policy failure |  |
+| `--show-removed` | List every removed path |  |
+| `--show-kept` | List every retained path |  |
+| `--rule <lineOrPattern>` | Focus on one rule, by line number or pattern |  |
+| `-o, --output <file>` | Save the report |  |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree ignore check .
+copytree ignore check . --strict
+```
+
+**Machine output**: `copytree-ignore-check@1`
+
+## `copytree ignore init`
+
+Print or write a conservative starter file
+
+Generate a starting point for .copytreeignore. Prints to stdout by default; writing requires --write, and replacing an existing file additionally requires --force.
+
+```bash
+copytree ignore init [path] [options]
+```
+
+| Argument | Meaning | Default |
+|---|---|---|
+| `path` | Project root | `.` |
+
+#### Template
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--template <name>` | empty or source | default: `empty` |
+| `--write` | Write <root>/.copytreeignore |  |
+| `--force` | Permit replacing an existing file | requires: `--write` |
+| `--format <type>` | gitignore (plain rules) or annotated (with comments) | default: `annotated` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Conflicts**
+
+- --force requires --write.
+
+**Examples**
+
+```bash
+copytree ignore init .
+copytree ignore init . --template source --write
+```
+
+## `copytree config show`
+
+Inspect effective configuration with provenance
+
+```bash
+copytree config show [options]
+```
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--section <name>` | Show one section only |  |
+| `--format <type>` | Report format: text, json | default: `text` |
+| `--sources` | Show where each effective value came from |  |
+| `--show-secrets` | Reveal security-sensitive values; requires a TTY, or --force | advanced |
+| `--force` | Permit --show-secrets when stdout is redirected | advanced |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree config show
+copytree config show --format json --sources
+```
+
+**Machine output**: `copytree-config@1`
+
+## `copytree config validate`
+
+Validate configuration against the schema
+
+```bash
+copytree config validate [options]
+```
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--strict` | Treat warnings as failures |  |
+| `--format <type>` | Report format: text, json | default: `text` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree config validate
+copytree config validate --format json
+```
+
+**Machine output**: `copytree-config-validation@1`
+
+## `copytree config migrate`
+
+Convert legacy ~/.copytree configuration into a data file
+
+Reads the legacy `~/.copytree/*.{js,json}` configuration and writes the equivalent `config.yaml` in the platform configuration directory. Prints the result by default; writing requires --write. The legacy directory is never modified.
+
+```bash
+copytree config migrate [options]
+```
+
+#### Migration
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--write` | Write the data configuration file |  |
+| `--force` | Permit replacing an existing data configuration file | requires: `--write` |
+| `--format <type>` | Report format: text, json | default: `text` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Conflicts**
+
+- --force requires --write.
+
+**Examples**
+
+```bash
+copytree config migrate
+copytree config migrate --write
+```
+
+**Machine output**: `copytree-config-migration@1`
+
+## `copytree cache status`
+
+Report cache contents and location
+
+```bash
+copytree cache status [options]
+```
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--format <type>` | Report format: text, json | default: `text` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree cache status
+```
+
+**Machine output**: `copytree-cache@1`
+
+## `copytree cache clear`
+
+Remove cached entries
+
+```bash
+copytree cache clear [options]
+```
+
+#### Categories
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--transformations` | Only the transformation cache |  |
+| `--references` | Only the temporary reference files (clear needs this explicitly) |  |
+| `--format <type>` | Report format: text, json | default: `text` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree cache clear
+copytree cache clear --transformations
+```
+
+**Machine output**: `copytree-cache@1`
+
+## `copytree cache gc`
+
+Remove expired entries and stale reference files
+
+```bash
+copytree cache gc [options]
+```
+
+#### Categories
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--transformations` | Only the transformation cache |  |
+| `--references` | Only the temporary reference files (clear needs this explicitly) |  |
+| `--retention-days <n>` | Reference-file retention window | advanced; default: `7` |
+| `--format <type>` | Report format: text, json | default: `text` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree cache gc
+```
+
+**Machine output**: `copytree-cache@1`
+
+## `copytree doctor`
+
+Check CopyTree, clipboard, Git and converters
+
+Diagnostic only: doctor reports, and repairs nothing. Every check names what it looked at and what to do when it fails.
+
+```bash
+copytree doctor [options]
+```
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--format <type>` | Report format: text, json | default: `text` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree doctor
+copytree doctor --format json
+```
+
+**Machine output**: `copytree-doctor@1`
+
+## `copytree completion`
+
+Generate shell completion code
+
+Completions are generated from the same command schema as the parser and the help.
+
+```bash
+copytree completion <shell> [options]
+```
+
+| Argument | Meaning | Default |
+|---|---|---|
+| `shell` | bash, zsh, fish, powershell | — |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree completion zsh
+copytree completion bash > /etc/bash_completion.d/copytree
+```
+
+## `copytree debug profile`
+
+Capture CPU and/or heap profiles
+
+A developer diagnostic. Performance profiling is deliberately absent from copy help: "profile" everywhere else in CopyTree means a file-selection profile.
+
+```bash
+copytree debug profile [path] [options]
+```
+
+| Argument | Meaning | Default |
+|---|---|---|
+| `path` | Project root | `.` |
+
+#### Profiling
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--type <kind>` | cpu, heap or all | default: `cpu` |
+| `--output-dir <dir>` | Where to write profiles and the report | default: `.profiles` |
+
+#### Feedback
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `-q, --quiet` | Suppress progress and successful completion feedback | conflicts: `--verbose` |
+| `-v, --verbose` | Show selection counts, limits, destination, size and duration | conflicts: `--quiet` |
+| `--debug` | Alias for --log-level debug | advanced |
+| `--log-level <level>` | Severity floor: error, warn, info, debug | advanced; default: `info` |
+| `--log-format <format>` | Feedback rendering: text, or newline-delimited json | advanced; default: `text` |
+| `--no-color` | Disable ANSI colour | advanced |
+
+**Examples**
+
+```bash
+copytree debug profile . --type cpu
+copytree debug profile . --type all
+```
+
+## `copytree help`
+
+Show help for CopyTree or one of its commands
+
+```bash
+copytree help [command...] [options]
+```
+
+| Argument | Meaning | Default |
+|---|---|---|
+| `command` | Command path | — |
+
+#### Report
+
+| Option | Meaning | Notes |
+|---|---|---|
+| `--format <type>` | text, or the versioned machine-readable command schema as json | default: `text` |
+| `--all` | Include advanced options |  |
+
+**Examples**
+
+```bash
+copytree help plan
+copytree help --format json
+```
+
+**Machine output**: `copytree-command-schema@1`
+
+## Migration
+
+Deprecated spellings still parse, and each one names its replacement on stderr.
+
+| Deprecated | Replacement |
+|---|---|
+| `--folder-profile` (copy) | `--profile` |
+| `--no-folder-profile` (copy) | `--no-profile` |
+| `--profile-dir` (copy) | `copytree debug profile --output-dir` |
+| `--filter` (copy) | `--include` |
+| `--display` (copy) | `--stdout` |
+| `--stream` (copy) | `--stdout` |
+| `--dry-run` (copy) | `copytree plan` |
+| `--head` (copy) | `--max-files` |
+| `--char-limit` (copy) | `--max-chars` |
+| `--include-binary` (copy) | `--binary base64` |
+| `--with-line-numbers` (copy) | `--line-numbers` |
+| `--only-tree` (copy) | `--no-content` |
+| `--with-git-status` (copy) | `--git-status` |
+| `--as-reference` (copy) | `--reference` |
+| `--sort-order` (copy) | `--order` |
+| `--always` (copy) | `--force-include` |
+| `--scope-include-config-excluded` (copy) | `--scope-include-default-excluded` |
+| `--explain` (copy) | `copytree plan --explain` |
+| `--secrets-guard` (copy) | `--secrets redact` |
+| `--no-secrets-guard` (copy) | `--secrets off` |
+| `--secrets-redact-mode` (copy) | `--redaction` |
+| `--fail-on-secrets` (copy) | `--secrets fail` |
+
+### Removed
+
+| Removed | Replacement | Why |
+|---|---|---|
+| `--info` | `--metadata` | Optional metadata is included by default; --no-metadata omits it. |
+| `--show-size` | `--metadata` | Sizes are part of the optional metadata, included by default. |
+| `--min-size <size>` | — | Filter by size with a plan report, or use --size-gate for the per-file gate. |
+| `--max-size <size>` | `--size-gate` | The per-file gate is --size-gate; the whole-run budget is --max-total-size. |
+| `--no-cache` | `--no-transform-cache` | Cache control is now scoped to the subsystem it affects. |
+| `--no-validate` | `copytree config validate` | Configuration validation is owned by the config command. |
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success, including a valid empty selection |
+| `1` | Operational failure: I/O, formatting, Git, converters |
+| `2` | Usage or configuration error |
+| `3` | A requested policy check failed |
+| `130` | Cancelled by SIGINT |
+
+Machine output and JSON feedback carry a stable symbolic code alongside the exit code.

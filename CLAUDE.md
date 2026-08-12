@@ -49,7 +49,8 @@ npm run format          # Auto-format code (use when formatting is requested)
 
 # Debugging
 DEBUG=copytree:* copytree        # Verbose logging
-copytree config:validate         # Check config
+copytree config validate         # Check config
+copytree doctor                  # Check installation, clipboard, Git, converters
 ```
 
 <paved_path>
@@ -73,11 +74,11 @@ copytree config:validate         # Check config
 7. Run `npm run test:coverage` (must pass 80%)
 
 ### Diagnose Slow/Large Runs
-1. Use git filters first: `--modified`, `--changed <ref>`
-2. Enable streaming: `--stream` or `-S`
-3. Set limits: `--head N`
-4. Check cache: `copytree cache:clear` if stale
-5. Profile with: `DEBUG=copytree:* copytree --dry-run`
+1. Use git filters first: `--modified`, `--staged`, `--changed <ref>`
+2. Narrow the run: `--scope <path>`
+3. Set limits: `--max-files N`, `--max-total-size`, `--max-chars`
+4. Check cache: `copytree cache clear` if stale
+5. Preview with: `copytree plan . --explain`; profile with `copytree debug profile .`
 
 ### Release to NPM
 **Use `/release [version]` to run the full release workflow.** This handles version determination, GitFlow merges, tagging, pushing, and monitoring the CI publish job.
@@ -131,10 +132,12 @@ Increase adherence by starting sessions with:
 ## Key Architecture (Details in Docs)
 
 - **Pipeline**: Event-driven stages, streaming >10MB (`@src/pipeline/Pipeline.js`, `@docs/technical/architecture.md`)
-- **Configuration**: Hierarchical (CLI > env > project > user > default) (`@src/config/ConfigManager.js`, `@config/schema.json`)
+- **Configuration**: Hierarchical (CLI > named profile > project profile > user data config > packaged defaults) (`@src/config/ConfigManager.js`, `@config/schema.json`)
 - **Profiles**: YAML-based file selection (`@src/config/FolderProfileLoader.js`)
 - **Transformers**: File processors with traits system (`@src/transforms/transformers/`)
-- **Commands**: Core CLI commands (`@bin/copytree.js`): copy, config:validate, config:inspect, cache:clear
+- **Commands**: One declarative schema (`@src/cli/schema.js`) generates the parser, help, docs,
+  completions and deprecations. Handlers live in `@src/commands/`: copy, plan, inspect, explain,
+  ignore (context/check/init), config, cache, doctor, completion, debug profile
 
 ## Path Handling Rules
 
@@ -146,7 +149,10 @@ Increase adherence by starting sessions with:
 
 ## Critical Files
 
-- `bin/copytree.js` - CLI entry
+- `bin/copytree.js` - CLI entry (parse, validate, dispatch; owns exit codes and signals)
+- `src/cli/schema.js` - The one command schema; parser, help, docs and completions derive from it
+- `src/cli/request.js` - Legacy and canonical spellings normalised into one request
+- `src/selection/selection.js` - The one selection engine, shared by copy/plan/inspect/explain/SDK
 - `src/pipeline/Pipeline.js` - Pipeline orchestration
 - `src/pipeline/Stage.js` - Stage base class
 - `src/config/ConfigManager.js` - Config system

@@ -34,11 +34,6 @@ export function createTestPipeline(stages = null, options = {}) {
 export async function createFullPipeline(options = {}) {
   // Import all stages
   const GitFilterStage = (await import('../../src/pipeline/stages/GitFilterStage.js')).default;
-  const ProfileFilterStage = (await import('../../src/pipeline/stages/ProfileFilterStage.js'))
-    .default;
-  const AlwaysIncludeStage = (await import('../../src/pipeline/stages/AlwaysIncludeStage.js'))
-    .default;
-  const LimitStage = (await import('../../src/pipeline/stages/LimitStage.js')).default;
   const CharLimitStage = (await import('../../src/pipeline/stages/CharLimitStage.js')).default;
   const InstructionsStage = (await import('../../src/pipeline/stages/InstructionsStage.js'))
     .default;
@@ -54,9 +49,6 @@ export async function createFullPipeline(options = {}) {
   pipeline.through([
     new FileDiscoveryStage(),
     new GitFilterStage(),
-    new ProfileFilterStage(),
-    new AlwaysIncludeStage(),
-    new LimitStage(),
     new FileLoadingStage(),
     new TransformStage(),
     new CharLimitStage(),
@@ -298,17 +290,9 @@ export function assertStageContract(stage, input, output) {
       input: () => true,
       output: (o) => Array.isArray(o.files) && o.files.length >= 0,
     },
-    ProfileFilterStage: {
-      input: (i) => Array.isArray(i.files),
-      output: (o) => Array.isArray(o.files) && o.files.length <= input.files.length,
-    },
     TransformStage: {
       input: (i) => Array.isArray(i.files) && i.files.every((f) => f.content !== undefined),
       output: (o) => Array.isArray(o.files),
-    },
-    LimitStage: {
-      input: (i) => Array.isArray(i.files),
-      output: (o) => Array.isArray(o.files) && o.files.length <= input.files.length,
     },
     DeduplicateFilesStage: {
       input: (i) => Array.isArray(i.files),

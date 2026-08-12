@@ -6,6 +6,11 @@
     <ct:fileCount>3</ct:fileCount>
     <ct:totalSize>102</ct:totalSize>
     <ct:profile>default</ct:profile>
+    <ct:git>
+      <ct:branch>main</ct:branch>
+      <ct:lastCommit hash="<HASH>"><![CDATA[baseline]]></ct:lastCommit>
+      <ct:hasUncommittedChanges>true</ct:hasUncommittedChanges>
+    </ct:git>
     <ct:directoryStructure>├── src/
 │   └── test.js
 ├── index.js
@@ -13,12 +18,12 @@
     <ct:instructions name="default"><![CDATA[This XML document represents the directory structure and contents of a project, which you will analyze to answer user questions. Reference files using @ followed by the relative path from the project root (e.g., @README.md, @src/app.js). The @ notation must not be enclosed in backticks. For example, always write "...in the file @app/page.tsx..." and never "...in the file `@app/page.tsx`...". You can also reference directories with @directory/path to instruct the agent to examine multiple files.]]></ct:instructions>
   </ct:metadata>
   <ct:files>
-    <ct:file path="@index.js" size="22" modified="<TIMESTAMP>"><![CDATA[console.log('Hello');
+    <ct:file path="@index.js" size="22" modified="<TIMESTAMP>" gitStatus="unmodified"><![CDATA[console.log('Hello');
 ]]></ct:file>
-    <ct:file path="@README.md" size="40" modified="<TIMESTAMP>"><![CDATA[# Test Project
+    <ct:file path="@README.md" size="40" modified="<TIMESTAMP>" gitStatus="modified"><![CDATA[# Test Project
 
 Temp change for testing.]]></ct:file>
-    <ct:file path="@src/test.js" size="40" modified="<TIMESTAMP>"><![CDATA[export function test() {
+    <ct:file path="@src/test.js" size="40" modified="<TIMESTAMP>" gitStatus="unmodified"><![CDATA[export function test() {
   return 42;
 }
 ]]></ct:file>

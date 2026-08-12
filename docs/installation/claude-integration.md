@@ -58,7 +58,7 @@ copytree
 copytree --profile myproject
 
 # Preview profile selection
-copytree --profile myproject --dry-run
+copytree plan . --profile myproject
 ```
 
 ### 2. Filter for Relevance
@@ -73,7 +73,7 @@ copytree --modified
 copytree --changed main
 
 # Specific file patterns
-copytree --filter "src/**/*.js"
+copytree --include "src/**/*.js"
 ```
 
 ### 3. Manage Output Size
@@ -82,13 +82,13 @@ For large projects, control the output size:
 
 ```bash
 # Limit to first 50 files
-copytree --head 50
+copytree --max-files 50
 
 # Set character limit
-copytree --char-limit 100000
+copytree --max-chars 100000
 
 # Show only tree structure
-copytree --only-tree
+copytree --no-content
 ```
 
 ## Workflow Examples
@@ -111,17 +111,17 @@ copytree --changed main
 
 ```bash
 # Copy documentation with force-include
-copytree --always "README.md" --always "docs/**/*"
+copytree --force-include "README.md" --force-include "docs/**/*"
 ```
 
 ### Understanding New Codebase
 
 ```bash
 # Get overview with tree structure first
-copytree --only-tree
+copytree --no-content
 
 # Then dive into specific areas
-copytree --filter "src/components/**"
+copytree --include "src/components/**"
 ```
 
 ## Tips for Effective Use
@@ -143,7 +143,7 @@ If clipboard fails with large output:
 copytree -o context.xml
 
 # Or limit the output size
-copytree --char-limit 50000
+copytree --max-chars 50000
 ```
 
 ### Performance Issues
@@ -155,7 +155,7 @@ For better performance:
 copytree
 
 # Disable caching if needed
-copytree --no-cache
+copytree --no-transform-cache
 ```
 
 ### Missing Context
@@ -164,10 +164,10 @@ If important files are missing:
 
 ```bash
 # Force include specific files
-copytree --always "config/*" --always "config.example.js"
+copytree --force-include "config/*" --force-include "config.example.js"
 
 # Check what profile is being used
-copytree --dry-run
+copytree plan .
 ```
 
 ## Related Documentation

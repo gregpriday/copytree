@@ -69,7 +69,7 @@ exclude:
 Preview what files will be selected:
 
 ```bash
-copytree --profile docs-only --dry-run
+copytree plan . --profile docs-only
 ```
 
 This shows which files match your rules without actually copying.
@@ -81,7 +81,7 @@ This shows which files match your rules without actually copying.
 copytree --profile docs-only
 
 # Display in terminal
-copytree --profile docs-only --display
+copytree --profile docs-only --stdout
 
 # Save to file
 copytree --profile docs-only --output documentation.md
@@ -341,10 +341,10 @@ Always preview before copying:
 
 ```bash
 # Preview selection
-copytree --profile myprofile --dry-run
+copytree plan . --profile myprofile
 
 # View in terminal first
-copytree --profile myprofile --display
+copytree --profile myprofile --stdout
 ```
 
 ### 5. Version Your Profiles
@@ -378,7 +378,7 @@ Rules might be too restrictive:
 
 ```bash
 # Use dry-run mode to debug
-copytree --profile myprofile --dry-run
+copytree plan . --profile myprofile
 
 # This shows:
 # - Which rules matched
@@ -411,7 +411,7 @@ Now that you can create custom profiles:
 
 ```bash
 # Profile usage
-copytree --profile <name> --dry-run         # Preview file selection
+copytree plan . --profile <name>         # Preview file selection
 
 # Using profiles
 copytree --profile myprofile                # Use custom profile

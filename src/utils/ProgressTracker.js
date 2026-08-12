@@ -12,7 +12,6 @@ import { PHASES } from '../ui/feedback/messages.js';
  */
 export const PIPELINE_STAGES = Object.freeze({
   DISCOVER: 'discover',
-  ALWAYS_INCLUDE: 'alwaysInclude',
   GIT_FILTER: 'gitFilter',
   FILTER: 'filter',
   SORT: 'sort',
@@ -36,12 +35,9 @@ export const PIPELINE_STAGES = Object.freeze({
  */
 const STAGE_INFO = {
   FileDiscoveryStage: [PIPELINE_STAGES.DISCOVER, 'Discovering files'],
-  AlwaysIncludeStage: [PIPELINE_STAGES.ALWAYS_INCLUDE, 'Including required files'],
   GitFilterStage: [PIPELINE_STAGES.GIT_FILTER, 'Filtering by git status'],
-  ProfileFilterStage: [PIPELINE_STAGES.FILTER, 'Applying filters'],
   SortFilesStage: [PIPELINE_STAGES.SORT, 'Sorting files'],
   BudgetStage: [PIPELINE_STAGES.BUDGET, 'Applying budgets'],
-  LimitStage: [PIPELINE_STAGES.LIMIT, 'Applying limits'],
   FileLoadingStage: [PIPELINE_STAGES.LOAD, 'Loading file contents'],
   SecretsGuardStage: [PIPELINE_STAGES.SECRETS, 'Scanning for secrets'],
   TransformStage: [PIPELINE_STAGES.TRANSFORM, 'Transforming files'],
@@ -72,7 +68,6 @@ export function stageIdFor(stageName) {
  */
 const STAGE_PHASES = Object.freeze({
   [PIPELINE_STAGES.DISCOVER]: PHASES.DISCOVER,
-  [PIPELINE_STAGES.ALWAYS_INCLUDE]: PHASES.SELECT,
   [PIPELINE_STAGES.GIT_FILTER]: PHASES.SELECT,
   [PIPELINE_STAGES.FILTER]: PHASES.SELECT,
   [PIPELINE_STAGES.SORT]: PHASES.SELECT,

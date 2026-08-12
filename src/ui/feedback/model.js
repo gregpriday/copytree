@@ -19,6 +19,14 @@ import { formatBytes, formatDuration } from '../../utils/helpers.js';
  * @readonly
  * @enum {string}
  */
+/**
+ * Schema identifier for `--log-format json` feedback.
+ *
+ * One object per line on stderr, each carrying this identifier, so a consumer
+ * can detect a change to the shape rather than silently misreading one.
+ */
+export const FEEDBACK_SCHEMA = 'copytree-feedback@1';
+
 export const FEEDBACK_EVENTS = Object.freeze({
   RUN_START: 'run.start',
   PHASE_CHANGE: 'phase.change',
@@ -376,7 +384,7 @@ export function buildEmptyModel({ warnings = [] } = {}) {
     headline: 'No files matched',
     metrics: [],
     warnings,
-    notes: ['Check --scope, --filter and ignore rules; use --dry-run --explain for details'],
+    notes: ['Check --scope, --include and ignore rules.', 'Run: copytree plan . --explain'],
     stats: { files: 0 },
   };
 }
@@ -409,7 +417,17 @@ export function buildFailureModel(description) {
       : description.title,
     metrics: [],
     warnings: [],
-    notes: description.suggestion ? [description.suggestion] : [],
+    // The remediation, then the stable code — the four parts section 20 of the
+    // CLI specification requires: title, subject, remediation, code. The code
+    // is what a reader pastes into an issue and what a script greps for, so it
+    // has to appear in the text output too, not only in the JSON feedback.
+    // Including `UNKNOWN_ERROR`: a code the reader can quote is the point, and
+    // an unclassified failure is exactly the case where an issue report needs
+    // one most.
+    notes: [
+      ...(description.suggestion ? [description.suggestion] : []),
+      `[${description.code ?? 'UNKNOWN_ERROR'}]`,
+    ],
     code: description.code,
     // Deliberately no `details`. A typed error's details are whatever the
     // thrower found useful — a ConfigurationError carries the entire loaded

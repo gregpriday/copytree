@@ -267,6 +267,59 @@ class CacheService {
   }
 
   /**
+   * Describe what is currently cached.
+   *
+   * Count, bytes, oldest and newest entry, and the location — the four facts
+   * that answer "is the cache the problem?" without anyone having to go and
+   * look in a hidden directory.
+   *
+   * @returns {Promise<{enabled: boolean, driver: string, path: string, entries: number,
+   *   bytes: number, oldest: string|null, newest: string|null}>} Cache status
+   */
+  async status() {
+    const empty = {
+      enabled: this.enabled,
+      driver: this.driver,
+      path: this.cachePath,
+      entries: 0,
+      bytes: 0,
+      oldest: null,
+      newest: null,
+    };
+
+    if (!this.enabled || this.driver !== 'file' || !(await fs.pathExists(this.cachePath))) {
+      return empty;
+    }
+
+    let entries = 0;
+    let bytes = 0;
+    let oldest = null;
+    let newest = null;
+
+    for (const file of await fs.readdir(this.cachePath)) {
+      if (!file.endsWith(this.extension)) continue;
+      try {
+        const stats = await fs.stat(path.join(this.cachePath, file));
+        entries += 1;
+        bytes += stats.size;
+        const mtime = stats.mtime.getTime();
+        if (oldest === null || mtime < oldest) oldest = mtime;
+        if (newest === null || mtime > newest) newest = mtime;
+      } catch {
+        // A file that vanished between listing and stat is not in the cache.
+      }
+    }
+
+    return {
+      ...empty,
+      entries,
+      bytes,
+      oldest: oldest === null ? null : new Date(oldest).toISOString(),
+      newest: newest === null ? null : new Date(newest).toISOString(),
+    };
+  }
+
+  /**
    * Run garbage collection on file cache
    * @param {Object} options - GC options
    * @returns {Promise<number>} Number of expired items removed

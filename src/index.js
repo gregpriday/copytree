@@ -49,7 +49,10 @@ export {
   ProfileError,
   InstructionsError,
   SecretsDetectedError,
+  PolicyError,
   ERROR_CODES,
+  EXIT_CODES,
+  exitCodeFor,
   createAbortError,
   isAbortError,
 } from './utils/errors.js';

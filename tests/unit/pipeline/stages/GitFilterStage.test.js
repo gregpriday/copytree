@@ -88,9 +88,21 @@ describe('GitFilterStage', () => {
       expect(mockGitUtils.isGitRepository).not.toHaveBeenCalled();
     });
 
-    it('should skip processing when not in git repository', async () => {
+    // A narrowing request that cannot be applied must not hand back the whole
+    // project: in CI that is a full-repository context where a diff was
+    // expected, at a size nothing about the run distinguishes from success.
+    it('fails when a Git selector is used outside a repository', async () => {
       mockGitUtils.isGitRepository.mockResolvedValue(false);
       stage = new GitFilterStage({ modified: true });
+
+      await expect(stage.process(createTestInput())).rejects.toThrow(/needs a Git repository/);
+      expect(mockGitUtils.getModifiedFiles).not.toHaveBeenCalled();
+    });
+
+    // Annotation is polish: its absence changes no selection, so it degrades.
+    it('skips annotation when --git-status is used outside a repository', async () => {
+      mockGitUtils.isGitRepository.mockResolvedValue(false);
+      stage = new GitFilterStage({ gitStatus: true });
       const input = createTestInput();
 
       const result = await stage.process(input);
@@ -180,9 +192,25 @@ describe('GitFilterStage', () => {
     // Carrying on is right — a directory that is not a repository should not
     // stop a copy. Doing it silently is not: the caller asked for a subset and
     // received everything, and nothing about the run said so.
-    it('passes every file through when git filtering fails, and records why', async () => {
+    it('fails rather than exporting everything when the git query fails', async () => {
       mockGitUtils.getModifiedFiles.mockRejectedValue(new Error('Git command failed'));
       stage = new GitFilterStage({ modified: true, basePath: '/project' });
+
+      await expect(stage.process(createTestInput())).rejects.toThrow(/Git command failed/);
+    });
+
+    it('propagates the ref that could not be resolved', async () => {
+      mockGitUtils.getChangedFiles.mockRejectedValue(new Error('unknown revision'));
+      stage = new GitFilterStage({ changed: 'no-such-ref', basePath: '/project' });
+
+      await expect(stage.process(createTestInput())).rejects.toThrow(/unknown revision/);
+    });
+
+    // Annotation still degrades, and the degradation still says what was asked
+    // for and why it could not be done.
+    it('records why --git-status could not be attached', async () => {
+      mockGitUtils.getFileStatuses.mockRejectedValue(new Error('Git command failed'));
+      stage = new GitFilterStage({ gitStatus: true, basePath: '/project' });
       const input = createTestInput();
 
       const result = await stage.process(input);
@@ -190,25 +218,16 @@ describe('GitFilterStage', () => {
       expect(result.files).toBe(input.files);
       expect(result.stats.degradations).toHaveLength(1);
       expect(result.stats.degradations[0]).toMatchObject({ stage: 'GitFilterStage' });
-      expect(result.stats.degradations[0].message).toContain('--modified could not be applied');
+      expect(result.stats.degradations[0].message).toContain('--git-status could not be applied');
       expect(result.stats.degradations[0].message).toContain('Git command failed');
-    });
-
-    it('names the ref that could not be resolved', async () => {
-      mockGitUtils.getChangedFiles.mockRejectedValue(new Error('unknown revision'));
-      stage = new GitFilterStage({ changed: 'no-such-ref', basePath: '/project' });
-
-      const result = await stage.process(createTestInput());
-
-      expect(result.stats.degradations[0].message).toContain('--changed no-such-ref');
     });
 
     // A multi-line git error must not drag its advice block into a status line.
     it('keeps only the first line of the underlying error', async () => {
-      mockGitUtils.getModifiedFiles.mockRejectedValue(
+      mockGitUtils.getFileStatuses.mockRejectedValue(
         new Error("fatal: bad revision\nUse '--' to separate paths from revisions"),
       );
-      stage = new GitFilterStage({ modified: true, basePath: '/project' });
+      stage = new GitFilterStage({ gitStatus: true, basePath: '/project' });
 
       const result = await stage.process(createTestInput());
 
@@ -295,11 +314,14 @@ describe('GitFilterStage', () => {
     it('should handle git metadata errors', async () => {
       mockGitUtils.getCurrentBranch.mockRejectedValue(new Error('Branch error'));
 
+      // Metadata is collected after the selection has been made, so a failure
+      // here still fails a selector — the run cannot claim to have filtered.
       stage = new GitFilterStage({ modified: true, basePath: '/project' });
-      const input = createTestInput();
+      await expect(stage.process(createTestInput())).rejects.toThrow(/Branch error/);
 
-      // Files pass through untouched, and the reason is recorded rather than
-      // discarded.
+      // For an annotation-only run it degrades, as everything non-load-bearing does.
+      stage = new GitFilterStage({ gitStatus: true, basePath: '/project' });
+      const input = createTestInput();
       const result = await stage.process(input);
       expect(result.files).toBe(input.files);
       expect(result.stats.degradations).toHaveLength(1);

@@ -98,7 +98,98 @@ const ERROR_CODES = Object.freeze({
   SECRETS_DETECTED: 'ERR_SECRETS_DETECTED',
   /** A symlink resolved outside the real repository root */
   SYMLINK_OUTSIDE_ROOT: 'ERR_SYMLINK_OUTSIDE_ROOT',
+  /** More than one output destination was requested */
+  DESTINATION_CONFLICT: 'ERR_DESTINATION_CONFLICT',
+  /** Two options that cannot be combined were both supplied */
+  OPTION_CONFLICT: 'ERR_OPTION_CONFLICT',
+  /** An option requires another option that was not supplied */
+  OPTION_REQUIRES: 'ERR_OPTION_REQUIRES',
+  /** A removed option was supplied; the error names its replacement */
+  DEPRECATED_OPTION: 'ERR_DEPRECATED_OPTION',
+  /** A named file-selection profile could not be found */
+  PROFILE_NOT_FOUND: 'ERR_PROFILE_NOT_FOUND',
+  /** A requested policy check failed (`--fail-empty`, `--strict`, ...) */
+  POLICY_FAILURE: 'ERR_POLICY_FAILURE',
+  /** An ignore file could not be read or parsed */
+  IGNORE_INVALID: 'ERR_IGNORE_INVALID',
 });
+
+/**
+ * Exit codes, as a stable contract.
+ *
+ * A caller scripting CopyTree needs to distinguish "you asked for something
+ * impossible" from "the disk went away" from "the check you requested failed".
+ * One non-zero code for all three forces them to parse messages.
+ *
+ * @readonly
+ * @enum {number}
+ */
+const EXIT_CODES = Object.freeze({
+  /** Success, including a valid empty selection unless policy says otherwise */
+  SUCCESS: 0,
+  /** Operational failure: I/O, formatting, Git, converters, clipboard under --strict */
+  OPERATIONAL: 1,
+  /** Usage or configuration error: invalid option, conflict, missing path, bad profile */
+  USAGE: 2,
+  /** A requested policy check failed */
+  POLICY: 3,
+  /** Cancelled by SIGINT */
+  CANCELLED: 130,
+});
+
+/** Error codes that mean "the command line or the configuration was wrong". */
+const USAGE_ERROR_CODES = new Set([
+  ERROR_CODES.INVALID_OPTION,
+  ERROR_CODES.INVALID_FORMAT,
+  ERROR_CODES.DESTINATION_CONFLICT,
+  ERROR_CODES.OPTION_CONFLICT,
+  ERROR_CODES.OPTION_REQUIRES,
+  ERROR_CODES.DEPRECATED_OPTION,
+  ERROR_CODES.PROFILE_NOT_FOUND,
+  ERROR_CODES.PATH_NOT_FOUND,
+  ERROR_CODES.NOT_A_DIRECTORY,
+  ERROR_CODES.SCOPE_OUTSIDE_ROOT,
+  ERROR_CODES.CONFIG_INVALID,
+  ERROR_CODES.IGNORE_INVALID,
+  'PROFILE_ERROR',
+  'VALIDATION_ERROR',
+  'CONFIG_ERROR',
+]);
+
+/**
+ * The process exit code an error should produce.
+ *
+ * @param {Error} error - The error being reported
+ * @returns {number} One of {@link EXIT_CODES}
+ */
+function exitCodeFor(error) {
+  const code = error?.code;
+  if (isAbortError(error)) return EXIT_CODES.CANCELLED;
+  // The secrets guard only throws when the caller asked it to (`--secrets
+  // fail`), so a detection is a policy check reporting back, not a machine
+  // failure. It keeps its own typed code for the SDK; only the exit code is
+  // shared with the other `--fail-*` checks.
+  if (code === ERROR_CODES.POLICY_FAILURE || code === ERROR_CODES.SECRETS_DETECTED) {
+    return EXIT_CODES.POLICY;
+  }
+  if (USAGE_ERROR_CODES.has(code)) return EXIT_CODES.USAGE;
+  return EXIT_CODES.OPERATIONAL;
+}
+
+/**
+ * A policy check the caller asked for, and which did not pass.
+ *
+ * Distinct from an operational failure on purpose: nothing went wrong with the
+ * machine. `--fail-empty` on an empty repository is CopyTree doing exactly what
+ * it was told, and exit code 3 says so.
+ */
+class PolicyError extends CopyTreeError {
+  constructor(message, policy, details = {}) {
+    super(message, ERROR_CODES.POLICY_FAILURE, { policy, ...details });
+    this.name = 'PolicyError';
+    this.policy = policy;
+  }
+}
 
 /**
  * Validation error
@@ -236,6 +327,20 @@ class SecretsDetectedError extends CopyTreeError {
 }
 
 /**
+ * Render a list of accepted values as an English phrase.
+ *
+ * @param {string[]} values - Accepted values
+ * @returns {string} e.g. `text, json or ndjson`
+ */
+
+/**
+ * The first non-empty line of a message.
+ *
+ * @param {string} message - Possibly multi-line text
+ * @returns {string|null} First line, or null when there is none
+ */
+
+/**
  * Turn an error into something a person can act on.
  *
  * Built from `error.code`, never from matching the message text: the codes are
@@ -249,6 +354,20 @@ class SecretsDetectedError extends CopyTreeError {
  * @returns {{status: string, title: string, subject: string|null, suggestion: string|null,
  *   code: string, details: Object}} A renderable description
  */
+function listPhrase(values) {
+  const list = [...values];
+  if (list.length <= 1) return list.join('');
+  return `${list.slice(0, -1).join(', ')} or ${list.at(-1)}`;
+}
+
+function firstLine(message) {
+  const line = String(message || '')
+    .split('\n')
+    .map((entry) => entry.trim())
+    .find((entry) => entry.length > 0);
+  return line ?? null;
+}
+
 function describeError(error, context = {}) {
   const code = error?.code || 'UNKNOWN_ERROR';
   const details = error?.details || {};
@@ -299,10 +418,15 @@ function describeError(error, context = {}) {
       return describe(error.message, null, details.suggestion || null);
 
     case ERROR_CODES.INVALID_FORMAT:
+      // The accepted set comes from the option that rejected the value, not
+      // from a list written here: `--format` on `plan` accepts a different set
+      // from `--format` on `copy`.
       return describe(
         'Unknown format',
         details.value || details.format || null,
-        'Choose xml, markdown, json, ndjson, sarif or tree',
+        details.accepted
+          ? `Choose ${listPhrase(details.accepted)}`
+          : details.suggestion || 'Choose xml, markdown, json, ndjson, sarif or tree',
       );
 
     case ERROR_CODES.CONFIG_INVALID:
@@ -326,8 +450,39 @@ function describeError(error, context = {}) {
       return describe(
         'No files matched',
         null,
-        'Check --scope, --filter and ignore rules; use --dry-run --explain for details',
+        'Check --scope, --include and ignore rules; run copytree plan . --explain for details',
       );
+
+    case ERROR_CODES.DESTINATION_CONFLICT:
+      // The message already names both offending flags, so repeating them as
+      // the subject would print the same fact twice.
+      return describe(
+        error.message,
+        null,
+        details.suggestion || 'Use exactly one of --reference, --clipboard, --stdout or --output',
+      );
+
+    case ERROR_CODES.OPTION_CONFLICT:
+    case ERROR_CODES.OPTION_REQUIRES:
+      return describe(error.message, details.value ?? null, details.suggestion || null);
+
+    case ERROR_CODES.DEPRECATED_OPTION:
+      // The message already names the option, so repeating it as the subject
+      // would print the same fact twice.
+      return describe(error.message, null, details.suggestion || null);
+
+    case ERROR_CODES.PROFILE_NOT_FOUND:
+      return describe(
+        `Profile not found: ${details.profile ?? details.value ?? ''}`.trim(),
+        details.searchPath || null,
+        "Run 'copytree inspect . --view profile' to list available profiles",
+      );
+
+    case ERROR_CODES.IGNORE_INVALID:
+      return describe(error.message, details.path || null, details.suggestion || null);
+
+    case ERROR_CODES.POLICY_FAILURE:
+      return describe(error.message, error.policy || null, details.suggestion || null);
 
     case ERROR_CODES.ABORTED:
       return describe('Cancelled', null, null);
@@ -342,6 +497,16 @@ function describeError(error, context = {}) {
           : error.message,
       );
     }
+
+    case 'GIT_ERROR':
+      // Git's stderr carries an advice block, and on some machines a toolchain
+      // warning above it. The first line is the failure; the rest is noise in a
+      // status line, and is available under --debug.
+      return describe(
+        `Git selection failed: ${error.operation ?? 'git'}`,
+        firstLine(error.message),
+        'Check the ref exists and that this directory is a Git repository',
+      );
 
     case 'PROFILE_ERROR':
       // The message already names the profile and what went wrong with it, so
@@ -482,7 +647,10 @@ export {
   ProfileError,
   InstructionsError,
   SecretsDetectedError,
+  PolicyError,
   ERROR_CODES,
+  EXIT_CODES,
+  exitCodeFor,
   createAbortError,
   isAbortError,
   describeError,

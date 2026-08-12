@@ -41,6 +41,26 @@ function cacheSegments(path) {
 const CONFIG_SOURCES = Object.freeze(['defaults', 'user']);
 
 /**
+ * The conventional per-user configuration directory for this platform.
+ *
+ * Data configuration lives here. The legacy `~/.copytree` directory is still
+ * read, with a warning, so nobody's setup breaks on upgrade.
+ *
+ * @returns {string} Absolute directory path
+ */
+export function defaultDataConfigPath() {
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    return path.join(appData, 'CopyTree');
+  }
+  if (process.platform === 'darwin') {
+    return path.join(os.homedir(), 'Library', 'Application Support', 'CopyTree');
+  }
+  const xdg = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+  return path.join(xdg, 'copytree');
+}
+
+/**
  * Hierarchical configuration loader.
  *
  * Everything resolves from the package directory and the explicit `basePath`
@@ -67,6 +87,12 @@ class ConfigManager {
     this.config = {};
     this.configPath = path.join(moduleDir, '../../config');
     this.userConfigPath = options.userConfigPath || path.join(os.homedir(), '.copytree');
+    // Data configuration, in the platform's conventional location. Preferred
+    // over the legacy directory because it is data rather than executable
+    // JavaScript: `~/.copytree/*.js` runs arbitrary code in the host process,
+    // which is inappropriate for an embedder and unreproducible for everyone.
+    this.dataConfigPath =
+      options.dataConfigPath || process.env.COPYTREE_DATA_CONFIG_PATH || defaultDataConfigPath();
 
     // Which sources contribute, in precedence order.
     const requested = Array.isArray(options.configSources) ? options.configSources : null;
@@ -264,47 +290,118 @@ class ConfigManager {
   }
 
   async loadUserConfig() {
-    if (!fs.existsSync(this.userConfigPath)) {
-      return;
-    }
-
-    const userConfigFiles = fs
-      .readdirSync(this.userConfigPath)
-      .filter((file) => file.endsWith('.js') || file.endsWith('.json'))
-      .sort();
-
     let loaded = 0;
 
-    for (const file of userConfigFiles) {
-      const configName = path.basename(file).replace(/\.(js|json)$/, '');
-      const filePath = path.join(this.userConfigPath, file);
-
-      try {
-        let userConfigData;
-        if (file.endsWith('.json')) {
-          userConfigData = fs.readJsonSync(filePath);
-        } else {
-          // Use dynamic import for ES modules
-          const moduleUrl = pathToFileURL(filePath).href + `?t=${Date.now()}`; // Add timestamp to bypass cache
-          const configModule = await import(moduleUrl);
-          userConfigData = configModule.default || configModule;
-        }
-
-        // Store user config for provenance tracking
-        this.userConfig[configName] = cloneDeep(userConfigData);
-
-        // Deep merge with existing config
-        this.config[configName] = merge({}, this.config[configName] || {}, userConfigData);
-        loaded++;
-      } catch (error) {
-        this._recordLoadError(`user:${configName}`, error);
-      }
-    }
+    // Legacy first, data configuration second, so a migrated setting wins over
+    // the file it was migrated from.
+    loaded += await this._loadLegacyUserConfig();
+    loaded += await this._loadDataConfig();
 
     // Set only once something actually loaded. The directory existing says
     // nothing: an empty ~/.copytree, or one whose every file failed to parse,
     // contributed no user configuration and should not report that it did.
     this.userConfigLoaded = loaded > 0;
+  }
+
+  /**
+   * Load `~/.copytree/*.{js,json}`.
+   *
+   * Retained for migration only. A `.js` file here is executed in the host
+   * process, which is why the replacement is data and why loading one says so.
+   *
+   * @returns {Promise<number>} How many files contributed
+   * @private
+   */
+  async _loadLegacyUserConfig() {
+    if (!fs.existsSync(this.userConfigPath)) return 0;
+
+    const files = fs
+      .readdirSync(this.userConfigPath)
+      .filter((file) => file.endsWith('.js') || file.endsWith('.json'))
+      .sort();
+
+    let loaded = 0;
+    for (const file of files) {
+      const configName = path.basename(file).replace(/\.(js|json)$/, '');
+      const filePath = path.join(this.userConfigPath, file);
+
+      try {
+        let data;
+        if (file.endsWith('.json')) {
+          data = fs.readJsonSync(filePath);
+        } else {
+          this._warn(
+            `Executable configuration is deprecated: ${filePath}. ` +
+              `Run 'copytree config migrate' to convert it to a data file.`,
+          );
+          const moduleUrl = `${pathToFileURL(filePath).href}?t=${Date.now()}`;
+          const configModule = await import(moduleUrl);
+          data = configModule.default || configModule;
+        }
+
+        this.userConfig[configName] = cloneDeep(data);
+        this.config[configName] = merge({}, this.config[configName] || {}, data);
+        this.configSources[configName] = filePath;
+        loaded += 1;
+      } catch (error) {
+        this._recordLoadError(`user:${configName}`, error);
+      }
+    }
+
+    return loaded;
+  }
+
+  /**
+   * Load data configuration from the platform's configuration directory.
+   *
+   * Accepts either one `config.yaml` carrying every section, or a file per
+   * section. Both are data: no module is imported and nothing is executed.
+   *
+   * @returns {Promise<number>} How many files contributed
+   * @private
+   */
+  async _loadDataConfig() {
+    if (!this.dataConfigPath || !fs.existsSync(this.dataConfigPath)) return 0;
+
+    const files = fs
+      .readdirSync(this.dataConfigPath)
+      .filter((file) => /\.(ya?ml|json)$/i.test(file))
+      .sort();
+
+    let loaded = 0;
+    for (const file of files) {
+      const filePath = path.join(this.dataConfigPath, file);
+      const stem = path.basename(file).replace(/\.(ya?ml|json)$/i, '');
+
+      try {
+        let data;
+        if (/\.json$/i.test(file)) {
+          data = fs.readJsonSync(filePath);
+        } else {
+          // Loaded on demand: most runs have no data configuration at all, and
+          // a YAML parser is a real import.
+          const { default: yaml } = await import('js-yaml');
+          data = yaml.load(fs.readFileSync(filePath, 'utf8')) || {};
+        }
+
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          throw new Error('configuration file must contain a mapping');
+        }
+
+        // `config.yaml` carries sections; `copytree.yaml` is one section.
+        const sections = stem === 'config' ? data : { [stem]: data };
+        for (const [section, value] of Object.entries(sections)) {
+          this.userConfig[section] = merge({}, this.userConfig[section] || {}, cloneDeep(value));
+          this.config[section] = merge({}, this.config[section] || {}, value);
+          this.configSources[section] = filePath;
+        }
+        loaded += 1;
+      } catch (error) {
+        this._recordLoadError(`data:${stem}`, error);
+      }
+    }
+
+    return loaded;
   }
 
   /**
@@ -610,12 +707,13 @@ class ConfigManager {
    * @private
    */
   _getConfigSource(path, value) {
-    // Check if value exists in user config
+    // Name the file, not just the tier. "user-config" is not enough to go and
+    // change a value, which is the only reason to ask where it came from.
     if (this._isFromUserConfig(path, value)) {
-      return 'user-config';
+      const section = String(path).split('.')[0];
+      return this.configSources[section] || 'user-config';
     }
 
-    // Default to default config
     return 'default';
   }
 

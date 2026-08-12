@@ -7,18 +7,14 @@ import path from 'path';
 import { withTempDir, settleFs } from '../helpers/tempfs.js';
 
 // Use dynamic imports for modules under test
-let Pipeline, FileDiscoveryStage, AlwaysIncludeStage, ProfileFilterStage;
+let Pipeline, FileDiscoveryStage;
 
 beforeAll(async () => {
   const pipelineModule = await import('../../src/pipeline/Pipeline.js');
   const fileDiscoveryStageModule = await import('../../src/pipeline/stages/FileDiscoveryStage.js');
-  const alwaysIncludeStageModule = await import('../../src/pipeline/stages/AlwaysIncludeStage.js');
-  const profileFilterStageModule = await import('../../src/pipeline/stages/ProfileFilterStage.js');
 
   Pipeline = pipelineModule.default;
   FileDiscoveryStage = fileDiscoveryStageModule.default;
-  AlwaysIncludeStage = alwaysIncludeStageModule.default;
-  ProfileFilterStage = profileFilterStageModule.default;
 });
 
 /**
@@ -240,8 +236,10 @@ describe('Force Include Integration Tests', () => {
     });
   });
 
-  describe('AlwaysIncludeStage integration', () => {
-    it('should mark force-included files and preserve through profile filters', async () => {
+  describe('force-include marking', () => {
+    // Exclusions are evaluated once, inside discovery, with force-includes
+    // applied afterwards. There is no second minimatch pass to survive.
+    it('should mark force-included files and survive a total exclusion', async () => {
       await withTempDir('alwaysinclude-preserve-through-filters', async (tempDir) => {
         await createTestFiles(tempDir);
 
@@ -252,12 +250,10 @@ describe('Force Include Integration Tests', () => {
           new FileDiscoveryStage({
             basePath: tempDir,
             patterns: ['**/*'],
+            excludes: ['**/*'], // Exclude everything
+            forceInclude: ['.example/**'],
             respectGitignore: false,
             includeHidden: false,
-          }),
-          new AlwaysIncludeStage(['.example/**']), // Mark immediately after discovery
-          new ProfileFilterStage({
-            exclude: ['**/*'], // Exclude everything
           }),
         ]);
 
@@ -290,13 +286,10 @@ describe('Force Include Integration Tests', () => {
         pipeline.through([
           new FileDiscoveryStage({
             basePath: tempDir,
-            patterns: ['**/*'],
+            patterns: ['*.js'], // Only include JS files
+            forceInclude: ['.example/**'],
             respectGitignore: false,
             includeHidden: false,
-          }),
-          new AlwaysIncludeStage(['.example/**']),
-          new ProfileFilterStage({
-            filter: ['*.js'], // Only include JS files
           }),
         ]);
 

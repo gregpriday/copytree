@@ -36,7 +36,7 @@ This XML document represents the directory structure and contents of a project, 
 
 ## Files
 
-<!-- copytree:file-begin path="@index.js" size=39 modified="<TIMESTAMP>" hash="sha256:743dbcff629be3ed2d9431d6873e090c0417632c75c19bd1edf3345054ac10b9" binary=false encoding="utf8" truncated=false -->
+<!-- copytree:file-begin path="@index.js" size=39 modified="<TIMESTAMP>" hash="sha256:743dbcff629be3ed2d9431d6873e090c0417632c75c19bd1edf3345054ac10b9" git="modified" binary=false encoding="utf8" truncated=false -->
 
 ### @index.js
 
@@ -48,7 +48,7 @@ This XML document represents the directory structure and contents of a project, 
 
 <!-- copytree:file-end path="@index.js" -->
 
-<!-- copytree:file-begin path="@README.md" size=15 modified="<TIMESTAMP>" hash="sha256:d4ad9c87725fe5e63d14298b274307d6723233b916d065a005d96dbfe4f44f17" binary=false encoding="utf8" truncated=false -->
+<!-- copytree:file-begin path="@README.md" size=15 modified="<TIMESTAMP>" hash="sha256:d4ad9c87725fe5e63d14298b274307d6723233b916d065a005d96dbfe4f44f17" git="unmodified" binary=false encoding="utf8" truncated=false -->
 
 ### @README.md
 
@@ -59,7 +59,7 @@ This XML document represents the directory structure and contents of a project, 
 
 <!-- copytree:file-end path="@README.md" -->
 
-<!-- copytree:file-begin path="@src/test.js" size=40 modified="<TIMESTAMP>" hash="sha256:f5c226999c18c0561a682d753a38652568e934baa38aefadad63b8cd7e8e0c95" binary=false encoding="utf8" truncated=false -->
+<!-- copytree:file-begin path="@src/test.js" size=40 modified="<TIMESTAMP>" hash="sha256:f5c226999c18c0561a682d753a38652568e934baa38aefadad63b8cd7e8e0c95" git="unmodified" binary=false encoding="utf8" truncated=false -->
 
 ### @src/test.js
 

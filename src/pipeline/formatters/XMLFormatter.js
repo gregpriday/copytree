@@ -7,10 +7,18 @@ import {
 import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
 
 class XMLFormatter {
-  constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
+  constructor({
+    stage,
+    addLineNumbers = false,
+    onlyTree = false,
+    includeMetadata = true,
+    reproducible = false,
+  } = {}) {
     this.stage = stage;
     this.addLineNumbers = addLineNumbers;
     this.onlyTree = onlyTree;
+    this.includeMetadata = includeMetadata;
+    this.reproducible = reproducible;
   }
 
   /**
@@ -29,7 +37,6 @@ class XMLFormatter {
 
   async format(input) {
     const chunks = [];
-    const generated = new Date().toISOString();
     const totalSize = this.stage.calculateTotalSize(input.files);
     const fileCount = input.files.filter((f) => f !== null).length;
 
@@ -44,7 +51,11 @@ class XMLFormatter {
     // Versioned so downstream prompts written against this shape can detect a
     // change instead of silently regressing.
     chunks.push(`    <ct:format>${OUTPUT_FORMAT_VERSIONS.xml}</ct:format>\n`);
-    chunks.push(`    <ct:generated>${generated}</ct:generated>\n`);
+    // A generation timestamp is the one field guaranteed to differ between two
+    // runs over an identical tree, so `--reproducible` omits it.
+    if (!this.reproducible) {
+      chunks.push(`    <ct:generated>${new Date().toISOString()}</ct:generated>\n`);
+    }
     chunks.push(`    <ct:fileCount>${fileCount}</ct:fileCount>\n`);
     chunks.push(`    <ct:totalSize>${totalSize}</ct:totalSize>\n`);
 
@@ -78,7 +89,9 @@ class XMLFormatter {
     }
 
     // Add directory structure to metadata
-    const directoryStructure = this.stage.generateDirectoryStructure(input.files);
+    const directoryStructure = this.includeMetadata
+      ? this.stage.generateDirectoryStructure(input.files)
+      : '';
     if (directoryStructure) {
       chunks.push(
         `    <ct:directoryStructure>${escapeXmlText(directoryStructure)}</ct:directoryStructure>\n`,
@@ -112,7 +125,7 @@ class XMLFormatter {
 
       let fileHeader = `    <ct:file path="@${escapeXmlAttribute(file.path)}" size="${escapeXmlAttribute(file.size)}"`;
 
-      if (file.modified) {
+      if (file.modified && this.includeMetadata && !this.reproducible) {
         const modifiedDate =
           file.modified instanceof Date ? file.modified : new Date(file.modified);
         fileHeader += ` modified="${modifiedDate.toISOString()}"`;
@@ -125,7 +138,7 @@ class XMLFormatter {
         }
       }
 
-      if (file.binaryCategory) {
+      if (file.binaryCategory && this.includeMetadata) {
         fileHeader += ` binaryCategory="${escapeXmlAttribute(file.binaryCategory)}"`;
       }
 

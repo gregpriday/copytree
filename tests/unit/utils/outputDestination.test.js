@@ -61,18 +61,33 @@ describe('extensionForFormat', () => {
 });
 
 describe('referenceFilePath', () => {
-  test('names the file after the directory being copied', () => {
-    // These accumulate in the system temp directory, and
-    // `copytree-1738xxxxxxx.xml` says nothing about where it came from.
-    expect(referenceFilePath('/repo/my-project', 'markdown')).toMatch(/my-project-\d+\.md$/);
+  // `<temp>/copytree/<project-slug>/<UTC-timestamp>-<short-hash>.<ext>`.
+  // Grouped per project, because these accumulate in a shared temp directory
+  // and `copytree-1738xxxxxxx.xml` says nothing about where it came from. The
+  // short hash is there because two copies of the same project inside the same
+  // millisecond is not hypothetical when a script loops.
+  test('groups the file under the project it came from', () => {
+    expect(referenceFilePath('/repo/my-project', 'markdown')).toMatch(
+      /\/copytree\/my-project\/\d{4}-\d{2}-\d{2}T[\d-]+Z-[0-9a-f]{8}\.md$/,
+    );
   });
 
   test('sanitises characters that are awkward in a filename', () => {
-    expect(referenceFilePath('/repo/My Project (v2)', 'xml')).toMatch(/my-project--v2--\d+\.xml$/);
+    expect(referenceFilePath('/repo/My Project (v2)', 'xml')).toMatch(
+      /\/copytree\/my-project--v2-\/[\dTZ-]+-[0-9a-f]{8}\.xml$/,
+    );
   });
 
   test('falls back to a generic name when there is no base path', () => {
-    expect(referenceFilePath(undefined, 'json')).toMatch(/copytree-\d+\.json$/);
+    expect(referenceFilePath(undefined, 'json')).toMatch(
+      /\/copytree\/copytree\/[\dTZ-]+-[0-9a-f]{8}\.json$/,
+    );
+  });
+
+  test('does not collide when called twice in the same millisecond', () => {
+    const first = referenceFilePath('/repo/my-project', 'xml');
+    const second = referenceFilePath('/repo/my-project', 'xml');
+    expect(first).not.toBe(second);
   });
 });
 

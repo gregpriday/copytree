@@ -62,7 +62,7 @@ To see what was generated instead of copying to clipboard:
 
 ```bash
 # Display output in terminal
-copytree --display
+copytree --stdout
 ```
 
 **Expected output format** (XML):
@@ -96,13 +96,13 @@ CopyTree supports multiple output formats:
 
 ```bash
 # JSON format
-copytree --format json --display
+copytree --format json --stdout
 
 # Markdown format
-copytree --format markdown --display
+copytree --format markdown --stdout
 
 # Tree view only (no file contents)
-copytree --format tree --display
+copytree --format tree --stdout
 ```
 
 ## Step 5: Save to a File
@@ -169,10 +169,10 @@ copytree --format markdown --output docs/project-structure.md
 
 ```bash
 # Only JavaScript files
-copytree --filter "**/*.js" --filter "**/*.jsx"
+copytree --include "**/*.js" --include "**/*.jsx"
 
 # Only docs
-copytree --filter "docs/**/*.md"
+copytree --include "docs/**/*.md"
 ```
 
 ## Understanding the Default Profile
@@ -210,7 +210,7 @@ Now that you've completed your first copy operation:
 ```bash
 # Basic copy
 copytree                                    # Copy to clipboard
-copytree --display                          # Show in terminal
+copytree --stdout                          # Show in terminal
 copytree --output file.xml                  # Save to file
 
 # Output formats
@@ -222,16 +222,16 @@ copytree --format tree                      # Tree only, no contents
 # File selection
 copytree --modified                         # Git modified files
 copytree --changed main                     # Changed vs branch
-copytree --filter "*.js"                    # Specific patterns
+copytree --include "*.js"                    # Specific patterns
 
 # Custom profiles
 copytree --profile myprofile                # Use custom profile
-copytree --profile myprofile --dry-run      # Preview profile selection
+copytree plan . --profile myprofile      # Preview profile selection
 
 # Configuration
-copytree config:validate                    # Check configuration
-copytree config:inspect                     # View active config
-copytree cache:clear                        # Clear caches
+copytree config validate                    # Check configuration
+copytree config show                     # View active config
+copytree cache clear                        # Clear caches
 ```
 
 ## Troubleshooting
@@ -251,7 +251,7 @@ The default profile might be too restrictive for your project. Try:
 
 ```bash
 # See what would be selected
-copytree --dry-run
+copytree plan .
 
 # Or create a custom profile (see the Profile Creation Guide)
 # https://github.com/gregpriday/copytree/blob/main/docs/profiles/first-profile.md
@@ -263,13 +263,13 @@ Limit the output size:
 
 ```bash
 # Limit to first N files
-copytree --head 100
+copytree --max-files 100
 
 # Use character limit per file
-copytree --char-limit 1000
+copytree --max-chars 1000
 
 # Use streaming for large projects
-copytree --stream --output large-project.xml
+copytree --stdout --output large-project.xml
 ```
 
 For more help, see the [Troubleshooting Guide](../usage/troubleshooting.md).

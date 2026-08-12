@@ -18,7 +18,7 @@ import Stage from '../Stage.js';
 import { walkWithIgnore } from '../../utils/ignoreWalker.js';
 import micromatch from 'micromatch';
 import fastGlob from 'fast-glob';
-import ignore from 'ignore';
+import { createMatcher } from '../../utils/ignoreMatcher.js';
 import path from 'path';
 import { promises as fsp } from 'node:fs';
 import { getLimiterFor } from '../../utils/taskLimiter.js';
@@ -73,8 +73,20 @@ class FileDiscoveryStage extends Stage {
     this.basePath = options.basePath || process.cwd();
     this.patterns = options.patterns || ['**/*'];
     this.respectGitignore = options.respectGitignore !== false;
-    this.forceInclude = options.forceInclude || [];
+    // The patterns the caller supplied. `process()` derives the effective set
+    // from these plus the configured dotfile force-includes plus
+    // `.copytreeinclude`, and must derive it fresh each time: a stage that
+    // accumulated them across two runs would force-include the union of both.
+    this.declaredForceInclude = options.forceInclude || [];
+    this.forceInclude = [...this.declaredForceInclude];
+    // Two exclusion sources, kept apart because they sit at different heights
+    // in the precedence stack: a profile's rules, then the caller's, which have
+    // the last word over every ignore file in the tree.
+    this.profileExcludes = options.profileExcludes || [];
     this.excludes = options.excludes || [];
+    // CLI include globs narrow the profile's include set rather than replacing
+    // it. A caller who wants the profile out of the way says --no-profile.
+    this.includes = options.includes || [];
 
     // Scoped traversal (R1)
     this.scope = Array.isArray(options.scope)
@@ -83,6 +95,11 @@ class FileDiscoveryStage extends Stage {
         ? [options.scope]
         : [];
     this.scopeIgnoresIgnoreFiles = options.scopeIgnoresIgnoreFiles === true;
+    // The candidate baseline `ignore context` needs: everything Git and the
+    // built-in defaults already remove, but not `.copytreeignore` — so the
+    // areas a rule might want to exclude are all still visible. Affects the
+    // ignore file only; `.copytreeinclude` is an inclusion and always applies.
+    this.skipCopytreeIgnore = options.skipCopytreeIgnore === true;
     this.scopeIgnoresConfigExcludes = options.scopeIgnoresConfigExcludes === true;
 
     // Budgets applied from stat(), before any file is opened
@@ -93,14 +110,16 @@ class FileDiscoveryStage extends Stage {
     this.extFilter = options.extFilter || null; // e.g. ['.js', '.ts']
     this.maxDepth =
       options.maxDepth !== undefined && options.maxDepth !== null ? options.maxDepth : null;
-    this.minSizeBytes =
-      options.minSizeBytes !== undefined && options.minSizeBytes !== null
-        ? options.minSizeBytes
-        : null;
-    this.maxSizeBytes =
-      options.maxSizeBytes !== undefined && options.maxSizeBytes !== null
-        ? options.maxSizeBytes
-        : null;
+
+    /**
+     * Every ignore source that took part, in evaluation order.
+     *
+     * Populated during the walk and handed downstream, because `inspect --view
+     * rules` and `explain` both need to name the sources and the order they
+     * were applied in, and reconstructing that after the fact means building
+     * the layer stack a second time.
+     */
+    this.activeRuleSources = [];
   }
 
   async process(input) {
@@ -113,29 +132,61 @@ class FileDiscoveryStage extends Stage {
     const startTime = Date.now();
 
     const explain = Boolean(this.options.explain || input.options?.explain);
+    const retention = this.options.decisionRetention || input.options?.decisionRetention || null;
     const report = new ExclusionReport({
       explain,
-      topN: this.config.get('copytree.exclusionReport.topN', 50),
+      retention: retention?.mode,
+      maxEntries: retention?.maxEntries,
+      topN: retention?.limit ?? this.config.get('copytree.exclusionReport.topN', 50),
     });
 
-    // Merge config forceIncludeDotfiles with runtime forceInclude
-    const configForceIncludes = this.config.get('copytree.forceIncludeDotfiles', []);
-    const forceIncludePatterns = [...this.forceInclude, ...configForceIncludes];
-    this.forceInclude = forceIncludePatterns;
+    // Rebuilt from the declared patterns, not appended to whatever the last
+    // run left behind, and the compiled matchers go with it.
+    this.forceInclude = [
+      ...this.declaredForceInclude,
+      ...this.config.get('copytree.forceIncludeDotfiles', []),
+    ];
+    this._forceIncludeMatcher = null;
+    this._includeMatcher = null;
+    this._cliIncludeMatcher = null;
 
     // .copytreeinclude has the highest precedence of all: load it before
     // building layers so gate overrides know about it.
+    //
+    // Loaded even when `.copytreeignore` is being skipped. The two files are
+    // opposites — one excludes, one force-includes — and the candidate baseline
+    // an ignore report is built from is defined by which *exclusions* are off.
+    // Coupling them made the baseline and the ignore-file-only plan differ by
+    // two things at once, so the difference was no longer attributable.
     await this.loadCopytreeInclude();
 
     const initialLayers = await this.buildInitialLayers(input);
+    const finalLayers = this.buildFinalLayers();
+    const describeLayer = (position) => (layer) => ({
+      kind: layer.kind,
+      source: layer.source,
+      ruleCount: Array.isArray(layer.rules) ? layer.rules.length : 0,
+      position,
+    });
+    // Nested ignore files sit between these two groups. They are discovered as
+    // the walker descends, so the list is completed after the walk; a single
+    // placeholder row was not an answer to "which rules are in force".
+    this.activeRuleSources = [
+      ...initialLayers.map(describeLayer('initial')),
+      ...finalLayers.map(describeLayer('final')),
+    ];
+    /** @type {Map<string, {kind: string, source: string, ruleCount: number}>} */
+    this.nestedRuleSources = new Map();
 
     // Ignore file names layered at every directory depth. Later names win, so a
     // `.copytreeignore` rule beats a conflicting `.gitignore` rule.
-    const ignoreFileNames = this.respectGitignore
-      ? this.config.get('copytree.gitignore.nested', true)
-        ? ['.gitignore', '.copytreeignore']
+    const ignoreFileNames = (
+      this.respectGitignore
+        ? this.config.get('copytree.gitignore.nested', true)
+          ? ['.gitignore', '.copytreeignore']
+          : ['.copytreeignore']
         : ['.copytreeignore']
-      : ['.copytreeignore'];
+    ).filter((name) => !(this.skipCopytreeIgnore && name === '.copytreeignore'));
 
     // Resolve the scope selection before walking so path errors surface early.
     const scopePaths =
@@ -160,10 +211,22 @@ class FileDiscoveryStage extends Stage {
     const discoveredFiles = [];
     const walkOptions = {
       ignoreFileNames,
+      // Every nested ignore file the walk actually reads, so `inspect --view
+      // rules` can name them instead of describing them.
+      onIgnoreFile: (layer) => {
+        if (this.nestedRuleSources.has(layer.source)) return;
+        this.nestedRuleSources.set(layer.source, {
+          kind: layer.kind,
+          source: layer.source,
+          ruleCount: Array.isArray(layer.rules) ? layer.rules.length : 0,
+          position: 'nested',
+        });
+      },
       includeDirectories: false,
       followSymlinks: this.options.followSymlinks === true,
       explain,
       initialLayers,
+      finalLayers,
       // The three retry settings the walkers actually read, and nothing else.
       // This was `this.config.all()`, which deep-clones the entire merged
       // configuration — including the exclusion lists, which are the largest
@@ -230,6 +293,18 @@ class FileDiscoveryStage extends Stage {
         continue;
       }
 
+      // CLI include globs are an additional narrowing condition: a file has to
+      // match at least one of them, on top of whatever the profile allowed.
+      if (this.includes.length > 0 && !this.matchesCliIncludes(relativePath)) {
+        report.add({
+          path: relativePath,
+          size: fileSize,
+          reason: EXCLUSION_REASONS.FILTER_PATTERN,
+          rule: `include:${this.includes.join(', ')}`,
+        });
+        continue;
+      }
+
       // Apply extension filter (--ext)
       if (this.extFilter && this.extFilter.length > 0) {
         const ext = path.extname(relativePath).toLowerCase();
@@ -242,26 +317,6 @@ class FileDiscoveryStage extends Stage {
           });
           continue;
         }
-      }
-
-      // Apply size filters (--min-size, --max-size)
-      if (this.minSizeBytes !== null && fileSize < this.minSizeBytes) {
-        report.add({
-          path: relativePath,
-          size: fileSize,
-          reason: EXCLUSION_REASONS.FILTER_PATTERN,
-          rule: `min-size:${this.minSizeBytes}`,
-        });
-        continue;
-      }
-      if (this.maxSizeBytes !== null && fileSize > this.maxSizeBytes) {
-        report.add({
-          path: relativePath,
-          size: fileSize,
-          reason: EXCLUSION_REASONS.FILTER_PATTERN,
-          rule: `max-size:${this.maxSizeBytes}`,
-        });
-        continue;
       }
 
       // Hard size gate, decided from stat(). `always` / .copytreeinclude is the
@@ -296,6 +351,8 @@ class FileDiscoveryStage extends Stage {
       report.remove(entry.path);
     }
 
+    // Forced entries last, so a file that was both discovered normally and
+    // force-included keeps the `alwaysInclude` mark.
     const merged = [...discoveredFiles, ...forcedEntries];
     const byPath = new Map(merged.map((f) => [f.path, f]));
     const finalFiles = [...byPath.values()];
@@ -303,8 +360,6 @@ class FileDiscoveryStage extends Stage {
     const filterDesc = [
       this.extFilter ? `ext: ${this.extFilter.join(',')}` : null,
       this.maxDepth !== null ? `max-depth: ${this.maxDepth}` : null,
-      this.minSizeBytes !== null ? `min-size: ${this.minSizeBytes}B` : null,
-      this.maxSizeBytes !== null ? `max-size: ${this.maxSizeBytes}B` : null,
       this.sizeGate !== null ? `size-gate: ${this.sizeGate}B` : null,
       scopePaths
         ? `scope: ${scopePaths.length} entr${scopePaths.length === 1 ? 'y' : 'ies'}`
@@ -323,6 +378,14 @@ class FileDiscoveryStage extends Stage {
       basePath: this.basePath,
       files: finalFiles,
       exclusionReport: report,
+      // Initial layers, then the nested files the walk found, then the layers
+      // that get the last word — evaluation order, which is the only order in
+      // which the list means anything.
+      ruleSources: [
+        ...this.activeRuleSources.filter((entry) => entry.position === 'initial'),
+        ...this.nestedRuleSources.values(),
+        ...this.activeRuleSources.filter((entry) => entry.position === 'final'),
+      ],
       stats: {
         ...input.stats,
         totalFiles: discoveredFiles.length,
@@ -370,7 +433,7 @@ class FileDiscoveryStage extends Stage {
 
     layers.push({
       base: this.basePath,
-      ig: ignore().add(dedupe(configRules)),
+      ig: createMatcher(dedupe(configRules)),
       kind: 'config-exclude',
       source: 'config:copytree.globalExcluded*',
       rules: dedupe(configRules),
@@ -388,7 +451,7 @@ class FileDiscoveryStage extends Stage {
 
     layers.push({
       base: this.basePath,
-      ig: ignore().add(hardRules),
+      ig: createMatcher(hardRules),
       kind: 'hard-exclude',
       source: 'builtin:always-excluded',
       rules: hardRules,
@@ -398,7 +461,7 @@ class FileDiscoveryStage extends Stage {
     if (input.options?.tests === false) {
       layers.push({
         base: this.basePath,
-        ig: ignore().add(TEST_EXCLUSIONS),
+        ig: createMatcher(TEST_EXCLUSIONS),
         kind: 'test-exclude',
         source: 'option:--no-tests',
         rules: TEST_EXCLUSIONS,
@@ -419,7 +482,7 @@ class FileDiscoveryStage extends Stage {
       for (const source of sources) {
         layers.push({
           base: this.basePath,
-          ig: ignore().add(source.rules),
+          ig: createMatcher(source.rules),
           kind: source.kind,
           source: source.path,
           rules: source.rules,
@@ -435,13 +498,41 @@ class FileDiscoveryStage extends Stage {
       }
     }
 
-    // 4. Caller-supplied excludes. Kept as their own layer so exclusion
-    //    accounting can attribute them, and re-applied later by
-    //    ProfileFilterStage so they have the final say over ignore negations.
+    return layers;
+  }
+
+  /**
+   * The layers that get the last word.
+   *
+   * Profile exclusions, then caller exclusions. They are evaluated after every
+   * nested `.gitignore` and `.copytreeignore`, which is the whole point: an
+   * `--exclude 'docs/'` that a `!docs/keep.md` deep in the tree could overturn
+   * would not be an exclusion, it would be a suggestion.
+   *
+   * This also replaces the second, minimatch-based application of the same
+   * patterns that used to happen downstream. One language, one evaluator, one
+   * pass — so anchoring, dotfiles, directory rules and negation cannot mean two
+   * different things depending on which stage looked at them.
+   *
+   * @returns {Array} Ordered final layers
+   */
+  buildFinalLayers() {
+    const layers = [];
+
+    if (this.profileExcludes.length > 0) {
+      layers.push({
+        base: this.basePath,
+        ig: createMatcher(this.profileExcludes),
+        kind: 'profile-exclude',
+        source: 'profile:exclude',
+        rules: this.profileExcludes,
+      });
+    }
+
     if (this.excludes.length > 0) {
       layers.push({
         base: this.basePath,
-        ig: ignore().add(this.excludes),
+        ig: createMatcher(this.excludes),
         kind: 'option-exclude',
         source: 'option:--exclude',
         rules: this.excludes,
@@ -485,6 +576,19 @@ class FileDiscoveryStage extends Stage {
       this._includeMatcher = micromatch.matcher(this.patterns);
     }
     return this._includeMatcher(relativePath);
+  }
+
+  /**
+   * Whether a path satisfies the CLI include globs.
+   *
+   * @param {string} relativePath - POSIX path relative to the base path
+   * @returns {boolean} Whether the path matches at least one CLI include
+   */
+  matchesCliIncludes(relativePath) {
+    if (!this._cliIncludeMatcher) {
+      this._cliIncludeMatcher = micromatch.matcher(this.includes, { dot: true });
+    }
+    return this._cliIncludeMatcher(relativePath);
   }
 
   /**
@@ -556,6 +660,23 @@ class FileDiscoveryStage extends Stage {
       const entryPath = toPosix(entry.path || entry);
       const size = entry.stats?.size || 0;
 
+      // Force inclusion overrides *exclusions* — ignore files, profile and CLI
+      // excludes, the hidden-file default, the size gate. It does not override
+      // an inclusion selector: `--include '**/*.ts'` is the caller narrowing
+      // what they asked for, and a force-include that survived it would make
+      // the flag advisory. Profile includes are deliberately not applied here,
+      // which is what lets `.copytreeinclude` reach a hidden file a profile's
+      // include list would never have matched.
+      if (this.includes.length > 0 && !this.matchesCliIncludes(entryPath)) {
+        report?.add({
+          path: entryPath,
+          size,
+          reason: EXCLUSION_REASONS.FILTER_PATTERN,
+          rule: `include:${this.includes.join(', ')}`,
+        });
+        continue;
+      }
+
       // `always` overrides ignore rules; it does not override the hard
       // exclusions. Packed objects and refs are not source, and are never what
       // a pattern like `.git/**` or a broad `**/config*` actually meant.
@@ -609,6 +730,11 @@ class FileDiscoveryStage extends Stage {
         size,
         modified: entry.stats?.mtime || null,
         stats: entry.stats,
+        // Marked here, at the decision, rather than re-derived by a later stage
+        // with a different matcher against a pattern list that never included
+        // `.copytreeinclude`. Downstream stages — the Git filter especially —
+        // need to know a file was demanded, not merely selected.
+        alwaysInclude: true,
       });
     }
 
@@ -661,7 +787,7 @@ class FileDiscoveryStage extends Stage {
 
       return {
         base: this.basePath,
-        ig: ignore().add(rules),
+        ig: createMatcher(rules),
         kind: 'gitignore',
         source: gitignorePath,
         rules,

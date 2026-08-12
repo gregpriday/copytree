@@ -62,10 +62,10 @@ gitleaks version
 
 ```bash
 # Explicitly enable (default)
-copytree --secrets-guard
+copytree --secrets redact
 
 # Disable for trusted repos
-copytree --no-secrets-guard
+copytree --secrets off
 ```
 
 ### Redaction Modes
@@ -74,15 +74,15 @@ Choose how secrets are marked:
 
 ```bash
 # Typed mode (default) - shows secret type
-copytree --secrets-redact-mode typed
+copytree --redaction typed
 # Output: ***REDACTED:AWS-ACCESS-KEY***
 
 # Generic mode - simple marker
-copytree --secrets-redact-mode generic
+copytree --redaction generic
 # Output: ***REDACTED***
 
 # Hash mode - includes hash for debugging
-copytree --secrets-redact-mode hash
+copytree --redaction hash
 # Output: ***REDACTED:AWS-ACCESS-KEY:a3f5d9ab***
 ```
 
@@ -91,7 +91,7 @@ copytree --secrets-redact-mode hash
 Fail the build if secrets are found:
 
 ```bash
-copytree --fail-on-secrets
+copytree --secrets fail
 ```
 
 Exit code will be non-zero if any secrets are detected, making it perfect for CI/CD pipelines.
@@ -261,18 +261,18 @@ gitleaks: {
 # Default: enabled, redacts inline with typed markers
 copytree
 
-# View only files that would be excluded
-copytree --dry-run
+# Preview the selection without reading a byte of content
+copytree plan .
 ```
 
 ### Development Workflow
 
 ```bash
 # Working with trusted internal repo
-copytree --no-secrets-guard
+copytree --secrets off
 
 # Sharing code with AI (paranoid mode)
-copytree --secrets-redact-mode generic --fail-on-secrets
+copytree --redaction generic --secrets fail
 ```
 
 ### CI/CD Pipeline
@@ -280,12 +280,12 @@ copytree --secrets-redact-mode generic --fail-on-secrets
 ```yaml
 # GitHub Actions
 - name: Check for secrets
-  run: copytree --fail-on-secrets --dry-run
+  run: copytree . --secrets fail --no-content
 
 # GitLab CI
 secrets_check:
   script:
-    - copytree --fail-on-secrets --format json -o report.json
+    - copytree --secrets fail --format json -o report.json
   artifacts:
     paths:
       - report.json

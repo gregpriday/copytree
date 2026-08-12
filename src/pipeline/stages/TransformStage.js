@@ -17,6 +17,9 @@ class TransformStage extends Stage {
     this.transformerConfig = options.transformers || {};
     this.maxConcurrency = options.maxConcurrency || appConfig.maxConcurrency || 5;
     this.noCache = options.noCache;
+    // An explicit request for conversion (`--binary convert`) outranks the
+    // heuristic that decides whether a registry is worth building.
+    this.force = options.force === true;
     this.cacheEnabled = options.cacheEnabled ?? true;
     this._cache = options.cache ?? null;
   }
@@ -52,7 +55,7 @@ class TransformStage extends Stage {
     // is wanted, and gets it. The skip applies to the factory form, where the
     // whole point is to avoid building one.
     if (!this.registry) {
-      if (!this.registryFactory || !this.hasWorkToDo(files)) {
+      if (!this.registryFactory || (!this.force && !this.hasWorkToDo(files))) {
         this.log('No files require transformation, skipping', 'debug');
         return input;
       }

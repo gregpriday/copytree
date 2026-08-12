@@ -41,6 +41,13 @@ class OutputFormattingStage extends Stage {
       this.config.get('copytree.addLineNumbers', false);
     this.lineNumberFormat = this.config.get('copytree.lineNumberFormat', '%4d: ');
     this.onlyTree = options.onlyTree || false;
+    // Optional per-entry metadata: modification times, binary categories, the
+    // rendered directory structure. On by default; `--no-metadata` strips it
+    // while leaving the schema and version fields every consumer parses.
+    this.includeMetadata = options.includeMetadata !== false;
+    // `--reproducible` removes the fields that differ between two runs over an
+    // identical tree, so a golden file can be compared byte for byte.
+    this.reproducible = options.reproducible === true;
   }
 
   /**
@@ -80,6 +87,8 @@ class OutputFormattingStage extends Stage {
         stage: this,
         addLineNumbers: this.addLineNumbers,
         onlyTree: this.onlyTree,
+        includeMetadata: this.includeMetadata,
+        reproducible: this.reproducible,
       });
       output = await formatter.format(input);
     } else {
@@ -108,11 +117,13 @@ class OutputFormattingStage extends Stage {
         // `metadata.format` to detect a schema change read `undefined` and
         // concluded nothing had changed.
         format: OUTPUT_FORMAT_VERSIONS.json,
-        generated: new Date().toISOString(),
+        ...(this.reproducible ? {} : { generated: new Date().toISOString() }),
         fileCount: input.files.filter((f) => f !== null).length,
         totalSize: this.calculateTotalSize(input.files),
         profile: input.profile?.name || 'default',
-        directoryStructure: this.generateDirectoryStructure(input.files),
+        ...(this.includeMetadata
+          ? { directoryStructure: this.generateDirectoryStructure(input.files) }
+          : {}),
         ...(input.instructions && {
           instructions: input.instructions,
         }),
@@ -123,9 +134,9 @@ class OutputFormattingStage extends Stage {
           const fileObj = {
             path: file.path,
             size: file.size,
-            modified: file.modified,
+            ...(this.includeMetadata && !this.reproducible ? { modified: file.modified } : {}),
             isBinary: file.isBinary,
-            encoding: file.encoding,
+            ...(this.includeMetadata ? { encoding: file.encoding } : {}),
           };
 
           // Add content unless --only-tree is set
@@ -156,8 +167,8 @@ class OutputFormattingStage extends Stage {
     // Build tree structure
     const tree = this.buildTreeStructure(input.files);
 
-    // Render tree
-    this.renderTree(tree, lines, '', true);
+    // Per-file sizes are optional metadata; the tree itself is the payload.
+    this.renderTree(tree, lines, '', true, this.includeMetadata);
 
     // Add summary
     lines.push('');

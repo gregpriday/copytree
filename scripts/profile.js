@@ -45,7 +45,9 @@ if (await fs.pathExists(FIXTURES)) {
   targetPath = FIXTURES;
 } else {
   console.warn(`⚠️  Fixtures not found at: ${FIXTURES}`);
-  console.warn('    Falling back to project root (this will profile the entire repo and may be slow).');
+  console.warn(
+    '    Falling back to project root (this will profile the entire repo and may be slow).',
+  );
   targetPath = ROOT;
 }
 

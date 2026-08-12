@@ -74,16 +74,28 @@ describe('Folder Profile Integration', () => {
       });
     });
 
-    it('gives CLI filter precedence over profile include', async () => {
+    // CLI includes narrow the profile's include set; they do not replace it.
+    // A caller who wants the profile out of the way says --no-profile. The old
+    // behaviour was a silent replacement nobody could infer from the flag name.
+    it('narrows the profile include set rather than replacing it', async () => {
       await withTempDir('folder-profile-filter-precedence', async (tmpDir) => {
         const testProjectDir = await createTestProject(tmpDir);
+        await fs.writeFile(
+          path.join(testProjectDir, '.copytree.yml'),
+          'include:\n  - "**/*.js"\n  - "**/*.md"\n',
+        );
+
+        const narrowed = await copyWithFolderProfile(testProjectDir, { filter: ['**/*.md'] });
+
+        expect(narrowed).toContain('README.md');
+        expect(narrowed).toContain('docs/guide.md');
+        expect(narrowed).not.toContain('index.js');
+
+        // An intersection that is empty is empty; the CLI selector cannot widen
+        // what the profile allowed.
         await fs.writeFile(path.join(testProjectDir, '.copytree.yml'), 'include:\n  - "**/*.js"\n');
-
-        const filePaths = await copyWithFolderProfile(testProjectDir, { filter: ['**/*.md'] });
-
-        expect(filePaths).toContain('README.md');
-        expect(filePaths).toContain('docs/guide.md');
-        expect(filePaths).not.toContain('index.js');
+        const disjoint = await copyWithFolderProfile(testProjectDir, { filter: ['**/*.md'] });
+        expect(disjoint).toEqual([]);
       });
     });
 

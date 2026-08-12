@@ -334,12 +334,12 @@ describe('Markdown formatter variants', () => {
     expect(instrEndIdx).toBeGreaterThan(instrBeginIdx);
   }, 30000);
 
-  test('markdown with --show-size', async () => {
+  test('markdown with --no-metadata', async () => {
     const { code, stdout, stderr } = await runCli([
       PROJECT,
       '--format',
       'markdown',
-      '--show-size',
+      '--no-metadata',
       '--display',
     ]);
 
@@ -347,8 +347,6 @@ describe('Markdown formatter variants', () => {
     expect(stderr).toBe('');
 
     const normalized = normalize(stdout, { projectRoot: PROJECT });
-    // --show-size is a no-op for Markdown (tree already includes sizes);
-    // golden should match base output
-    expect(normalized).toMatchGolden('markdown/with-show-size.md.golden');
+    expect(normalized).toMatchGolden('markdown/no-metadata.md.golden');
   }, 30000);
 });

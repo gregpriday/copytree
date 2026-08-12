@@ -63,7 +63,9 @@ import {
   readdir as readdirCb,
   readFile as readFileCb,
   realpath as realpathCb,
+  rename as renameCb,
   rm as rmCb,
+  rmdir as rmdirCb,
   stat as statCb,
   writeFile as writeFileCb,
 } from 'node:fs';
@@ -74,7 +76,9 @@ const mkdir = promisify(mkdirCb);
 const readdir = promisify(readdirCb);
 const readFile = promisify(readFileCb);
 const realpath = promisify(realpathCb);
+const rename = promisify(renameCb);
 const rm = promisify(rmCb);
+const rmdir = promisify(rmdirCb);
 const stat = promisify(statCb);
 const writeFile = promisify(writeFileCb);
 
@@ -197,6 +201,8 @@ export {
   realpath,
   realpathSync,
   remove,
+  rename,
+  rmdir,
   removeSync,
   rm,
   rmSync,
@@ -232,6 +238,8 @@ export default {
   realpath,
   realpathSync,
   remove,
+  rename,
+  rmdir,
   removeSync,
   rm,
   rmSync,

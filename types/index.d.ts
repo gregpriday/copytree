@@ -378,10 +378,19 @@ export interface ScanOptions {
    * target to be a git repository.
    */
   respectGitignore?: boolean;
-  /** Only git modified files */
+  /** Only git modified files (working tree and index) */
   modified?: boolean;
+  /**
+   * Only files staged for the next commit.
+   *
+   * Distinct from `modified`, which folds staged, unstaged and untracked work
+   * together. "What am I about to commit" is a different question.
+   */
+  staged?: boolean;
   /** Files changed since git ref */
   changed?: string;
+  /** Keep only these extensions, with or without a leading dot */
+  ext?: string | string[];
   /** Maximum directory depth */
   maxDepth?: number;
   /** Apply transformers */
@@ -1835,6 +1844,18 @@ export class InstructionsError extends CopyTreeError {}
 export class SecretsDetectedError extends CopyTreeError {}
 
 /**
+ * A policy check the caller asked for, and which did not pass.
+ *
+ * Distinct from an operational failure: nothing went wrong with the machine.
+ * `--fail-empty` on an empty repository is CopyTree doing exactly what it was
+ * told, and exit code 3 says so.
+ */
+export class PolicyError extends CopyTreeError {
+  /** The flag or check that failed */
+  policy: string;
+}
+
+/**
  * Stable, machine-readable error codes.
  *
  * Switch on `error.code` to pick a recovery action. Values never change once
@@ -1851,9 +1872,38 @@ export type ErrorCode =
   | 'ERR_ABORTED'
   | 'ERR_NO_FILES_MATCHED'
   | 'ERR_SECRETS_DETECTED'
-  | 'ERR_SYMLINK_OUTSIDE_ROOT';
+  | 'ERR_SYMLINK_OUTSIDE_ROOT'
+  | 'ERR_DESTINATION_CONFLICT'
+  | 'ERR_OPTION_CONFLICT'
+  | 'ERR_OPTION_REQUIRES'
+  | 'ERR_DEPRECATED_OPTION'
+  | 'ERR_PROFILE_NOT_FOUND'
+  | 'ERR_POLICY_FAILURE'
+  | 'ERR_IGNORE_INVALID';
 
 export const ERROR_CODES: Readonly<Record<string, ErrorCode>>;
+
+/**
+ * Process exit codes, as a stable contract.
+ *
+ * A caller scripting CopyTree needs to distinguish "you asked for something
+ * impossible" from "the disk went away" from "the check you requested failed".
+ */
+export const EXIT_CODES: Readonly<{
+  /** Success, including a valid empty selection unless policy says otherwise */
+  SUCCESS: 0;
+  /** Operational failure: I/O, formatting, Git, converters */
+  OPERATIONAL: 1;
+  /** Usage or configuration error */
+  USAGE: 2;
+  /** A requested policy check failed */
+  POLICY: 3;
+  /** Cancelled by SIGINT */
+  CANCELLED: 130;
+}>;
+
+/** The process exit code an error should produce. */
+export function exitCodeFor(error: unknown): number;
 
 /**
  * Create the canonical abort error: `name === 'AbortError'`, `code === 'ERR_ABORTED'`.

@@ -101,7 +101,7 @@ export default {
 | `sizeGate` | `--size-gate` | bytes \| false | 262144 | Per-file gate applied from `stat()`, before opening |
 | `maxTotalSize` | `--max-total-size` | bytes | 104857600 | Total size budget across all files |
 | `maxFileCount` | `--max-files` | number | 10000 | Maximum number of files |
-| `maxCharacterLimit` | `--char-limit` | chars | 2000000 | Character budget across all file content |
+| `maxCharacterLimit` | `--max-chars` | chars | 2000000 | Character budget across all file content |
 | `defaultProfile` | `--profile` | string | `default` | Default profile to use |
 | `respectGitignore` | N/A | boolean | `true` | Respect gitignore rules (see below) |
 | `gitignore.nested` | N/A | boolean | `true` | Read `.gitignore` at every depth, not just the root |
@@ -138,7 +138,7 @@ One documented order, lowest precedence to highest. Last match wins, as in git.
 6. Root `.copytreeignore`
 7. Nested `.copytreeignore` (deepest last)
 8. `--exclude` patterns
-9. `.copytreeinclude` / `--always` (highest: overrides everything above)
+9. `.copytreeinclude` / `--force-include` (highest: overrides everything above)
 
 All of this is plain filesystem reads. CopyTree never shells out to `git check-ignore` and never
 requires the target to be a git repository, so it works on a plain folder.
@@ -239,10 +239,10 @@ Check your effective configuration:
 
 ```bash
 # Validate syntax and values
-copytree config:validate
+copytree config validate
 
 # Show configuration with sources
-copytree config:inspect
+copytree config show
 ```
 
 **Example output**:
@@ -361,7 +361,7 @@ Use CLI flags for CI environments:
 
 ```bash
 # CI script
-copytree --profile ci-minimal --display
+copytree --profile ci-minimal --stdout
 ```
 
 ### Scenario 4: Personal Defaults
@@ -467,7 +467,7 @@ export default {
 See which settings are active and their sources:
 
 ```bash
-copytree config:inspect
+copytree config show
 ```
 
 ### Validate Configuration
@@ -475,7 +475,7 @@ copytree config:inspect
 Ensure configuration is valid:
 
 ```bash
-copytree config:validate
+copytree config validate
 ```
 
 ### Debug Configuration Loading
@@ -483,7 +483,7 @@ copytree config:validate
 Enable verbose logging:
 
 ```bash
-DEBUG=copytree:config copytree config:inspect
+DEBUG=copytree:config copytree config show
 ```
 
 ### Common Issues
@@ -494,7 +494,7 @@ Check YAML/JSON syntax:
 
 ```bash
 # Validate just the syntax
-copytree config:validate
+copytree config validate
 
 # Common issues:
 # - Incorrect indentation (YAML)
@@ -560,7 +560,7 @@ export default {
 
 ```bash
 # Try different settings without modifying config
-copytree --profile test-profile --display
+copytree --profile test-profile --stdout
 ```
 
 ### 4. Document Configuration Files
@@ -589,10 +589,10 @@ export default {
 
 ```bash
 # Check configuration is valid
-copytree config:validate
+copytree config validate
 
 # Inspect effective configuration
-copytree config:inspect
+copytree config show
 ```
 
 ## Related Documentation

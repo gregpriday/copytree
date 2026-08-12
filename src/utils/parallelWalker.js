@@ -41,6 +41,9 @@ import { EXCLUSION_REASONS } from './exclusionReport.js';
  * @param {boolean} [options.followSymlinks=false] - Whether to follow symbolic links
  * @param {boolean} [options.explain=false] - Include explanation for each decision
  * @param {Array} [options.initialLayers=[]] - Pre-existing ignore layers (e.g., config excludes)
+ * @param {Array} [options.finalLayers=[]] - Layers evaluated after every nested ignore file, so
+ *   profile and CLI exclusions outrank a negation written deep in the tree
+ * @param {Function} [options.onIgnoreFile] - Called with each nested ignore layer as it is read
  * @param {Object} [options.config] - Configuration object for retry settings
  * @param {number} [options.concurrency=5] - Maximum concurrent directory operations
  * @param {number} [options.highWaterMark] - Backpressure threshold (default: 2x concurrency)
@@ -60,6 +63,7 @@ export async function* walkParallel(root, options = {}) {
     followSymlinks = false,
     explain = false,
     initialLayers = [],
+    finalLayers = [],
     config = {},
     concurrency = 5,
     highWaterMark = concurrency * 2,
@@ -69,6 +73,7 @@ export async function* walkParallel(root, options = {}) {
     scopeIgnoresIgnoreFiles = false,
     scopeIgnoresConfigExcludes = false,
     onExclude = null,
+    onIgnoreFile = null,
   } = options;
 
   const ignoreNames =
@@ -303,8 +308,16 @@ export async function* walkParallel(root, options = {}) {
       }
     }
 
-    // Check if this path should be ignored
-    const decision = isIgnored(absPath, root, layers, isDir, explain);
+    // Check if this path should be ignored. The final layers are evaluated
+    // last and are not inherited, so they are appended per decision rather
+    // than accumulating once per directory.
+    const decision = isIgnored(
+      absPath,
+      root,
+      finalLayers.length > 0 ? [...layers, ...finalLayers] : layers,
+      isDir,
+      explain,
+    );
 
     if (isDir) {
       let queuedResult = null;
@@ -388,7 +401,9 @@ export async function* walkParallel(root, options = {}) {
     stats.directoriesScanned++;
 
     // Load ignore rules contributed by this directory (layered, later wins)
-    const nextLayers = [...layers, ...(await layersForDirectory(dir, ignoreNames, false))];
+    const dirLayers = await layersForDirectory(dir, ignoreNames, false);
+    for (const layer of dirLayers) onIgnoreFile?.(layer);
+    const nextLayers = [...layers, ...dirLayers];
 
     let entries;
     try {
@@ -441,6 +456,7 @@ export async function* walkParallel(root, options = {}) {
         initialLayers,
         scopeIgnoresIgnoreFiles,
         scopeIgnoresConfigExcludes,
+        finalLayers,
       );
 
       let entryStat;
@@ -467,7 +483,13 @@ export async function* walkParallel(root, options = {}) {
             reason: EXCLUSION_REASONS.GITIGNORE,
             rule: `ancestor excluded: ${toPosix(path.relative(root, prunedAt))}`,
           }
-        : isIgnored(absEntry, root, layers, isDir, explain);
+        : isIgnored(
+            absEntry,
+            root,
+            finalLayers.length > 0 ? [...layers, ...finalLayers] : layers,
+            isDir,
+            explain,
+          );
 
       if (decision.ignored) {
         if (isDir) stats.directoriesPruned++;

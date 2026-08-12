@@ -1,5 +1,6 @@
 import Stage from '../Stage.js';
 import GitUtils from '../../utils/GitUtils.js';
+import { GitError } from '../../utils/errors.js';
 import { toPosix } from '../../utils/pathUtils.js';
 import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 
@@ -9,12 +10,41 @@ import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 class GitFilterStage extends Stage {
   constructor(options = {}) {
     super(options);
+    // Selecting by Git status is a narrowing request. If it cannot be applied,
+    // carrying on hands back the *whole* project — in CI, a full-repository
+    // context where a diff was expected, at a size and token count nothing
+    // about the run distinguishes from success. Annotating with `--git-status`
+    // is different: it is polish, and its absence changes no selection.
+    this.fatal = Boolean(options.modified || options.staged || options.changed);
     this.basePath = options.basePath || process.cwd();
     this.modified = options.modified || false;
+    this.staged = options.staged || false;
     this.changed = options.changed || null;
-    this.includeGitStatus = options.withGitStatus || false;
+    this.includeGitStatus = options.withGitStatus || options.gitStatus || false;
 
     this.gitUtils = new GitUtils(this.basePath);
+  }
+
+  /**
+   * What the caller asked for, in their own words.
+   * @returns {string} The flag that produced this stage
+   */
+  askedFor() {
+    if (this.modified) return '--modified';
+    if (this.staged) return '--staged';
+    if (this.changed) return `--changed ${this.changed}`;
+    return '--git-status';
+  }
+
+  /**
+   * The Git selection mode, as a stable label for reports and metadata.
+   * @returns {string|null} Mode label, or null when nothing is being filtered
+   */
+  gitModeLabel() {
+    if (this.modified) return 'modified';
+    if (this.staged) return 'staged';
+    if (this.changed) return `changed:${this.changed}`;
+    return null;
   }
 
   async process(input) {
@@ -25,7 +55,7 @@ class GitFilterStage extends Stage {
     }
 
     // Skip if no git filtering is requested
-    if (!this.modified && !this.changed && !this.includeGitStatus) {
+    if (!this.modified && !this.staged && !this.changed && !this.includeGitStatus) {
       return input;
     }
 
@@ -35,7 +65,14 @@ class GitFilterStage extends Stage {
     try {
       // Check if we're in a git repository
       if (!(await this.gitUtils.isGitRepository())) {
-        this.log('Not a git repository, skipping git filters', 'warn');
+        if (this.fatal) {
+          throw new GitError(
+            `${this.askedFor()} needs a Git repository, and ${this.basePath} is not one`,
+            'isGitRepository',
+            { basePath: this.basePath },
+          );
+        }
+        this.log('Not a git repository, skipping git status', 'warn');
         return input;
       }
 
@@ -46,13 +83,16 @@ class GitFilterStage extends Stage {
       if (this.modified) {
         gitFiles = await this.gitUtils.getModifiedFiles();
         this.log(`Found ${gitFiles.length} modified files`, 'debug');
+      } else if (this.staged) {
+        gitFiles = await this.gitUtils.getStagedFiles();
+        this.log(`Found ${gitFiles.length} staged files`, 'debug');
       } else if (this.changed) {
         gitFiles = await this.gitUtils.getChangedFiles(this.changed);
         this.log(`Found ${gitFiles.length} changed files since ${this.changed}`, 'debug');
       }
 
       // Filter files if git filtering is active
-      if (this.modified || this.changed) {
+      if (this.modified || this.staged || this.changed) {
         const gitFileSet = new Set(gitFiles.map((f) => toPosix(f)));
 
         const gitLimited = input.files.filter((file) => {
@@ -73,7 +113,7 @@ class GitFilterStage extends Stage {
                 path: file.path,
                 size: file.size || 0,
                 reason: EXCLUSION_REASONS.GIT_FILTER,
-                rule: this.modified ? 'modified' : `changed:${this.changed}`,
+                rule: this.gitModeLabel(),
               });
             }
           }
@@ -101,7 +141,7 @@ class GitFilterStage extends Stage {
         branch: await this.gitUtils.getCurrentBranch(),
         lastCommit: await this.gitUtils.getLastCommit(),
         hasUncommittedChanges: await this.gitUtils.hasUncommittedChanges(),
-        filterType: this.modified ? 'modified' : this.changed ? `changed:${this.changed}` : null,
+        filterType: this.gitModeLabel(),
       };
 
       this.log(`Git filtering completed in ${this.getElapsedTime(startTime)}`, 'info');
@@ -116,14 +156,13 @@ class GitFilterStage extends Stage {
         },
       };
     } catch (error) {
-      // Carrying on is right — a directory that is not a repository, or a git
-      // binary that is missing, should not stop a copy. Doing it silently is
-      // not: the caller asked for a subset and received everything, at a size
-      // and token count nothing about the run distinguished from success.
-      const asked = this.modified ? '--modified' : `--changed ${this.changed}`;
+      // A failed *selector* stops the run: see the constructor. A failed
+      // annotation does not, because nothing about the selection changes.
+      if (this.fatal) throw error;
+
       return this.degrade(
         input,
-        `${asked} could not be applied, so no files were filtered by git status: ${error.message}`,
+        `${this.askedFor()} could not be applied, so no git status was attached: ${error.message}`,
       );
     }
   }

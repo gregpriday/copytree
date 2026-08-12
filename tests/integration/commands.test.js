@@ -6,10 +6,26 @@ import path from 'path';
 import fs from 'fs-extra';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { promises as fsPromises } from 'fs';
+import os from 'os';
+import { mkdtempSync, rmSync } from 'fs';
 import { withTempDir, settleFs } from '../helpers/tempfs.js';
 
 // Jest/Babel compatibility: construct the test directory path
 const __dirname = path.join(process.cwd(), 'tests/integration');
+
+/**
+ * A HOME of this suite's own.
+ *
+ * `COPYTREE_CACHE_ENABLED` is not honoured — environment overrides were removed
+ * from the configuration system — so the cache path falls back to
+ * `~/.copytree/cache`. Without this, `copytree cache clear` in these tests
+ * deletes the cache of whoever is running them.
+ */
+const SANDBOX_HOME = mkdtempSync(path.join(os.tmpdir(), 'copytree-inttest-home-'));
+
+afterAll(() => {
+  rmSync(SANDBOX_HOME, { recursive: true, force: true });
+});
 
 // Helper to run CLI commands
 function runCommand(command, options = {}) {
@@ -19,8 +35,9 @@ function runCommand(command, options = {}) {
       NODE_PATH: path.join(__dirname, '../../node_modules'),
       // Set dummy API key for tests to avoid AI provider errors
       GEMINI_API_KEY: 'test-api-key-for-integration-tests',
-      // Disable cache to avoid side effects
-      COPYTREE_CACHE_ENABLED: 'false',
+      // A HOME the suite owns, so cache commands cannot reach the real one.
+      HOME: SANDBOX_HOME,
+      USERPROFILE: SANDBOX_HOME,
       // Disable transforms by default to avoid AI calls
       COPYTREE_NO_TRANSFORM: 'true',
     };
@@ -206,12 +223,13 @@ output:
         );
 
         expect(exitCode).toBe(0);
-        // A dry run is a preview: it selected, sorted and budgeted, but read
-        // and wrote nothing. The neutral status says so without claiming a
-        // success it did not achieve.
-        const output = stdout + stderr;
-        expect(output).toMatch(/Preview/);
-        expect(output).toMatch(/No content was read/);
+        // `--dry-run` is `plan` under its old name: it selects, sorts and
+        // budgets, and reads no file contents. The plan report is the requested
+        // payload, so it is on stdout, and the deprecation notice is feedback,
+        // so it is on stderr.
+        expect(stdout).toMatch(/Plan for/);
+        expect(stdout).toMatch(/No file contents were read/);
+        expect(stderr).toMatch(/--dry-run is deprecated/);
       });
     });
 
@@ -225,21 +243,48 @@ output:
   });
 
   describe('Cache Commands', () => {
-    test('cache:clear should clear cache', async () => {
-      const { stdout, exitCode } = await runCommand(`node "${cliPath}" cache:clear`);
+    test('cache clear reports what it removed', async () => {
+      const { stdout, exitCode } = await runCommand(`node "${cliPath}" cache clear`);
 
       expect(exitCode).toBe(0);
-      expect(stdout).toContain('Cache cleared');
+      expect(stdout).toMatch(/Cleared \d+ transformations entr/);
+    });
+
+    // The colon spelling still parses, and says what to use instead.
+    test('cache:clear still works as a deprecated alias', async () => {
+      const { stdout, stderr, exitCode } = await runCommand(`node "${cliPath}" cache:clear`);
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toMatch(/Cleared \d+ transformations entr/);
+      expect(stderr).toContain("'copytree cache:clear' is deprecated");
+    });
+
+    test('cache status reports location and size', async () => {
+      const { stdout, exitCode } = await runCommand(`node "${cliPath}" cache status`);
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain('Cache status');
+      expect(stdout).toContain('references');
     });
   });
 
   describe('Configuration Commands', () => {
-    test('config:validate should validate configuration', async () => {
-      const { stdout, exitCode } = await runCommand(`node "${cliPath}" config:validate`);
+    test('config validate reports each check and the verdict', async () => {
+      const { stdout, exitCode } = await runCommand(`node "${cliPath}" config validate`);
 
       expect(exitCode).toBe(0);
-      expect(stdout).toContain('Validating CopyTree Configuration');
+      expect(stdout).toContain('packaged defaults');
       expect(stdout).toContain('Configuration is valid');
+    });
+
+    test('config show names the source of each effective value', async () => {
+      const { stdout, exitCode } = await runCommand(
+        `node "${cliPath}" config show --section copytree --sources`,
+      );
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain('effective configuration');
+      expect(stdout).toContain('Source');
     });
   });
 
@@ -384,8 +429,8 @@ output:
         );
 
         expect(exitCode).toBe(0);
-        const output = stdout + stderr;
-        expect(output).toMatch(/Preview/);
+        expect(stdout).toMatch(/Plan for/);
+        expect(stderr).toMatch(/--dry-run is deprecated/);
         // Note: We can't easily test actual clipboard in CI, so we test dry-run
       });
     });

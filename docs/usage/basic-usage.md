@@ -28,7 +28,7 @@ copytree
 copytree /path/to/project
 
 # Copy and display in terminal
-copytree --display
+copytree --stdout
 ```
 
 ## Understanding Profiles
@@ -71,7 +71,7 @@ copytree --profile my-react
 copytree --profile api-docs
 
 # Preview profile selection
-copytree --profile api-docs --dry-run
+copytree plan . --profile api-docs
 ```
 
 ### Example Custom Profile Use Cases
@@ -90,13 +90,13 @@ Use glob patterns to select specific files:
 
 ```bash
 # Only JavaScript files
-copytree --filter "*.js"
+copytree --include "*.js"
 
 # Multiple patterns
-copytree --filter "*.js" --filter "*.jsx"
+copytree --include "*.js" --include "*.jsx"
 
 # Complex patterns
-copytree --filter "src/**/*.{js,ts}"
+copytree --include "src/**/*.{js,ts}"
 ```
 
 ### 2. Git-Based Selection
@@ -141,20 +141,20 @@ copytree --output snapshot.md --format markdown
 
 ```bash
 # Display in terminal
-copytree --display
+copytree --stdout
 
 # Display with syntax highlighting
-copytree --display --format tree
+copytree --stdout --format tree
 ```
 
 ### 4. Streaming
 
 ```bash
 # Stream output (for piping)
-copytree --stream | gzip > project.xml.gz
+copytree --stdout | gzip > project.xml.gz
 
 # Stream to another tool
-copytree --stream | some-analysis-tool
+copytree --stdout | some-analysis-tool
 ```
 
 ### 5. Instructions Control
@@ -267,7 +267,7 @@ copytree --modified
 copytree --changed main..feature/new-feature
 
 # Include git status
-copytree --with-git-status
+copytree --git-status
 ```
 
 ### 3. Documentation Generation
@@ -276,21 +276,21 @@ copytree --with-git-status
 # Copy for documentation
 copytree --profile docs-only
 
-# Copy with file info
-copytree --profile mycustom --show-size --with-line-numbers
+# Copy with rich metadata and line numbers
+copytree --profile mycustom --metadata --line-numbers
 
 # Tree structure only
-copytree --profile mycustom --only-tree
+copytree --profile mycustom --no-content
 ```
 
 ### 4. Debugging Support
 
 ```bash
 # Copy with line numbers
-copytree --with-line-numbers
+copytree --line-numbers
 
 # Dry run to see what would be copied
-copytree --dry-run
+copytree plan .
 ```
 
 ## Advanced Options
@@ -299,26 +299,23 @@ copytree --dry-run
 
 ```bash
 # Limit characters per file
-copytree --char-limit 5000
+copytree --max-chars 5000
 
 # Limit to first N files
-copytree --head 50
+copytree --max-files 50
 ```
 
 ### File Information
 
 ```bash
 # Include line numbers
-copytree --with-line-numbers
+copytree --line-numbers
 
-# Include file sizes
-copytree --show-size
+# Include git status for every selected file
+copytree --git-status
 
-# Include git status
-copytree --with-git-status
-
-# Show file info table
-copytree --info
+# Optional rich metadata is on by default; strip it down to the schema fields
+copytree --no-metadata
 ```
 
 ### Transformations
@@ -395,14 +392,14 @@ copytree --profile full
 copytree src/ --profile react
 
 # Limit number of files
-copytree --head 100
+copytree --max-files 100
 ```
 
 ### 3. Skip Unnecessary Processing
 
 ```bash
 # Skip cache for fresh results
-copytree --no-cache
+copytree --no-transform-cache
 ```
 
 ## Troubleshooting
@@ -411,7 +408,7 @@ copytree --no-cache
 
 ```bash
 # Dry run
-copytree --dry-run
+copytree plan .
 
 # Validate profile
 copytree --validate --profile myprofile
@@ -421,10 +418,10 @@ copytree --validate --profile myprofile
 
 ```bash
 # Check configuration
-copytree config:validate
+copytree config validate
 
 # Inspect configuration with provenance
-copytree config:inspect
+copytree config show
 ```
 
 ### Common Issues
@@ -432,7 +429,7 @@ copytree config:inspect
 1. **Nothing copied**: Check if files match profile rules
 2. **Too many files**: Use more specific profile or filters
 3. **Missing files**: Check .copytreeignore and gitignore
-4. **Slow performance**: Limit scope with `--head` or disable cache with `--no-cache`
+4. **Slow performance**: Limit scope with `--max-files` or bypass the transformation cache with `--no-transform-cache`
 
 ## Next Steps
 

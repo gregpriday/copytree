@@ -38,20 +38,16 @@ describe('Flags and combinations', () => {
     expect(normalized).toMatchGolden('flags/only-tree.xml.golden');
   }, 30000);
 
-  test('--info (file metadata)', async () => {
-    const { code, stdout, stderr } = await runCli([
-      PROJECT,
-      '--format',
-      'markdown',
-      '--info',
-      '--display',
-    ]);
+  test('--no-metadata (optional metadata stripped)', async () => {
+    const { code, stdout, stderr } = await runCli([PROJECT, '--no-metadata', '--display']);
 
     expect(code).toBe(0);
     expect(stderr).toBe('');
+    expect(stdout).not.toContain('modified=');
+    expect(stdout).toContain('<ct:format>');
 
     const normalized = normalize(stdout, { projectRoot: PROJECT });
-    expect(normalized).toMatchGolden('flags/info-block.md.golden');
+    expect(normalized).toMatchGolden('flags/no-metadata.xml.golden');
   }, 30000);
 
   test('--with-git-status (git status integration)', async () => {
@@ -115,12 +111,12 @@ describe('Flags and combinations', () => {
     expect(normalized).toMatchGolden('flags/json-with-line-numbers.golden');
   }, 30000);
 
-  test('--format markdown --info', async () => {
+  test('--format markdown --no-metadata', async () => {
     const { code, stdout, stderr } = await runCli([
       PROJECT,
       '--format',
       'markdown',
-      '--info',
+      '--no-metadata',
       '--display',
     ]);
 
@@ -128,7 +124,7 @@ describe('Flags and combinations', () => {
     expect(stderr).toBe('');
 
     const normalized = normalize(stdout, { projectRoot: PROJECT });
-    expect(normalized).toMatchGolden('flags/markdown-with-info.golden');
+    expect(normalized).toMatchGolden('flags/markdown-no-metadata.golden');
   }, 30000);
 
   test('--only-tree with XML format', async () => {
@@ -150,13 +146,15 @@ describe('Flags and combinations', () => {
     expect(normalized).toMatchGolden('flags/xml-only-tree.golden');
   }, 30000);
 
-  test('--show-size flag', async () => {
-    const { code, stdout, stderr } = await runCli([PROJECT, '--show-size', '--display']);
-
-    expect(code).toBe(0);
-    expect(stderr).toBe('');
-
-    const normalized = normalize(stdout, { projectRoot: PROJECT });
-    expect(normalized).toMatchGolden('flags/with-show-size.xml.golden');
+  // `--info` and `--show-size` were accepted and read by nothing: they set a
+  // value equal to its own default, so no output could ever differ. Removed,
+  // with the replacement named.
+  test('removed metadata flags name their replacement', async () => {
+    for (const flag of ['--info', '--show-size']) {
+      const { code, stderr } = await runCli([PROJECT, flag, '--display']);
+      expect(code).toBe(2);
+      expect(stderr).toContain(`${flag} has been removed`);
+      expect(stderr).toContain('--metadata');
+    }
   }, 30000);
 });

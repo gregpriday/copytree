@@ -1,10 +1,13 @@
 import Pipeline from '../pipeline/Pipeline.js';
 import { ValidationError, ERROR_CODES, createAbortError } from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
-import FolderProfileLoader from '../config/FolderProfileLoader.js';
 import { ProgressTracker } from '../utils/ProgressTracker.js';
 import { ExclusionReport } from '../utils/exclusionReport.js';
-import { resolveScope } from '../utils/scopeResolver.js';
+import {
+  buildSelectionStages,
+  loadSelectionProfile,
+  resolveBudgets,
+} from '../selection/selection.js';
 import path from 'path';
 import fs from '../utils/fsx.js';
 
@@ -207,94 +210,64 @@ export async function* scan(basePath, options = {}) {
     throw createAbortError('Scan aborted');
   }
 
-  // 1. Load Folder Profile (Fix: Use FolderProfileLoader with basePath)
-  const loader = new FolderProfileLoader({ cwd: resolvedPath });
-  let folderProfile = null;
-
-  // If a specific profile name is passed in options, load it; otherwise auto-discover
-  try {
-    if (options.profile) {
-      folderProfile = await loader.loadNamed(options.profile);
-    } else {
-      folderProfile = await loader.discover();
-    }
-  } catch (e) {
-    // If explicit profile failed, throw. If auto-discovery failed, ignore.
-    if (options.profile) throw e;
-  }
-
   // Create or use provided config instance for isolation
   const configInstance = options.config || (await ConfigManager.create());
 
-  // Build configuration from options and config defaults
-  const copytreeConfig = configInstance.get('copytree', {});
-
-  // 2. Build Profile Config (Merging Logic)
-  // Precedence: Options (API) > Folder Profile (.copytree.yml) > Global Defaults
-
-  // Helper to ensure array
   const toArray = (val) => (Array.isArray(val) ? val : val ? [val] : []);
 
-  const profile = {
-    // Include patterns
-    include: options.filter
-      ? toArray(options.filter)
-      : folderProfile?.include?.length > 0
-        ? folderProfile.include
-        : ['**/*'],
-
-    // Exclude patterns from the caller and the folder profile.
-    // Config-level exclusions (globalExcludedDirectories / globalExcludedFiles)
-    // are NOT merged here: FileDiscoveryStage applies them unconditionally, so
-    // the CLI and the programmatic API cannot drift apart.
-    exclude: [...toArray(options.exclude), ...(folderProfile?.exclude || [])],
-
-    // Filter patterns
-    filter: toArray(options.filter),
-
-    // Force-include patterns
-    always: [...toArray(options.always), ...toArray(folderProfile?.always)],
-
-    // Options merging
-    options: {
-      respectGitignore:
-        options.respectGitignore ??
-        folderProfile?.options?.respectGitignore ??
-        copytreeConfig.respectGitignore ??
-        true,
-      includeHidden:
-        options.includeHidden ??
-        folderProfile?.options?.includeHidden ??
-        copytreeConfig.includeHidden ??
-        false,
-      followSymlinks:
-        options.followSymlinks ??
-        folderProfile?.options?.followSymlinks ??
-        copytreeConfig.followSymlinks ??
-        false,
-      maxFileSize:
-        options.maxFileSize ?? folderProfile?.options?.maxFileSize ?? copytreeConfig.maxFileSize,
-      sizeGate: options.sizeGate ?? folderProfile?.options?.sizeGate ?? copytreeConfig.sizeGate,
-      maxTotalSize:
-        options.maxTotalSize ?? folderProfile?.options?.maxTotalSize ?? copytreeConfig.maxTotalSize,
-      maxFileCount:
-        options.maxFileCount ?? folderProfile?.options?.maxFileCount ?? copytreeConfig.maxFileCount,
-      charLimit: options.charLimit ?? folderProfile?.options?.charLimit,
-      maxDepth: options.maxDepth ?? folderProfile?.options?.maxDepth,
+  // The SDK speaks the same canonical request as the CLI, and builds its
+  // selection through the same engine. Two implementations of "which files get
+  // selected" is exactly the drift this module used to contain: an embedder and
+  // a shell user could hand CopyTree the same project and the same rules and
+  // get different files.
+  const request = {
+    operation: 'scan',
+    target: resolvedPath,
+    selection: {
+      profileName: typeof options.profile === 'string' ? options.profile : null,
+      profileDisabled: options.profile === false,
+      scopes: toArray(options.scope),
+      includes: toArray(options.filter),
+      excludes: toArray(options.exclude),
+      forceIncludes: toArray(options.always),
+      extensions: toArray(options.ext),
+      maxDepth: options.maxDepth ?? null,
+      noTests: options.tests === false,
+      git: options.modified
+        ? { mode: 'modified', ref: null }
+        : options.staged
+          ? { mode: 'staged', ref: null }
+          : options.changed
+            ? { mode: 'changed', ref: options.changed }
+            : null,
+      gitStatus: options.withGitStatus === true,
+      dedupe: options.dedupe === true,
+      scopeIncludeIgnored: options.scopeIgnoresIgnoreFiles === true,
+      scopeIncludeDefaultExcluded: options.scopeIgnoresConfigExcludes === true,
+      sort: options.sort || 'path',
+      order: options.sortOrder || 'asc',
     },
+    budgets: {
+      sizeGate: options.sizeGate ?? null,
+      maxTotalSize: options.maxTotalSize ?? null,
+      maxFiles: options.maxFileCount ?? null,
+      maxChars: options.charLimit ?? null,
+    },
+    content: { format: options.format ?? 'xml', includeContent: options.includeContent !== false },
   };
 
-  // Resolve the scope BEFORE the pipeline runs. The pipeline continues on stage
-  // errors by design, which would turn "that folder does not exist" into an
-  // empty result indistinguishable from "everything there is gitignored".
-  const scope = toArray(options.scope);
-  const scopeEntries =
-    scope.length > 0
-      ? await resolveScope(resolvedPath, scope, {
-          followSymlinks: profile.options.followSymlinks,
-        })
-      : [];
-  const scopePaths = scopeEntries.map((entry) => entry.absolutePath);
+  const profile = await loadSelectionProfile(resolvedPath, request.selection);
+  const budgets = resolveBudgets(request, profile, configInstance);
+
+  // Caller-supplied overrides that the profile does not carry.
+  if (options.respectGitignore !== undefined)
+    profile.options.respectGitignore = options.respectGitignore;
+  if (options.includeHidden !== undefined) profile.options.includeHidden = options.includeHidden;
+  if (options.followSymlinks !== undefined) profile.options.followSymlinks = options.followSymlinks;
+  if (options.maxFileSize !== undefined)
+    budgets.hardFileLimit = { value: options.maxFileSize, source: 'cli' };
+
+  const charLimit = request.budgets.maxChars ?? profile.options.charLimit ?? null;
 
   // Create pipeline with stages and pass config instance for isolation
   const pipeline = new Pipeline({
@@ -307,78 +280,16 @@ export async function* scan(basePath, options = {}) {
     quiet: options.quiet !== false,
   });
 
-  // Setup stages
-  const stages = [];
-
-  // Merge force-include patterns
-  const mergedAlways = [...toArray(options.always), ...toArray(profile.always)];
-
-  // 1. File Discovery Stage
-  const { default: FileDiscoveryStage } = await import('../pipeline/stages/FileDiscoveryStage.js');
-  stages.push(
-    new FileDiscoveryStage({
-      basePath: resolvedPath,
-      patterns: profile.include || ['**/*'],
-      excludes: profile.exclude || [],
-      respectGitignore: profile.options.respectGitignore,
-      includeHidden: profile.options.includeHidden,
-      followSymlinks: profile.options.followSymlinks,
-      maxFileSize: profile.options.maxFileSize,
-      sizeGate: profile.options.sizeGate,
-      maxDepth: profile.options.maxDepth,
-      forceInclude: mergedAlways,
-      scope: scopePaths,
-      scopeIgnoresIgnoreFiles: options.scopeIgnoresIgnoreFiles === true,
-      scopeIgnoresConfigExcludes: options.scopeIgnoresConfigExcludes === true,
-      explain: options.explain === true,
-    }),
-  );
-
-  // 2. Always Include Stage
-  if (mergedAlways.length > 0) {
-    const { default: AlwaysIncludeStage } =
-      await import('../pipeline/stages/AlwaysIncludeStage.js');
-    stages.push(new AlwaysIncludeStage(mergedAlways));
-  }
-
-  // 3. Git Filter Stage
-  if (options.modified || options.changed) {
-    const { default: GitFilterStage } = await import('../pipeline/stages/GitFilterStage.js');
-    stages.push(
-      new GitFilterStage({
-        basePath: resolvedPath,
-        modified: options.modified,
-        changed: options.changed,
-        withGitStatus: options.withGitStatus,
-      }),
-    );
-  }
-
-  // 4. Profile Filter Stage
-  const { default: ProfileFilterStage } = await import('../pipeline/stages/ProfileFilterStage.js');
-  stages.push(
-    new ProfileFilterStage({
-      exclude: profile.exclude || [],
-      filter: profile.filter || [],
-    }),
-  );
-
-  // 5. Sort Stage — ALWAYS, not only when the caller asked for an order.
-  //    Budgets truncate from the tail, so "which files survive" is only
-  //    meaningful once the order is defined.
-  const { default: SortFilesStage } = await import('../pipeline/stages/SortFilesStage.js');
-  stages.push(
-    new SortFilesStage({ sortBy: options.sort || 'path', order: options.sortOrder || 'asc' }),
-  );
-
-  // 6. Budget Stage — maxFileCount and maxTotalSize, applied to the sorted list.
-  const { default: BudgetStage } = await import('../pipeline/stages/BudgetStage.js');
-  stages.push(
-    new BudgetStage({
-      maxFileCount: profile.options.maxFileCount,
-      maxTotalSize: profile.options.maxTotalSize,
-    }),
-  );
+  const { stages, scopePaths } = await buildSelectionStages({
+    root: resolvedPath,
+    request,
+    profile,
+    budgets,
+    config: configInstance,
+    retention: options.explain === true ? { mode: 'top', limit: 50 } : { mode: 'counts' },
+  });
+  const scope = request.selection.scopes;
+  void scopePaths;
 
   // Secret scanning needs content, but two of the exclusions it applies (the
   // secret-prone glob list, the scan size ceiling) are decidable without it.
@@ -389,7 +300,6 @@ export async function* scan(basePath, options = {}) {
     options.secretsGuard !== false &&
     (options.secretsGuard === true || configInstance.get('secretsGuard.enabled', true));
 
-  // 7. File Loading Stage (if includeContent is not explicitly false)
   if (options.includeContent !== false) {
     const { default: FileLoadingStage } = await import('../pipeline/stages/FileLoadingStage.js');
     stages.push(
@@ -398,7 +308,6 @@ export async function* scan(basePath, options = {}) {
       }),
     );
 
-    // 8. Transform Stage (if requested)
     if (options.transform) {
       const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
       const TransformerRegistry = (await import('../transforms/TransformerRegistry.js')).default;
@@ -415,28 +324,19 @@ export async function* scan(basePath, options = {}) {
     }
   }
 
-  // 9. Deduplicate Stage — after loading, because duplicates are decided by
-  //    content hash and there is no content before this point.
-  //
-  //    Before the secrets guard, because redaction destroys the distinction it
-  //    hashes on: two config files differing only in their credentials become
-  //    byte-identical strings of the same marker, and one is then dropped as a
-  //    duplicate of the other.
+  // Deduplicate after loading, because duplicates are decided by content hash
+  // and there is no content before this point. Before the secrets guard,
+  // because redaction destroys the distinction it hashes on: two config files
+  // differing only in their credentials become byte-identical strings of the
+  // same marker, and one is then dropped as a duplicate of the other.
   if (options.dedupe) {
     const { default: DeduplicateFilesStage } =
       await import('../pipeline/stages/DeduplicateFilesStage.js');
     stages.push(new DeduplicateFilesStage());
   }
 
-  // 10. Secrets Guard Stage — same policy, same position, as the CLI. An
-  //     embedder should not have to know which entry point it reached for to
-  //     know whether credentials were redacted.
-  //
-  //     Outside the content block above, because it runs in plan mode too: the
-  //     secret-prone glob list and the scan size ceiling are both decidable
-  //     without content, and omitting them made a dry run's selection differ
-  //     from the real run's. It still lands after transformation, since that
-  //     branch adds no stages when there is no content.
+  // Same policy, same position, as the CLI. An embedder should not have to know
+  // which entry point it reached for to know whether credentials were redacted.
   if (secretsGuardEnabled) {
     const { default: SecretsGuardStage } = await import('../pipeline/stages/SecretsGuardStage.js');
     stages.push(
@@ -451,14 +351,13 @@ export async function* scan(basePath, options = {}) {
     );
   }
 
-  // 10. Character Limit Stage
   // Nullish rather than truthy, so `charLimit: 0` reaches the stage as the
   // budget it is instead of being read as "no budget requested".
-  if (profile.options.charLimit != null) {
+  if (charLimit != null) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(
       new CharLimitStage({
-        limit: parseInt(profile.options.charLimit, 10),
+        limit: parseInt(charLimit, 10),
         // Without content loaded (dry run) the budget is planned from byte size
         // so the dry run still selects the same files as the real run.
         plan: options.includeContent === false,
@@ -507,7 +406,7 @@ export async function* scan(basePath, options = {}) {
     const result = await pipeline.process({
       basePath: resolvedPath,
       profile,
-      options: { ...options, scope },
+      options: { ...options, scope, tests: request.selection.noTests ? false : true },
     });
 
     // A cancelled run is always fatal, whatever `continueOnError` recovered.

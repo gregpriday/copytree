@@ -11,11 +11,8 @@ const baseConfig = {
   // Coverage configuration
   collectCoverageFrom: [
     'src/**/*.js',
-    'src/**/*.jsx',
     '!src/**/*.test.js',
     '!src/**/*.spec.js',
-    '!src/**/*.test.jsx',
-    '!src/**/*.spec.jsx',
     '!src/index.js', // CLI entry point
   ],
   coverageDirectory: 'coverage',
@@ -29,7 +26,7 @@ const baseConfig = {
 
   // Transform files for ESM
   transform: {
-    '^.+\\.(js|jsx)$': 'babel-jest',
+    '^.+\\.js$': 'babel-jest',
   },
 
   // Transform all node_modules ESM packages for Jest compatibility
@@ -74,8 +71,6 @@ const mockedProject = {
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
     '^.*/services/InstructionsLoader\\.js$': '<rootDir>/tests/mocks/InstructionsLoader.js',
-    '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
-    '^ink$': '<rootDir>/tests/mocks/ink.js',
   },
   setupFiles: ['<rootDir>/tests/setup-env.js', '<rootDir>/tests/setup-global-mocks.js'],
 };
@@ -98,8 +93,6 @@ const realProject = {
     // Keep non-intrusive mocks (UI libraries, etc.)
     '^.*/utils/logger\\.js$': '<rootDir>/tests/mocks/logger.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
-    '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
-    '^ink$': '<rootDir>/tests/mocks/ink.js',
     // Note: ConfigManager and InstructionsLoader are NOT mocked here
   },
   setupFiles: ['<rootDir>/tests/setup-env.js'], // Only environment setup, no global mocks
@@ -116,8 +109,6 @@ const loggerUnitProject = {
     // logger.js is intentionally NOT mocked here
     '^.*/config/ConfigManager\\.js$': '<rootDir>/tests/mocks/ConfigManager.js',
     '^.*/config\\.js$': '<rootDir>/tests/mocks/config.js',
-    '^ink-testing-library$': '<rootDir>/tests/mocks/ink-testing-library.js',
-    '^ink$': '<rootDir>/tests/mocks/ink.js',
   },
   setupFiles: ['<rootDir>/tests/setup-env.js'],
 };

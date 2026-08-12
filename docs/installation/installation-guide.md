@@ -78,8 +78,11 @@ npm link  # Makes 'copytree' command available globally
 # Check version
 copytree --version
 
+# Check the installation end to end
+copytree doctor
+
 # Test basic functionality
-copytree --display --dry-run
+copytree plan .
 ```
 
 ### 2. Automatic Setup
@@ -167,14 +170,14 @@ CopyTree caches external repositories and transformations:
 
 ```bash
 # Clear all caches
-copytree cache:clear
+copytree cache clear
 
 # Clear specific caches
-copytree cache:clear --transformations
-copytree cache:clear --git
+copytree cache clear --transformations
+copytree cache clear --git
 
 # View cache settings
-copytree config:inspect
+copytree config show
 ```
 
 ## Verification
@@ -183,17 +186,17 @@ copytree config:inspect
 
 ```bash
 # Copy current directory (dry run)
-copytree --dry-run
+copytree plan .
 
 # Validate configuration
-copytree config:validate
+copytree config validate
 ```
 
 ### Test Installation
 
 ```bash
 # Test with dry run
-copytree --dry-run
+copytree plan .
 
 # Note: Transformers are configured in profiles, not via CLI flags
 ```
@@ -237,7 +240,7 @@ npx copytree
 
 ```bash
 # Check which optional dependencies are missing
-copytree config:validate
+copytree config validate
 
 # Install missing dependencies based on your OS (see above)
 ```
@@ -246,13 +249,13 @@ copytree config:validate
 
 ```bash
 # Validate configuration
-copytree config:validate
+copytree config validate
 
 # Inspect configuration
-copytree config:inspect
+copytree config show
 
 # Validate configuration
-copytree config:validate
+copytree config validate
 ```
 
 ### Node.js Version Issues
@@ -295,7 +298,7 @@ copytree --help
 
 # View specific command help
 copytree copy --help
-copytree config:validate --help
+copytree config validate --help
 
 # Check documentation
 See the docs/ folder in the repository

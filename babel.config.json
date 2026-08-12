@@ -1,8 +1,7 @@
 {
   "sourceType": "unambiguous",
   "presets": [
-    ["@babel/preset-env", { "targets": { "node": "20" } }],
-    ["@babel/preset-react", { "runtime": "automatic" }]
+    ["@babel/preset-env", { "targets": { "node": "20" } }]
   ],
   "env": {
     "test": {

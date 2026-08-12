@@ -70,10 +70,34 @@ async function hashAll(files) {
 }
 
 class MarkdownFormatter {
-  constructor({ stage, addLineNumbers = false, onlyTree = false } = {}) {
+  constructor({
+    stage,
+    addLineNumbers = false,
+    onlyTree = false,
+    includeMetadata = true,
+    reproducible = false,
+  } = {}) {
     this.stage = stage; // Delegates helper methods and config
     this.addLineNumbers = addLineNumbers;
     this.onlyTree = onlyTree;
+    this.includeMetadata = includeMetadata;
+    this.reproducible = reproducible;
+  }
+
+  /**
+   * The modification timestamp for a file, when it should be emitted at all.
+   *
+   * `--no-metadata` drops it as optional metadata; `--reproducible` drops it
+   * because it varies with the filesystem rather than with the content.
+   *
+   * @param {Object} file - File entry
+   * @returns {string|null} ISO timestamp, or null
+   */
+  modifiedTimestamp(file) {
+    if (!this.includeMetadata || this.reproducible || !file.modified) return null;
+    return file.modified instanceof Date
+      ? file.modified.toISOString()
+      : new Date(file.modified).toISOString();
   }
 
   async format(input) {
@@ -95,7 +119,11 @@ class MarkdownFormatter {
     lines.push('---');
     lines.push(`format: ${OUTPUT_FORMAT_VERSIONS.markdown}`);
     lines.push('tool: copytree');
-    lines.push(`generated: ${escapeYamlScalar(new Date().toISOString())}`);
+    // Omitted under `--reproducible`: it is the one field guaranteed to differ
+    // between two runs over an identical tree.
+    if (!this.reproducible) {
+      lines.push(`generated: ${escapeYamlScalar(new Date().toISOString())}`);
+    }
     lines.push(`base_path: ${escapeYamlScalar(input.basePath)}`);
     lines.push(`profile: ${escapeYamlScalar(profileName)}`);
     lines.push(`file_count: ${fileCount}`);
@@ -168,7 +196,9 @@ class MarkdownFormatter {
       // full re-read of the entire selection from disk, in a formatter whose
       // input is already in memory. Hashing every file concurrently up front
       // produces the same digests without the serialization.
-      const hashes = await hashAll(files);
+      // Hashing re-reads every selected file. Skipped entirely when the caller
+      // has asked for no optional metadata, since the digest is the metadata.
+      const hashes = this.includeMetadata ? await hashAll(files) : new Map();
 
       for (const file of files) {
         const relPath = `@${file.path}`;
@@ -186,11 +216,7 @@ class MarkdownFormatter {
           continue;
         }
 
-        const modifiedISO = file.modified
-          ? file.modified instanceof Date
-            ? file.modified.toISOString()
-            : new Date(file.modified).toISOString()
-          : null;
+        const modifiedISO = this.modifiedTimestamp(file);
         const sha = hashes.get(file) ?? null;
         let binaryMode = undefined;
         if (file.isBinary) {
@@ -208,7 +234,7 @@ class MarkdownFormatter {
           binary: file.isBinary ? true : false,
           encoding: file.encoding || undefined,
           binaryMode,
-          binaryCategory: file.binaryCategory || undefined,
+          binaryCategory: this.includeMetadata ? file.binaryCategory || undefined : undefined,
           truncated: file.truncated ? true : false,
           truncatedAt: file.truncated ? (file.content?.length ?? 0) : undefined,
         };

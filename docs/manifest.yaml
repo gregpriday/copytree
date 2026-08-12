@@ -135,7 +135,7 @@ tasks:
         - "Add .copytreeinclude for important hidden/config files"
         - "Create a custom profile for your use case"
         - "Learn common CLI commands and flags"
-        - "Test with --dry-run to preview"
+        - "Test with plan to preview"
 
   - id: understand-architecture
     title: "Understand CopyTree architecture and pipeline"

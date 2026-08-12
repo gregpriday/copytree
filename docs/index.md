@@ -89,8 +89,19 @@ copytree --output project-overview.xml
 # Copy only git modified files
 copytree --modified
 
+# Copy only what is staged for the next commit
+copytree --staged
+
 # Copy files changed since a specific ref
 copytree --changed HEAD~5
+```
+
+### Understand before you copy
+```bash
+copytree plan .                 # exactly which files, in what order, at what size
+copytree inspect .              # structure, active rules, effective profile and budgets
+copytree explain docs/README.md # why one path is in, or out
+copytree ignore context .       # a content-free inventory for authoring .copytreeignore
 ```
 
 
@@ -98,19 +109,24 @@ copytree --changed HEAD~5
 
 CopyTree uses a two-level configuration system:
 
-1. **Default Configuration**: Built-in defaults
-2. **User Configuration**: `~/.copytree/config/` directory (`.js` or `.json` files)
+1. **Packaged defaults**: shipped with CopyTree
+2. **User data configuration**: `config.yaml` in the platform's configuration directory
+   (`~/.config/copytree`, `~/Library/Application Support/CopyTree`, or `%APPDATA%\CopyTree`).
+   The legacy `~/.copytree/*.js` directory is still read, with a warning;
+   `copytree config migrate --write` converts it.
 
 ### Quick Configuration
 ```bash
 # Validate configuration
-copytree config:validate
+copytree config validate
 
 # Inspect configuration with provenance
-copytree config:inspect
+copytree config show --sources
 
-# Clear cache
-copytree cache:clear
+# Caches and temporary reference files
+copytree cache status
+copytree cache clear
+copytree cache gc
 ```
 
 ## 📖 Learn More
@@ -124,11 +140,11 @@ copytree cache:clear
 Having issues? Check our comprehensive [Troubleshooting Guide](./usage/troubleshooting.md) or run:
 
 ```bash
-# Check system requirements
-copytree config:validate
+# Check the installation end to end
+copytree doctor
 
-# View debug information
-DEBUG=copytree:* copytree
+# Validate configuration
+copytree config validate
 ```
 
 ## 📄 License

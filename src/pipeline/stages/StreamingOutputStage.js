@@ -19,6 +19,18 @@ import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
  * Processes files one at a time and streams output
  */
 class StreamingOutputStage extends Stage {
+  /**
+   * The modification timestamp for a file, when it should be emitted at all.
+   * @param {Object} file - File entry
+   * @returns {string|null} ISO timestamp, or null
+   */
+  modifiedTimestamp(file) {
+    if (!this.includeMetadata || this.reproducible || !file.modified) return null;
+    return file.modified instanceof Date
+      ? file.modified.toISOString()
+      : new Date(file.modified).toISOString();
+  }
+
   constructor(options = {}) {
     super(options);
     // Fatal for the same reason OutputFormattingStage is: recovering past a
@@ -43,6 +55,12 @@ class StreamingOutputStage extends Stage {
       this.config.get('copytree.addLineNumbers', false);
     this.lineNumberFormat = this.config.get('copytree.lineNumberFormat', '%4d: ');
     this.prettyPrint = options.prettyPrint ?? true;
+    // Same contract as the buffered stage: optional metadata is on by default,
+    // and `--reproducible` removes the fields that vary between two runs over
+    // an identical tree. Streaming is how a document is written, not a
+    // different document.
+    this.includeMetadata = options.includeMetadata !== false;
+    this.reproducible = options.reproducible === true;
   }
 
   async process(input) {
@@ -177,7 +195,9 @@ class StreamingOutputStage extends Stage {
     stream.write('---\n');
     stream.write(`format: ${OUTPUT_FORMAT_VERSIONS.markdown}\n`);
     stream.write('tool: copytree\n');
-    stream.write(`generated: ${escapeYamlScalar(new Date().toISOString())}\n`);
+    if (!this.reproducible) {
+      stream.write(`generated: ${escapeYamlScalar(new Date().toISOString())}\n`);
+    }
     stream.write(`base_path: ${escapeYamlScalar(input.basePath)}\n`);
     stream.write(`profile: ${escapeYamlScalar(input.profile?.name || 'default')}\n`);
     stream.write(`file_count: ${fileCount}\n`);
@@ -343,7 +363,9 @@ class StreamingOutputStage extends Stage {
     // a consumer checking for a schema change read nothing and concluded
     // nothing had changed — the exact failure the version exists to prevent.
     stream.write(`    <ct:format>${OUTPUT_FORMAT_VERSIONS.xml}</ct:format>\n`);
-    stream.write(`    <ct:generated>${new Date().toISOString()}</ct:generated>\n`);
+    if (!this.reproducible) {
+      stream.write(`    <ct:generated>${new Date().toISOString()}</ct:generated>\n`);
+    }
     stream.write(`    <ct:fileCount>${input.files.length}</ct:fileCount>\n`);
     stream.write(`    <ct:totalSize>${this.calculateTotalSize(input.files)}</ct:totalSize>\n`);
 
@@ -382,10 +404,9 @@ class StreamingOutputStage extends Stage {
 
       let xml = `    <ct:file path="@${escapeXmlAttribute(file.path)}" size="${escapeXmlAttribute(file.size)}"`;
 
-      if (file.modified) {
-        const modifiedDate =
-          file.modified instanceof Date ? file.modified : new Date(file.modified);
-        xml += ` modified="${modifiedDate.toISOString()}"`;
+      const modified = this.modifiedTimestamp(file);
+      if (modified) {
+        xml += ` modified="${modified}"`;
       }
 
       if (file.isBinary) {
@@ -440,7 +461,9 @@ class StreamingOutputStage extends Stage {
     stream.write(`  "directory": ${JSON.stringify(input.basePath)},\n`);
     stream.write('  "metadata": {\n');
     stream.write(`    "format": ${JSON.stringify(OUTPUT_FORMAT_VERSIONS.json)},\n`);
-    stream.write(`    "generated": "${new Date().toISOString()}",\n`);
+    if (!this.reproducible) {
+      stream.write(`    "generated": "${new Date().toISOString()}",\n`);
+    }
     stream.write(`    "fileCount": ${input.files.length},\n`);
     stream.write(`    "totalSize": ${this.calculateTotalSize(input.files)}`);
 
@@ -468,7 +491,7 @@ class StreamingOutputStage extends Stage {
       const fileObj = {
         path: file.path,
         size: file.size,
-        modified: file.modified,
+        ...(this.modifiedTimestamp(file) ? { modified: this.modifiedTimestamp(file) } : {}),
         isBinary: file.isBinary,
         encoding: file.encoding,
         content:
@@ -556,7 +579,7 @@ class StreamingOutputStage extends Stage {
           type: 'metadata',
           format: OUTPUT_FORMAT_VERSIONS.ndjson,
           directory: input.basePath,
-          generated: new Date().toISOString(),
+          ...(this.reproducible ? {} : { generated: new Date().toISOString() }),
           fileCount: files.length,
           totalSize,
           profile: profileName,
@@ -592,7 +615,7 @@ class StreamingOutputStage extends Stage {
           type: 'file',
           path: file.path,
           size: file.size,
-          modified: file.modified,
+          ...(this.modifiedTimestamp(file) ? { modified: this.modifiedTimestamp(file) } : {}),
           isBinary: !!file.isBinary,
         };
 
@@ -628,7 +651,7 @@ class StreamingOutputStage extends Stage {
           type: 'metadata',
           format: OUTPUT_FORMAT_VERSIONS.ndjson,
           directory: input.basePath,
-          generated: new Date().toISOString(),
+          ...(this.reproducible ? {} : { generated: new Date().toISOString() }),
           fileCount: files.length,
           totalSize,
           profile: profileName,
@@ -662,7 +685,7 @@ class StreamingOutputStage extends Stage {
         type: 'summary',
         fileCount: files.length,
         totalSize,
-        processedAt: new Date().toISOString(),
+        ...(this.reproducible ? {} : { processedAt: new Date().toISOString() }),
       };
       stream.push(JSON.stringify(summary) + '\n');
       callback();
@@ -713,7 +736,7 @@ class StreamingOutputStage extends Stage {
           ],
           properties: {
             size: file.size || 0,
-            modified: file.modified || null,
+            modified: this.modifiedTimestamp(file),
             isBinary: !!file.isBinary,
           },
         };
@@ -781,7 +804,7 @@ class StreamingOutputStage extends Stage {
             invocations: [
               {
                 executionSuccessful: true,
-                endTimeUtc: new Date().toISOString(),
+                ...(this.reproducible ? {} : { endTimeUtc: new Date().toISOString() }),
                 workingDirectory: {
                   uri: workingDirectoryUri,
                 },

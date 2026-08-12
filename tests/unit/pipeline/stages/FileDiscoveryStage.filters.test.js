@@ -151,55 +151,6 @@ describe('FileDiscoveryStage — convenience filter flags', () => {
     });
   });
 
-  // ─── Min/max size filters (--min-size / --max-size) ──────────────────────────
-
-  describe('size filters (--min-size / --max-size)', () => {
-    beforeEach(async () => {
-      // Create files of known sizes
-      await fs.writeFile(path.join(tempDir, 'empty.txt'), ''); // 0 bytes
-      await fs.writeFile(path.join(tempDir, 'small.txt'), 'a'.repeat(100)); // 100 bytes
-      await fs.writeFile(path.join(tempDir, 'medium.txt'), 'b'.repeat(1000)); // 1000 bytes
-      await fs.writeFile(path.join(tempDir, 'large.txt'), 'c'.repeat(10000)); // 10000 bytes
-    });
-
-    it('should exclude files smaller than minSizeBytes', async () => {
-      const stage = makeStage({ basePath: tempDir, minSizeBytes: 500 });
-      const paths = await discover(stage, tempDir);
-      expect(paths).toEqual(['large.txt', 'medium.txt']);
-    });
-
-    it('should exclude files larger than maxSizeBytes', async () => {
-      const stage = makeStage({ basePath: tempDir, maxSizeBytes: 500 });
-      const paths = await discover(stage, tempDir);
-      expect(paths).toEqual(['empty.txt', 'small.txt']);
-    });
-
-    it('should apply both min and max size filters simultaneously', async () => {
-      const stage = makeStage({ basePath: tempDir, minSizeBytes: 50, maxSizeBytes: 5000 });
-      const paths = await discover(stage, tempDir);
-      expect(paths).toEqual(['medium.txt', 'small.txt']);
-    });
-
-    it('should include files exactly at the boundary values', async () => {
-      const stage = makeStage({ basePath: tempDir, minSizeBytes: 100, maxSizeBytes: 1000 });
-      const paths = await discover(stage, tempDir);
-      expect(paths).toContain('small.txt'); // exactly 100 bytes
-      expect(paths).toContain('medium.txt'); // exactly 1000 bytes
-    });
-
-    it('should return nothing when size range excludes all files', async () => {
-      const stage = makeStage({ basePath: tempDir, minSizeBytes: 50000 });
-      const paths = await discover(stage, tempDir);
-      expect(paths).toHaveLength(0);
-    });
-
-    it('should include all files when no size filters are set', async () => {
-      const stage = makeStage({ basePath: tempDir });
-      const paths = await discover(stage, tempDir);
-      expect(paths).toHaveLength(4);
-    });
-  });
-
   // ─── Combined filters ────────────────────────────────────────────────────────
 
   describe('combined filters', () => {
@@ -213,19 +164,20 @@ describe('FileDiscoveryStage — convenience filter flags', () => {
       await fs.writeFile(path.join(tempDir, 'src', 'deep', 'nested.js'), 'e'.repeat(300));
     });
 
-    it('should combine ext, maxDepth, and size filters', async () => {
+    it('should combine ext, maxDepth and the size gate', async () => {
       const stage = makeStage({
         basePath: tempDir,
         extFilter: ['.js'],
         maxDepth: 1,
-        minSizeBytes: 100,
-        maxSizeBytes: 1000,
+        // The per-file context gate replaced --min-size/--max-size: one concept,
+        // one name, decided from stat() before anything is opened.
+        sizeGate: 1000,
       });
       const paths = await discover(stage, tempDir);
-      // Only .js files, max 1 level deep, between 100 and 1000 bytes
+      // Only .js files, max 1 level deep, at or below the gate.
       // root.js (200B, depth 0) ✓
       // root.md — wrong ext
-      // src/lib.js (5000B) — too large
+      // src/lib.js (5000B) — over the size gate
       // src/lib.ts — wrong ext
       // src/deep/nested.js — depth 2, excluded
       expect(paths).toEqual(['root.js']);

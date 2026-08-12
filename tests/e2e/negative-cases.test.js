@@ -52,8 +52,11 @@ describe('Negative cases', () => {
     expect(code).not.toBe(0);
 
     const errorOutput = normalize(stderr || stdout, { projectRoot: PROJECT });
-    expect(errorOutput).toContain('Choose one output destination');
-    expect(errorOutput).toContain('Use only one of --output, --display, --stream or --clipboard');
+    expect(errorOutput).toContain('Invalid output destination');
+    expect(errorOutput).toContain(
+      'Choose one output destination: --reference, --clipboard, --stdout or --output',
+    );
+    expect(errorOutput).toContain('[ERR_DESTINATION_CONFLICT]');
     // Nothing was produced: the run stopped before the pipeline started.
     expect(stdout).toBe('');
   }, 30000);

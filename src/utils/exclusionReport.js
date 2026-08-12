@@ -106,10 +106,24 @@ export class ExclusionReport {
    * @param {Object} [options={}] - Options
    * @param {boolean} [options.explain=false] - Retain per-file detail
    * @param {number} [options.topN=50] - How many of the largest exclusions to keep
+   * @param {'counts'|'top'|'all'} [options.retention] - How much detail to keep.
+   *   `counts` keeps aggregates only; `top` keeps the largest `topN`; `all`
+   *   keeps every decision up to `maxEntries`. Normal copy uses `top`, and only
+   *   planning and explanation pay for `all`.
+   * @param {number} [options.maxEntries=100000] - Ceiling for `all` retention
    */
   constructor(options = {}) {
     this.explain = options.explain === true;
     this.topN = Number.isInteger(options.topN) && options.topN > 0 ? options.topN : 50;
+    this.retention = options.retention ?? (this.explain ? 'top' : 'counts');
+    // `all` implies detail is being collected, whatever `explain` said.
+    if (this.retention !== 'counts') this.explain = true;
+    this.maxEntries =
+      Number.isInteger(options.maxEntries) && options.maxEntries > 0 ? options.maxEntries : 100000;
+    /** Whether the entry ceiling dropped any decisions. */
+    this.truncated = false;
+    /** How many decisions the ceiling dropped. */
+    this.omittedEntries = 0;
     this.total = 0;
     this.byReason = Object.create(null);
     for (const reason of ALL_REASONS) {
@@ -139,18 +153,41 @@ export class ExclusionReport {
 
     if (!this.explain) return;
 
+    if (this.retention === 'all' && this._details.length >= this.maxEntries) {
+      // A silent cap would read as "that is everything". Counted and reported
+      // instead, so a consumer knows the ledger is partial and by how much.
+      this.truncated = true;
+      this.omittedEntries += 1;
+      return;
+    }
+
     this._details.push({
       path: detail.path,
       size: detail.size || 0,
       reason: detail.reason,
+      ...(detail.isDirectory ? { isDirectory: true } : {}),
       ...(detail.rule ? { rule: detail.rule } : {}),
       ...(detail.ruleSource ? { ruleSource: detail.ruleSource } : {}),
     });
 
-    // Keep memory bounded on repositories with very large ignored trees.
-    if (this._details.length > this.topN * 8) {
+    // Keep memory bounded on repositories with very large ignored trees. Only
+    // `top` retention compacts: `all` was asked for precisely because the caller
+    // wants every decision, and is bounded by `maxEntries` instead.
+    if (this.retention !== 'all' && this._details.length > this.topN * 8) {
       this._compact();
     }
+  }
+
+  /**
+   * Every retained decision, in the order it was made.
+   *
+   * Only meaningful under `all` retention; under `top` the list has already
+   * been reduced to the largest entries.
+   *
+   * @returns {ExclusionDetail[]} Retained decisions
+   */
+  entries() {
+    return this._details;
   }
 
   /**
@@ -231,8 +268,19 @@ export class ExclusionReport {
     };
 
     if (this.explain) {
-      this._compact();
-      result.largest = this._details.slice(0, this.topN);
+      if (this.retention === 'all') {
+        // The largest entries are still the useful summary; the full ledger is
+        // reached through `entries()` rather than duplicated into every result.
+        result.largest = [...this._details].sort((a, b) => b.size - a.size).slice(0, this.topN);
+        result.retained = this._details.length;
+        if (this.truncated) {
+          result.truncated = true;
+          result.omittedEntries = this.omittedEntries;
+        }
+      } else {
+        this._compact();
+        result.largest = this._details.slice(0, this.topN);
+      }
     }
 
     return result;

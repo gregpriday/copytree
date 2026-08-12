@@ -7,7 +7,7 @@ import {
   SPINNER_FRAMES,
 } from './glyphs.js';
 import { PHASES, phaseLabel, formatCount, truncatePath } from './messages.js';
-import { FEEDBACK_EVENTS } from './model.js';
+import { FEEDBACK_EVENTS, FEEDBACK_SCHEMA } from './model.js';
 
 /**
  * How long a run must take before a spinner is worth showing.
@@ -414,7 +414,17 @@ export class Reporter {
   emitJson(event) {
     if (this.format !== 'json') return;
     const { stats, details, ...rest } = event;
-    const payload = { ...rest, ...(stats ? { stats } : {}), ...(details ? { details } : {}) };
+    // Versioned, so a consumer written against this shape can detect a change
+    // instead of silently misreading one.
+    const payload = {
+      schema: FEEDBACK_SCHEMA,
+      ...rest,
+      ...(stats ? { stats } : {}),
+      ...(details ? { details } : {}),
+      // `files` is the field a consumer reads off a completion event; leaving
+      // it only inside `stats` made the documented shape wrong.
+      ...(stats && typeof stats.files === 'number' ? { files: stats.files } : {}),
+    };
     try {
       this.stream.write(`${JSON.stringify(payload)}\n`);
     } catch {

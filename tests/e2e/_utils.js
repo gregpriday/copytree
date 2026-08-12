@@ -122,8 +122,11 @@ export function normalize(text, options = {}) {
     if (line === lastLine && line.includes('%')) {
       continue;
     }
-    // Skip ANSI escape sequences that weren't removed
-    if (line.match(/^\[[\dK;A-Z]+/)) {
+    // Skip ANSI escape sequences that weren't removed. Anchored to a complete
+    // CSI remnant (`[2K`, `[?25h`) rather than "starts with a bracket and some
+    // capitals", which also swallowed every `[ERR_...]` code line the error
+    // contract requires.
+    if (line.match(/^\[[?\d;]*[A-Za-z]$/)) {
       continue;
     }
     uniqueLines.push(line);

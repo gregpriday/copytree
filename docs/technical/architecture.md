@@ -23,30 +23,90 @@ All processing stages inherit from the `Stage` base class (`src/pipeline/Stage.j
 
 ### Stage Order
 
-Both entry points — the CLI (`src/commands/copy.js`) and the programmatic API (`src/api/scan.js`) — assemble the same ordered pipeline. Where they diverge is only in which optional stages are present, never in the order or in what gets excluded.
+Every entry point builds the same selection through **one engine**,
+`src/selection/selection.js`. `copy`, `plan`, `inspect`, `explain`, `ignore check` and the
+programmatic `scan()` call `buildSelectionStages()`; they differ only in what they do afterwards.
+A preview whose selection differs from the run it previews is worse than no preview, and one
+implementation is the only way to guarantee it cannot happen.
+
+**Selection stages** (built by the shared engine):
 
 | # | Stage | Always? | Responsibility |
 |---|-------|---------|----------------|
-| 1 | `FileDiscoveryStage` | yes | Layered ignore evaluation, scope traversal, size gate, exclusion accounting |
-| 2 | `AlwaysIncludeStage` | when `always` is set | Marks force-included files |
-| 3 | `GitFilterStage` | with `--modified` / `--changed` | Git status filtering |
-| 4 | `ProfileFilterStage` | yes | Caller `exclude` / `filter` patterns get the final say |
-| 5 | `SortFilesStage` | yes | Establishes the order budgets will truncate from |
-| 6 | `BudgetStage` | yes | `maxFileCount`, then `maxTotalSize` |
-| 7 | `LimitStage` | with `--head` | Hard head limit |
-| 8 | `FileLoadingStage` | unless `--only-tree` | Reads content, classifies binaries |
-| 9 | `TransformStage` | when transformers apply | Document conversion, etc. |
-| 10 | `SecretsGuardStage` | when enabled | Detection and redaction |
-| 11 | `DeduplicateFilesStage` | with `--dedupe` | Content-hash dedup |
-| 12 | `CharLimitStage` | with `--char-limit` | Character budget, line-boundary truncation |
-| 13 | `InstructionsStage` | CLI only | Loads the instructions block |
-| 14 | `OutputFormattingStage` / `StreamingOutputStage` | yes | Renders the versioned output |
+| 1 | `FileDiscoveryStage` | yes | Layered ignore evaluation, include narrowing, scope traversal, size gate, exclusion accounting |
+| 2 | `AlwaysIncludeStage` | when force-includes exist | Marks force-included files |
+| 3 | `GitFilterStage` | with `--modified` / `--staged` / `--changed` / `--git-status` | Git filtering, and Git status annotation independent of it |
+| 4 | `SortFilesStage` | yes | Establishes the order budgets will truncate from |
+| 5 | `BudgetStage` | yes | `maxFiles`, then `maxTotalSize` |
+
+**Content stages** (appended by `copy` only):
+
+| # | Stage | Always? | Responsibility |
+|---|-------|---------|----------------|
+| 6 | `FileLoadingStage` | unless `--no-content` | Reads content, classifies binaries |
+| 7 | `TransformStage` | when transformers apply | Document conversion, etc. |
+| 8 | `DeduplicateFilesStage` | with `--dedupe` | Content-hash dedup |
+| 9 | `SecretsGuardStage` | unless `--secrets off` | Detection and redaction |
+| 10 | `CharLimitStage` | with `--max-chars` | Character budget, line-boundary truncation |
+| 11 | `InstructionsStage` | unless `--no-instructions` | Loads the instructions block |
+| 12 | `OutputFormattingStage` / `StreamingOutputStage` | yes | Renders the versioned output |
+
+There is no second exclusion pass. `ProfileFilterStage` used to re-apply the caller's exclude
+patterns through `minimatch` after discovery had already applied them through the Git-ignore
+engine, so anchoring, dotfiles, directory rules and negation could mean two different things
+depending on which stage looked at a path. Profile and CLI exclusions are now layers in the one
+evaluator, placed after every nested ignore file so they still get the last word. `LimitStage` is
+gone with `--head`: after a deterministic sort, `--max-files` is the same operation under a name
+that says which files survive.
 
 Two ordering constraints are load-bearing:
 
 - **Sort precedes budget.** Budgets truncate from the tail, so "which files survive" is only meaningful once the order is defined. `--sort modified` means "keep the recently-touched files when the budget bites"; that is a promise the pipeline can only keep if sorting has already happened.
 - **Dedup follows loading.** Duplicates are decided by content hash, and there is no content before `FileLoadingStage`.
 - **Secret scanning follows transformation.** What gets scanned has to be what gets emitted. Scanning first left a gap: a transformer that converts a document to text can surface a credential that was not present in the bytes the scanner saw.
+
+### The exclusion evaluator
+
+One language, one evaluator, one pass. Exclusions are Git-ignore syntax — `.gitignore`,
+`.copytreeignore`, profile `exclude`, CLI `--exclude` — and inclusions are globs — profile
+`include`, CLI `--include`, `.copytreeinclude`, force-includes. `--scope` values are literal paths,
+never globs, so right-click integrations and paths containing brackets stay predictable.
+
+Layers are evaluated in this order, last match winning within the stack:
+
+1. Root containment and hard safety (`.git`, symlink escapes) — never overrideable
+2. Literal scope traversal
+3. Profile and CLI include selectors (CLI narrows the profile; it does not replace it)
+4. Built-in default exclusions (dependencies, caches, media, known junk)
+5. The user's global Git ignore
+6. `.git/info/exclude`
+7. Root and nested `.gitignore`, deeper sources later
+8. Root and nested `.copytreeignore`, deeper sources later
+9. Profile exclusions
+10. CLI `--exclude` rules
+11. Force inclusion — `.copytreeinclude`, profile force-includes, then `--force-include`
+12. Stat filters and per-file gates
+13. Deterministic sort
+14. File-count and total-size budgets
+
+Layers 9 and 10 are passed to the walkers as `finalLayers` and evaluated after every per-directory
+ignore file, which is what makes them the caller's last word: an `--exclude 'docs/'` that a
+`!docs/keep.md` buried three directories down could overturn would be a suggestion, not an
+exclusion.
+
+### Decision retention
+
+The exclusion report keeps aggregate counts unconditionally, because they are incremented at a
+decision that was already being made. Per-file detail is a policy:
+
+| Mode | Used by | Keeps |
+|---|---|---|
+| `counts` | `inspect`, `ignore context`, ordinary `scan()` | Aggregates only |
+| `top` | `copy` | The largest `topN` exclusions |
+| `all` | `plan --explain`, `explain` | Every decision, up to `maxEntries`, with the overflow counted and reported |
+
+A silent cap would read as "that is everything", so `all` reports `truncated` and
+`omittedEntries` rather than quietly dropping the tail.
 
 ### Fatal versus recoverable stages
 
@@ -696,7 +756,6 @@ describe('Pipeline Integration', () => {
     
     pipeline.through([
       FileDiscoveryStage,
-      ProfileFilterStage,
       TransformStage,
       OutputFormattingStage
     ]);

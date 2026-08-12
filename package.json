@@ -38,11 +38,13 @@
     "test:performance": "jest --config jest.performance.config.js --runInBand",
     "lint": "eslint src/ bin/",
     "lint:fix": "eslint src/ bin/ --fix",
-    "format": "prettier --write \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
-    "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"bin/**/*.js\" \"tests/**/*.{js,jsx}\"",
-    "prepublishOnly": "npm run lint && npm run test && npm run typecheck",
+    "format": "prettier --write \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\"",
+    "prepublishOnly": "npm run lint && npm run docs:cli:check && npm run test && npm run typecheck",
     "benchmark:latency-ab": "node tests/performance/latency-ab.bench.js",
-    "knip": "knip"
+    "knip": "knip",
+    "docs:cli": "node scripts/generate-cli-docs.js",
+    "docs:cli:check": "node scripts/generate-cli-docs.js --check"
   },
   "keywords": [
     "cli",
@@ -87,17 +89,14 @@
     "commander": "^15.0.0",
     "fast-glob": "^3.3.3",
     "ignore": "^7.0.6",
-    "ink": "^7.1.1",
     "js-yaml": "^4.3.0",
     "micromatch": "^4.0.8",
     "minimatch": "^10.2.5",
     "p-limit": "^7.3.1",
-    "react": "^19.2.8",
     "simple-git": "^3.36.0"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.29.7",
-    "@babel/preset-react": "^7.29.7",
     "@eslint/js": "^10.0.1",
     "@jest/globals": "^30.4.1",
     "@types/node": "^26.1.1",
@@ -106,7 +105,6 @@
     "eslint": "^10.8.0",
     "fast-xml-parser": "^5.10.1",
     "fs-extra": "^11.4.0",
-    "ink-testing-library": "^4.0.0",
     "jest": "^30.4.2",
     "knip": "^6.32.0",
     "lodash": "^4.18.1",
