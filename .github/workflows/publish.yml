@@ -94,7 +94,13 @@ jobs:
       - name: Record the verified artifact
         id: pack
         run: |
-          FILE="$(ls dist/*.tgz)"
+          # `./dist/...`, not `dist/...`. `npm publish` runs its argument through
+          # npm-package-arg, which reads a bare `a/b` as the GitHub shorthand
+          # `owner/repo` — so `npm publish dist/copytree-1.0.0-rc.1.tgz` went
+          # off to `git ls-remote ssh://git@github.com/dist/copytree-1.0.0-rc.1.tgz.git`
+          # and died with a public-key error, having never looked at the
+          # tarball sitting next to it. A leading `./` makes it a file spec.
+          FILE="./$(ls dist/*.tgz)"
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
           # npm's own integrity format, so it can be compared against what the
           # registry reports after publication.
