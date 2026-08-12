@@ -11,18 +11,21 @@ This guide helps you resolve common issues with CopyTree.
 **Solutions**:
 
 1. **Check npm global bin path**:
+
    ```bash
    npm bin -g
    # Add this path to your PATH environment variable
    ```
 
 2. **Add to PATH** (add to ~/.bashrc or ~/.zshrc):
+
    ```bash
    export PATH="$(npm bin -g):$PATH"
    source ~/.bashrc  # or ~/.zshrc
    ```
 
 3. **Verify installation**:
+
    ```bash
    npm list -g copytree
    ```
@@ -39,6 +42,7 @@ This guide helps you resolve common issues with CopyTree.
 **Solutions**:
 
 1. **Configure npm prefix**:
+
    ```bash
    mkdir ~/.npm-global
    npm config set prefix '~/.npm-global'
@@ -58,6 +62,7 @@ This guide helps you resolve common issues with CopyTree.
 **Problem**: Incompatible Node.js version
 
 **Solution**:
+
 ```bash
 # Check current version
 node --version
@@ -79,6 +84,7 @@ nvm use 20
 **Solutions**:
 
 1. **Validate configuration**:
+
    ```bash
    copytree config validate
    ```
@@ -95,6 +101,7 @@ nvm use 20
 **Solutions**:
 
 1. **Check config location**:
+
    ```bash
    ls -la ~/.copytree/
    ```
@@ -115,17 +122,20 @@ nvm use 20
 **Solutions**:
 
 1. **Check clipboard functionality**:
+
    ```bash
    echo "test" | pbcopy  # macOS
    echo "test" | xclip -selection clipboard  # Linux
    ```
 
 2. **Use display mode to verify**:
+
    ```bash
    copytree --stdout
    ```
 
 3. **Save to file instead**:
+
    ```bash
    copytree --output test.xml
    ```
@@ -142,21 +152,24 @@ nvm use 20
 **Solutions**:
 
 1. **Use file output**:
+
    ```bash
    copytree --output large-project.xml
    ```
 
 2. **Limit content**:
+
    ```bash
    copytree --max-files 100 --max-chars 5000
    ```
 
 3. **Use specific profile**:
+
    ```bash
    copytree --profile minimal
    ```
 
-4. **Stream output**:
+4. **Write straight to a file or pipe**:
    ```bash
    copytree --stdout > project.xml
    ```
@@ -166,6 +179,7 @@ nvm use 20
 **Problem**: Output format not as expected
 
 **Solution**:
+
 ```bash
 # Specify format explicitly
 copytree --format json
@@ -182,17 +196,20 @@ copytree --format tree
 **Solutions**:
 
 1. **Check current directory**:
+
    ```bash
    pwd
    ls -la
    ```
 
 2. **Use less restrictive profile**:
+
    ```bash
    copytree --profile full
    ```
 
 3. **Debug file selection**:
+
    ```bash
    copytree plan .
    ```
@@ -209,11 +226,13 @@ copytree --format tree
 **Solutions**:
 
 1. **Use specific profile**:
+
    ```bash
    copytree --profile minimal
    ```
 
 2. **Add exclusions**:
+
    ```bash
    # Create .copytreeignore
    echo "node_modules/" > .copytreeignore
@@ -232,11 +251,13 @@ copytree --format tree
 **Solutions**:
 
 1. **Verify Git repository**:
+
    ```bash
    git status
    ```
 
 2. **Check Git installation**:
+
    ```bash
    git --version
    ```
@@ -256,11 +277,13 @@ copytree --format tree
 **Solutions**:
 
 1. **Use specific profile**:
+
    ```bash
    copytree --profile api  # Instead of --profile full
    ```
 
 2. **Use filters to limit scope**:
+
    ```bash
    copytree --include "src/**/*.js"
    ```
@@ -277,12 +300,14 @@ copytree --format tree
 
 **Solutions**:
 
-1. **Stream output**:
+1. **Write straight to a file or pipe**:
+
    ```bash
    copytree --stdout > output.xml
    ```
 
 2. **Limit files processed**:
+
    ```bash
    copytree src/ --max-files 1000
    ```
@@ -297,6 +322,7 @@ copytree --format tree
 ### macOS Issues
 
 **Clipboard not working**:
+
 ```bash
 # Test pbcopy
 echo "test" | pbcopy
@@ -304,6 +330,7 @@ pbpaste  # Should output "test"
 ```
 
 **File permissions**:
+
 ```bash
 # Reset permissions
 chmod -R 755 ~/.copytree
@@ -312,6 +339,7 @@ chmod -R 755 ~/.copytree
 ### Linux Issues
 
 **Missing clipboard support**:
+
 ```bash
 # Install clipboard utilities
 sudo apt-get install xclip  # Debian/Ubuntu
@@ -319,6 +347,7 @@ sudo yum install xclip      # RedHat/CentOS
 ```
 
 **Path issues**:
+
 ```bash
 # Add to ~/.bashrc
 export PATH="$HOME/.npm-global/bin:$PATH"
@@ -327,12 +356,14 @@ export PATH="$HOME/.npm-global/bin:$PATH"
 ### Windows (WSL) Issues
 
 **Line ending problems**:
+
 ```bash
 # Configure Git
 git config --global core.autocrlf input
 ```
 
 **Path translation**:
+
 ```bash
 # Use WSL paths
 copytree /mnt/c/Users/username/project
@@ -381,16 +412,19 @@ ls -la ~/.copytree/cache/
 ## Common Error Messages
 
 ### "Profile not found"
+
 - Check profile name spelling
 - Ensure profile file exists in `.copytree/` or `~/.copytree/profiles/`
 - Check with `ls .copytree/` or `ls ~/.copytree/profiles/`
 
 ### "No files found matching criteria"
+
 - Current directory might be empty
 - Profile rules might be too restrictive
 - Check .gitignore and .copytreeignore
 
 ### "Invalid configuration"
+
 - Run `copytree config validate`
 - Check JSON syntax in config files
 - Ensure all required fields are present

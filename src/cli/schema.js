@@ -24,15 +24,37 @@ export const FORMAT_ALIASES = Object.freeze({ md: 'markdown' });
 /** Sort keys, in the order they are offered. */
 export const SORT_KEYS = Object.freeze(['path', 'size', 'modified', 'name', 'extension', 'depth']);
 
-/** Binary/document policies for `--binary`. */
+/**
+ * Binary/document policies for `--binary`.
+ *
+ * `convert` is deliberately absent. It advertised document conversion that did
+ * not exist: no converter was ever registered, so the policy's only effect was
+ * to load a PDF's raw bytes and hand them to a transform stage that had nothing
+ * to do with them. See `REMOVED_OPTION_VALUES`.
+ */
 export const BINARY_POLICIES = Object.freeze([
   'default',
   'omit',
   'comment',
   'placeholder',
   'base64',
-  'convert',
 ]);
+
+/**
+ * Option values that were removed, and what to use instead.
+ *
+ * Named rather than merely rejected: "invalid value" sends someone to the help
+ * text to look for a spelling mistake they did not make.
+ */
+export const REMOVED_OPTION_VALUES = Object.freeze({
+  binary: {
+    convert: {
+      replacement: 'placeholder',
+      reason:
+        'document conversion is not implemented; no converter was ever registered, so `convert` only ever produced a placeholder',
+    },
+  },
+});
 
 /** Secret-handling policies for `--secrets`. */
 export const SECRET_POLICIES = Object.freeze(['redact', 'fail', 'off']);

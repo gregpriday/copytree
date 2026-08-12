@@ -52,6 +52,7 @@ copytree
 4. Copied the result to your clipboard
 
 **Now you can paste the output into:**
+
 - ChatGPT, Claude, or any AI assistant
 - Documentation tools
 - Code review platforms
@@ -180,12 +181,14 @@ copytree --include "docs/**/*.md"
 When you run `copytree` without options, it uses the built-in default profile which:
 
 **Includes**:
+
 - All source code files
 - Configuration files
 - Documentation (README, docs, etc.)
 - Package manifests
 
 **Excludes**:
+
 - Dependencies (`node_modules`, `vendor`, etc.)
 - Build outputs (`dist`, `build`, `.next`, etc.)
 - Version control (`.git`, `.svn`)

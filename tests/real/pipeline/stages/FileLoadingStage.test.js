@@ -17,6 +17,51 @@ function makeConfig(overrides = {}) {
 }
 
 describe('FileLoadingStage (real)', () => {
+  test('tolerates a configuration whose list settings are null', async () => {
+    // A configuration file that writes `structureOnlyPatterns:` with no value
+    // yields null, not an empty list. Every one of these settings is mapped or
+    // indexed immediately afterwards, so the `|| []` fallbacks are the
+    // difference between a normal run and a TypeError on the first file.
+    await withTempDir('file-loading-null-config', async (tmpDir) => {
+      const absolutePath = path.join(tmpDir, 'a.txt');
+      await fs.writeFile(absolutePath, 'plain text');
+
+      const stage = new FileLoadingStage({
+        config: makeConfig({
+          'copytree.structureOnlyPatterns': null,
+          'copytree.binaryPolicy': null,
+        }),
+      });
+
+      const result = await stage.loadFileContent({ path: 'a.txt', absolutePath });
+
+      expect(result.content).toBe('plain text');
+      expect(result.isBinary).toBe(false);
+    });
+  });
+
+  test('names an uncategorised binary rather than leaving the reason blank', async () => {
+    await withTempDir('file-loading-uncategorised', async (tmpDir) => {
+      const absolutePath = path.join(tmpDir, 'mystery.qqq');
+      await fs.writeFile(absolutePath, Buffer.from([0x00, 0x01, 0x02, 0x00, 0xff, 0xfe]));
+
+      const stage = new FileLoadingStage({
+        config: makeConfig({
+          'copytree.structureOnlyPatterns': [],
+          'copytree.binaryFileAction': 'comment',
+          'copytree.binaryPolicy': {},
+        }),
+      });
+
+      const result = await stage.loadFileContent({ path: 'mystery.qqq', absolutePath });
+
+      expect(result.isBinary).toBe(true);
+      expect(result.excluded).toBe(true);
+      // Whatever the detector called it, the reason is never empty.
+      expect(result.excludedReason).toBeTruthy();
+    });
+  });
+
   test('returns structure-only placeholder when pattern matches', async () => {
     await withTempDir('file-loading-structure-only', async (tmpDir) => {
       const absolutePath = path.join(tmpDir, 'package-lock.json');
@@ -62,15 +107,19 @@ describe('FileLoadingStage (real)', () => {
     });
   });
 
-  test('loads convertible binary documents as Buffer for transform stage', async () => {
-    await withTempDir('file-loading-convert-doc', async (tmpDir) => {
+  test('represents a document as a binary placeholder, like any other binary', async () => {
+    // Documents used to be loaded as raw bytes for a converter that was never
+    // registered. The bytes then reached the secrets guard, which could not
+    // scan them and dropped the file outright — so a PDF disappeared from the
+    // export entirely rather than appearing as a placeholder.
+    await withTempDir('file-loading-document', async (tmpDir) => {
       const absolutePath = path.join(tmpDir, 'doc.pdf');
       await fs.writeFile(absolutePath, Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e]));
 
       const stage = new FileLoadingStage({
         config: makeConfig({
           'copytree.structureOnlyPatterns': [],
-          'copytree.binaryPolicy': { document: 'convert' },
+          'copytree.binaryPolicy': { document: 'placeholder' },
         }),
       });
 
@@ -80,8 +129,9 @@ describe('FileLoadingStage (real)', () => {
       });
 
       expect(result.isBinary).toBe(true);
-      expect(Buffer.isBuffer(result.content)).toBe(true);
       expect(result.binaryCategory).toBe('document');
+      expect(Buffer.isBuffer(result.content)).toBe(false);
+      expect(result.needsTransform).toBeFalsy();
     });
   });
 

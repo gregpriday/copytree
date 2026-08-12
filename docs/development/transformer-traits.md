@@ -18,28 +18,28 @@ Transformer traits are metadata that describe the characteristics and requiremen
 ```javascript
 const traits = {
   // Input/Output Types
-  inputTypes: ['text', 'binary'],     // What input types this transformer handles
-  outputTypes: ['text'],              // What output types this transformer produces
-  
+  inputTypes: ['text', 'binary'], // What input types this transformer handles
+  outputTypes: ['text'], // What output types this transformer produces
+
   // Behavior Characteristics
-  idempotent: true,                   // Can be run multiple times safely
-  orderSensitive: false,              // Whether order matters for this transformer
-  heavy: true,                        // CPU/memory intensive operation
-  stateful: false,                    // Maintains state between runs
-  
+  idempotent: true, // Can be run multiple times safely
+  orderSensitive: false, // Whether order matters for this transformer
+  heavy: true, // CPU/memory intensive operation
+  stateful: false, // Maintains state between runs
+
   // Dependencies and Conflicts
   dependencies: ['network'], // External dependencies required
-  conflictsWith: ['other-transformer'],   // Incompatible transformers
-  
+  conflictsWith: ['other-transformer'], // Incompatible transformers
+
   // Resource Requirements
   requirements: {
-    apiKey: true,                     // Requires API key
-    network: true,                    // Requires network access
-    memory: '100MB'                   // Memory requirements
+    apiKey: true, // Requires API key
+    network: true, // Requires network access
+    memory: '100MB', // Memory requirements
   },
-  
+
   // Categorization
-  tags: ['ai', 'summary', 'expensive'] // Categories for grouping and warnings
+  tags: ['ai', 'summary', 'expensive'], // Categories for grouping and warnings
 };
 ```
 
@@ -68,21 +68,26 @@ import TransformerRegistry from './TransformerRegistry.js';
 const registry = new TransformerRegistry();
 
 // Register transformer with traits
-registry.register('binary', new BinaryTransformer(), {
-  extensions: ['.zip'],
-  priority: 20
-}, {
-  // Traits object
-  inputTypes: ['any'],
-  outputTypes: ['binary'],
-  idempotent: true,
-  orderSensitive: false,
-  heavy: false,
-  requirements: {
-    memory: '100MB'
+registry.register(
+  'binary',
+  new BinaryTransformer(),
+  {
+    extensions: ['.zip'],
+    priority: 20,
   },
-  tags: ['binary']
-});
+  {
+    // Traits object
+    inputTypes: ['any'],
+    outputTypes: ['binary'],
+    idempotent: true,
+    orderSensitive: false,
+    heavy: false,
+    requirements: {
+      memory: '100MB',
+    },
+    tags: ['binary'],
+  },
+);
 ```
 
 ### Default Transformer Traits
@@ -126,8 +131,8 @@ The system includes predefined traits for built-in transformers:
 const plan = ['pdf', 'first-lines', 'markdown'];
 const result = registry.validatePlan(plan);
 
-console.log(result.valid);    // true/false
-console.log(result.issues);   // Array of validation issues
+console.log(result.valid); // true/false
+console.log(result.issues); // Array of validation issues
 console.log(result.warnings); // Array of optimization suggestions
 ```
 
@@ -219,12 +224,12 @@ registry.setValidationEnabled(true);
 ```javascript
 // Get traits for specific transformer
 const traits = registry.getTraits('pdf');
-console.log(traits.heavy);        // true
+console.log(traits.heavy); // true
 console.log(traits.requirements); // { memory: '100MB' }
 
 // List all transformers with traits
 const transformers = registry.list();
-transformers.forEach(t => {
+transformers.forEach((t) => {
   if (t.traits) {
     console.log(`${t.name}: ${t.traits.tags.join(', ')}`);
   }
@@ -239,15 +244,15 @@ import Pipeline from './Pipeline.js';
 // Pipeline can use validation during construction
 const pipeline = new Pipeline(config);
 pipeline.addStage('validation', async (context) => {
-  const transformerNames = context.stages.map(stage => stage.name);
+  const transformerNames = context.stages.map((stage) => stage.name);
   const validation = registry.validatePlan(transformerNames);
-  
+
   if (!validation.valid) {
     context.logger.warn('Transformer plan has issues:', validation.issues);
   }
-  
+
   if (validation.warnings.length > 0) {
-    validation.warnings.forEach(warning => {
+    validation.warnings.forEach((warning) => {
       context.logger.warn(`${warning.type}: ${warning.message}`);
     });
   }
@@ -282,10 +287,10 @@ pipeline.addStage('validation', async (context) => {
 
 ```javascript
 // Good: Descriptive, hierarchical tags
-tags: ['ai', 'text-processing', 'summary', 'expensive']
+tags: ['ai', 'text-processing', 'summary', 'expensive'];
 
 // Avoid: Generic or meaningless tags
-tags: ['misc', 'transformer']
+tags: ['misc', 'transformer'];
 ```
 
 ### 3. Specify Explicit Conflicts
@@ -308,7 +313,7 @@ if (!validation.valid) {
 }
 
 // Log warnings for optimization opportunities
-validation.warnings.forEach(warning => {
+validation.warnings.forEach((warning) => {
   logger.warn(warning.message);
 });
 ```
@@ -337,7 +342,7 @@ if (traits) {
 try {
   const result = registry.validatePlan(plan);
   if (!result.valid) {
-    result.issues.forEach(issue => {
+    result.issues.forEach((issue) => {
       switch (issue.severity) {
         case 'error':
           logger.error(`Validation error: ${issue.message}`);
@@ -361,9 +366,7 @@ try {
 ```javascript
 // Check for missing resources before execution
 const validation = registry.validatePlan(['pdf']);
-const resourceIssues = validation.issues.filter(issue => 
-  issue.type === 'missing_resource'
-);
+const resourceIssues = validation.issues.filter((issue) => issue.type === 'missing_resource');
 
 if (resourceIssues.length > 0) {
   throw new Error(`Missing required resources: ${resourceIssues[0].message}`);
@@ -380,20 +383,25 @@ If you have existing transformer registrations:
 // Old way (still works)
 registry.register('transformer', new Transformer(), {
   extensions: ['.txt'],
-  priority: 10
+  priority: 10,
 });
 
 // New way with traits
-registry.register('transformer', new Transformer(), {
-  extensions: ['.txt'],
-  priority: 10
-}, {
-  inputTypes: ['text'],
-  outputTypes: ['text'],
-  idempotent: true,
-  heavy: false,
-  tags: ['text-processing']
-});
+registry.register(
+  'transformer',
+  new Transformer(),
+  {
+    extensions: ['.txt'],
+    priority: 10,
+  },
+  {
+    inputTypes: ['text'],
+    outputTypes: ['text'],
+    idempotent: true,
+    heavy: false,
+    tags: ['text-processing'],
+  },
+);
 ```
 
 ### Backward Compatibility

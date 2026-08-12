@@ -12,7 +12,33 @@ jest.mock('../../../src/utils/logger.js', () => ({
 
 import fs from '../../../src/utils/fsx.js';
 import path from 'path';
-import { execFileSync, execSync } from 'child_process';
+import { execFile, execSync } from 'child_process';
+
+/**
+ * Git execution is asynchronous now — a synchronous clone froze the event loop
+ * of any application embedding CopyTree, and made an `AbortSignal` impossible
+ * to observe. These tests describe git's *behaviour*, not its calling
+ * convention, so this adapter keeps them expressed as `(file, args) => stdout`
+ * and translates to the callback protocol `execFile` actually uses.
+ */
+let gitBehaviour = () => '';
+const gitOnce = [];
+
+const execFileSync = {
+  mockImplementation: (fn) => {
+    gitBehaviour = fn;
+  },
+  mockImplementationOnce: (fn) => {
+    gitOnce.push(fn);
+  },
+  mockReturnValue: (value) => {
+    gitBehaviour = () => value;
+  },
+  mockClear: () => execFile.mockClear(),
+  get mock() {
+    return execFile.mock;
+  },
+};
 import GitHubUrlHandler from '../../../src/services/GitHubUrlHandler.js';
 
 /** Build `git ls-remote` style output from ref names. */
@@ -37,6 +63,19 @@ describe('GitHubUrlHandler', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     existing = new Set();
+    gitBehaviour = () => '';
+    gitOnce.length = 0;
+
+    execFile.mockImplementation((file, args, options, callback) => {
+      const done = typeof options === 'function' ? options : callback;
+      const behaviour = gitOnce.length > 0 ? gitOnce.shift() : gitBehaviour;
+      try {
+        done(null, behaviour(file, args) ?? '', '');
+      } catch (error) {
+        done(error, error.stdout ?? '', error.stderr ?? '');
+      }
+      return { kill: jest.fn() };
+    });
 
     fs.existsSync.mockImplementation((p) => existing.has(String(p)));
     fs.ensureDirSync.mockImplementation(() => {});
@@ -44,6 +83,51 @@ describe('GitHubUrlHandler', () => {
     fs.removeSync.mockImplementation((p) => existing.delete(String(p)));
     // Identity realpath: individual tests override to model symlinks
     fs.realpathSync = jest.fn((p) => String(p));
+
+    // The cache lock is a directory, because `mkdir` is atomic. Modelled
+    // faithfully: creating one that exists must fail with EEXIST, or the lock
+    // is not a lock.
+    fs.mkdirSync = jest.fn((p) => {
+      const key = String(p);
+      if (existing.has(key)) {
+        const error = new Error(`EEXIST: file already exists, mkdir '${key}'`);
+        error.code = 'EEXIST';
+        throw error;
+      }
+      existing.add(key);
+    });
+    fs.statSync = jest.fn(() => ({ mtimeMs: Date.now() }));
+    // The real `readdirSync` returns an array or throws; the automock returns
+    // undefined, which is neither.
+    fs.readdirSync = jest.fn(() => []);
+    fs.utimesSync = jest.fn();
+
+    // The lock is owner-checked: it writes a token into the lock directory and
+    // only releases a lock still carrying that token.
+    const tokens = new Map();
+    fs.writeFileSync = jest.fn((p, data) => {
+      tokens.set(String(p), String(data));
+      existing.add(String(p));
+    });
+    fs.readFileSync = jest.fn((p) => {
+      const key = String(p);
+      if (!tokens.has(key)) {
+        const error = new Error(`ENOENT: no such file, open '${key}'`);
+        error.code = 'ENOENT';
+        throw error;
+      }
+      return tokens.get(key);
+    });
+    fs.rmSync = jest.fn((p) => {
+      const key = String(p);
+      existing.delete(key);
+      for (const tracked of [...tokens.keys()]) {
+        if (tracked === key || tracked.startsWith(`${key}/`)) tokens.delete(tracked);
+      }
+      for (const tracked of [...existing]) {
+        if (tracked.startsWith(`${key}/`)) existing.delete(tracked);
+      }
+    });
   });
 
   /** Make git calls behave like a working remote, and record clones. */
@@ -61,14 +145,21 @@ describe('GitHubUrlHandler', () => {
         contents.forEach((entry) => existing.add(path.join(dir, entry)));
       }
       if (subcommand === 'rev-parse') {
-        // git exits non-zero when the ref does not exist
         const wanted = args[args.length - 1];
-        if (!refs.includes(wanted)) {
+        // Tag detection asks whether a specific tag ref exists, and git exits
+        // non-zero when it does not.
+        if (wanted.startsWith('refs/tags/') && !refs.includes(wanted)) {
           const error = new Error(`Command failed: git rev-parse ${wanted}`);
           error.status = 1;
           throw error;
         }
-        return 'abc123\n';
+        return '0'.repeat(39) + '1\n';
+      }
+      if (subcommand === 'worktree') {
+        // `worktree add --detach --force <dir> <commit>`
+        const dir = args[args.length - 2];
+        existing.add(dir);
+        contents.forEach((entry) => existing.add(path.join(dir, entry)));
       }
       return '';
     });
@@ -244,7 +335,7 @@ describe('GitHubUrlHandler', () => {
 
       await handler.resolveRef();
 
-      expect(execFileSync).not.toHaveBeenCalled();
+      expect(execFile).not.toHaveBeenCalled();
       expect(handler.branch).toBe('develop');
     });
 
@@ -311,7 +402,12 @@ describe('GitHubUrlHandler', () => {
       const targetPath = await handler.getFiles();
 
       expect(gitCall('clone')).toBeDefined();
-      expect(targetPath).toBe(handler.repoDir);
+      // Not the cache directory: the run reads an isolated checkout of the
+      // resolved commit, so a concurrent run resetting the cache cannot change
+      // the files underneath this one mid-walk.
+      expect(targetPath).not.toBe(handler.repoDir);
+      expect(targetPath).toContain('worktrees');
+      expect(gitSubcommands()).toContain('worktree');
     });
 
     it('should clone the resolved slashed branch', async () => {
@@ -377,7 +473,10 @@ describe('GitHubUrlHandler', () => {
 
       const targetPath = await handler.getFiles();
 
-      expect(targetPath).toBe(path.join(handler.repoDir, '..draft'));
+      // A directory legitimately named `..draft` starts with `..` without
+      // escaping anything. The scan root is the isolated worktree.
+      expect(path.basename(targetPath)).toBe('..draft');
+      expect(targetPath).toContain('worktrees');
     });
 
     it('should report a missing subpath', async () => {
@@ -438,6 +537,56 @@ describe('GitHubUrlHandler', () => {
       expect(gitSubcommands()).not.toContain('clone');
     });
 
+    it('holds an exclusive lock while it mutates the cache', async () => {
+      const handler = new GitHubUrlHandler('https://github.com/user/repo');
+      mockGit({ head: 'main' });
+
+      const lockDir = [];
+      fs.mkdirSync = jest.fn((p) => {
+        lockDir.push(String(p));
+        existing.add(String(p));
+      });
+
+      await handler.getFiles();
+
+      // `mkdir` is the mutex: atomic on every supported filesystem, and no
+      // dependency. Without it, two runs `reset --hard` the same clone.
+      expect(lockDir.some((entry) => entry.endsWith('.lock'))).toBe(true);
+    });
+
+    it('releases the lock even when the operation fails', async () => {
+      const handler = new GitHubUrlHandler('https://github.com/user/repo');
+      mockGit({ head: 'main' });
+      execFileSync.mockImplementation((file, args) => {
+        if (args[0] === 'ls-remote' && args.includes('--symref')) {
+          return 'ref: refs/heads/main\tHEAD\n';
+        }
+        if (args[0] === 'clone') throw new Error('remote hung up');
+        return '';
+      });
+
+      await expect(handler.getFiles()).rejects.toThrow();
+
+      // A lock left behind by a failed run makes the repository uncopyable
+      // until someone finds the directory and deletes it by hand.
+      const removed = fs.rmSync.mock.calls.map((call) => String(call[0]));
+      expect(removed.some((entry) => entry.endsWith('.lock'))).toBe(true);
+    });
+
+    it('scans the resolved commit, not the moving ref', async () => {
+      const handler = new GitHubUrlHandler('https://github.com/user/repo');
+      mockGit({ head: 'main' });
+
+      await handler.getFiles();
+
+      // A branch can move between the fetch and the walk. Resolving to a SHA
+      // first means the export describes one tree rather than two.
+      expect(handler.commit).toMatch(/^[0-9a-f]{40}$/);
+      const worktreeAdd = gitCall('worktree');
+      expect(worktreeAdd[1]).toContain('--detach');
+      expect(worktreeAdd[1][worktreeAdd[1].length - 1]).toBe(handler.commit);
+    });
+
     it('should reclone when the update fails', async () => {
       const handler = new GitHubUrlHandler('https://github.com/user/repo/tree/main');
       existing.add(handler.repoDir);
@@ -454,6 +603,29 @@ describe('GitHubUrlHandler', () => {
       await handler.getFiles();
 
       expect(gitCall('clone')).toBeDefined();
+    });
+  });
+
+  describe('credential safety', () => {
+    it('strips a token out of anything git says', async () => {
+      const handler = new GitHubUrlHandler('https://github.com/user/repo');
+      mockGit({ head: 'main' });
+      execFileSync.mockImplementation((file, args) => {
+        if (args[0] === 'ls-remote' && args.includes('--symref')) {
+          return 'ref: refs/heads/main\tHEAD\n';
+        }
+        // git echoes the remote URL back in most of its failure messages, and
+        // that URL can carry a token. Error messages reach logs, `stats`, and
+        // whatever the embedding application does with both.
+        throw new Error(
+          "fatal: could not read from 'https://x-access-token:ghp_SECRETVALUE123456@github.com/user/repo'",
+        );
+      });
+
+      const error = await handler.getFiles().catch((e) => e);
+
+      expect(error.message).not.toContain('ghp_SECRETVALUE123456');
+      expect(error.message).not.toContain('x-access-token');
     });
   });
 

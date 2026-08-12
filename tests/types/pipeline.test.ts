@@ -7,6 +7,9 @@
  * If this file compiles without errors, the types are correct.
  */
 
+// Pipeline composition lives behind `copytree/advanced` from 1.0: everything
+// reachable from the package root is semver-stable, and these extension points
+// are not ready to carry that promise.
 import {
   Pipeline,
   Stage,
@@ -30,11 +33,8 @@ import {
   PipelineStartEvent,
   PipelineCompleteEvent,
   PipelineErrorEvent,
-  ConfigManager,
-  Logger,
-  ProgressCallback,
-  FileResult,
-} from 'copytree';
+} from 'copytree/advanced';
+import { ConfigManager, Logger, ProgressCallback, FileResult } from 'copytree';
 
 // ============================================================================
 // Pipeline Statistics Tests
@@ -261,9 +261,7 @@ async function testPipelineClass() {
   pipeline.through([new CustomStage(), new CustomStage()]);
 
   // Test fluent chaining
-  const chainedPipeline = new Pipeline()
-    .through(new CustomStage())
-    .through([new CustomStage()]);
+  const chainedPipeline = new Pipeline().through(new CustomStage()).through([new CustomStage()]);
 
   // Test process() method with generics
   interface Input {
@@ -362,7 +360,7 @@ async function testStageClass() {
   // Create a custom stage
   class MyStage extends Stage {
     async process(input: unknown): Promise<unknown> {
-      return { ...input as object, processed: true };
+      return { ...(input as object), processed: true };
     }
 
     validate(input: unknown): boolean {

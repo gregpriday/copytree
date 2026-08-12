@@ -11,7 +11,12 @@ import path from 'path';
 class BaseTransformer {
   constructor(options = {}) {
     this.options = options;
-    this.config = config();
+    // The operation's configuration when it was supplied, and only then the
+    // process-wide singleton. A transformer that always read the singleton
+    // could not be isolated: an embedder running two operations with different
+    // `ConfigManager` instances would have both transform under whichever one
+    // happened to be installed globally.
+    this.config = options.config ?? config();
     this.logger = options.logger || logger.child(this.constructor.name);
 
     // Enable caching based on configuration
@@ -38,6 +43,10 @@ class BaseTransformer {
       const specificConfig = `cache.transformations.${transformerName}`;
 
       this.cache = CacheService.create('transform', {
+        // The same instance this transformer runs under, so the cache location
+        // and driver cannot come from a different configuration than the
+        // policy that decided what to cache.
+        config: this.config,
         enabled: this.config.get(`${specificConfig}.enabled`, this.cacheEnabled),
         defaultTtl: this.config.get(`${specificConfig}.ttl`, this.cacheTTL),
       });

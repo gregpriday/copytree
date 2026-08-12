@@ -27,6 +27,15 @@ export default [
         clearTimeout: true,
         setInterval: true,
         clearInterval: true,
+        // Web-platform globals Node has provided since well before the
+        // supported floor of 22.12, and which cancellation depends on.
+        AbortController: true,
+        AbortSignal: true,
+        DOMException: true,
+        TextEncoder: true,
+        TextDecoder: true,
+        URL: true,
+        structuredClone: true,
       },
     },
     rules: {

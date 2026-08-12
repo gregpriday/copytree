@@ -656,8 +656,19 @@ class TransformerRegistry {
    */
   static async createDefault(options = {}) {
     const registry = new TransformerRegistry();
-    // Store config for potential use by transformers
     registry.config = options.config || null;
+
+    // Passed to every transformer, not merely stored on the registry.
+    //
+    // It used to be only stored. The transformers below were constructed with
+    // no arguments, so `BaseTransformer` fell through to the process-wide
+    // `config()` singleton — and an operation running with its own
+    // `ConfigManager` had its selection and formatting governed by that
+    // instance while its transformation cache and binary policy came from
+    // another. Two concurrent operations with contradictory configurations
+    // could therefore transform each other's files under the wrong settings,
+    // which is exactly the isolation the SDK advertises.
+    const shared = registry.config ? { config: registry.config } : {};
 
     // Register default transformers - using dynamic imports for better ESM compatibility
     const { default: FileLoaderTransformer } =
@@ -669,7 +680,7 @@ class TransformerRegistry {
     // File Loader - default transformer
     registry.register(
       'file-loader',
-      new FileLoaderTransformer(),
+      new FileLoaderTransformer(shared),
       {
         isDefault: true,
         priority: 0,
@@ -691,7 +702,7 @@ class TransformerRegistry {
     // Streaming File Loader - for large files
     registry.register(
       'streaming-file-loader',
-      new StreamingFileLoaderTransformer(),
+      new StreamingFileLoaderTransformer(shared),
       {
         priority: 0,
       },
@@ -712,7 +723,7 @@ class TransformerRegistry {
     // Binary transformer
     registry.register(
       'binary',
-      new BinaryTransformer(),
+      new BinaryTransformer(shared),
       {
         extensions: [
           '.doc',

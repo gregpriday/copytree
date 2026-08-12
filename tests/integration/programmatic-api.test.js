@@ -249,8 +249,15 @@ describe('Programmatic API Integration', () => {
       expect(api.format).toBeDefined();
       expect(api.copy).toBeDefined();
       expect(api.default).toBeDefined();
-      expect(api.Pipeline).toBeDefined();
-      expect(api.TransformerRegistry).toBeDefined();
+      // Extension points moved to `copytree/advanced` for 1.0: everything
+      // reachable from the root is semver-stable, and these were not ready to
+      // carry that promise.
+      expect(api.Pipeline).toBeUndefined();
+      expect(api.TransformerRegistry).toBeUndefined();
+
+      const extensions = await import('../../src/advanced.js');
+      expect(extensions.Pipeline).toBeDefined();
+      expect(extensions.TransformerRegistry).toBeDefined();
     });
 
     it('should have consistent file structure across all APIs', async () => {

@@ -15,6 +15,7 @@ The default profile works great for general use, but you might want a custom pro
 ## Profile Basics
 
 A profile is a YAML file that tells CopyTree:
+
 - Which files to **include**
 - Which files to **exclude**
 - Which **transformers** to apply
@@ -53,15 +54,15 @@ version: 1.0.0
 
 # Include patterns (glob syntax)
 include:
-  - "**/*.md"           # All Markdown files
-  - "docs/**/*"         # Everything in docs directory
-  - "README*"           # README files
-  - "CHANGELOG*"        # Changelog files
+  - '**/*.md' # All Markdown files
+  - 'docs/**/*' # Everything in docs directory
+  - 'README*' # README files
+  - 'CHANGELOG*' # Changelog files
 
 # Exclude patterns
 exclude:
-  - "node_modules/**"   # Never include dependencies
-  - "**/test/**"        # Skip test documentation
+  - 'node_modules/**' # Never include dependencies
+  - '**/test/**' # Skip test documentation
 ```
 
 ### Step 3: Test Your Profile
@@ -100,19 +101,19 @@ name: source-only
 description: Source code without tests or config
 
 include:
-  - "src/**/*.{js,jsx,ts,tsx}"
-  - "lib/**/*.{js,ts}"
-  - "*.{js,ts}"
+  - 'src/**/*.{js,jsx,ts,tsx}'
+  - 'lib/**/*.{js,ts}'
+  - '*.{js,ts}'
 
 exclude:
-  - "**/*.test.{js,ts}"
-  - "**/*.spec.{js,ts}"
-  - "**/__tests__/**"
-  - "**/*.config.{js,ts}"
+  - '**/*.test.{js,ts}'
+  - '**/*.spec.{js,ts}'
+  - '**/__tests__/**'
+  - '**/*.config.{js,ts}'
 
 always:
-  - "package.json"
-  - "tsconfig.json"
+  - 'package.json'
+  - 'tsconfig.json'
 ```
 
 ### Pattern 2: API Documentation
@@ -124,19 +125,19 @@ name: api-docs
 description: API routes, controllers, and schemas
 
 include:
-  - "src/routes/**/*"
-  - "src/controllers/**/*"
-  - "src/models/**/*"
-  - "src/middleware/**/*"
-  - "**/*.swagger.{yml,yaml,json}"
-  - "**/*.openapi.{yml,yaml,json}"
+  - 'src/routes/**/*'
+  - 'src/controllers/**/*'
+  - 'src/models/**/*'
+  - 'src/middleware/**/*'
+  - '**/*.swagger.{yml,yaml,json}'
+  - '**/*.openapi.{yml,yaml,json}'
 
 exclude:
-  - "**/*.test.*"
+  - '**/*.test.*'
 
 always:
-  - "package.json"
-  - "README.md"
+  - 'package.json'
+  - 'README.md'
 ```
 
 ### Pattern 3: Frontend Components
@@ -148,20 +149,20 @@ name: components
 description: Frontend components and styles
 
 include:
-  - "src/components/**/*"
-  - "src/pages/**/*"
-  - "src/styles/**/*"
-  - "**/*.{jsx,tsx,vue}"
-  - "**/*.{css,scss,sass}"
+  - 'src/components/**/*'
+  - 'src/pages/**/*'
+  - 'src/styles/**/*'
+  - '**/*.{jsx,tsx,vue}'
+  - '**/*.{css,scss,sass}'
 
 exclude:
-  - "**/*.test.{jsx,tsx}"
-  - "**/*.spec.{jsx,tsx}"
-  - "**/*.stories.{jsx,tsx}"
+  - '**/*.test.{jsx,tsx}'
+  - '**/*.spec.{jsx,tsx}'
+  - '**/*.stories.{jsx,tsx}'
 
 always:
-  - "package.json"
-  - "tailwind.config.js"
+  - 'package.json'
+  - 'tailwind.config.js'
 ```
 
 ## Advanced Features
@@ -175,8 +176,8 @@ name: with-transformers
 description: Profile with file loading
 
 include:
-  - "**/*.{md,txt,js,ts}"
-  - "docs/**/*"
+  - '**/*.{md,txt,js,ts}'
+  - 'docs/**/*'
 
 transformers:
   # Load file content
@@ -185,6 +186,7 @@ transformers:
 ```
 
 Built-in transformers:
+
 - **file-loader**: Loads text file content
 - **binary**: Handles binary files (placeholder or base64)
 - **streaming-file-loader**: Streams large files (>10MB)
@@ -200,13 +202,13 @@ extends: default
 
 # Additional includes (merged with parent)
 include:
-  - "examples/**/*"
-  - "tutorials/**/*"
+  - 'examples/**/*'
+  - 'tutorials/**/*'
 
 # Additional excludes (merged with parent)
 exclude:
-  - "**/*.draft.md"
-  - "docs/archive/**"
+  - '**/*.draft.md'
+  - 'docs/archive/**'
 ```
 
 ### External Sources
@@ -218,21 +220,21 @@ name: with-external
 description: Include files from external sources
 
 include:
-  - "src/**/*"
+  - 'src/**/*'
 
 external:
   # Include from GitHub
   - source: https://github.com/user/shared-docs
     destination: external/shared
     rules:
-      - include: "**/*.md"
+      - include: '**/*.md'
 
   # Include from local directory
   - source: /path/to/shared/library
     destination: external/lib
     rules:
-      - include: "**/*.js"
-      - exclude: "**/node_modules/**"
+      - include: '**/*.js'
+      - exclude: '**/node_modules/**'
 ```
 
 ## Rule Processing Order
@@ -249,13 +251,13 @@ CopyTree processes rules in this order:
 
 ```yaml
 include:
-  - "src/**/*.js"
+  - 'src/**/*.js'
 
 exclude:
-  - "src/legacy/**"
+  - 'src/legacy/**'
 
 always:
-  - "src/legacy/important.js"  # Included despite exclude rule
+  - 'src/legacy/important.js' # Included despite exclude rule
 ```
 
 ## Profile Location Strategy
@@ -263,6 +265,7 @@ always:
 Choose where to store your profiles based on usage:
 
 **Project profiles** (`.copytree/`):
+
 - Committed to version control
 - Shared with team members
 - Project-specific configurations
@@ -275,6 +278,7 @@ vi .copytree/myproject.yml
 ```
 
 **User profiles** (`~/.copytree/profiles/`):
+
 - Personal configurations
 - Available across all projects
 - Not committed to repositories
@@ -286,6 +290,7 @@ vi ~/.copytree/profiles/personal.yml
 ```
 
 **Built-in profiles** (package installation):
+
 - Shipped with CopyTree
 - Read-only (do not modify)
 - Used as base for inheritance
@@ -297,14 +302,14 @@ vi ~/.copytree/profiles/personal.yml
 ```yaml
 # Good - specific and focused
 include:
-  - "src/auth/**/*.{js,ts}"
-  - "src/auth/**/*.test.{js,ts}"
+  - 'src/auth/**/*.{js,ts}'
+  - 'src/auth/**/*.test.{js,ts}'
 
 # Avoid - too broad, then exclude
 include:
-  - "**/*"
+  - '**/*'
 exclude:
-  - "everything/you/dont/want/**"
+  - 'everything/you/dont/want/**'
 ```
 
 ### 2. Use Meaningful Names

@@ -45,7 +45,7 @@ export default async function doctorCommand(request, context = {}) {
   await checkClipboard(add);
   await checkGit(add);
   await checkGitleaks(add);
-  await checkConverters(add);
+  await checkBinaryHandling(add);
   await checkShellCompletion(add);
 
   const failures = checks.filter((check) => check.status === 'fail').length;
@@ -291,28 +291,50 @@ async function checkGitleaks(add) {
 }
 
 /**
- * Check which document converters can run.
+ * Report how binary and document files will actually be represented.
+ *
+ * This check used to be called "document converters" and reported the number of
+ * registered transformers — a number that had nothing to do with the question,
+ * and which read as "3 converters available" on an installation that could not
+ * convert anything at all. Counting components is not a capability check.
+ *
+ * What a person running `doctor` wants to know is what will happen to the PDFs
+ * and images in their project, so that is what this answers.
+ *
  * @param {Function} add - Check recorder
  */
-async function checkConverters(add) {
+async function checkBinaryHandling(add) {
   try {
-    const { default: TransformerRegistry } = await import('../transforms/TransformerRegistry.js');
-    const registry = await TransformerRegistry.createDefault();
-    const names =
-      typeof registry.list === 'function'
-        ? registry.list()
-        : [...(registry.transformers?.keys?.() ?? [])];
+    const config = await ConfigManager.create({ noValidate: true });
+    const fallback = config.get('copytree.binaryFileAction', 'placeholder');
+    const policies = config.get('copytree.binaryPolicy', {}) || {};
+
+    // Grouped by outcome rather than listed per category: twenty lines of
+    // `image: comment` is a data dump, not a diagnosis.
+    const byPolicy = new Map();
+    for (const [category, policy] of Object.entries(policies)) {
+      if (!byPolicy.has(policy)) byPolicy.set(policy, []);
+      byPolicy.get(policy).push(category);
+    }
+
+    const summary = [...byPolicy.entries()]
+      .map(([policy, categories]) => `${policy}: ${categories.sort().join(', ')}`)
+      .sort()
+      .join('; ');
+
     add(
-      'document converters',
+      'binary and document handling',
       'pass',
-      `${names.length} transformer${names.length === 1 ? '' : 's'} registered`,
+      `default ${fallback}${summary ? `; ${summary}` : ''}`,
+      // Stated plainly rather than left to be discovered from an empty export.
+      'Document conversion is not available in this version; documents are named in the tree with a placeholder body',
     );
   } catch (error) {
     add(
-      'document converters',
+      'binary and document handling',
       'warn',
-      error.message,
-      'Document conversion will be skipped; other formats are unaffected',
+      `could not resolve the binary policy: ${error.message}`,
+      'Run `copytree config validate` to find the configuration problem',
     );
   }
 }

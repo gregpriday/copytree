@@ -1,43 +1,389 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://copytree.dev/schema/config/1.json",
+  "title": "CopyTree configuration",
+  "description": "The complete set of public configuration keys. Closed on purpose: an unknown key is almost always a typo or a setting from an older version, and accepting it silently means the user's intent is discarded without a word. Adding a key here is the deliberate act of making it public.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Configuration schema version this file was written against"
+    },
     "app": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "env": {
+          "type": "string",
+          "enum": [
+            "development",
+            "production",
+            "test"
+          ]
+        },
+        "debug": {
+          "type": "boolean"
+        },
+        "basePath": {
+          "type": "string"
+        },
+        "userConfigPath": {
+          "type": "string"
+        },
+        "defaultCommand": {
+          "type": "string"
+        },
+        "interactiveMode": {
+          "type": "boolean"
+        },
+        "maxConcurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "chunkSize": {
+          "type": "integer",
+          "minimum": 1024
+        },
+        "defaultOutput": {
+          "type": "string",
+          "enum": [
+            "clipboard",
+            "file",
+            "display",
+            "stream",
+            "reference"
+          ]
+        },
+        "outputEncoding": {
+          "type": "string",
+          "enum": [
+            "utf8",
+            "utf-8"
+          ]
+        },
+        "prettyPrint": {
+          "type": "boolean"
+        },
+        "defaultInstructions": {
+          "type": "string"
+        },
+        "exitOnError": {
+          "type": "boolean"
+        },
+        "verboseErrors": {
+          "type": "boolean"
+        }
+      }
     },
     "cache": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "driver": { "type": "string" },
-        "enabled": { "type": "boolean" },
-        "prefix": { "type": "string" },
-        "defaultTtl": { "type": "integer" },
-        "file": { "type": "object", "additionalProperties": true },
-        "transformations": { "type": "object", "additionalProperties": true }
-      },
-      "additionalProperties": true
+        "driver": {
+          "type": "string",
+          "enum": [
+            "file",
+            "memory",
+            "none"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "defaultTtl": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "file": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "extension": {
+              "type": "string"
+            },
+            "gcProbability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "maxAge": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "transformations": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "ttl": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
     },
     "copytree": {
       "type": "object",
-      "additionalProperties": true
+      "additionalProperties": false,
+      "properties": {
+        "globalExcludedDirectories": {
+          "$ref": "#/definitions/stringArray"
+        },
+        "basePathExcludedDirectories": {
+          "$ref": "#/definitions/stringArray"
+        },
+        "globalExcludedFiles": {
+          "$ref": "#/definitions/stringArray"
+        },
+        "structureOnlyPatterns": {
+          "$ref": "#/definitions/stringArray"
+        },
+        "forceIncludeDotfiles": {
+          "$ref": "#/definitions/stringArray"
+        },
+        "maxFileSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxTotalSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxFileCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sizeGate": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxOutputSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxCharacterLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxBase64Size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Largest binary that will be base64-encoded under the `base64` policy"
+        },
+        "followSymlinks": {
+          "type": "boolean"
+        },
+        "includeHidden": {
+          "type": "boolean"
+        },
+        "preserveEmptyDirs": {
+          "type": "boolean"
+        },
+        "respectGitignore": {
+          "type": "boolean",
+          "description": "Apply .gitignore rules. A profile's own `respectGitignore` overrides this."
+        },
+        "gitignore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nested": {
+              "type": "boolean"
+            },
+            "infoExclude": {
+              "type": "boolean"
+            },
+            "globalExcludesFile": {
+              "type": "boolean"
+            }
+          }
+        },
+        "exclusionReport": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "topN": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxEntries": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "binaryFileAction": {
+          "$ref": "#/definitions/binaryPolicyValue"
+        },
+        "binaryPlaceholderText": {
+          "type": "string"
+        },
+        "binaryDetect": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sampleBytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "nonPrintableThreshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "binaryExtensions": {
+          "type": "object",
+          "description": "Extension lists keyed by binary category",
+          "additionalProperties": {
+            "$ref": "#/definitions/stringArray"
+          }
+        },
+        "binaryPolicy": {
+          "type": "object",
+          "description": "Per-category overrides of binaryFileAction",
+          "additionalProperties": {
+            "$ref": "#/definitions/binaryPolicyValue"
+          }
+        },
+        "binaryCommentTemplates": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "xml": {
+              "type": "string"
+            },
+            "markdown": {
+              "type": "string"
+            }
+          }
+        },
+        "addLineNumbers": {
+          "type": "boolean"
+        },
+        "lineNumberFormat": {
+          "type": "string"
+        },
+        "treeIndent": {
+          "type": "string"
+        },
+        "treeConnectors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "middle": {
+              "type": "string"
+            },
+            "last": {
+              "type": "string"
+            },
+            "vertical": {
+              "type": "string"
+            },
+            "empty": {
+              "type": "string"
+            }
+          }
+        },
+        "fs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "retryAttempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "retryDelay": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxDelay": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "discovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "parallelEnabled": {
+              "type": "boolean"
+            },
+            "maxConcurrency": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "highWaterMark": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            }
+          }
+        }
+      }
     },
     "logging": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "level": {
           "type": "string",
-          "enum": ["error", "warn", "info", "debug"],
+          "enum": [
+            "error",
+            "warn",
+            "info",
+            "debug"
+          ],
           "description": "Minimum log level to output"
         },
         "format": {
           "type": "string",
-          "enum": ["text", "json", "silent"],
+          "enum": [
+            "text",
+            "json",
+            "silent"
+          ],
           "description": "Log output format"
         },
         "colorize": {
           "type": "string",
-          "enum": ["auto", "always", "never"],
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ],
           "description": "Color output mode"
         },
         "timestamp": {
@@ -46,12 +392,98 @@
         },
         "destination": {
           "type": "string",
-          "enum": ["stderr", "stdout"],
+          "enum": [
+            "stderr",
+            "stdout"
+          ],
           "description": "Log output destination stream"
         }
-      },
-      "additionalProperties": false
+      }
+    },
+    "secretsGuard": {
+      "type": "object",
+      "description": "Secret detection and redaction. A top-level section, not part of `copytree`, because it is a policy rather than a selection setting.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Run the guard at all"
+        },
+        "exclude": {
+          "$ref": "#/definitions/stringArray",
+          "description": "Glob patterns for files excluded outright as secret-prone"
+        },
+        "redactInline": {
+          "type": "boolean",
+          "description": "Redact matches in place rather than excluding the file"
+        },
+        "redactionMode": {
+          "type": "string",
+          "enum": [
+            "typed",
+            "generic",
+            "hash"
+          ],
+          "description": "What a redaction marker reveals about what it replaced"
+        },
+        "maxFileBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Largest file the scanner will read"
+        },
+        "failOnSecrets": {
+          "type": "boolean",
+          "description": "Exit 3 on the first finding"
+        },
+        "oversizePolicy": {
+          "type": "string",
+          "enum": [
+            "exclude",
+            "include",
+            "warn"
+          ],
+          "description": "What to do with a file larger than maxFileBytes"
+        },
+        "gitleaks": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The optional external scanner. Absent means the built-in scanner is used.",
+          "properties": {
+            "binaryPath": {
+              "type": "string"
+            },
+            "configPath": {
+              "type": "string"
+            },
+            "extraArgs": {
+              "$ref": "#/definitions/stringArray"
+            },
+            "logLevel": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   },
-  "additionalProperties": true
+  "definitions": {
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "binaryPolicyValue": {
+      "type": "string",
+      "description": "What to do with a binary or document file",
+      "enum": [
+        "load",
+        "omit",
+        "skip",
+        "comment",
+        "placeholder",
+        "base64"
+      ]
+    }
+  }
 }

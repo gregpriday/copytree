@@ -58,6 +58,7 @@ tests/
 **Purpose:** Test individual functions, classes, and modules in isolation.
 
 **Scope:**
+
 - Pipeline stage contracts and lifecycle hooks
 - Transformer trait enforcement
 - Configuration hierarchy and precedence
@@ -66,6 +67,7 @@ tests/
 - Utility functions
 
 **Characteristics:**
+
 - Run in < 10ms per test
 - No external dependencies (network, filesystem where possible)
 - Use mocks for external services
@@ -76,6 +78,7 @@ tests/
 **Purpose:** Test interaction between multiple modules without full system deployment.
 
 **Scope:**
+
 - Stage orchestration across multiple stages
 - Event emission and propagation
 - External source handling (with local git repos)
@@ -83,6 +86,7 @@ tests/
 - Profile loading and inheritance
 
 **Characteristics:**
+
 - Run in < 100ms per test
 - Use local resources (no network)
 - Test real file I/O patterns
@@ -93,6 +97,7 @@ tests/
 **Purpose:** Validate complete user workflows from CLI invocation to output.
 
 **Scope:**
+
 - All output formats (XML, JSON, Markdown, Tree)
 - Profile usage and filtering
 - Git integration (modified, branch comparison)
@@ -100,6 +105,7 @@ tests/
 - Error handling and recovery
 
 **Characteristics:**
+
 - Run in < 1s per test
 - Use golden file comparisons
 - Test actual CLI entry points
@@ -110,6 +116,7 @@ tests/
 **Purpose:** Ensure performance remains within acceptable bounds.
 
 **Scope:**
+
 - Time budgets per project size (small/medium/large)
 - Memory usage patterns
 - Concurrency scaling
@@ -117,6 +124,7 @@ tests/
 - Streaming behavior for large files
 
 **Characteristics:**
+
 - Run on schedule (nightly/weekly) in CI
 - Track trends over time
 - Fail on regressions > 10%
@@ -127,6 +135,7 @@ tests/
 **Purpose:** Test system behavior under unusual or adversarial conditions.
 
 **Scope:**
+
 - Path traversal attempts
 - Symlink loops
 - Malformed files (PDFs, CSVs, images)
@@ -157,6 +166,7 @@ const metricsNormalized = normalizeMetrics(content);
 ```
 
 **Features:**
+
 - Path normalization (absolute → relative, OS-agnostic)
 - Timestamp normalization (ISO 8601, Unix epochs)
 - UUID and request ID normalization
@@ -179,11 +189,12 @@ const largeProject = createLargeProject('large', 500, { avgFileSize: 2048 });
 // Create local git repos for external source testing
 const repo = createLocalGitRepo('test-repo', {
   'README.md': '# Test',
-  'src/index.js': 'console.log("hello");'
+  'src/index.js': 'console.log("hello");',
 });
 ```
 
 **Features:**
+
 - Programmatic fixture creation
 - Golden file management
 - Local git repository creation
@@ -195,7 +206,11 @@ const repo = createLocalGitRepo('test-repo', {
 Pipeline testing utilities:
 
 ```javascript
-import { PipelineEventCollector, createTestPipeline, runPipelineWithEvents } from './helpers/pipeline.js';
+import {
+  PipelineEventCollector,
+  createTestPipeline,
+  runPipelineWithEvents,
+} from './helpers/pipeline.js';
 
 // Collect and validate pipeline events
 const collector = new PipelineEventCollector(pipeline);
@@ -209,6 +224,7 @@ const pipeline = createTestPipeline([stage1, stage2, stage3]);
 ```
 
 **Features:**
+
 - Event collection and validation
 - Pipeline contract enforcement
 - Mock stage creation
@@ -220,6 +236,7 @@ const pipeline = createTestPipeline([stage1, stage2, stage3]);
 Golden files are stored in `tests/fixtures/goldens/` and represent expected outputs for regression testing.
 
 **Usage:**
+
 ```javascript
 import { readGolden, matchGolden } from './helpers/fixtures.js';
 
@@ -232,6 +249,7 @@ expect(normalized).toMatchGolden('simple.xml');
 ```
 
 **Conventions:**
+
 - One golden file per format per fixture
 - Naming: `<fixture-name>.<format>` (e.g., `simple.xml`, `simple.json`)
 - Always normalize before comparison
@@ -256,12 +274,12 @@ were a fact.
 
 Everything not named in a per-file entry below:
 
-| Metric | Threshold |
-| ------ | --------: |
-| Statements | 67% |
-| Branches | 57% |
-| Functions | 65% |
-| Lines | 67% |
+| Metric     | Threshold |
+| ---------- | --------: |
+| Statements |       67% |
+| Branches   |       57% |
+| Functions  |       65% |
+| Lines      |       67% |
 
 Jest removes any file matched by a path-specific key from the `global` pool, so
 these numbers describe the remainder, and are lower than the "All files" row the
@@ -299,6 +317,7 @@ npm run test:coverage
 The command fails when any threshold is unmet. Branch coverage is included
 deliberately: line coverage alone passes for code where only the happy path is
 ever taken.
+
 - Exit codes
 
 ---
@@ -310,6 +329,7 @@ ever taken.
 **Location:** `tests/unit/pipeline/events.contract.test.js`
 
 **Coverage:**
+
 - `pipeline:start`, `pipeline:complete`, `pipeline:error` events
 - `stage:start`, `stage:complete`, `stage:error` events
 - `file:batch` events with action types
@@ -320,6 +340,7 @@ ever taken.
 **Test Count:** 20+ tests
 
 **Key Validations:**
+
 - All required event fields present
 - Event ordering is correct
 - Timing data is accurate
@@ -331,6 +352,7 @@ ever taken.
 **Location:** `tests/unit/transforms/traits.enforcement.test.js`
 
 **Coverage:**
+
 - Heavy transformer identification and scheduling
 - Idempotent trait behavior
 - Input/output type matching and chaining
@@ -341,6 +363,7 @@ ever taken.
 **Test Count:** 20+ tests
 
 **Key Validations:**
+
 - Heavy transformers respect budget constraints
 - Idempotent transformers can be reapplied safely
 - Type incompatibilities prevent invalid chains
@@ -352,6 +375,7 @@ ever taken.
 **Location:** `tests/unit/config/config.hierarchy.test.js`
 
 **Coverage:**
+
 - Precedence order: default < user < project < env < CLI
 - Nested object deep merging
 - Environment variable mapping (GEMINI_API_KEY, etc.)
@@ -362,6 +386,7 @@ ever taken.
 **Test Count:** 28 tests
 
 **Key Validations:**
+
 - Highest precedence source wins for each key
 - Nested values merge correctly across levels
 - Environment variables map to config keys
@@ -377,6 +402,7 @@ ever taken.
 **Location:** `tests/e2e/cli.outputs.test.js` (planned)
 
 **Scope:**
+
 - All output formats (XML, JSON, Markdown, Tree)
 - Profile application
 - Include/exclude patterns
@@ -387,6 +413,7 @@ ever taken.
 - Instructions injection
 
 **Approach:**
+
 ```javascript
 it.each(['xml', 'json', 'tree', 'markdown'])('produces stable %s output', async (format) => {
   const { stdout } = await runCLI(['--format', format, fixturePath('simple-project')]);
@@ -400,6 +427,7 @@ it.each(['xml', 'json', 'tree', 'markdown'])('produces stable %s output', async 
 **Location:** `tests/integration/external-sources.test.js` (planned)
 
 **Scope:**
+
 - Local git repository cloning
 - Cache hit/miss behavior
 - Branch detection
@@ -409,6 +437,7 @@ it.each(['xml', 'json', 'tree', 'markdown'])('produces stable %s output', async 
 - Update detection
 
 **Approach:**
+
 ```javascript
 it('clones and caches local git repo', async () => {
   const repo = createLocalGitRepo('test-repo', files);
@@ -425,6 +454,7 @@ it('clones and caches local git repo', async () => {
 **Location:** `tests/integration/robustness.test.js` (planned)
 
 **Scope:**
+
 - Path traversal attempts (`../../../etc/passwd`)
 - Symlink loops
 - Malformed files (corrupt PDFs, invalid CSV, broken images)
@@ -435,13 +465,14 @@ it('clones and caches local git repo', async () => {
 - Deep nesting (> 100 levels)
 
 **Approach:**
+
 ```javascript
 it('prevents path traversal', async () => {
   const { files } = await runPipeline({
-    sourcePath: fixturesWith('../../../dangerous/path')
+    sourcePath: fixturesWith('../../../dangerous/path'),
   });
 
-  expect(files.every(f => isWithinSourcePath(f.path))).toBe(true);
+  expect(files.every((f) => isWithinSourcePath(f.path))).toBe(true);
 });
 ```
 
@@ -450,6 +481,7 @@ it('prevents path traversal', async () => {
 **Location:** `.github/workflows/performance.yml` (planned)
 
 **Scope:**
+
 - Scheduled runs (nightly/weekly)
 - Small project (10 files): < 1s
 - Medium project (100 files): < 5s
@@ -459,6 +491,7 @@ it('prevents path traversal', async () => {
 - Concurrency scaling: linear up to 10 workers
 
 **Approach:**
+
 ```yaml
 - name: Run performance benchmarks
   run: npm run benchmark -- --json > perf-results.json
@@ -491,7 +524,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node: [22, 24]  # Node.js 22.12+ required
+        node: [22, 24] # Node.js 22.12+ required
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
@@ -522,6 +555,7 @@ jobs:
 ### Required Checks
 
 **Pull Request Gates:**
+
 - ✅ Linting passes
 - ✅ Unit tests pass (100%)
 - ✅ Integration tests pass (100%)
@@ -529,6 +563,7 @@ jobs:
 - ✅ Coverage thresholds met (80% global, 95% critical)
 
 **Scheduled Checks (Nightly/Weekly):**
+
 - Performance benchmarks within budgets
 - No regressions > 10%
 - Memory usage trends
@@ -540,6 +575,7 @@ jobs:
 ### Writing Tests
 
 1. **Follow AAA Pattern:**
+
    ```javascript
    // Arrange
    const input = createTestInput();
@@ -552,6 +588,7 @@ jobs:
    ```
 
 2. **Use Descriptive Test Names:**
+
    ```javascript
    it('retries retryable errors up to max attempts', async () => { ... });
    // NOT: it('works', () => { ... });
@@ -652,6 +689,7 @@ jobs:
 ### Test Suite Metrics
 
 **Current (Phase 1 Complete):**
+
 - **Total Tests:** ~150+
 - **Unit Tests:** ~120
 - **Integration Tests:** ~20
@@ -659,6 +697,7 @@ jobs:
 - **Coverage:** 80% global (target met)
 
 **Target (All Phases Complete):**
+
 - **Total Tests:** 300+
 - **Unit Tests:** 200+
 - **Integration Tests:** 60+
@@ -668,6 +707,7 @@ jobs:
 ### Performance Benchmarks
 
 **Targets:**
+
 - Small project (10 files): < 1s
 - Medium project (100 files): < 5s
 - Large project (500+ files): < 30s
@@ -750,6 +790,7 @@ UPDATE_GOLDEN=true npm test
 This testing strategy provides a solid foundation for ensuring CopyTree's reliability, performance, and maintainability. With the core infrastructure in place (Phase 1 complete), we're well-positioned to expand coverage and enforce quality gates throughout the development process.
 
 **Key Principles:**
+
 1. **Comprehensive:** Cover all layers (unit → integration → e2e → perf)
 2. **Practical:** Focus on high-value tests aligned with architecture
 3. **Automated:** Enforce quality gates in CI/CD

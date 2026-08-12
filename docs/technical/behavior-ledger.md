@@ -12,7 +12,7 @@ The rule this exists to enforce: **do not approve a changed golden file because
 ## 0.17.0 (dependency and process-boundary pass)
 
 The first performance pass removed duplicated work. This one removes
-*dependencies* and *process boundaries* — the fixed cost every invocation paid
+_dependencies_ and _process boundaries_ — the fixed cost every invocation paid
 before it did anything. Almost all of it is invisible; these are the exceptions.
 
 ### Streamed Markdown `sha256` describes the emitted content
@@ -21,7 +21,7 @@ The buffered formatter was fixed in the previous pass; `StreamingOutputStage`
 still did the opposite, and for the same reason it was wrong there: by the time
 a file is streamed its content has been redacted by `SecretsGuardStage` and
 rewritten by transformers, so hashing `file.absolutePath` published the digest
-of the *unredacted* original beside the redacted document. That is enough to
+of the _unredacted_ original beside the redacted document. That is enough to
 confirm a guess at the removed bytes. It also reopened and reread every selected
 file, serialized inside the per-file transform. Hashes now come from the emitted
 content, falling back to disk only when there is none.
@@ -35,7 +35,7 @@ probes the same two paths again. Four probes per run, on a stage that runs on
 every copy, to reach a conclusion the load already reaches.
 
 Stage-level behaviour did change for anyone calling `InstructionsStage.process()`
-directly: it used to return the input unchanged when a *named* set failed to
+directly: it used to return the input unchanged when a _named_ set failed to
 load, while `validate()` threw for that same case. The two disagreed and only
 `validate()`'s answer ever reached a user. `validate()` is now a no-op.
 
@@ -57,7 +57,7 @@ logs one.
 
 ### `--log-level`/`colorize: always` into a pipe now actually colours
 
-The logger built styled strings with Chalk and then decided *itself*, via
+The logger built styled strings with Chalk and then decided _itself_, via
 `_shouldColorize()`, whether to write them or strip them. Chalk's own detection
 ran first and returned unstyled text whenever it judged the destination not to be
 a terminal — so asking for colour explicitly, into a pipe or a file, produced
@@ -96,7 +96,7 @@ or a script — the place `-o` is most used. Opt in with `--reveal`.
 entire selection that `FileLoadingStage` had already read. It also produced the
 wrong answer: by that point the content in memory has been redacted by
 `SecretsGuardStage` and rewritten by transformers, so a redacted file was
-published beside the digest of its *unredacted* original — a hash that does not
+published beside the digest of its _unredacted_ original — a hash that does not
 describe the document carrying it, and one that lets a reader confirm a guess at
 the bytes redaction removed. Hashes now come from the emitted content, falling
 back to disk only when there is none (`--only-tree`).
@@ -104,7 +104,7 @@ back to disk only when there is none (`--only-tree`).
 ### Programmatic results are no longer re-sorted after `SortFilesStage`
 
 `scan()` ran a second full sort using a bare `new Intl.Collator()` — the
-*system* locale, no numeric handling, ties unresolved — over a selection
+_system_ locale, no numeric handling, ties unresolved — over a selection
 `SortFilesStage` had already ordered with a collator pinned to `en`, numeric
 aware, with a code-unit tie-break. So the second sort did not merely repeat
 O(n log n) work, it replaced a deterministic order with a machine-dependent one:
@@ -124,7 +124,7 @@ is still always present; construct a `Pipeline` with `measureMemory: true` (as
 schema and validated the merged result on every invocation — including the
 overwhelmingly common one where no `~/.copytree` config exists and no
 environment overrides are set, so the "merged result" is exactly the defaults
-that shipped inside the package. Validation exists to catch bad *user* input;
+that shipped inside the package. Validation exists to catch bad _user_ input;
 re-proving the packaged defaults on every run is what the test suite is for.
 Ajv is now imported lazily and validation runs when a user config file or an
 env override actually contributed. `config:validate` is unaffected — it never
@@ -133,7 +133,7 @@ used this path, it has its own checks.
 ### A clean Gitleaks result is final
 
 Every clean file was scanned twice: Gitleaks, then the built-in regex scanner
-over the same bytes, because the fallback triggered on *zero findings* rather
+over the same bytes, because the fallback triggered on _zero findings_ rather
 than on failure. On a repository of mostly clean files that is the common path.
 The built-in scanner remains the fallback for Gitleaks being absent or failing.
 A file that Gitleaks passes and the weaker scanner would have flagged is now
@@ -166,7 +166,7 @@ so every document said `default` regardless of which profile ran.
 
 ### `--dry-run` no longer writes anything
 
-A dry run built the full pipeline and skipped only *delivery*, so `--dry-run
+A dry run built the full pipeline and skipped only _delivery_, so `--dry-run
 --stream` wrote the whole document to stdout and `--dry-run --stream -o
 existing.xml` truncated that file — while reporting "No content was read and no
 output was written". The pipeline now stops after selection, which also means a
@@ -184,7 +184,7 @@ or left standing by the release-readiness pass below.
 
 **The generic rules match the credential, not the statement around it.**
 `GENERIC_TOKEN` was `(api|secret|token|password)[\s:=]{1,4}[A-Za-z0-9._-]{12,}`,
-which matched from the *keyword* onward and redacted everything it swallowed.
+which matched from the _keyword_ onward and redacted everything it swallowed.
 `const token = payload.token.trim();` became `const ***REDACTED***);`, and
 `Token classification:` became `***REDACTED***`. On the reporting repository
 this produced 130 detections across 72 files, every one a false positive, each
@@ -486,7 +486,7 @@ passes its instance through.
 
 **Version resolves from CopyTree's own package.**
 `config/app.js` read `package.json` from `process.cwd()`. Since CopyTree is
-normally run from inside another project, it reported *that* project's version,
+normally run from inside another project, it reported _that_ project's version,
 falling back to a hard-coded `0.13.1` otherwise.
 
 **XML attributes are escaped.**
@@ -508,7 +508,7 @@ These describe what the code already did; no behaviour changed.
   not exist in `jest.config.js`. Real thresholds now exist, set at the measured
   baseline.
 - `copyStream()` claimed "only one file's content in memory at a time". It is
-  chunked *output*; selection and loading complete first. See the types.
+  chunked _output_; selection and loading complete first. See the types.
 - `scan()` claimed bounded memory. The async-iterable shape is for consumption
   convenience; sorting and exact budgets both need the full candidate set.
 
@@ -522,13 +522,13 @@ command ran the whole suite (unit, e2e, real) under the name "integration".
 
 ## Known gaps, deliberately not closed here
 
-These are pinned by tests that assert the *current* behaviour, so the fix has
+These are pinned by tests that assert the _current_ behaviour, so the fix has
 something to flip rather than being discovered again from scratch.
 
 **Pipeline event payloads are unbounded.**
 `stage:start` carries the full pipeline input and `stage:complete` the full
 output, so an `onEvent` listener sees file content from every stage, including
-stages that run *before* redaction. Two consequences: an embedder that logs
+stages that run _before_ redaction. Two consequences: an embedder that logs
 events logs unredacted credentials, and the payload cannot cross an Electron IPC
 boundary at all, because it carries the `ConfigManager` whose AJV instance is
 circular.
@@ -553,7 +553,7 @@ survivor.
 **`--clipboard` completes silently.**
 The copy succeeds and the clipboard receives the content, but Ink writes no
 frame, so nothing is printed. Pre-existing: it reproduces on the commit before
-reference output became the default, where clipboard *was* the default and the
+reference output became the default, where clipboard _was_ the default and the
 same silence applied. Not a render-throttle race — waiting 500ms after the state
 update changes nothing, so the frame is never queued rather than never flushed.
 Marked in `src/ui/components/CopyView.js`.

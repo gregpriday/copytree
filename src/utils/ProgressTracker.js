@@ -13,10 +13,8 @@ import { PHASES } from '../ui/feedback/messages.js';
 export const PIPELINE_STAGES = Object.freeze({
   DISCOVER: 'discover',
   GIT_FILTER: 'gitFilter',
-  FILTER: 'filter',
   SORT: 'sort',
   BUDGET: 'budget',
-  LIMIT: 'limit',
   LOAD: 'load',
   SECRETS: 'secrets',
   TRANSFORM: 'transform',
@@ -69,10 +67,8 @@ export function stageIdFor(stageName) {
 const STAGE_PHASES = Object.freeze({
   [PIPELINE_STAGES.DISCOVER]: PHASES.DISCOVER,
   [PIPELINE_STAGES.GIT_FILTER]: PHASES.SELECT,
-  [PIPELINE_STAGES.FILTER]: PHASES.SELECT,
   [PIPELINE_STAGES.SORT]: PHASES.SELECT,
   [PIPELINE_STAGES.BUDGET]: PHASES.SELECT,
-  [PIPELINE_STAGES.LIMIT]: PHASES.SELECT,
   [PIPELINE_STAGES.LOAD]: PHASES.LOAD,
   [PIPELINE_STAGES.TRANSFORM]: PHASES.TRANSFORM,
   [PIPELINE_STAGES.DEDUPE]: PHASES.CONTEXT,

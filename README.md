@@ -8,6 +8,7 @@
 🌐 **[copytree.dev](https://copytree.dev)**
 
 **Who is this for?**
+
 - Engineers sharing code context with AI tools (Claude, ChatGPT, etc.)
 - Code reviewers capturing diffs and changes
 - Documentation writers exporting structured code snippets
@@ -100,7 +101,7 @@ Repeatable options take one value per occurrence: `--include a --include b`.
 - `--max-total-size <size>` / `--max-files <n>` / `--max-chars <n>` – Bound the whole context
 - `--line-numbers` – Add line numbers to text content
 - `--git-status` – Attach Git status to selected files
-- `--binary <default|omit|comment|placeholder|base64|convert>` – Binary/document policy
+- `--binary <default|omit|comment|placeholder|base64>` – Binary/document policy
 - `--secrets <redact|fail|off>` – Secret policy (default: **redact**)
 - `--dedupe` – Remove content-identical files
 - `--sort <path|size|modified|name|extension|depth>` / `--order <asc|desc>` – Selection order,
@@ -158,16 +159,18 @@ copytree --format markdown -o structure.md
 Profiles control which files are included and how they're processed.
 
 **Create a custom profile:**
+
 ```yaml
 # .copytree/my-profile.yml
 name: my-profile
-include: ["src/**/*.js", "README.md"]
-exclude: ["**/*.test.js"]
+include: ['src/**/*.js', 'README.md']
+exclude: ['**/*.test.js']
 output:
   format: markdown
 ```
 
 **Use your profile:**
+
 ```bash
 # Use a profile by name
 copytree --profile my-profile -o summary.md
@@ -191,7 +194,7 @@ User preferences are **data, not code**, in the conventional location for your p
 ```yaml
 # config.yaml
 copytree:
-  maxFileSize: 10485760   # 10MB
+  maxFileSize: 10485760 # 10MB
   includeHidden: false
   respectGitignore: true
 ```
@@ -236,23 +239,25 @@ what you get from `copy()` is what `copytree` would have printed.
 ```js
 import { copy, ConfigManager } from 'copytree';
 
-// Create the config once per process (or per project), not per call.
-// `userConfig: false` skips ~/.copytree so the same inputs produce the same
-// context on every machine — important when the app is shared or signed.
+// SDK calls are hermetic by default: packaged defaults only, so the same
+// inputs produce the same context on every machine. Build a ConfigManager
+// yourself only to reuse one across calls (loading parses every config file
+// and compiles the schema), or to opt in to the user's own configuration with
+// `ConfigManager.create()`.
 const config = await ConfigManager.create({ userConfig: false });
 
 const result = await copy(repoRoot, {
-  scope: ['src/panels/file-browser'],   // literal paths, dirs or files
+  scope: ['src/panels/file-browser'], // literal paths, dirs or files
   maxTotalSize: 2_000_000,
   charLimit: 400_000,
   explain: true,
   config,
 });
 
-console.log(result.output);                      // formatted context
-console.log(result.outputFormatVersion);         // 'copytree-xml@1'
-console.log(result.stats.estimatedTokens);       // ~78000
-console.log(result.stats.excluded.byReason);     // { gitignore: 380, sizeGate: 1, ... }
+console.log(result.output); // formatted context
+console.log(result.outputFormatVersion); // 'copytree-xml@1'
+console.log(result.stats.estimatedTokens); // ~78000
+console.log(result.stats.excluded.byReason); // { gitignore: 380, sizeGate: 1, ... }
 
 if (result.stats.truncated) {
   console.warn(`Dropped ${result.stats.truncatedCount} files (${result.stats.truncatedBy})`);
@@ -293,10 +298,14 @@ try {
   await copy(repoRoot, { scope: [selectedPath], config });
 } catch (error) {
   switch (error.code) {
-    case ERROR_CODES.SCOPE_OUTSIDE_ROOT: return showOutsideProjectWarning();
-    case ERROR_CODES.PATH_NOT_FOUND:     return showMissingPathWarning();
-    case ERROR_CODES.ABORTED:            return; // user cancelled
-    default: throw error;
+    case ERROR_CODES.SCOPE_OUTSIDE_ROOT:
+      return showOutsideProjectWarning();
+    case ERROR_CODES.PATH_NOT_FOUND:
+      return showMissingPathWarning();
+    case ERROR_CODES.ABORTED:
+      return; // user cancelled
+    default:
+      throw error;
   }
 }
 ```
@@ -322,21 +331,21 @@ For detailed guides, see the `docs/` directory:
 
 ## 📚 Commands Reference
 
-| Command | What it does |
-|---|---|
-| `copytree [path]` | Copy, using a file reference by default |
-| `copytree copy [path]` | The explicit form of the default operation |
-| `copytree plan [path]` | Preview the exact selection without reading contents |
-| `copytree inspect [path]` | Inspect structure, rules, profile and budgets |
-| `copytree explain <entry...>` | Explain why paths are included or excluded |
-| `copytree ignore context [path]` | Build context for authoring `.copytreeignore` |
-| `copytree ignore check [path]` | Validate ignore rules and show their effect |
-| `copytree ignore init [path]` | Print or write a conservative starter file |
-| `copytree config show\|validate\|migrate` | Inspect, validate or migrate configuration |
-| `copytree cache status\|clear\|gc` | Inspect or manage caches and reference files |
-| `copytree doctor` | Check CopyTree, clipboard, Git and converters |
-| `copytree completion <shell>` | Generate shell completion code |
-| `copytree debug profile [path]` | Capture CPU and/or heap profiles |
+| Command                                   | What it does                                          |
+| ----------------------------------------- | ----------------------------------------------------- |
+| `copytree [path]`                         | Copy, using a file reference by default               |
+| `copytree copy [path]`                    | The explicit form of the default operation            |
+| `copytree plan [path]`                    | Preview the exact selection without reading contents  |
+| `copytree inspect [path]`                 | Inspect structure, rules, profile and budgets         |
+| `copytree explain <entry...>`             | Explain why paths are included or excluded            |
+| `copytree ignore context [path]`          | Build context for authoring `.copytreeignore`         |
+| `copytree ignore check [path]`            | Validate ignore rules and show their effect           |
+| `copytree ignore init [path]`             | Print or write a conservative starter file            |
+| `copytree config show\|validate\|migrate` | Inspect, validate or migrate configuration            |
+| `copytree cache status\|clear\|gc`        | Inspect or manage caches and reference files          |
+| `copytree doctor`                         | Check CopyTree, clipboard, Git and effective policies |
+| `copytree completion <shell>`             | Generate shell completion code                        |
+| `copytree debug profile [path]`           | Capture CPU and/or heap profiles                      |
 
 The colon spellings (`config:validate`, `cache:clear`) still parse and name their replacement.
 
@@ -352,7 +361,7 @@ The colon spellings (`config:validate`, `cache:clear`) still parse and name thei
 → Raise `--size-gate`, or `--force-include` the specific paths you need
 
 **Binary files**
-→ `--binary <default|omit|comment|placeholder|base64|convert>` states the policy explicitly
+→ `--binary <default|omit|comment|placeholder|base64>` states the policy explicitly
 
 **Memory issues**
 → Lower `--max-total-size`, or narrow the run with `--scope`
@@ -369,7 +378,7 @@ The colon spellings (`config:validate`, `cache:clear`) still parse and name thei
 ### Debug Mode
 
 ```bash
-# Check the installation, clipboard, Git and converters
+# Check the installation, clipboard, Git and effective policies
 copytree doctor
 
 # Verbose run detail
@@ -432,12 +441,16 @@ See our [Testing Guide](tests/README.md) for more details on writing and running
 
 CopyTree is optimized for large codebases:
 
-- **Streaming processing** - Memory efficient for large files (>10MB)
+- **Chunked output** - The formatted document is never assembled as one string,
+  so output can start reaching a file or a pipe before the last file is rendered.
+  This is not a memory bound: the selection and its content are still resident.
 - **Parallel file processing** - Faster for many files
 - **Smart caching** - Avoid redundant transformations
-- **Configurable limits** - Prevent resource exhaustion
+- **Configurable limits** - `--max-total-size`, `--max-files` and `--size-gate`
+  are what actually bound memory
 
 **Performance targets:**
+
 - Process 10,000 files in < 30 seconds
 - Memory usage < 500MB for large projects
 - Support projects up to 100MB total size

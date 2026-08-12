@@ -175,18 +175,131 @@ describe('GitleaksAdapter', () => {
       );
     });
 
-    it('should handle malformed JSON gracefully', async () => {
+    it('never turns unreadable findings into a clean result', async () => {
+      // Exit 1 is Gitleaks saying "I found secrets". If its report cannot be
+      // parsed, the one answer that must not come back is "no secrets" — the
+      // guard would be reporting success at the exact moment it has most
+      // reason not to. This returned `[]`.
       const mockChild = createMockProcess(1, 'invalid json', '');
       mockSpawn.mockReturnValue(mockChild);
 
-      const result = await adapter.scanString('test', 'test.js');
+      await expect(adapter.scanString('test', 'test.js')).rejects.toThrow(
+        /reported findings but its report was empty or unreadable/,
+      );
 
-      expect(result).toEqual([]);
+      // And the circuit is open, so the caller falls back for the rest of the run.
+      expect(adapter.failure).toBeTruthy();
+    });
+
+    it.each([
+      ['blank output', ''],
+      ['a JSON null', 'null'],
+      ['an empty array', '[]'],
+      ['an array of nulls', '[null]'],
+      ['findings with no location', '[{}]'],
+      ['an array of primitives', '["secret"]'],
+    ])('treats exit 1 with %s as a scan it cannot trust', async (_name, stdout) => {
+      // Exit 1 is Gitleaks saying "I found secrets". Every one of these is the
+      // scanner then failing to say what — and "no findings" is the one answer
+      // that must not come back, because it reads as a clean file.
+      const mockChild = createMockProcess(1, stdout, '');
+      mockSpawn.mockReturnValue(mockChild);
+
+      await expect(adapter.scanString('test', 'test.js')).rejects.toThrow(/empty or unreadable/);
+    });
+
+    it('accepts a well-formed finding on exit 1', async () => {
+      const mockChild = createMockProcess(
+        1,
+        JSON.stringify([{ RuleID: 'aws-key', StartLine: 3, EndLine: 3, Match: 'AKIA...' }]),
+        '',
+      );
+      mockSpawn.mockReturnValue(mockChild);
+
+      const findings = await adapter.scanString('test', 'config.js');
+
+      expect(findings).toHaveLength(1);
+      expect(findings[0].File).toBe('config.js');
+    });
+
+    it('does not retain the findings report on the error it throws', async () => {
+      // stdout IS the findings report, and a finding carries the matched
+      // secret. Attaching the original error as `cause` hands that to every
+      // structured logger that serialises error chains.
+      const secret = 'AKIAIOSFODNN7EXAMPLE';
+      const mockChild = createMockProcess(1, `not json ${secret}`, '');
+      mockSpawn.mockReturnValue(mockChild);
+
+      const error = await adapter.scanString('test', 'test.js').catch((e) => e);
+
+      expect(JSON.stringify(error, Object.getOwnPropertyNames(error))).not.toContain(secret);
+      expect(error.cause).toBeUndefined();
+    });
+
+    it('keeps a credential out of the message when the scanner puts one on stderr', async () => {
+      const secret = 'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+      const mockChild = createMockProcess(2, '', `debug: matched token=${secret}`);
+      mockSpawn.mockReturnValue(mockChild);
+
+      const error = await adapter.scanString('test', 'test.js').catch((e) => e);
+
+      expect(error.message).not.toContain(secret);
+    });
+
+    it('propagates a cancellation instead of degrading the scan', async () => {
+      const controller = new AbortController();
+      const mockChild = new EventEmitter();
+      mockChild.stdin = Object.assign(new EventEmitter(), { write: jest.fn(), end: jest.fn() });
+      mockChild.stdout = new EventEmitter();
+      mockChild.stderr = new EventEmitter();
+      mockChild.kill = jest.fn();
+      mockSpawn.mockReturnValue(mockChild);
+      controller.abort();
+
+      const error = await adapter
+        .scanString('test', 'test.js', { signal: controller.signal })
+        .catch((e) => e);
+
+      // A cancelled run is not a degraded one: opening the circuit and falling
+      // back to a weaker scanner is work for a run that is being abandoned.
+      expect(error.name).toBe('AbortError');
+      expect(adapter.failure).toBeNull();
+    });
+
+    it('never treats an unreadable report on a clean exit as a clean scan', async () => {
+      const mockChild = createMockProcess(0, 'not json at all', '');
+      mockSpawn.mockReturnValue(mockChild);
+
+      await expect(adapter.scanString('test', 'test.js')).rejects.toThrow(
+        /exited cleanly but its report could not be parsed/,
+      );
+    });
+
+    it('treats genuinely empty output on a clean exit as no findings', async () => {
+      const mockChild = createMockProcess(0, '', '');
+      mockSpawn.mockReturnValue(mockChild);
+
+      await expect(adapter.scanString('test', 'test.js')).resolves.toEqual([]);
+    });
+
+    it('keeps stdout out of error messages', async () => {
+      // stdout is the findings report, and a finding can carry the secret it
+      // matched. Error messages reach logs, stats and the embedder.
+      const secret = 'AKIAIOSFODNN7EXAMPLE';
+      const mockChild = createMockProcess(2, secret, 'config error');
+      mockSpawn.mockReturnValue(mockChild);
+
+      await expect(adapter.scanString('test', 'test.js')).rejects.toThrow(
+        expect.objectContaining({ message: expect.not.stringContaining(secret) }),
+      );
     });
 
     it('should throw error on spawn failure', async () => {
       const mockChild = new EventEmitter();
-      mockChild.stdin = { write: jest.fn(), end: jest.fn() };
+      mockChild.stdin = Object.assign(new EventEmitter(), {
+        write: jest.fn(),
+        end: jest.fn(),
+      });
       mockChild.stdout = new EventEmitter();
       mockChild.stderr = new EventEmitter();
       mockSpawn.mockReturnValue(mockChild);
@@ -238,7 +351,10 @@ describe('GitleaksAdapter', () => {
       jest.useRealTimers(); // Explicitly use real timers
 
       const mockChild = new EventEmitter();
-      mockChild.stdin = { write: jest.fn(), end: jest.fn() };
+      mockChild.stdin = Object.assign(new EventEmitter(), {
+        write: jest.fn(),
+        end: jest.fn(),
+      });
       mockChild.stdout = new EventEmitter();
       mockChild.stderr = new EventEmitter();
       mockChild.kill = jest.fn(() => {
@@ -254,8 +370,9 @@ describe('GitleaksAdapter', () => {
       // We expect it to reject with a timeout error
       await expect(promise).rejects.toThrow('Gitleaks scan timed out after 10 seconds');
 
-      // And we expect that the process was killed (no-arg kill for cross-platform compat)
-      expect(mockChild.kill).toHaveBeenCalledWith();
+      // Asked to stop first. A bare `kill()` is a request a wedged process can
+      // ignore; the adapter escalates to SIGKILL if SIGTERM goes unanswered.
+      expect(mockChild.kill).toHaveBeenCalledWith('SIGTERM');
     }, 12000); // Set a test timeout longer than the 10s in the code
   });
 
@@ -385,12 +502,15 @@ describe('GitleaksAdapter', () => {
  */
 function createMockProcess(exitCode, stdout, stderr) {
   const mockChild = new EventEmitter();
-  mockChild.stdin = {
+  // A real child's stdin is a writable stream, not a bare object: the adapter
+  // listens on it for the EPIPE a child that exits early produces.
+  mockChild.stdin = Object.assign(new EventEmitter(), {
     write: jest.fn(),
     end: jest.fn(),
-  };
+  });
   mockChild.stdout = new EventEmitter();
   mockChild.stderr = new EventEmitter();
+  mockChild.kill = jest.fn();
 
   // Emit data and close after a tick
   setImmediate(() => {

@@ -10,24 +10,27 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ### Prerequisites
 
-- **Node.js 20.0.0 or higher**
+- **Node.js 22.12.0 or higher** (matches `engines` in `package.json`)
 - npm (comes with Node.js)
 - Git
 
 ### Development Setup
 
 1. **Fork and clone the repository**
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/copytree.git
    cd copytree
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Run tests to verify setup**
+
    ```bash
    npm test
    ```
@@ -55,6 +58,7 @@ We follow Git Flow:
 ### Making Changes
 
 1. **Create a branch from `develop`**
+
    ```bash
    git checkout develop
    git pull origin develop
@@ -68,6 +72,7 @@ We follow Git Flow:
    - Update documentation as needed
 
 3. **Test your changes**
+
    ```bash
    npm test                  # Run all tests
    npm run test:coverage     # Check coverage
@@ -78,6 +83,7 @@ We follow Git Flow:
 4. **Commit your changes**
    - Use clear, descriptive commit messages
    - Reference issue numbers when applicable
+
    ```bash
    git commit -m "feat: add new transformer for XYZ files
 
@@ -140,6 +146,7 @@ tests/
 - **Aim for 80%+ coverage** (enforced by CI)
 
 Example:
+
 ```javascript
 import MyTransformer from '../src/transforms/transformers/MyTransformer.js';
 
@@ -207,6 +214,7 @@ describe('MyTransformer', () => {
 ### Bug Reports
 
 Include:
+
 - **Description** of the bug
 - **Steps to reproduce**
 - **Expected behavior**
@@ -217,6 +225,7 @@ Include:
 ### Feature Requests
 
 Include:
+
 - **Clear description** of the feature
 - **Use case** - Why is this needed?
 - **Proposed implementation** (optional)
@@ -226,13 +235,27 @@ Include:
 
 (For maintainers)
 
-1. Update version in `package.json` and `config/app.js`
-2. Update `CHANGELOG.md`
-3. Create release branch
-4. Run full test suite
-5. Tag release
-6. Publish to npm
-7. Create GitHub release
+Releases are automated. Pushing a `v*` tag runs `.github/workflows/publish.yml`,
+which verifies, packs, publishes and _then_ creates the GitHub release — in that
+order, so a failed publish cannot produce a release for a version nobody can
+install.
+
+1. Update the version in `package.json` only. Everything else reads it:
+   `src/version.js` is the single source of truth, `config/app.js` imports it,
+   and the declarations carry no version at all.
+2. Update `CHANGELOG.md`.
+3. Create a `release/*` branch, merge it per Git Flow.
+4. Run `npm run verify:release` — the same gate the workflow runs: lint,
+   formatting, generated-document drift, types, dead code, the full suite with
+   coverage, and the packed-tarball consumer tests.
+5. Tag `vX.Y.Z` on `main` and push the tag.
+6. Watch the workflow. It confirms the tag matches `package.json`, publishes the
+   exact tarball it verified, waits for the registry to report the version, and
+   only then cuts the GitHub release.
+
+Do not run `npm publish` by hand. `prepublishOnly` runs the full verifier, so a
+manual publish is slow rather than dangerous, but it bypasses provenance and the
+tag/version check.
 
 ## Getting Help
 
@@ -247,6 +270,7 @@ By contributing, you agree that your contributions will be licensed under the MI
 ## Recognition
 
 Contributors will be recognized in:
+
 - GitHub contributors page
 - CHANGELOG.md for significant contributions
 - README.md for major features

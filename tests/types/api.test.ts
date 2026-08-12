@@ -12,7 +12,6 @@ import {
   copyStream,
   scan,
   format,
-  resolveScope,
   estimateTokens,
   ConfigManager,
   EXCLUSION_REASONS,
@@ -85,15 +84,18 @@ async function testConfigManager() {
 
 function testProgressTypes() {
   // Test ProgressEvent shape
+  // The shape the runtime actually emits. It used to be declared as
+  // `filesProcessed` / `totalFiles` / `currentFile` / `timestamp`, none of
+  // which any stage has ever set.
   const event: ProgressEvent = {
     percent: 50,
     message: 'Processing files...',
     // Stable stage id, never a class name — consumers render this directly.
     stage: 'discover',
-    filesProcessed: 100,
-    totalFiles: 200,
-    currentFile: 'src/index.ts',
-    timestamp: Date.now(),
+    phase: 'discover',
+    completed: 100,
+    total: 200,
+    item: 'src/index.ts',
   };
 
   // Test minimal ProgressEvent (only required fields)
@@ -123,7 +125,9 @@ async function testScanApi() {
     const size: number = file.size;
     const modified: Date = file.modified;
     const isBinary: boolean = file.isBinary;
-    const content: string | Buffer | null | undefined = file.content;
+    // `Uint8Array`, not `Buffer`: the published declarations must compile
+    // without `@types/node`, which the package does not depend on.
+    const content: string | Uint8Array | null | undefined = file.content;
     const encoding: string | undefined = file.encoding;
     const gitStatus: string | undefined = file.gitStatus;
   }
@@ -326,8 +330,8 @@ async function testCombinedUsage() {
       if (progress.stage) {
         console.log(`  Stage: ${progress.stage}`);
       }
-      if (progress.filesProcessed !== undefined && progress.totalFiles !== undefined) {
-        console.log(`  Files: ${progress.filesProcessed}/${progress.totalFiles}`);
+      if (progress.completed !== undefined && progress.total !== undefined) {
+        console.log(`  Files: ${progress.completed}/${progress.total}`);
       }
     },
   });
@@ -351,7 +355,8 @@ async function testScopedCopy() {
   const version: string | null = result.outputFormatVersion;
   const scoped: string[] | undefined = result.stats.scope;
 
-  // Scope entries can also be resolved directly.
+  // Scope entries can also be resolved directly, from the advanced subpath.
+  const { resolveScope } = await import('copytree/advanced');
   const entries = await resolveScope('/repo', ['src']);
   const abs: string = entries[0].absolutePath;
   const rel: string = entries[0].relativePath;

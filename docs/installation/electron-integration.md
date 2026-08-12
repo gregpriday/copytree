@@ -175,6 +175,7 @@ require('esbuild').build({
 **Cause:** Attempting to `require()` CopyTree directly.
 
 **Solution:** Use dynamic import:
+
 ```javascript
 // ❌ Wrong
 const { copy } = require('copytree');
@@ -188,6 +189,7 @@ const { copy } = await import('copytree');
 **Error:** `Cannot find module 'copytree'`
 
 **Solutions:**
+
 1. Ensure `copytree` is in `dependencies`, not `devDependencies`
 2. Run `npm install` after adding the dependency
 3. Check if bundler is configured to externalize Node.js modules
@@ -197,6 +199,7 @@ const { copy } = await import('copytree');
 **Error:** Paths not resolving correctly in packaged app.
 
 **Solution:** Use absolute paths or resolve relative to `app.getAppPath()`:
+
 ```javascript
 import { app } from 'electron';
 import path from 'path';
@@ -210,6 +213,7 @@ const result = await copy(projectPath);
 **Symptoms:** High memory usage or crashes with large codebases.
 
 **Solutions:**
+
 1. Use streaming mode:
    ```javascript
    for await (const chunk of copyStream(path)) {
@@ -224,10 +228,10 @@ const result = await copy(projectPath);
 ## Compatibility Matrix
 
 | Electron Version | Node.js | CopyTree Support |
-|------------------|---------|------------------|
-| ≥28 (LTS)        | ≥20     | ✅ Full support   |
-| 24-27            | 18-19   | ⚠️ May work       |
-| <24              | <18     | ❌ Not supported  |
+| ---------------- | ------- | ---------------- |
+| ≥28 (LTS)        | ≥20     | ✅ Full support  |
+| 24-27            | 18-19   | ⚠️ May work      |
+| <24              | <18     | ❌ Not supported |
 
 ## Best Practices
 

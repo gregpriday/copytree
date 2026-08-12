@@ -11,13 +11,22 @@ import { logger } from '../utils/logger.js';
  */
 class CacheService {
   constructor(options = {}) {
-    this.enabled = options.enabled ?? config().get('cache.enabled', true);
-    this.driver = options.driver || config().get('cache.driver', 'file');
-    this.prefix = options.prefix || config().get('cache.prefix', 'copytree_');
-    this.defaultTtl = options.defaultTtl || config().get('cache.defaultTtl', 3600);
+    // The operation's configuration when one was supplied, and only then the
+    // process-wide singleton. Reading the singleton unconditionally meant an
+    // embedded caller could pass its own ConfigManager for selection and
+    // formatting and still have its cache driver, path, prefix and TTL come
+    // from whatever happened to be installed globally — including a user's
+    // home directory, in a library that is otherwise hermetic.
+    const cfg = options.config ?? config();
+
+    this.config = cfg;
+    this.enabled = options.enabled ?? cfg.get('cache.enabled', true);
+    this.driver = options.driver || cfg.get('cache.driver', 'file');
+    this.prefix = options.prefix || cfg.get('cache.prefix', 'copytree_');
+    this.defaultTtl = options.defaultTtl || cfg.get('cache.defaultTtl', 3600);
 
     // File cache settings
-    let configPath = options.cachePath || config().get('cache.file.path');
+    let configPath = options.cachePath || cfg.get('cache.file.path');
 
     // If no path from config, use home directory cache
     if (!configPath) {
@@ -26,10 +35,9 @@ class CacheService {
 
     // Ensure cache path is absolute
     this.cachePath = path.isAbsolute(configPath) ? configPath : path.resolve(configPath);
-    this.extension = config().get('cache.file.extension', '.cache');
-    this.gcProbability = config().get('cache.file.gcProbability', 0.01);
-    this.maxCacheAge =
-      options.maxCacheAge || config().get('cache.file.maxAge', 7 * 24 * 60 * 60 * 1000); // 7 days in ms
+    this.extension = cfg.get('cache.file.extension', '.cache');
+    this.gcProbability = cfg.get('cache.file.gcProbability', 0.01);
+    this.maxCacheAge = options.maxCacheAge || cfg.get('cache.file.maxAge', 7 * 24 * 60 * 60 * 1000); // 7 days in ms
 
     // Memory cache for current process
     this.memoryCache = new Map();

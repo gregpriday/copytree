@@ -1,12 +1,7 @@
 import Stage from '../Stage.js';
 import fs from '../../utils/fsx.js';
 import path from 'path';
-import {
-  detect,
-  detectFromBuffer,
-  categorizeByExt,
-  isConvertibleDocument,
-} from '../../utils/BinaryDetector.js';
+import { detect, detectFromBuffer, categorizeByExt } from '../../utils/BinaryDetector.js';
 import { Minimatch } from 'minimatch';
 import { getLimiterFor } from '../../utils/taskLimiter.js';
 
@@ -122,24 +117,6 @@ class FileLoadingStage extends Stage {
 
       // Get policy for this file's category
       const policy = settings.binaryPolicy[det.category] || settings.binaryAction;
-
-      // Handle convertible documents - load raw bytes so transformers can convert
-      if (det.isBinary && isConvertibleDocument(det.category, det.ext) && policy === 'convert') {
-        const content = buffer ?? (await fs.readFile(file.absolutePath)); // Buffer
-        return {
-          ...file,
-          content,
-          isBinary: true,
-          encoding: undefined,
-          binaryCategory: det.category,
-          binaryName: det.name,
-          // The one file shape that genuinely requires the transform stage:
-          // raw bytes deliberately left unconverted for a transformer to pick
-          // up. Recording it here means the stage can be skipped outright when
-          // no file in the selection carries it.
-          needsTransform: true,
-        };
-      }
 
       // Handle non-convertible binaries
       if (det.isBinary) {

@@ -432,7 +432,7 @@ describe('help, doctor and completion', () => {
       'clipboard file reference',
       'git',
       'gitleaks (optional)',
-      'document converters',
+      'binary and document handling',
       'shell completion',
     ]) {
       expect(names).toContain(expected);

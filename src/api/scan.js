@@ -10,6 +10,7 @@ import {
 } from '../selection/selection.js';
 import path from 'path';
 import fs from '../utils/fsx.js';
+import { resolveOperationConfig } from './operationConfig.js';
 
 /**
  * Stage-computed stats forwarded verbatim from the pipeline result, onto the
@@ -211,7 +212,7 @@ export async function* scan(basePath, options = {}) {
   }
 
   // Create or use provided config instance for isolation
-  const configInstance = options.config || (await ConfigManager.create());
+  const configInstance = await resolveOperationConfig(options);
 
   const toArray = (val) => (Array.isArray(val) ? val : val ? [val] : []);
 

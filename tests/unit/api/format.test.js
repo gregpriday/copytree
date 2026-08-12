@@ -278,12 +278,15 @@ describe('format()', () => {
       expect(new Date(parsed.metadata.generated)).toBeInstanceOf(Date);
     });
 
-    it('should include directory structure', async () => {
+    it('should include directory structure as the rendered tree', async () => {
       const output = await format(sampleFiles, { format: 'json' });
       const parsed = JSON.parse(output);
 
-      expect(parsed.metadata.directoryStructure).toBeDefined();
-      expect(Array.isArray(parsed.metadata.directoryStructure)).toBe(true);
+      // One meaning, everywhere. This used to be an array of directory paths
+      // here, the same paths comma-joined in `formatStream()`, and the rendered
+      // tree in the CLI — three documents all claiming to be `copytree-json@1`.
+      expect(typeof parsed.metadata.directoryStructure).toBe('string');
+      expect(parsed.metadata.directoryStructure).toContain('subdir/');
     });
   });
 });

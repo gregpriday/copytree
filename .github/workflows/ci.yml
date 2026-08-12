@@ -24,10 +24,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -55,6 +55,22 @@ jobs:
           LANG: 'C'
           LC_ALL: 'C'
 
+      - name: Type-check the declarations
+        run: npm run typecheck
+
+      - name: Check generated documentation for drift
+        run: npm run docs:cli:check
+
+      - name: Check for dead code and undeclared dependencies
+        run: |
+          npm run knip
+          npm run knip:production
+
+      # The published artifact, exercised the way a consumer would: installed
+      # from the tarball with production dependencies only, imported by name.
+      - name: Verify the packed package
+        run: npm run test:package
+
       - name: Check for uncommitted golden file changes
         run: |
           if git diff --exit-code -- tests/fixtures/goldens; then
@@ -73,7 +89,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@8cad3ba95e5920c42f44492e54bc9639cba47959 # v6.0.2
         with:
           files: ./coverage/lcov.info
           flags: unittests
@@ -93,10 +109,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -111,6 +127,22 @@ jobs:
           TZ: 'UTC'
           LANG: 'C'
           LC_ALL: 'C'
+
+      - name: Type-check the declarations
+        run: npm run typecheck
+
+      - name: Check generated documentation for drift
+        run: npm run docs:cli:check
+
+      - name: Check for dead code and undeclared dependencies
+        run: |
+          npm run knip
+          npm run knip:production
+
+      # The published artifact, exercised the way a consumer would: installed
+      # from the tarball with production dependencies only, imported by name.
+      - name: Verify the packed package
+        run: npm run test:package
 
       - name: Check for uncommitted golden file changes
         shell: bash
@@ -128,10 +160,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '22'
 
@@ -150,10 +182,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '22'
 

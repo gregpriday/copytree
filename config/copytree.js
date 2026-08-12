@@ -285,7 +285,7 @@ export default {
   },
 
   // Binary policy per category (overrides binaryFileAction)
-  // Options: comment | skip | placeholder | base64 | convert
+  // Options: load | omit | skip | comment | placeholder | base64
   binaryPolicy: {
     image: 'comment', // Images: show comment placeholder
     video: 'comment', // Video: show comment placeholder
@@ -304,7 +304,12 @@ export default {
     mlWeights: 'comment', // Model weights: show comment placeholder
     dataBlob: 'comment', // Columnar/serialized data: show comment placeholder
     cert: 'comment', // Certificates and key material: show comment placeholder
-    document: 'convert', // PDF/DOC/etc: convert to text if possible
+    // PDF/DOC/etc. Treated like any other binary: named in the tree, with a
+    // placeholder body. This was `convert`, which loaded the raw bytes for a
+    // converter that does not exist — and the secrets guard then dropped the
+    // file outright as unscannable, so documents silently vanished from the
+    // export instead of appearing as placeholders.
+    document: 'placeholder',
     other: 'comment', // Unknown binaries: show comment placeholder
     text: 'load', // Text files: load normally
   },

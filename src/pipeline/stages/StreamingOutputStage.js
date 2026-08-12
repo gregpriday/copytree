@@ -1,942 +1,114 @@
 import Stage from '../Stage.js';
-import { ERROR_CODES, FileSystemError, ValidationError } from '../../utils/errors.js';
-import { Transform } from 'stream';
-import path from 'path';
-import { pathToFileURL } from 'url';
-import {
-  detectFenceLanguage,
-  chooseFence,
-  formatBeginMarker,
-  formatEndMarker,
-  escapeYamlScalar,
-} from '../../utils/markdown.js';
-import { hashFile, hashContent } from '../../utils/fileHash.js';
-import { escapeXmlAttribute, escapeXmlText } from '../../utils/helpers.js';
-import { OUTPUT_FORMAT_VERSIONS } from '../../utils/outputVersion.js';
+import { assertFormat, buildDocument, serialize } from '../../formatters/index.js';
+import { openAtomicWriteStream } from '../../utils/atomicWrite.js';
 
 /**
- * Streaming output stage for handling large outputs
- * Processes files one at a time and streams output
+ * Write the document to its destination as it is produced.
+ *
+ * Streaming is how a document is written, not a different document. This stage
+ * owns no serialization: it renders through the same `src/formatters` chunks
+ * the buffered stage joins, so the two cannot drift. What it owns is the
+ * destination — opening it late, respecting backpressure, and replacing a file
+ * atomically so a failed or cancelled run cannot leave half an export where a
+ * complete one used to be.
  */
 class StreamingOutputStage extends Stage {
-  /**
-   * The modification timestamp for a file, when it should be emitted at all.
-   * @param {Object} file - File entry
-   * @returns {string|null} ISO timestamp, or null
-   */
-  modifiedTimestamp(file) {
-    if (!this.includeMetadata || this.reproducible || !file.modified) return null;
-    return file.modified instanceof Date
-      ? file.modified.toISOString()
-      : new Date(file.modified).toISOString();
-  }
-
   constructor(options = {}) {
     super(options);
     // Fatal for the same reason OutputFormattingStage is: recovering past a
     // failure to produce the document means reporting success with no document,
-    // or with a different one than was asked for. Without this the pipeline
-    // continued and the real "Unknown format: foo" was replaced downstream by a
-    // generic "No output generated".
+    // or with a different one than was asked for.
     this.fatal = true;
-    const raw = (options.format || 'xml').toString().toLowerCase();
-    this.format = raw === 'md' ? 'markdown' : raw;
+    // Validated in the constructor: an unknown format must fail before
+    // discovery has read anything.
+    this.format = assertFormat(options.format ?? 'xml');
     // A destination *path* rather than an open stream. Opening it during stage
     // assembly meant the file was created — and an existing one truncated —
     // before discovery had even run, and minutes before this stage attached an
     // error listener, so a bad path surfaced as an uncaught EventEmitter error
-    // instead of a reported failure. The stream is now opened in `process()`,
-    // after the format has been validated, with its error handling in place.
+    // instead of a reported failure.
     this.outputPath = options.outputPath || null;
     this.outputStream = options.outputStream || null;
-    this.addLineNumbers =
-      options.addLineNumbers ??
-      options.withLineNumbers ??
-      this.config.get('copytree.addLineNumbers', false);
-    this.lineNumberFormat = this.config.get('copytree.lineNumberFormat', '%4d: ');
-    this.prettyPrint = options.prettyPrint ?? true;
-    // Same contract as the buffered stage: optional metadata is on by default,
-    // and `--reproducible` removes the fields that vary between two runs over
-    // an identical tree. Streaming is how a document is written, not a
-    // different document.
-    this.includeMetadata = options.includeMetadata !== false;
-    this.reproducible = options.reproducible === true;
+    this.signal = options.signal ?? null;
+    this.renderOptions = {
+      format: this.format,
+      addLineNumbers: options.addLineNumbers ?? options.withLineNumbers,
+      onlyTree: options.onlyTree || false,
+      includeMetadata: options.includeMetadata !== false,
+      reproducible: options.reproducible === true,
+      prettyPrint: options.prettyPrint,
+      withGitStatus: options.withGitStatus,
+      showSize: options.showSize,
+    };
+  }
+
+  /**
+   * Streaming failures are fatal, exactly as buffered formatting failures are.
+   * @param {Error} error - The failure
+   * @param {*} _input - Unused
+   * @throws {Error} Always
+   */
+  async handleError(error, _input) {
+    this.log(`Streaming output failed: ${error.message}`, 'debug');
+    throw error;
   }
 
   async process(input) {
     this.log(`Streaming output as ${this.format}`, 'debug');
     const startTime = Date.now();
 
-    // Build the transform first: an unknown format must fail before anything
-    // has been created on disk.
-    const transformStream = this.createTransformStream(input);
+    const document = buildDocument(input, this.renderOptions, this.config);
 
-    const { stream: destination, owned } = await this.openDestination();
-
-    try {
-      // For file outputs, wait until the destination flushes to disk.
-      const outputStreamFinished = owned
-        ? new Promise((resolve, reject) => {
-            destination.once('finish', resolve);
-            destination.once('error', reject);
-          })
-        : Promise.resolve();
-
-      transformStream.pipe(destination);
-
-      const streamed = new Promise((resolve, reject) => {
-        transformStream.on('finish', resolve);
-        transformStream.on('error', reject);
-      });
-
-      // Raced, not awaited in sequence: a destination that fails mid-write —
-      // a full disk, a closed pipe — rejects while `streamFiles` is still
-      // feeding it, and awaiting the writes first would hang until the source
-      // ran dry before anyone looked at the error.
-      await Promise.all([this.streamFiles(input, transformStream), streamed, outputStreamFinished]);
-    } catch (error) {
-      // Only destroy what this stage opened. A caller's stream, and stdout,
-      // outlive the run and are not ours to close.
-      if (owned) destination.destroy();
-      throw error;
+    if (this.outputPath) {
+      await this.streamToFile(document);
+    } else {
+      await this.streamToWritable(document, this.outputStream || process.stdout);
     }
 
     this.log(`Streamed output in ${this.getElapsedTime(startTime)}`, 'info');
 
-    // Return input unchanged (streaming doesn't modify the data)
-    return {
-      ...input,
-      streamed: true,
-      outputFormat: this.format,
-    };
+    return { ...input, streamed: true, outputFormat: this.format };
   }
 
   /**
-   * Open the destination, as late as possible and with errors attached.
-   *
-   * Waiting for `open` is what turns a missing directory or a permission
-   * problem into a rejection this stage can report, rather than an error event
-   * with no listener that takes the process down.
-   *
-   * @returns {Promise<{stream: NodeJS.WritableStream, owned: boolean}>} The
-   *   destination, and whether this stage is responsible for closing it
-   * @private
+   * Write to a file, replacing it only once the document is complete.
+   * @param {Object} document - Canonical document
+   * @returns {Promise<void>} Resolves once the destination is replaced
    */
-  async openDestination() {
-    if (!this.outputPath) {
-      return { stream: this.outputStream || process.stdout, owned: false };
-    }
-
-    const { default: fs } = await import('../../utils/fsx.js');
-    const resolved = path.resolve(this.outputPath);
+  async streamToFile(document) {
+    const handle = await openAtomicWriteStream(this.outputPath, { signal: this.signal });
 
     try {
-      await fs.ensureDir(path.dirname(resolved));
-
-      const stream = fs.createWriteStream(resolved);
-      await new Promise((resolve, reject) => {
-        stream.once('open', resolve);
-        stream.once('error', reject);
-      });
-
-      return { stream, owned: true };
+      for await (const chunk of serialize(document)) {
+        this.signal?.throwIfAborted();
+        await handle.write(chunk);
+      }
+      await handle.commit();
     } catch (error) {
-      // Typed, so the reporter can name the file and the operation instead of
-      // falling through to "CopyTree could not complete the operation".
-      throw new FileSystemError(
-        `write ${resolved}: ${error.message}`,
-        resolved,
-        'write the output file',
-        { code: error.code },
-      );
+      await handle.abort();
+      throw error;
     }
   }
 
-  createTransformStream(input) {
-    if (this.format === 'xml') {
-      return this.createXMLStream(input);
-    } else if (this.format === 'json') {
-      return this.createJSONStream(input);
-    } else if (this.format === 'tree') {
-      return this.createTreeStream(input);
-    } else if (this.format === 'markdown') {
-      return this.createMarkdownStream(input);
-    } else if (this.format === 'ndjson') {
-      return this.createNDJSONStream(input);
-    } else if (this.format === 'sarif') {
-      return this.createSARIFStream(input);
-    }
-
-    throw new ValidationError(`Unknown streaming format: ${this.format}`, 'format', this.format, {
-      code: ERROR_CODES.INVALID_FORMAT,
-      value: this.format,
-    });
-  }
-
-  createMarkdownStream(input) {
-    const stream = new Transform({
-      writableObjectMode: true,
-      transform: (chunk, _encoding, callback) => callback(null, chunk),
-    });
-    const files = input.files || [];
-    const nonNullFiles = files.filter((f) => f !== null);
-    const fileCount = nonNullFiles.length;
-    const totalSize = this.calculateTotalSize(nonNullFiles);
-    const includeGitStatus = !!input.options?.withGitStatus;
-    const includeLineNumbers = !!(this.addLineNumbers || input.options?.withLineNumbers);
-    const onlyTree = !!input.options?.onlyTree;
-    const charLimitApplied = !!(
-      input.options?.charLimit ||
-      input.stats?.truncatedFiles > 0 ||
-      nonNullFiles.some((f) => f?.truncated)
-    );
-
-    // Header and front matter
-    stream.write('---\n');
-    stream.write(`format: ${OUTPUT_FORMAT_VERSIONS.markdown}\n`);
-    stream.write('tool: copytree\n');
-    if (!this.reproducible) {
-      stream.write(`generated: ${escapeYamlScalar(new Date().toISOString())}\n`);
-    }
-    stream.write(`base_path: ${escapeYamlScalar(input.basePath)}\n`);
-    stream.write(`profile: ${escapeYamlScalar(input.profile?.name || 'default')}\n`);
-    stream.write(`file_count: ${fileCount}\n`);
-    stream.write(`total_size_bytes: ${totalSize}\n`);
-    stream.write(`char_limit_applied: ${charLimitApplied ? 'true' : 'false'}\n`);
-    stream.write(`only_tree: ${onlyTree ? 'true' : 'false'}\n`);
-    stream.write(`include_git_status: ${includeGitStatus ? 'true' : 'false'}\n`);
-    stream.write(`include_line_numbers: ${includeLineNumbers ? 'true' : 'false'}\n`);
-    const instrIncluded = !!(input.instructions && !input.options?.noInstructions);
-    const instrName = input.instructionsName || null;
-    stream.write('instructions:\n');
-    stream.write(`  name: ${instrName ? escapeYamlScalar(instrName) : 'null'}\n`);
-    stream.write(`  included: ${instrIncluded ? 'true' : 'false'}\n`);
-    stream.write('---\n\n');
-
-    // Title
-    stream.write(`# CopyTree Export — ${path.basename(input.basePath)}\n\n`);
-
-    // Directory Tree
-    stream.write('## Directory Tree\n');
-    const tree = this.buildTreeStructure(nonNullFiles);
-    const treeLines = [];
-    this.renderTree(tree, treeLines, '', true);
-    stream.write('```text\n');
-    stream.write(treeLines.join('\n'));
-    stream.write('\n```\n\n');
-
-    // Instructions
-    if (instrIncluded) {
-      stream.write('## Instructions\n\n');
-      stream.write(
-        `<!-- copytree:instructions-begin name=${escapeYamlScalar(instrName || 'default')} -->\n`,
-      );
-      const instrFence = chooseFence(input.instructions || '');
-      stream.write(`${instrFence}text\n`);
-      stream.write(input.instructions.toString());
-      stream.write(`\n${instrFence}\n\n`);
-      stream.write(
-        `<!-- copytree:instructions-end name=${escapeYamlScalar(instrName || 'default')} -->\n\n`,
-      );
-    }
-
-    // Transform per file
-    stream._transform = async (file, _encoding, callback) => {
-      if (!file || onlyTree) return callback();
-
-      const relPath = `@${file.path}`;
-      const modifiedISO = file.modified
-        ? file.modified instanceof Date
-          ? file.modified.toISOString()
-          : new Date(file.modified).toISOString()
-        : null;
-      // Hash what is being emitted, not what is on disk.
-      //
-      // The order here is load-bearing, and it used to be the other way round.
-      // By this point content has been through redaction and transformation, so
-      // a file whose credentials the secrets guard replaced was published beside
-      // the digest of its *unredacted* original — which is enough to confirm a
-      // guess at the removed bytes, and defeats the redaction entirely. It also
-      // meant every streamed file was reopened and reread purely to hash it,
-      // serialized inside the per-file transform.
-      //
-      // Disk remains the fallback for the one case with no content to hash:
-      // `--only-tree`-shaped entries and binaries carried as a placeholder.
-      let sha = null;
-      try {
-        if (typeof file.content === 'string') {
-          sha = hashContent(file.content, 'sha256');
-        } else if (file.absolutePath) {
-          sha = await hashFile(file.absolutePath, 'sha256', { size: file.size });
-        }
-      } catch (_e) {
-        // Ignore hash computation errors
-      }
-      const binaryAction = this.config.get('copytree.binaryFileAction', 'placeholder');
-      // Prepare attributes for the file-begin marker (include meta here instead of inline <small>)
-      const attrs = {
-        path: relPath,
-        size: file.size ?? 0,
-        modified: modifiedISO || undefined,
-        hash: sha ? `sha256:${sha}` : undefined,
-        git: includeGitStatus && file.gitStatus ? file.gitStatus : undefined,
-        binary: file.isBinary ? true : false,
-        encoding: file.encoding || undefined,
-        binaryMode: file.isBinary
-          ? binaryAction === 'base64' || file.encoding === 'base64'
-            ? 'base64'
-            : binaryAction === 'placeholder'
-              ? 'placeholder'
-              : binaryAction === 'skip'
-                ? 'skip'
-                : undefined
-          : undefined,
-        truncated: file.truncated ? true : false,
-        truncatedAt: file.truncated ? (file.content?.length ?? 0) : undefined,
-      };
-      let chunk = '';
-      chunk += formatBeginMarker(attrs) + '\n\n';
-      chunk += `### ${relPath}\n\n`;
-      // binaryAction already defined above
-
-      const lang = file.isBinary
-        ? binaryAction === 'base64' || file.encoding === 'base64'
-          ? 'text'
-          : 'text'
-        : detectFenceLanguage(file.path);
-      const content = file.content || '';
-      const fence = chooseFence(typeof content === 'string' ? content : '');
-      chunk += `${fence}${lang ? lang : ''}`.trim() + '\n';
-      if (file.isBinary) {
-        if (binaryAction === 'base64' || file.encoding === 'base64') {
-          chunk += 'Content-Transfer: base64\n';
-          chunk += (typeof content === 'string' ? content : '') + '\n';
-        } else if (binaryAction === 'placeholder') {
-          chunk +=
-            (typeof content === 'string'
-              ? content
-              : this.config.get('copytree.binaryPlaceholderText', '[Binary file not included]') ||
-                '') + '\n';
-        }
-      } else {
-        const text = this.addLineNumbers ? this.addLineNumbersToContent(content) : content;
-        chunk += text + '\n';
-      }
-      chunk += `${fence}\n`;
-      if (file.truncated) {
-        const remaining =
-          typeof file.originalLength === 'number'
-            ? Math.max(0, file.originalLength - (file.content?.length || 0))
-            : undefined;
-        chunk += `\n<!-- copytree:truncated reason="char-limit"${remaining !== undefined ? ` remaining="${remaining}"` : ''} -->\n`;
-      }
-      chunk += `\n${formatEndMarker(relPath)}\n\n`;
-
-      callback(null, chunk);
-    };
-
-    // No closing content needed for Markdown format
-    // Files are self-contained with begin/end markers
-
-    return stream;
-  }
-
-  createXMLStream(input) {
-    const stream = new Transform({
-      writableObjectMode: true,
-      transform: (chunk, encoding, callback) => {
-        callback(null, chunk);
-      },
-    });
-
-    // Write XML header and metadata
-    const header = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    const rootStart = `<ct:directory xmlns:ct="urn:copytree" path="${escapeXmlAttribute(input.basePath)}">\n`;
-
-    stream.write(header);
-    stream.write(rootStart);
-
-    // Write metadata
-    stream.write('  <ct:metadata>\n');
-    // Versioned, and in the same position as the buffered formatter's. Without
-    // it a streamed document was indistinguishable from an unversioned one, so
-    // a consumer checking for a schema change read nothing and concluded
-    // nothing had changed — the exact failure the version exists to prevent.
-    stream.write(`    <ct:format>${OUTPUT_FORMAT_VERSIONS.xml}</ct:format>\n`);
-    if (!this.reproducible) {
-      stream.write(`    <ct:generated>${new Date().toISOString()}</ct:generated>\n`);
-    }
-    stream.write(`    <ct:fileCount>${input.files.length}</ct:fileCount>\n`);
-    stream.write(`    <ct:totalSize>${this.calculateTotalSize(input.files)}</ct:totalSize>\n`);
-
-    if (input.profile) {
-      stream.write(
-        `    <ct:profile>${escapeXmlText(input.profile.name || 'default')}</ct:profile>\n`,
-      );
-    }
-
-    if (input.gitMetadata) {
-      stream.write('    <ct:git>\n');
-      if (input.gitMetadata.branch) {
-        stream.write(`      <ct:branch>${escapeXmlText(input.gitMetadata.branch)}</ct:branch>\n`);
-      }
-      if (input.gitMetadata.lastCommit) {
-        const msg = (input.gitMetadata.lastCommit.message || '')
-          .toString()
-          .split(']]>')
-          .join(']]]]><![CDATA[>');
-        stream.write(
-          `      <ct:lastCommit hash="${escapeXmlAttribute(input.gitMetadata.lastCommit.hash)}"><![CDATA[${msg}]]></ct:lastCommit>\n`,
-        );
-      }
-      stream.write('    </ct:git>\n');
-    }
-
-    stream.write('  </ct:metadata>\n');
-    stream.write('  <ct:files>\n');
-
-    // Transform for individual files
-    stream._transform = (file, encoding, callback) => {
-      if (!file || file === null) {
-        callback();
-        return;
-      }
-
-      let xml = `    <ct:file path="@${escapeXmlAttribute(file.path)}" size="${escapeXmlAttribute(file.size)}"`;
-
-      const modified = this.modifiedTimestamp(file);
-      if (modified) {
-        xml += ` modified="${modified}"`;
-      }
-
-      if (file.isBinary) {
-        xml += ' binary="true"';
-        if (file.encoding) {
-          xml += ` encoding="${escapeXmlAttribute(file.encoding)}"`;
-        }
-      }
-
-      if (file.gitStatus) {
-        xml += ` gitStatus="${escapeXmlAttribute(file.gitStatus)}"`;
-      }
-
-      xml += '>';
-
-      // Add content directly to file element
-      let content = file.content || '';
-      if (this.addLineNumbers && !file.isBinary) {
-        content = this.addLineNumbersToContent(content);
-      }
-
-      // Wrap content in CDATA to ensure well-formed XML
-      const c = content.toString().split(']]>').join(']]]]><![CDATA[>');
-      xml += `<![CDATA[${c}]]>`;
-      xml += '</ct:file>\n';
-
-      callback(null, xml);
-    };
-
-    // Add end handler to close XML when stream ends
-    stream._final = (callback) => {
-      stream.push('  </ct:files>\n');
-      stream.push('</ct:directory>\n');
-      callback();
-    };
-
-    return stream;
-  }
-
-  createJSONStream(input) {
-    const stream = new Transform({
-      writableObjectMode: true,
-      transform: (chunk, encoding, callback) => {
-        callback(null, chunk);
-      },
-    });
-
-    let isFirst = true;
-
-    // Write JSON header
-    stream.write('{\n');
-    stream.write(`  "directory": ${JSON.stringify(input.basePath)},\n`);
-    stream.write('  "metadata": {\n');
-    stream.write(`    "format": ${JSON.stringify(OUTPUT_FORMAT_VERSIONS.json)},\n`);
-    if (!this.reproducible) {
-      stream.write(`    "generated": "${new Date().toISOString()}",\n`);
-    }
-    stream.write(`    "fileCount": ${input.files.length},\n`);
-    stream.write(`    "totalSize": ${this.calculateTotalSize(input.files)}`);
-
-    if (input.profile) {
-      stream.write(',\n');
-      stream.write(`    "profile": ${JSON.stringify(input.profile.name || 'default')}`);
-    }
-
-    stream.write('\n  },\n');
-    stream.write('  "files": [\n');
-
-    // Transform for individual files
-    stream._transform = (file, encoding, callback) => {
-      if (!file || file === null) {
-        callback();
-        return;
-      }
-
-      let json = '';
-      if (!isFirst) {
-        json += ',\n';
-      }
-      isFirst = false;
-
-      const fileObj = {
-        path: file.path,
-        size: file.size,
-        ...(this.modifiedTimestamp(file) ? { modified: this.modifiedTimestamp(file) } : {}),
-        isBinary: file.isBinary,
-        encoding: file.encoding,
-        content:
-          this.addLineNumbers && !file.isBinary
-            ? this.addLineNumbersToContent(file.content)
-            : file.content,
-      };
-
-      json +=
-        '    ' +
-        JSON.stringify(fileObj, null, this.prettyPrint ? 2 : 0)
-          .split('\n')
-          .map((line, i) => (i === 0 ? line : '    ' + line))
-          .join('\n');
-
-      callback(null, json);
-    };
-
-    // Add _final handler to close JSON structure
-    stream._final = (callback) => {
-      stream.push('\n  ]\n');
-      stream.push('}\n');
-      callback();
-    };
-
-    return stream;
-  }
-
-  createTreeStream(input) {
-    const stream = new Transform({
-      writableObjectMode: true,
-      transform: (chunk, encoding, callback) => {
-        callback(null, chunk);
-      },
-    });
-
-    // For tree format, we need to collect all files first
-    // So we'll buffer them and output at the end
-    const files = [];
-
-    stream._transform = (file, encoding, callback) => {
-      if (file && file !== null) {
-        files.push(file);
-      }
-      callback();
-    };
-
-    // Add _final handler to output the tree
-    stream._final = (callback) => {
-      // Build and render tree
-      const lines = [];
-      lines.push(input.basePath);
-      lines.push('');
-
-      const tree = this.buildTreeStructure(files);
-      this.renderTree(tree, lines, '', true);
-
-      lines.push('');
-      lines.push(`${files.length} files, ${this.formatBytes(this.calculateTotalSize(files))}`);
-
-      stream.push(lines.join('\n') + '\n');
-      callback();
-    };
-
-    return stream;
-  }
-
-  createNDJSONStream(input) {
-    const files = input.files || [];
-    const totalSize = this.calculateTotalSize(files);
-    const profileName = input.profile?.name || 'default';
-
-    let metadataWritten = false;
-
-    const stream = new Transform({
-      writableObjectMode: true,
-      transform: (chunk, _encoding, callback) => callback(null, chunk),
-    });
-
-    stream._transform = (file, _encoding, callback) => {
-      // Write metadata as first line if not yet written
-      if (!metadataWritten) {
-        metadataWritten = true;
-        const metadata = {
-          type: 'metadata',
-          format: OUTPUT_FORMAT_VERSIONS.ndjson,
-          directory: input.basePath,
-          ...(this.reproducible ? {} : { generated: new Date().toISOString() }),
-          fileCount: files.length,
-          totalSize,
-          profile: profileName,
-        };
-
-        if (input.gitMetadata) {
-          metadata.git = {
-            branch: input.gitMetadata.branch || null,
-            lastCommit: input.gitMetadata.lastCommit
-              ? {
-                  hash: input.gitMetadata.lastCommit.hash,
-                  message: input.gitMetadata.lastCommit.message,
-                }
-              : null,
-            filterType: input.gitMetadata.filterType || null,
-            hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
-          };
-        }
-
-        if (input.instructions) {
-          metadata.instructions = {
-            name: input.instructionsName || 'default',
-            content: input.instructions,
-          };
-        }
-
-        stream.push(JSON.stringify(metadata) + '\n');
-      }
-
-      // Write file record
-      if (file && file !== null) {
-        const record = {
-          type: 'file',
-          path: file.path,
-          size: file.size,
-          ...(this.modifiedTimestamp(file) ? { modified: this.modifiedTimestamp(file) } : {}),
-          isBinary: !!file.isBinary,
-        };
-
-        if (file.encoding) record.encoding = file.encoding;
-        if (file.binaryCategory) record.binaryCategory = file.binaryCategory;
-        if (file.gitStatus) record.gitStatus = file.gitStatus;
-        if (file.truncated) {
-          record.truncated = true;
-          if (file.originalLength !== undefined) {
-            record.originalLength = file.originalLength;
-          }
-        }
-
-        if (typeof file.content === 'string') {
-          let content = file.content;
-          if (this.addLineNumbers && !file.isBinary) {
-            content = this.addLineNumbersToContent(content);
-          }
-          record.content = content;
-        }
-
-        stream.push(JSON.stringify(record) + '\n');
-      }
-      callback();
-    };
-
-    // Add _final handler to output summary line
-    stream._final = (callback) => {
-      // If no files were processed, still write metadata
-      if (!metadataWritten) {
-        metadataWritten = true;
-        const metadata = {
-          type: 'metadata',
-          format: OUTPUT_FORMAT_VERSIONS.ndjson,
-          directory: input.basePath,
-          ...(this.reproducible ? {} : { generated: new Date().toISOString() }),
-          fileCount: files.length,
-          totalSize,
-          profile: profileName,
-        };
-
-        if (input.gitMetadata) {
-          metadata.git = {
-            branch: input.gitMetadata.branch || null,
-            lastCommit: input.gitMetadata.lastCommit
-              ? {
-                  hash: input.gitMetadata.lastCommit.hash,
-                  message: input.gitMetadata.lastCommit.message,
-                }
-              : null,
-            filterType: input.gitMetadata.filterType || null,
-            hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
-          };
-        }
-
-        if (input.instructions) {
-          metadata.instructions = {
-            name: input.instructionsName || 'default',
-            content: input.instructions,
-          };
-        }
-
-        stream.push(JSON.stringify(metadata) + '\n');
-      }
-
-      const summary = {
-        type: 'summary',
-        fileCount: files.length,
-        totalSize,
-        ...(this.reproducible ? {} : { processedAt: new Date().toISOString() }),
-      };
-      stream.push(JSON.stringify(summary) + '\n');
-      callback();
-    };
-
-    return stream;
-  }
-
-  createSARIFStream(input) {
-    const stream = new Transform({
-      writableObjectMode: true,
-      transform: (chunk, _encoding, callback) => callback(null, chunk),
-    });
-
-    // SARIF requires all data before outputting, so we buffer files
-    const files = [];
-
-    stream._transform = (file, _encoding, callback) => {
-      if (file && file !== null) {
-        files.push(file);
-      }
-      callback();
-    };
-
-    // Add _final handler to output complete SARIF document
-    stream._final = (callback) => {
-      const toolName = 'CopyTree';
-      const toolVersion = input.version || '0.0.0';
-      const informationUri = 'https://copytree.dev';
-
-      const results = files.map((file) => {
-        const totalLines =
-          typeof file.content === 'string' && !file.isBinary ? file.content.split('\n').length : 0;
-
-        const result = {
-          ruleId: 'file-discovered',
-          level: 'note',
-          message: { text: `File discovered: ${file.path}` },
-          locations: [
-            {
-              physicalLocation: {
-                artifactLocation: {
-                  uri: file.path,
-                  uriBaseId: '%SRCROOT%',
-                },
-              },
-            },
-          ],
-          properties: {
-            size: file.size || 0,
-            modified: this.modifiedTimestamp(file),
-            isBinary: !!file.isBinary,
-          },
-        };
-
-        if (totalLines > 0) {
-          result.locations[0].physicalLocation.region = {
-            startLine: 1,
-            endLine: Math.max(1, totalLines),
-          };
-        }
-
-        if (file.encoding) result.properties.encoding = file.encoding;
-        if (file.binaryCategory) result.properties.binaryCategory = file.binaryCategory;
-        if (file.gitStatus) result.properties.gitStatus = file.gitStatus;
-        if (file.truncated) {
-          result.properties.truncated = true;
-          if (file.originalLength !== undefined) {
-            result.properties.originalLength = file.originalLength;
-          }
-        }
-
-        return result;
+  /**
+   * Write to a writable this stage does not own.
+   *
+   * stdout and a caller-supplied stream outlive the run, so they are never
+   * closed here — only written to, with backpressure honoured.
+   *
+   * @param {Object} document - Canonical document
+   * @param {NodeJS.WritableStream} destination - Where to write
+   * @returns {Promise<void>} Resolves once every chunk is accepted
+   */
+  async streamToWritable(document, destination) {
+    for await (const chunk of serialize(document)) {
+      this.signal?.throwIfAborted();
+      if (destination.write(chunk)) continue;
+      await new Promise((resolve, reject) => {
+        destination.once('drain', resolve);
+        destination.once('error', reject);
       });
-
-      const fileCount = files.length;
-      const skippedFiles = input.stats?.skippedFiles || 0;
-      const totalSize = this.calculateTotalSize(files);
-      const basePath = input.basePath || '';
-      const workingDirectoryUri =
-        basePath && path.isAbsolute(basePath) ? pathToFileURL(basePath).href : basePath;
-
-      const sarif = {
-        $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
-        version: '2.1.0',
-        runs: [
-          {
-            tool: {
-              driver: {
-                name: toolName,
-                version: toolVersion,
-                informationUri,
-                rules: [
-                  {
-                    id: 'file-discovered',
-                    name: 'FileDiscovered',
-                    shortDescription: {
-                      text: 'A file was discovered by CopyTree.',
-                    },
-                    fullDescription: {
-                      text: 'CopyTree enumerated this file in the selected scope based on the configured profile and filters.',
-                    },
-                    helpUri: informationUri,
-                    defaultConfiguration: {
-                      level: 'note',
-                    },
-                    properties: {
-                      category: 'file-discovery',
-                      tags: ['discovery', 'enumeration'],
-                    },
-                  },
-                ],
-              },
-            },
-            results,
-            invocations: [
-              {
-                executionSuccessful: true,
-                ...(this.reproducible ? {} : { endTimeUtc: new Date().toISOString() }),
-                workingDirectory: {
-                  uri: workingDirectoryUri,
-                },
-              },
-            ],
-            properties: {
-              profile: input.profile?.name || 'default',
-              fileCount,
-              skippedFiles,
-              totalSize,
-              git: input.gitMetadata
-                ? {
-                    branch: input.gitMetadata.branch || null,
-                    lastCommit: input.gitMetadata.lastCommit
-                      ? {
-                          hash: input.gitMetadata.lastCommit.hash,
-                          message: input.gitMetadata.lastCommit.message,
-                        }
-                      : null,
-                    hasUncommittedChanges: input.gitMetadata.hasUncommittedChanges || false,
-                  }
-                : null,
-            },
-          },
-        ],
-      };
-
-      const output = this.prettyPrint ? JSON.stringify(sarif, null, 2) : JSON.stringify(sarif);
-      stream.push(output);
-      callback();
-    };
-
-    return stream;
-  }
-
-  async streamFiles(input, transformStream) {
-    // Process files one at a time to manage memory
-    let processed = 0;
-
-    for (const file of input.files) {
-      if (file !== null) {
-        transformStream.write(file);
-
-        // Small delay to prevent overwhelming the stream
-        if (processed % 100 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 0));
-        }
-
-        processed++;
-      }
     }
-
-    // Signal end of data
-    transformStream.end();
-  }
-
-  // Removed escapeXML method - content is now output raw without escaping
-
-  addLineNumbersToContent(content) {
-    if (!content) return content;
-
-    const lines = content.split('\n');
-    return lines
-      .map((line, index) => {
-        const lineNumber = (index + 1).toString();
-        const formatted = this.lineNumberFormat
-          .replace('%d', lineNumber)
-          .replace('%4d', lineNumber.padStart(4));
-        return formatted + line;
-      })
-      .join('\n');
-  }
-
-  calculateTotalSize(files) {
-    return files.reduce((total, file) => {
-      return total + (file ? file.size : 0);
-    }, 0);
-  }
-
-  buildTreeStructure(files) {
-    const tree = {};
-
-    for (const file of files) {
-      if (file === null) continue;
-
-      const parts = file.path.split('/');
-      let current = tree;
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-
-        if (i === parts.length - 1) {
-          current[part] = {
-            isFile: true,
-            size: file.size,
-          };
-        } else {
-          if (!current[part]) {
-            current[part] = {};
-          }
-          current = current[part];
-        }
-      }
-    }
-
-    return tree;
-  }
-
-  renderTree(node, lines, prefix, _isLast) {
-    const entries = Object.entries(node).sort(([a], [b]) => {
-      const aIsFile = node[a].isFile;
-      const bIsFile = node[b].isFile;
-
-      if (aIsFile && !bIsFile) return 1;
-      if (!aIsFile && bIsFile) return -1;
-
-      return a.localeCompare(b);
-    });
-
-    entries.forEach(([name, value], index) => {
-      const isLastEntry = index === entries.length - 1;
-      const connector = isLastEntry ? '└── ' : '├── ';
-
-      if (value.isFile) {
-        lines.push(`${prefix}${connector}${name} (${this.formatBytes(value.size)})`);
-      } else {
-        lines.push(`${prefix}${connector}${name}/`);
-
-        const extension = isLastEntry ? '    ' : '│   ';
-        this.renderTree(value, lines, prefix + extension, false);
-      }
-    });
   }
 }
 

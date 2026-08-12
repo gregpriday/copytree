@@ -58,6 +58,7 @@ The default profile provides sensible exclusions for common build artifacts, dep
 ### When to Use Custom Profiles
 
 Create custom profiles when you need to:
+
 - Focus on specific file types or directories
 - Apply transformers to certain files
 - Include files from external sources
@@ -179,7 +180,8 @@ copytree --format markdown
 ```
 
 Output structure:
-```markdown
+
+````markdown
 ---
 format: copytree-md@1
 ...
@@ -188,28 +190,35 @@ format: copytree-md@1
 # CopyTree Export — project
 
 ## Directory Tree
+
 ```text
 ├── src/
 └── README.md
 ```
+````
 
 ## Files
 
 <!-- copytree:file-begin path="@src/index.js" size=123 ... -->
+
 ### @src/index.js
+
 ```js
 // File content here
 ```
+
 <!-- copytree:file-end path="@src/index.js" -->
-```
+
+````
 
 ### JSON
 
 ```bash
 copytree --format json
-```
+````
 
 Output structure:
+
 ```json
 {
   "files": [
@@ -228,6 +237,7 @@ copytree --format tree
 ```
 
 Output structure:
+
 ```
 project/
 ├── src/
@@ -369,8 +379,8 @@ external:
   - source: https://github.com/org/docs
     destination: docs/external
     rules:
-      - "*.md"
-      - "**/*.md"
+      - '*.md'
+      - '**/*.md'
 ```
 
 ## Performance Tips

@@ -55,6 +55,7 @@ npm install --save-dev copytree
 ```
 
 Then use with npx:
+
 ```bash
 npx copytree
 ```
@@ -272,14 +273,17 @@ nvm use 20
 ## Platform-Specific Notes
 
 ### macOS
+
 - Clipboard integration works out of the box
 - Install Xcode Command Line Tools if Git is missing: `xcode-select --install`
 
 ### Linux
+
 - May need to install xclip or xsel for clipboard support
 - Some distributions require additional packages for Node.js
 
 ### Windows
+
 - Use WSL2 for best compatibility
 - Native Windows support is experimental
 - Clipboard integration requires additional setup
@@ -305,5 +309,6 @@ See the docs/ folder in the repository
 ```
 
 If you encounter issues not covered here, please:
+
 1. Check our comprehensive [Troubleshooting Guide](../usage/troubleshooting.md)
 2. Visit our [GitHub repository](https://github.com/gregpriday/copytree) for updates and to report bugs

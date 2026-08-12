@@ -27,6 +27,11 @@ test-results/
 CHANGELOG.md
 LICENSE
 
+# Generated from the command schema. Its formatting is the generator's
+# business; reformatting it here makes `docs:cli:check` report drift against a
+# file prettier itself just changed.
+docs/cli/copytree-reference.md
+
 # Git
 .git/
 

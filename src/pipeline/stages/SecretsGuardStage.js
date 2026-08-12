@@ -1,7 +1,7 @@
 import Stage from '../Stage.js';
 import GitleaksAdapter from '../../services/GitleaksAdapter.js';
 import SecretRedactor from '../../utils/SecretRedactor.js';
-import { SecretsDetectedError } from '../../utils/errors.js';
+import { SecretsDetectedError, isAbortError } from '../../utils/errors.js';
 import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 import { scanContent } from '../../utils/secretPatterns.js';
 import { Minimatch } from 'minimatch';
@@ -49,6 +49,11 @@ class SecretsGuardStage extends Stage {
     // not at construction — see `_resolveScanner()`.
     this._scannerResolved = false;
     this._gitleaksFailureReported = false;
+    // Set when the preferred scanner failed mid-run and the built-in scanner
+    // took over. A degraded scan is still a scan, but the caller has to be able
+    // to tell the difference — silently downgrading the guard and reporting a
+    // clean run is how a secret reaches a model.
+    this._degradation = null;
     this._resolveSettings();
   }
 
@@ -247,15 +252,28 @@ class SecretsGuardStage extends Stage {
 
       if (this.useGitleaks) {
         try {
-          fileFindings = await this.gitleaks.scanString(file.content, filePath);
+          fileFindings = await this.gitleaks.scanString(file.content, filePath, {
+            signal: this.options?.signal,
+          });
           scanned = true;
         } catch (error) {
+          // A cancellation is not a scanner failure. The adapter rethrows it
+          // unwrapped for exactly this reason; catching it here would turn an
+          // abandoned run into a "degraded scan" and then carry on scanning
+          // every remaining file with the fallback.
+          if (isAbortError(error)) throw error;
+
           // Said once, not once per file. The adapter opens its circuit on an
           // operational failure, so the condition that produced this will
           // produce it again for every remaining file — and a warning repeated
           // a thousand times buries the one line that explains the run.
           if (!this._gitleaksFailureReported) {
             this._gitleaksFailureReported = true;
+            this._degradation = {
+              from: 'gitleaks',
+              to: 'builtin',
+              reason: error.message,
+            };
             this.log(
               `Gitleaks scan failed (${error.message}); using the built-in scanner for the rest of this run`,
               'warn',
@@ -322,6 +340,9 @@ class SecretsGuardStage extends Stage {
           // file was excluded before it reached a scanner, so naming one in
           // either case would overstate what the numbers below mean.
           scanner: this._scannerName(),
+          // Present only when the preferred scanner failed and a weaker one
+          // finished the run. Its absence is the assertion that it did not.
+          ...(this._degradation ? { degraded: this._degradation } : {}),
           planOnly: this.planOnly,
           findings: findings.length,
           redacted: redactionCount,
@@ -337,6 +358,7 @@ class SecretsGuardStage extends Stage {
           // stdout; it carries positions, rule ids and fingerprints only.
           report: {
             scanner: this._scannerName(),
+            ...(this._degradation ? { degraded: this._degradation } : {}),
             redactionMode: this.redactionMode,
             findings,
           },

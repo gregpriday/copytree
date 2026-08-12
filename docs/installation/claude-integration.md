@@ -43,7 +43,6 @@ copytree -o project-context.xml
 
 Then you can reference this file in Claude Code conversations.
 
-
 ## Best Practices
 
 ### 1. Use Appropriate Profiles

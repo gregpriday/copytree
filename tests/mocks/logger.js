@@ -23,7 +23,16 @@ const createMockLogger = () => {
     setInkEventsMode: jest.fn(),
     isInkEventsMode: jest.fn().mockReturnValue(false),
     createProgressBar: jest.fn(),
-    child: jest.fn(() => createMockLogger()),
+    // Deliberately a plain function, not `jest.fn()`.
+    //
+    // The suite runs with `resetMocks: true`, which wipes every mock's
+    // implementation before each test. A `jest.fn(() => createMockLogger())`
+    // therefore starts returning `undefined` the moment a test begins, so any
+    // module that takes a child logger in its constructor — most of them —
+    // blows up on its first log call with "Cannot read properties of
+    // undefined". Nothing asserts on `child` being called, so there is no
+    // reason for it to be a spy.
+    child: () => createMockLogger(),
   };
   return mockLogger;
 };

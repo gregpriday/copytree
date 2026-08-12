@@ -31,7 +31,7 @@ most invocations actually are.
 
 They cannot share a harness because their requirements are opposite. A
 throughput benchmark runs in-process and amortises startup away so the work
-dominates. A latency benchmark has to *include* startup, because on a
+dominates. A latency benchmark has to _include_ startup, because on a
 hundred-file project startup is the majority of the wall clock: an in-process
 measurement of that copy reports the ~20 ms of work and hides the ~95 ms the
 user waited. Optimising against the throughput harness alone is how a CLI ends
@@ -46,7 +46,7 @@ node tests/performance/latency.bench.js --include tiny --samples 20
 
 ### When the machine is not idle: `latency-ab`
 
-`latency.bench.js` compares a run against a *saved* run, which means comparing
+`latency.bench.js` compares a run against a _saved_ run, which means comparing
 across time — and on a machine doing anything else, load moves a median further
 than any realistic change does. A background build has been observed moving the
 same scenario from 96 ms to 168 ms.
@@ -54,7 +54,7 @@ same scenario from 96 ms to 168 ms.
 `latency-ab.bench.js` removes that confound by never comparing across time. It
 takes a second checkout and measures in **pairs**: one invocation of each, back
 to back, alternating which goes first so neither side keeps the warmer cache.
-The reported change is the median of the per-pair *differences*, so load that hit
+The reported change is the median of the per-pair _differences_, so load that hit
 both members of a pair cancels out of it.
 
 ```bash
@@ -127,22 +127,22 @@ an algorithmic one look identical in a wall-clock number.
 ### Profiling is not wired into timing runs
 
 CPU profiles, heap snapshots, and filesystem tracing all perturb the run they
-measure. The ordinary benchmark establishes *where* something changed;
-`npm run profile:cpu` is used afterwards to explain *why*.
+measure. The ordinary benchmark establishes _where_ something changed;
+`npm run profile:cpu` is used afterwards to explain _why_.
 
 ## The performance model
 
 Scenarios are grouped by the domain they isolate:
 
-| Domain | IDs | What it answers |
-| --- | --- | --- |
-| Startup | `START-*` | How long before CopyTree can begin useful work? |
-| Discovery | `DISC-*` | How does traversal scale with files, depth, ignore rules, and scope? |
-| Selection | `SELECT-*` | What do sorting and budgets cost as the selection grows? |
-| Loading | `LOAD-*` | How many reads and bytes does content loading actually require? |
-| Formatting | `FMT-*` | How does each formatter scale with file count and content size? |
-| Streaming | `STRM-*` | How quickly does the first byte arrive, and is memory bounded? |
-| End-to-end | `E2E-*` | What does a representative real operation cost? |
+| Domain     | IDs        | What it answers                                                      |
+| ---------- | ---------- | -------------------------------------------------------------------- |
+| Startup    | `START-*`  | How long before CopyTree can begin useful work?                      |
+| Discovery  | `DISC-*`   | How does traversal scale with files, depth, ignore rules, and scope? |
+| Selection  | `SELECT-*` | What do sorting and budgets cost as the selection grows?             |
+| Loading    | `LOAD-*`   | How many reads and bytes does content loading actually require?      |
+| Formatting | `FMT-*`    | How does each formatter scale with file count and content size?      |
+| Streaming  | `STRM-*`   | How quickly does the first byte arrive, and is memory bounded?       |
+| End-to-end | `E2E-*`    | What does a representative real operation cost?                      |
 
 Formatter scenarios load their files during setup, so the measured region
 contains no disk I/O. A formatter that looks fast because discovery was slow is
@@ -150,16 +150,16 @@ not a useful measurement.
 
 ## Fixtures
 
-| Fixture | Shape | Exercises |
-| --- | --- | --- |
-| `empty` | Empty directory | Startup and configuration with no traversal to hide behind |
-| `tiny-100` | 100 × 1 KB | The common interactive case, latency-dominated |
-| `flat-10k` | 10,000 files, one directory | `readdir` and entry sorting |
-| `balanced-10k` | 10,000 files, realistic tree | The general discovery baseline |
-| `deep-10k` | 10,000 files, depth 20, `.gitignore` per level | Ignore-layer stack scaling |
-| `pruned-50k` | 50,000 files, 90% under ignored subtrees | Directory pruning |
-| `scope-50k` | 50,000 files, 100-file target subtree | Scoped traversal |
-| `text-50mb` | 500 × 100 KB | Bytes rather than entries |
+| Fixture        | Shape                                          | Exercises                                                  |
+| -------------- | ---------------------------------------------- | ---------------------------------------------------------- |
+| `empty`        | Empty directory                                | Startup and configuration with no traversal to hide behind |
+| `tiny-100`     | 100 × 1 KB                                     | The common interactive case, latency-dominated             |
+| `flat-10k`     | 10,000 files, one directory                    | `readdir` and entry sorting                                |
+| `balanced-10k` | 10,000 files, realistic tree                   | The general discovery baseline                             |
+| `deep-10k`     | 10,000 files, depth 20, `.gitignore` per level | Ignore-layer stack scaling                                 |
+| `pruned-50k`   | 50,000 files, 90% under ignored subtrees       | Directory pruning                                          |
+| `scope-50k`    | 50,000 files, 100-file target subtree          | Scoped traversal                                           |
+| `text-50mb`    | 500 × 100 KB                                   | Bytes rather than entries                                  |
 
 ## Statistics
 

@@ -48,7 +48,53 @@ describe('SecretsGuardStage', () => {
 
     await stage.process(buildInput('const token = "abc";'));
 
-    expect(mockGitleaks.scanString).toHaveBeenCalledWith(expect.any(String), 'test.js');
+    expect(mockGitleaks.scanString).toHaveBeenCalledWith(
+      expect.any(String),
+      'test.js',
+      expect.objectContaining({}),
+    );
+  });
+
+  test('records the downgrade when gitleaks fails mid-run', async () => {
+    mockGitleaks.scanString.mockRejectedValue(
+      new Error('Gitleaks reported findings but its output could not be parsed'),
+    );
+    const stage = new SecretsGuardStage({ enabled: true });
+    await stage.onInit();
+
+    const result = await stage.process(buildInput('const token = "abc";'));
+
+    // The run still completes — the built-in scanner takes over — but a caller
+    // has to be able to tell that the stronger scanner did not finish. A silent
+    // downgrade reported as a clean run is how a secret reaches a model.
+    expect(result.stats.secretsGuard.scanner).toBe('builtin');
+    expect(result.stats.secretsGuard.degraded).toMatchObject({
+      from: 'gitleaks',
+      to: 'builtin',
+    });
+    expect(result.stats.secretsGuard.degraded.reason).toMatch(/could not be parsed/);
+  });
+
+  test('propagates a cancellation instead of recording a downgrade', async () => {
+    const abort = new Error('Cancelled by SIGINT');
+    abort.name = 'AbortError';
+    mockGitleaks.scanString.mockRejectedValue(abort);
+    const stage = new SecretsGuardStage({ enabled: true });
+    await stage.onInit();
+
+    // A cancelled run is not a degraded one. Catching the abort here would
+    // mark the run degraded and then keep scanning every remaining file with
+    // the fallback, for a run that is being abandoned.
+    await expect(stage.process(buildInput('const token = "abc";'))).rejects.toThrow(/Cancelled/);
+  });
+
+  test('reports no degradation when the scan completes normally', async () => {
+    const stage = new SecretsGuardStage({ enabled: true });
+    await stage.onInit();
+
+    const result = await stage.process(buildInput('const token = "abc";'));
+
+    expect(result.stats.secretsGuard.degraded).toBeUndefined();
   });
 
   test('falls back to basic regex scanning when gitleaks is unavailable', async () => {

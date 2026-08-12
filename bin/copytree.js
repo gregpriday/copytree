@@ -214,7 +214,7 @@ async function run(spec, invocation) {
   if (!loader) throw new Error(`No handler registered for ${handlerId ?? spec.id}`);
 
   const { default: handler } = await loader();
-  await handler(request, { notices });
+  await handler(request, { notices, signal: cancellation.signal });
 }
 
 /**
@@ -337,21 +337,70 @@ function wantsJsonFeedback() {
 }
 
 /**
- * Ctrl+C is a decision, not a fault.
+ * The one cancellation source for the run.
  *
- * Node's default SIGINT handling kills the process outright, which skips `exit`
- * listeners — so a run interrupted mid-spinner would leave the cursor hidden
- * and the live line half-drawn. Claiming the signal here lets the terminal be
- * put back the way it was found, and reports the outcome as what it is: a
- * cancellation, in the neutral status, with no stack trace.
+ * Handed to every handler, which threads it into the pipeline, the walkers, the
+ * writers and any child process. Nothing else creates an `AbortController` for
+ * the CLI.
  */
-process.on('SIGINT', () => {
+const cancellation = new AbortController();
+
+/** Whether the terminal has already been restored and the outcome reported. */
+let cancelled = false;
+
+/**
+ * Put the terminal back the way it was found.
+ *
+ * Node's default signal handling kills the process outright, which skips `exit`
+ * listeners — so a run interrupted mid-spinner would leave the cursor hidden
+ * and the live line half-drawn.
+ */
+function restoreTerminal() {
   if (process.stderr.isTTY) {
     process.stderr.write('\r\x1b[2K\x1b[?25h');
   }
+}
+
+/**
+ * Ctrl+C is a decision, not a fault.
+ *
+ * The first signal *cancels* rather than exits. That distinction is the whole
+ * point: exiting immediately skips every cleanup path, so a run interrupted
+ * while writing left a half-written export at the destination, a temporary
+ * reference file behind, a profiler session open and a `git clone` still
+ * running as an orphan. Aborting instead lets each of those unwind — the
+ * atomic writer discards its temporary file and leaves the previous export
+ * intact — and the run then reports the outcome as what it is: a cancellation,
+ * in the neutral status, with no stack trace.
+ *
+ * A second signal is an instruction to stop waiting, and is honoured
+ * immediately. Cleanup that hangs must never trap someone in their own
+ * terminal.
+ *
+ * @param {string} signal - Signal name
+ */
+function onCancel(signal) {
+  if (cancelled) {
+    restoreTerminal();
+    process.exit(130);
+  }
+
+  cancelled = true;
+  cancellation.abort(new DOMException(`Cancelled by ${signal}`, 'AbortError'));
+
+  restoreTerminal();
   process.stderr.write(`${process.stderr.isTTY ? '○' : '-'} Cancelled\n`);
-  process.exit(130);
-});
+  process.exitCode = 130;
+
+  // If the run does not unwind promptly, stop waiting for it. Without this a
+  // stage that ignores the signal would leave Ctrl+C looking like it did
+  // nothing at all.
+  const forced = setTimeout(() => process.exit(130), 2000);
+  forced.unref();
+}
+
+process.on('SIGINT', () => onCancel('SIGINT'));
+process.on('SIGTERM', () => onCancel('SIGTERM'));
 
 // Legacy variadic spellings are rewritten before the parser sees them, so the
 // parser only ever deals in the canonical one-value-per-occurrence form.
@@ -379,6 +428,13 @@ try {
       );
     }
     process.exitCode = error.exitCode === 0 ? 0 : 2;
+  } else if (cancelled) {
+    // The signal handler has already restored the terminal, said "Cancelled"
+    // and set exit 130. Whatever the run threw on its way out is the
+    // *consequence* of that cancellation, not a second thing that went wrong,
+    // and reporting it would tell the user their deliberate Ctrl+C was a
+    // failure.
+    process.exitCode = 130;
   } else {
     process.exitCode = await reportFailure(error);
   }

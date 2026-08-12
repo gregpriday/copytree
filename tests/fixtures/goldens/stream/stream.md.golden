@@ -34,6 +34,8 @@ This XML document represents the directory structure and contents of a project, 
 
 <!-- copytree:instructions-end name="default" -->
 
+## Files
+
 <!-- copytree:file-begin path="@index.js" size=22 modified="<TIMESTAMP>" hash="sha256:ca28d4e130339be96924c338e727c848a2e52d901837a76abb1e921da860e679" binary=false encoding="utf8" truncated=false -->
 
 ### @index.js

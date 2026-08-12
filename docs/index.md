@@ -45,21 +45,23 @@ For contributors and extenders:
 - **[Architecture Guide](./technical/architecture.md)** - Pipeline, stages, and event system
 - **[Testing Strategy](./technical/testing-strategy.md)** - Test infrastructure and patterns
 
-
 ## ✨ Key Features
 
 ### 1. **Intelligent File Selection**
+
 - **Profile System**: Default profile automatically used; create custom profiles for project-specific needs
 - **Git Integration**: Copy only modified or changed files
 - **Pattern Matching**: Flexible include/exclude rules
 
 ### 2. **Multiple Output Options**
+
 - **Clipboard**: Default output for easy pasting
 - **File Output**: Save to file
 - **Streaming**: Real-time output for large projects
 - **Multiple Formats**: XML (default), Markdown, JSON, NDJSON, SARIF, or tree view
 
 ### 3. **Developer-Friendly**
+
 - **External Sources**: Include files from GitHub or other directories
 - **Editor Integration**: Works with VS Code, Cursor, and Claude Code
 - **Secrets Detection**: Prevent accidental exposure of API keys and credentials
@@ -67,6 +69,7 @@ For contributors and extenders:
 ## 🎯 Common Use Cases
 
 ### Share Code with AI
+
 ```bash
 # Copy entire project (uses default profile)
 copytree
@@ -76,6 +79,7 @@ copytree --profile myproject
 ```
 
 ### Document Generation
+
 ```bash
 # Generate project overview as Markdown
 copytree --output project-overview.md
@@ -85,6 +89,7 @@ copytree --output project-overview.xml
 ```
 
 ### Code Review
+
 ```bash
 # Copy only git modified files
 copytree --modified
@@ -97,13 +102,13 @@ copytree --changed HEAD~5
 ```
 
 ### Understand before you copy
+
 ```bash
 copytree plan .                 # exactly which files, in what order, at what size
 copytree inspect .              # structure, active rules, effective profile and budgets
 copytree explain docs/README.md # why one path is in, or out
 copytree ignore context .       # a content-free inventory for authoring .copytreeignore
 ```
-
 
 ## 🔧 Configuration
 
@@ -116,6 +121,7 @@ CopyTree uses a two-level configuration system:
    `copytree config migrate --write` converts it.
 
 ### Quick Configuration
+
 ```bash
 # Validate configuration
 copytree config validate

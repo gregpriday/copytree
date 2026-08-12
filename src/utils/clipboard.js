@@ -5,6 +5,24 @@ import path from 'path';
 import { logger } from './logger.js';
 
 /**
+ * How long to wait for the platform's clipboard helper.
+ *
+ * Short on purpose: a wedged Finder or a headless session must not hang a copy
+ * that has otherwise finished. But two seconds is a guess about someone else's
+ * machine, and it is wrong on a loaded CI runner, a remote desktop session, or
+ * a VM with cold page cache — where the helper is killed mid-write and the run
+ * silently falls back to copying text.
+ *
+ * `COPYTREE_CLIPBOARD_TIMEOUT_MS` raises it for those environments.
+ *
+ * @returns {number} Milliseconds
+ */
+function clipboardTimeout() {
+  const configured = Number.parseInt(process.env.COPYTREE_CLIPBOARD_TIMEOUT_MS ?? '', 10);
+  return Number.isInteger(configured) && configured > 0 ? configured : 2000;
+}
+
+/**
  * Enhanced clipboard utilities with file reference support
  */
 class Clipboard {
@@ -62,7 +80,7 @@ class Clipboard {
         const result = spawnSync(method.tool, method.args, {
           input: method.payload,
           stdio: ['pipe', 'pipe', 'pipe'],
-          timeout: 2000,
+          timeout: clipboardTimeout(),
         });
 
         if (result.error || result.status !== 0) {
@@ -91,7 +109,7 @@ tell app "Finder" to set the clipboard to aFile`;
         const result = spawnSync('osascript', ['-e', script], {
           encoding: 'utf8',
           stdio: 'pipe',
-          timeout: 2000,
+          timeout: clipboardTimeout(),
         });
 
         // `spawnSync` does not throw when the child exits non-zero, so the

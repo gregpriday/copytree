@@ -9,7 +9,7 @@
 
 import SortFilesStage from '../../../src/pipeline/stages/SortFilesStage.js';
 import { detectFromBuffer, categorizeByExt } from '../../../src/utils/BinaryDetector.js';
-import OutputFormattingStage from '../../../src/pipeline/stages/OutputFormattingStage.js';
+import { addLineNumbersToContent } from '../../../src/formatters/document.js';
 
 /**
  * Build file entries with names chosen to stress collation: mixed case, digit
@@ -169,18 +169,17 @@ describe('line numbering is unchanged by the format pre-parse', () => {
   it.each(['%4d: ', '%d: ', '%d| ', 'no-placeholder '])(
     'matches the reference for format %p',
     (format) => {
-      const stage = new OutputFormattingStage({ format: 'xml' });
-      stage.lineNumberFormat = format;
-
       const content = Array.from({ length: 1200 }, (_, i) => `line ${i}`).join('\n');
 
-      expect(stage.addLineNumbersToContent(content)).toBe(reference(format, content));
+      expect(addLineNumbersToContent(content, { lineNumberFormat: format })).toBe(
+        reference(format, content),
+      );
     },
   );
 
   it('returns falsy content untouched', () => {
-    const stage = new OutputFormattingStage({ format: 'xml' });
-    expect(stage.addLineNumbersToContent('')).toBe('');
-    expect(stage.addLineNumbersToContent(null)).toBeNull();
+    const options = { lineNumberFormat: '%4d: ' };
+    expect(addLineNumbersToContent('', options)).toBe('');
+    expect(addLineNumbersToContent(null, options)).toBeNull();
   });
 });

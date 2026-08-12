@@ -1,10 +1,113 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
+import { logger } from '../utils/logger.js';
 
 // `execFile`, not `exec`: version detection does not need a shell, and starting
 // one is a second process plus a round of command-string parsing on a path the
 // user may well have put a space in.
 const execFileAsync = promisify(execFile);
+
+/** How long a single scan may take before it is stopped. */
+const SCAN_TIMEOUT_MS = 10000;
+
+/** How long a terminated child has to exit before it is killed outright. */
+const KILL_GRACE_MS = 2000;
+
+/**
+ * The most output a single scan may produce.
+ *
+ * Generous for a findings report, and small enough that a binary writing
+ * forever cannot be copied into this process's heap in its entirety.
+ */
+const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Whether a parsed entry is a finding this codebase can actually act on.
+ *
+ * Shape matters because of what happens downstream: the redactor locates a
+ * secret from its coordinates, and an entry without them is normalised toward
+ * the start of the file. A malformed finding therefore does not merely fail —
+ * it gets counted as *found and redacted* while the real secret stays in the
+ * document, which reads as successful protection in the statistics.
+ *
+ * @param {*} entry - Parsed array element
+ * @returns {boolean} True when the entry can be located and redacted
+ */
+function isUsableFinding(entry) {
+  return (
+    typeof entry === 'object' &&
+    entry !== null &&
+    !Array.isArray(entry) &&
+    Number.isInteger(entry.StartLine)
+  );
+}
+
+/**
+ * Parse a Gitleaks findings report.
+ *
+ * The distinction this preserves is between *no findings* and *findings we
+ * could not read*. Collapsing the two is how a scanner that said "secrets
+ * found" produces a clean result.
+ *
+ * `detected` is the exit code's verdict. When Gitleaks has said it found
+ * something, an empty list is not an answer — it is the same silence as an
+ * unparseable one, and treating `[]`, `null` or blank output as "clean" there
+ * reintroduces exactly the fail-open this function exists to close.
+ *
+ * @param {string} stdout - Raw report
+ * @param {boolean} [detected=false] - Whether the exit code reported findings
+ * @returns {Array|null} Findings, or null when the report cannot be trusted
+ */
+function parseFindings(stdout, detected = false) {
+  const text = (stdout ?? '').trim();
+
+  if (!text) {
+    // Gitleaks writes nothing when it has nothing to report — but only a clean
+    // exit makes that claim.
+    return detected ? null : [];
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+
+  // Gitleaks emits `null` rather than `[]` for an empty report in some
+  // versions. Same rule: believable on a clean exit, not on a detection.
+  if (parsed === null) return detected ? null : [];
+  if (!Array.isArray(parsed)) return null;
+  if (!parsed.every(isUsableFinding)) return null;
+  // "Found secrets" and "here are none of them" cannot both be true.
+  if (detected && parsed.length === 0) return null;
+
+  return parsed;
+}
+
+/**
+ * Render stderr for an error message, bounded and stripped of control bytes.
+ *
+ * @param {string} stderr - Captured stderr
+ * @returns {string} Message fragment
+ */
+function describeStderr(stderr) {
+  // Deliberately says almost nothing.
+  //
+  // This string ends up in `stats.secretsGuard.degraded.reason` and on the
+  // user's terminal, and its source is a program whose entire subject is
+  // secrets — a custom rule set, a debug log level or a misconfiguration can
+  // put a matched value on stderr. Heuristic redaction would leak any format
+  // the heuristic does not recognise, which is the wrong side to be wrong on.
+  //
+  // The full stderr is available at debug level, where the reader has asked
+  // for it and it is not being copied into a statistics object.
+  const text = (stderr ?? '').trim();
+  if (!text) return '';
+
+  logger.debug('Gitleaks stderr', { stderr: text.slice(0, 4000) });
+  return ' (see the debug log for the scanner output)';
+}
 
 /**
  * Adapter for Gitleaks secret scanning engine
@@ -71,10 +174,12 @@ class GitleaksAdapter {
    *
    * @param {string} content - File content to scan
    * @param {string} logicalPath - Logical file path for reporting
+   * @param {Object} [options={}] - Scan options
+   * @param {AbortSignal} [options.signal] - Cancels the scan and stops the child
    * @returns {Promise<GitleaksFinding[]>} Array of findings
-   * @throws {Error} If gitleaks execution fails
+   * @throws {Error} If gitleaks execution fails, or reports findings it cannot serialize
    */
-  async scanString(content, logicalPath = 'stdin') {
+  async scanString(content, logicalPath = 'stdin', options = {}) {
     // A scanner that has already failed operationally fails the same way again.
     // Rethrowing the original keeps the caller's fallback path identical to the
     // first failure, without paying for another process to rediscover it.
@@ -85,7 +190,7 @@ class GitleaksAdapter {
     const { args } = await this._scanArgs();
 
     try {
-      const findings = await this._executeGitleaks(args, content);
+      const findings = await this._executeGitleaks(args, content, options.signal);
 
       // Remap File field to logical path
       return findings.map((finding) => ({
@@ -93,29 +198,59 @@ class GitleaksAdapter {
         File: logicalPath,
       }));
     } catch (error) {
-      // If gitleaks exits with code 1, it means secrets were found
-      // The JSON output should still be valid
-      if (error.code === 1 && error.stdout) {
-        try {
-          const findings = JSON.parse(error.stdout);
-          return Array.isArray(findings)
-            ? findings.map((f) => ({
-                ...f,
-                File: logicalPath,
-              }))
-            : [];
-        } catch (parseError) {
-          // If we can't parse the output, treat it as no findings
-          return [];
+      // Exit 1 means Gitleaks found secrets. The findings are on stdout.
+      if (error.code === 1) {
+        const findings = parseFindings(error.stdout, true);
+
+        // `null` means Gitleaks said "secrets found" and we could not read
+        // which ones. This used to return `[]` — turning the scanner's own
+        // detection into a clean verdict because of a serialization problem,
+        // which is the exact shape of a security failure: the guard reports
+        // success precisely when it has most reason not to.
+        //
+        // Throwing hands the file to the caller's fallback scanner and marks
+        // the run degraded. A weaker second opinion is a defensible answer.
+        // Silence is not.
+        if (findings === null) {
+          throw this._fail(
+            'Gitleaks reported findings but its report was empty or unreadable; ' +
+              'the file was re-scanned with the built-in scanner',
+            error,
+          );
         }
+
+        return findings.map((finding) => ({ ...finding, File: logicalPath }));
       }
+
+      // A cancellation is the caller's decision, not a scanner failure. Turning
+      // it into one would open the circuit, fall back to the built-in scanner,
+      // and mark the run degraded — for a run that is being abandoned anyway.
+      if (error?.name === 'AbortError' || error?.code === 'ABORT_ERR') throw error;
 
       // Anything else is operational — a spawn failure, an unparseable exit
       // code, a timeout. It will recur for every remaining file, so the circuit
       // opens here and this is the last process this adapter starts.
-      this.broken = new Error(`Gitleaks execution failed: ${error.message}`, { cause: error });
-      throw this.broken;
+      throw this._fail(`Gitleaks execution failed: ${error.message}`, error);
     }
+  }
+
+  /**
+   * Open the circuit breaker and produce the failure to throw.
+   *
+   * @param {string} message - What went wrong
+   * @param {Error} cause - Underlying failure
+   * @returns {Error} The recorded failure
+   * @private
+   */
+  _fail(message, cause) {
+    // The cause is deliberately NOT attached. A Gitleaks error carries its
+    // stdout, and stdout is the findings report — which can contain the matched
+    // secret. An error object reaches logs, `stats`, and whatever the embedding
+    // application does with both, and structured loggers serialise `cause`
+    // along with everything hanging off it.
+    this.broken = new Error(message);
+    if (cause?.code !== undefined) this.broken.exitCode = cause.code;
+    return this.broken;
   }
 
   /**
@@ -125,71 +260,140 @@ class GitleaksAdapter {
    * @param {string} stdin - Content to pipe to stdin
    * @returns {Promise<GitleaksFinding[]>} Parsed findings
    */
-  async _executeGitleaks(args, stdin) {
+  async _executeGitleaks(args, stdin, signal = null) {
     return new Promise((resolve, reject) => {
-      const child = spawn(this.binaryPath, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      if (signal?.aborted) {
+        reject(signal.reason ?? new Error('Gitleaks scan aborted'));
+        return;
+      }
+
+      const child = spawn(this.binaryPath, args, { stdio: ['pipe', 'pipe', 'pipe'] });
 
       let stdout = '';
       let stderr = '';
-      let timedOut = false;
+      let overflowed = false;
+      let outcome = null;
+      let hardKill = null;
 
-      // Set timeout to kill hung scans
-      const timeoutMs = 10000; // 10 seconds
-      const timer = setTimeout(() => {
-        timedOut = true;
+      /**
+       * Ask the child to stop, then insist.
+       *
+       * A `kill()` with no escalation is a request a wedged process is free to
+       * ignore, which turns a hung scan into a hung run.
+       *
+       * @param {string} reason - Why it is being stopped
+       */
+      const terminate = (reason) => {
+        outcome ??= reason;
         try {
-          child.kill();
-        } catch (e) {
-          // Process may have already exited
+          child.kill('SIGTERM');
+        } catch {
+          // Already gone.
         }
-      }, timeoutMs);
+        hardKill ??= setTimeout(() => {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // Already gone.
+          }
+        }, KILL_GRACE_MS).unref();
+      };
 
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
+      const timer = setTimeout(() => terminate('timeout'), SCAN_TIMEOUT_MS);
+      const onAbort = () => terminate('aborted');
+      signal?.addEventListener('abort', onAbort, { once: true });
 
-      child.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
+      /**
+       * Accumulate a stream, refusing to grow without bound.
+       *
+       * A misconfigured binary that writes forever would otherwise be copied
+       * into this process's heap in its entirety.
+       *
+       * @param {string} name - Which buffer to append to
+       * @returns {Function} Data handler
+       */
+      const collect = (name) => (data) => {
+        if (overflowed) return;
+        const text = data.toString();
+        if (name === 'stdout') {
+          if (stdout.length + text.length > MAX_OUTPUT_BYTES) {
+            overflowed = true;
+            terminate('overflow');
+            return;
+          }
+          stdout += text;
+        } else {
+          if (stderr.length + text.length > MAX_OUTPUT_BYTES) return;
+          stderr += text;
+        }
+      };
+
+      child.stdout.on('data', collect('stdout'));
+      child.stderr.on('data', collect('stderr'));
+
+      /** Release the timers and listeners this scan owns. */
+      const cleanup = () => {
+        clearTimeout(timer);
+        if (hardKill) clearTimeout(hardKill);
+        signal?.removeEventListener('abort', onAbort);
+      };
 
       child.on('error', (error) => {
-        clearTimeout(timer);
+        cleanup();
         reject(new Error(`Failed to spawn gitleaks: ${error.message}`));
       });
 
       child.on('close', (code) => {
-        clearTimeout(timer);
+        cleanup();
 
-        if (timedOut) {
-          reject(new Error('Gitleaks scan timed out after 10 seconds'));
+        if (outcome === 'aborted') {
+          reject(signal?.reason ?? new Error('Gitleaks scan aborted'));
           return;
         }
+        if (outcome === 'timeout') {
+          reject(new Error(`Gitleaks scan timed out after ${SCAN_TIMEOUT_MS / 1000} seconds`));
+          return;
+        }
+        if (outcome === 'overflow') {
+          reject(new Error(`Gitleaks produced more than ${MAX_OUTPUT_BYTES} bytes of output`));
+          return;
+        }
+
         if (code === 0) {
-          // No secrets found
-          try {
-            const findings = stdout.trim() ? JSON.parse(stdout) : [];
-            resolve(Array.isArray(findings) ? findings : []);
-          } catch (error) {
-            // Empty or invalid JSON means no findings
-            resolve([]);
+          const findings = parseFindings(stdout);
+
+          // Unreadable output on a nominal success is a scanner malfunction,
+          // not a clean scan. Returning `[]` here asserted "this file contains
+          // no secrets" on the strength of output nobody could read.
+          if (findings === null) {
+            reject(new Error('Gitleaks exited cleanly but its report could not be parsed'));
+            return;
           }
-        } else if (code === 1) {
-          // Secrets found - this is expected
-          // Return error with stdout so caller can parse findings
+
+          resolve(findings);
+          return;
+        }
+
+        if (code === 1) {
+          // Secrets found. Expected, and the findings are on stdout.
           const error = new Error('Secrets detected');
           error.code = code;
           error.stdout = stdout;
-          error.stderr = stderr;
           reject(error);
-        } else {
-          // Actual error
-          reject(new Error(`Gitleaks exited with code ${code}: ${stderr || stdout}`));
+          return;
         }
+
+        // Only stderr, never stdout: stdout is the findings report, and a
+        // finding can carry the secret it matched. An error message ends up in
+        // logs, in `stats`, and in whatever the embedding application does with
+        // both.
+        reject(new Error(`Gitleaks exited with code ${code}${describeStderr(stderr)}`));
       });
 
-      // Write content to stdin
+      child.stdin.on('error', () => {
+        // A child that died before reading stdin gives us EPIPE. The exit code
+        // is the real story; this would just race it.
+      });
       child.stdin.write(stdin, 'utf8');
       child.stdin.end();
     });

@@ -232,6 +232,12 @@ class Pipeline extends EventEmitter {
       const stageName = this._getStageName(Stage, i);
 
       try {
+        // Checked between stages as well as inside them. A stage that does not
+        // observe the signal itself still cannot start after the run has been
+        // cancelled, which bounds how long a Ctrl+C takes to be honoured to the
+        // duration of one stage rather than the whole pipeline.
+        this.options.signal?.throwIfAborted();
+
         this.emit('stage:start', {
           stage: stageName,
           index: i,

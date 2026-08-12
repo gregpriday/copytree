@@ -1,5 +1,22 @@
-import NDJSONFormatter from '../../src/pipeline/formatters/NDJSONFormatter.js';
-import OutputFormattingStage from '../../src/pipeline/stages/OutputFormattingStage.js';
+import { renderInput, serialize, buildDocument } from '../../../src/formatters/index.js';
+import OutputFormattingStage from '../../../src/pipeline/stages/OutputFormattingStage.js';
+
+/**
+ * Adapt the canonical NDJSON serializer to the call shape these
+ * assertions were written against.
+ *
+ * The formatter classes are gone — there is one serializer per format now, and
+ * it is a generator — but what these tests check is the document, not how it
+ * was constructed, so the assertions carry over unchanged.
+ *
+ * @param {Object} [overrides={}] - Rendering options
+ * @returns {{format: Function}} Formatter-shaped adapter
+ */
+function ndjsonFormatter(overrides = {}) {
+  return {
+    format: (input) => renderInput(input, { format: 'ndjson', ...overrides }),
+  };
+}
 
 describe('NDJSON Formatter', () => {
   // Mock stage for formatter tests
@@ -18,8 +35,7 @@ describe('NDJSON Formatter', () => {
 
   describe('format()', () => {
     it('should generate valid NDJSON with metadata, files, and summary', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+      const formatter = ndjsonFormatter();
 
       const input = {
         basePath: '/test',
@@ -68,8 +84,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should parse each line independently', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+      const formatter = ndjsonFormatter();
 
       const input = {
         basePath: '/test',
@@ -90,8 +105,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should include git metadata when present', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+      const formatter = ndjsonFormatter();
 
       const input = {
         basePath: '/test',
@@ -119,8 +133,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should include instructions when present', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+      const formatter = ndjsonFormatter();
 
       const input = {
         basePath: '/test',
@@ -140,8 +153,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should respect onlyTree option', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage, onlyTree: true });
+      const formatter = ndjsonFormatter({ onlyTree: true });
 
       const input = {
         basePath: '/test',
@@ -164,8 +176,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should add line numbers when requested', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage, addLineNumbers: true });
+      const formatter = ndjsonFormatter({ addLineNumbers: true });
 
       const input = {
         basePath: '/test',
@@ -189,8 +200,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should handle binary files with encoding', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+      const formatter = ndjsonFormatter();
 
       const input = {
         basePath: '/test',
@@ -218,8 +228,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should include git status when present', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+      const formatter = ndjsonFormatter();
 
       const input = {
         basePath: '/test',
@@ -243,8 +252,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should handle truncated files', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+      const formatter = ndjsonFormatter();
 
       const input = {
         basePath: '/test',
@@ -270,8 +278,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should handle multiple files', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+      const formatter = ndjsonFormatter();
 
       const input = {
         basePath: '/test',
@@ -297,8 +304,7 @@ describe('NDJSON Formatter', () => {
     });
 
     it('should filter out null files', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+      const formatter = ndjsonFormatter();
 
       const input = {
         basePath: '/test',
@@ -319,49 +325,38 @@ describe('NDJSON Formatter', () => {
     });
   });
 
-  describe('stream()', () => {
-    it('should stream output line-by-line to writer', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+  describe('chunking', () => {
+    const input = {
+      basePath: '/test',
+      profile: { name: 'default' },
+      files: [{ path: 'a.js', size: 10, isBinary: false, content: 'a' }],
+    };
 
-      const input = {
-        basePath: '/test',
-        profile: { name: 'default' },
-        files: [{ path: 'a.js', size: 10, isBinary: false, content: 'a' }],
-      };
+    it('emits one self-contained record per chunk', async () => {
+      const chunks = [];
+      for await (const chunk of serialize(buildDocument(input, { format: 'ndjson' }))) {
+        chunks.push(chunk);
+      }
 
-      const written = [];
-      const writer = (line) => written.push(line);
+      // metadata + one file + summary
+      expect(chunks).toHaveLength(3);
 
-      await formatter.stream(input, writer);
-
-      // Should have written 3 lines (metadata, file, summary)
-      expect(written.length).toBe(3);
-
-      // Each line should end with newline
-      written.forEach((line) => {
-        expect(line.endsWith('\n')).toBe(true);
-      });
-
-      // Each line (minus newline) should be valid JSON
-      written.forEach((line) => {
-        expect(() => JSON.parse(line.trim())).not.toThrow();
-      });
+      // NDJSON's contract is that a consumer can act on each line as it
+      // arrives, so a chunk that is not itself a complete record would break
+      // every incremental reader.
+      for (const chunk of chunks) {
+        expect(chunk.endsWith('\n')).toBe(true);
+        expect(() => JSON.parse(chunk.trim())).not.toThrow();
+      }
     });
 
-    it('should throw if writer is not provided', async () => {
-      const stage = createMockStage();
-      const formatter = new NDJSONFormatter({ stage });
+    it('concatenates to exactly the buffered document', async () => {
+      let streamed = '';
+      for await (const chunk of serialize(buildDocument(input, { format: 'ndjson' }))) {
+        streamed += chunk;
+      }
 
-      const input = {
-        basePath: '/test',
-        profile: { name: 'default' },
-        files: [],
-      };
-
-      await expect(formatter.stream(input, null)).rejects.toThrow(
-        'NDJSONFormatter.stream requires a writer function',
-      );
+      expect(streamed).toBe(await ndjsonFormatter().format(input));
     });
   });
 

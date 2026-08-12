@@ -64,6 +64,11 @@ describe('OS-specific file reference copy', () => {
       TMPDIR: tempDir,
       TMP: tempDir,
       TEMP: tempDir,
+      // The clipboard helper has a deliberately short budget so a wedged
+      // Finder cannot hang a copy. On a loaded parallel run the stub is
+      // occasionally killed before it writes its log, which makes this test
+      // about scheduling rather than about the command it is checking.
+      COPYTREE_CLIPBOARD_TIMEOUT_MS: '30000',
     };
 
     if (process.platform === 'darwin') {

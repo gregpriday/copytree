@@ -7,11 +7,22 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "paths": {
-      "copytree": ["../../types/index.d.ts"]
+      "copytree": [
+        "../../types/index.d.ts"
+      ],
+      "copytree/advanced": [
+        "../../types/advanced.d.ts"
+      ]
     }
   },
-  "include": ["./*.ts"],
-  "exclude": ["node_modules"]
+  "include": [
+    "./*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

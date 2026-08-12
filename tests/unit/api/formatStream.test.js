@@ -285,7 +285,9 @@ describe('formatStream()', () => {
   describe('Empty inputs', () => {
     it('should handle empty file array gracefully', async () => {
       // formatStream produces valid output even with empty arrays
-      const chunks = await collectChunks(formatStream([], { format: 'json', basePath: testDir }));
+      const chunks = await collectChunks(
+        formatStream([], { format: 'json', basePath: testDir, allowEmpty: true }),
+      );
 
       const fullOutput = chunks.join('');
       const parsed = JSON.parse(fullOutput);
@@ -300,7 +302,7 @@ describe('formatStream()', () => {
       }
 
       const chunks = await collectChunks(
-        formatStream(emptyGenerator(), { format: 'ndjson', basePath: testDir }),
+        formatStream(emptyGenerator(), { format: 'ndjson', basePath: testDir, allowEmpty: true }),
       );
 
       // NDJSON should still have metadata and summary records even with no files

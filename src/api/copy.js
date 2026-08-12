@@ -8,8 +8,10 @@ import { buildEstimates } from '../utils/estimate.js';
 import { versionFor } from '../utils/outputVersion.js';
 import { PIPELINE_STAGES } from '../utils/ProgressTracker.js';
 import fs from '../utils/fsx.js';
+import { writeFileAtomic } from '../utils/atomicWrite.js';
 import path from 'path';
 import Clipboard from '../utils/clipboard.js';
+import { resolveOperationConfig } from './operationConfig.js';
 
 /**
  * @typedef {import('./scan.js').ScanOptions} ScanOptions
@@ -144,7 +146,7 @@ export async function copy(basePath, options = {}) {
 
   // Create isolated config instance for this operation if not provided
   // This enables concurrent copy operations with different configurations
-  const configInstance = options.config || (await ConfigManager.create());
+  const configInstance = await resolveOperationConfig(options);
 
   const manifestOptions = {
     structureOnlyPatterns: configInstance.get('copytree.structureOnlyPatterns', []),
@@ -297,6 +299,9 @@ export async function copy(basePath, options = {}) {
     instructions: options.instructions,
     showSize: options.showSize,
     prettyPrint: options.prettyPrint,
+    includeMetadata: options.includeMetadata,
+    reproducible: options.reproducible,
+    withGitStatus: options.withGitStatus,
     allowEmpty: true,
     // Same instance the selection ran under, so a concurrent operation cannot
     // format these files with its own settings.
@@ -331,8 +336,8 @@ export async function copy(basePath, options = {}) {
   // Write to file if output path specified
   if (options.output) {
     const outputPath = path.resolve(options.output);
-    await fs.ensureDir(path.dirname(outputPath));
-    await fs.writeFile(outputPath, output, 'utf8');
+    // Atomic: a failed or cancelled run must not truncate an existing export.
+    await writeFileAtomic(outputPath, output);
     result.outputPath = outputPath;
   }
 

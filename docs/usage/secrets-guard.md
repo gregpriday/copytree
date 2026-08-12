@@ -11,6 +11,7 @@ copytree
 ```
 
 Output:
+
 ```
 🔒 Secrets Guard: 2 files excluded, 3 secrets redacted
 📎 144 files [980 KB] copied to clipboard
@@ -28,11 +29,13 @@ Output:
 ### Install Gitleaks
 
 **macOS:**
+
 ```bash
 brew install gitleaks
 ```
 
 **Linux:**
+
 ```bash
 # Download latest release
 curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.19.0/gitleaks_8.19.0_linux_x64.tar.gz | tar -xz
@@ -40,6 +43,7 @@ sudo mv gitleaks /usr/local/bin/
 ```
 
 **Windows:**
+
 ```powershell
 # Using Chocolatey
 choco install gitleaks
@@ -98,33 +102,35 @@ Exit code will be non-zero if any secrets are detected, making it perfect for CI
 
 ## Configuration
 
-### Global Config
+### Global config
 
-Add to `~/.copytree/config/copytree.js`:
+Add to your `config.yaml` — `~/Library/Application Support/CopyTree/config.yaml`
+on macOS, `~/.config/copytree/config.yaml` on Linux, `%APPDATA%\CopyTree\config.yaml`
+on Windows. Run `copytree config show --sources` to see the path in use.
 
-```javascript
-module.exports = {
-  secretsGuard: {
-    enabled: true,
-    redactionMode: 'typed',
-    failOnSecrets: false,
-    maxFileBytes: 1000000, // 1MB max file size to scan
-    parallelism: 4, // Concurrent scans
-    exclude: [
-      // Additional patterns beyond defaults
-      'internal-secrets.json',
-    ],
-    allowlist: [
-      // Patterns to always allow (e.g., test fixtures)
-      '**/test/fixtures/**',
-      '**/examples/**',
-    ],
-    gitleaks: {
-      binaryPath: 'gitleaks', // Custom path if needed
-      configPath: null, // Path to .gitleaks.toml
-    },
-  },
-};
+```yaml
+secretsGuard:
+  enabled: true
+  redactionMode: typed
+  failOnSecrets: false
+  maxFileBytes: 1000000
+  oversizePolicy: exclude
+  exclude:
+    # Additional patterns beyond the defaults
+    - internal-secrets.json
+    - '**/test/fixtures/**'
+    - '**/examples/**'
+  gitleaks:
+    # Only needed when the binary is not on PATH, or you have your own rules.
+    binaryPath: gitleaks
+    configPath: /path/to/.gitleaks.toml
+```
+
+Every key here is validated. The schema is closed, so a typo is reported rather
+than silently ignored:
+
+```bash
+copytree config validate
 ```
 
 ## Excluded File Patterns
@@ -132,28 +138,35 @@ module.exports = {
 These files are **always excluded** (never scanned or included):
 
 **Environment files:**
+
 - `.env`, `.env.*`, `.env.local`, `.env.production`, etc.
 
 **Private keys:**
+
 - `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.p8`
 - `id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`
 
 **Credentials:**
+
 - `credentials.json`, `secrets.json`, `auth.json`
 - `*-credentials.json`, `*-secrets.json`
 
 **Service accounts:**
+
 - `service-account-*.json`
 - `firebase-adminsdk-*.json`
 - `google-credentials.json`
 
 **Keystores:**
+
 - `*.jks`, `*.keystore`, `gradle.properties`
 
 **Config files:**
+
 - `.npmrc`, `.pypirc`, `.aws/credentials`, `.docker/config.json`
 
 **Terraform:**
+
 - `*.tfstate`, `*.tfstate.backup`
 
 See full list in `src/pipeline/stages/SecretsGuardStage.js`
@@ -164,8 +177,8 @@ When Gitleaks is installed it is used, and detects 200+ patterns including:
 
 - **AWS**: Access keys (AKIA*, ASIA*), Secret keys
 - **Google**: API keys (AIza*), Service account JSON
-- **GitHub**: Tokens (ghp_*, github_pat_*)
-- **Slack**: Tokens (xoxb-*, xoxp-*)
+- **GitHub**: Tokens (ghp__, github_pat__)
+- **Slack**: Tokens (xoxb-_, xoxp-_)
 - **Private Keys**: RSA, DSA, EC, SSH keys
 - **Database URLs**: With embedded credentials
 - **JWT Tokens**: Bearer tokens
@@ -182,9 +195,9 @@ the statement around it, so redacted code still parses:
 
 ```javascript
 // before
-const apiKey = "sk_live_EXAMPLE_NOT_A_REAL_KEY";
+const apiKey = 'sk_live_EXAMPLE_NOT_A_REAL_KEY';
 // after
-const apiKey = "***REDACTED:PROVIDER_TOKEN***";
+const apiKey = '***REDACTED:PROVIDER_TOKEN***';
 ```
 
 This is what makes the built-in scanner safe to leave on by default. Its output
@@ -196,10 +209,10 @@ literal or an environment-style assignment, clear an entropy floor, and not be a
 recognisable placeholder. So these are left alone:
 
 ```javascript
-const token = payload.token.trim();          // a property read
-const bearer = extractBearerToken(header);   // a function call
-apiKey: "<YOUR_API_KEY_HERE>"                // a placeholder
-password: "process.env.DB_PASS"              // a reference
+const token = payload.token.trim(); // a property read
+const bearer = extractBearerToken(header); // a function call
+apiKey: '<YOUR_API_KEY_HERE>'; // a placeholder
+password: 'process.env.DB_PASS'; // a reference
 ```
 
 Findings never carry the matched bytes. They travel into `stats`, into events,
@@ -213,7 +226,7 @@ carries a rule id, a position, a length, and a truncated SHA-256 fingerprint.
 Add `gitleaks:allow` comment on the same line:
 
 ```javascript
-const testKey = "AKIAIOSFODNN7EXAMPLE"; // gitleaks:allow
+const testKey = 'AKIAIOSFODNN7EXAMPLE'; // gitleaks:allow
 ```
 
 ### Allowlist Patterns
@@ -222,11 +235,11 @@ In config:
 
 ```javascript
 allowlist: [
-  '**/test/**',           // All test files
-  '**/fixtures/**',       // Test fixtures
-  '**/examples/**',       // Example code
+  '**/test/**', // All test files
+  '**/fixtures/**', // Test fixtures
+  '**/examples/**', // Example code
   'docs/api-examples.md', // Specific files
-]
+];
 ```
 
 ### Custom Gitleaks Config
@@ -249,7 +262,7 @@ Then configure CopyTree to use it:
 
 ```javascript
 gitleaks: {
-  configPath: './.gitleaks.toml'
+  configPath: './.gitleaks.toml';
 }
 ```
 
@@ -298,6 +311,7 @@ secrets_check:
 **Problem:** Secrets Guard disabled with warning
 
 **Solution:**
+
 ```bash
 # macOS
 brew install gitleaks
@@ -311,6 +325,7 @@ gitleaks version
 **Problem:** Legitimate code being redacted
 
 **Solutions:**
+
 1. Use inline `gitleaks:allow` comments
 2. Add paths to allowlist
 3. Create custom `.gitleaks.toml`
@@ -321,6 +336,7 @@ gitleaks version
 **Problem:** Scanning is slow
 
 **Solutions:**
+
 ```javascript
 // Reduce file size limit
 maxFileBytes: 500000, // 500KB
@@ -369,7 +385,7 @@ exclude: ['*.bundle.js', '*.min.js']
 ### Related Documentation
 
 - [CLI Reference](../cli/copytree-reference.md)
-- [Configuration Guide](./configuration.md)
+- [Configuration Guide](../reference/configuration.md)
 - [Troubleshooting](./troubleshooting.md)
 
 ### External Resources

@@ -1,14 +1,22 @@
 #!/usr/bin/env node
 /**
  * Development profiling script.
- * Runs copytree on the test fixtures and saves profiling output to .profiles/
+ *
+ * A thin wrapper over `copytree debug profile`, kept because typing the fixture
+ * path and the output directory every time is tedious. It deliberately owns no
+ * profiling logic of its own.
+ *
+ * It used to invoke `--profile <type>`, `--profile-dir` and `--stream`, all of
+ * which were superseded when profiling moved under `debug profile`. It kept
+ * working — the deprecation shims saw to that — while printing three warnings
+ * and demonstrating obsolete usage to anyone who read it.
  *
  * Usage:
  *   node scripts/profile.js
  *   node scripts/profile.js --type cpu
  *   node scripts/profile.js --type heap
  *   node scripts/profile.js --type all
- *   node scripts/profile.js --type cpu --profile-dir ./debug/profiles
+ *   node scripts/profile.js --type cpu --output-dir ./debug/profiles
  *
  * Or via npm:
  *   npm run profile
@@ -16,55 +24,48 @@
  *   npm run profile:heap
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import fs from 'fs-extra';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = path.join(ROOT, 'bin', 'copytree.js');
 const FIXTURES = path.join(ROOT, 'tests', 'fixtures', 'simple-project');
 
-// Parse CLI args
 const args = process.argv.slice(2);
 let type = 'all';
-let profileDir = path.join(ROOT, '.profiles');
+let outputDir = path.join(ROOT, '.profiles');
 
-for (let i = 0; i < args.length; i++) {
+for (let i = 0; i < args.length; i += 1) {
   if (args[i] === '--type' && args[i + 1]) {
     type = args[++i];
-  } else if (args[i] === '--profile-dir' && args[i + 1]) {
-    profileDir = path.resolve(args[++i]);
+  } else if ((args[i] === '--output-dir' || args[i] === '--profile-dir') && args[i + 1]) {
+    if (args[i] === '--profile-dir') {
+      console.warn('--profile-dir is deprecated here too; use --output-dir');
+    }
+    outputDir = path.resolve(args[++i]);
   }
 }
 
-// Fall back to project root if fixtures not present
-let targetPath;
-if (await fs.pathExists(FIXTURES)) {
-  targetPath = FIXTURES;
-} else {
-  console.warn(`⚠️  Fixtures not found at: ${FIXTURES}`);
+const targetPath = existsSync(FIXTURES) ? FIXTURES : ROOT;
+if (targetPath === ROOT) {
   console.warn(
-    '    Falling back to project root (this will profile the entire repo and may be slow).',
+    'Fixture project not found; profiling the repository root instead (this will be slow).',
   );
-  targetPath = ROOT;
 }
 
 console.log(`Running ${type} profile on: ${targetPath}`);
-console.log(`Output directory: ${profileDir}\n`);
-
-const cmd = [
-  `node "${CLI}"`,
-  `"${targetPath}"`,
-  `--profile ${type}`,
-  `--profile-dir "${profileDir}"`,
-  '--stream',
-  '--format json',
-].join(' ');
+console.log(`Output directory: ${outputDir}\n`);
 
 try {
-  execSync(cmd, { stdio: 'inherit', cwd: ROOT });
-} catch (err) {
-  process.exit(err.status ?? 1);
+  // `execFileSync` with an argument array rather than a shell command string:
+  // both paths come from the filesystem and may contain spaces.
+  execFileSync(
+    process.execPath,
+    [CLI, 'debug', 'profile', targetPath, '--type', type, '--output-dir', outputDir],
+    { stdio: 'inherit', cwd: ROOT },
+  );
+} catch (error) {
+  process.exit(error.status ?? 1);
 }

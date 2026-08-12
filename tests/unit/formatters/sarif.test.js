@@ -1,5 +1,22 @@
-import SARIFFormatter from '../../src/pipeline/formatters/SARIFFormatter.js';
-import OutputFormattingStage from '../../src/pipeline/stages/OutputFormattingStage.js';
+import { renderInput, serialize, buildDocument } from '../../../src/formatters/index.js';
+import OutputFormattingStage from '../../../src/pipeline/stages/OutputFormattingStage.js';
+
+/**
+ * Adapt the canonical SARIF serializer to the call shape these
+ * assertions were written against.
+ *
+ * The formatter classes are gone — there is one serializer per format now, and
+ * it is a generator — but what these tests check is the document, not how it
+ * was constructed, so the assertions carry over unchanged.
+ *
+ * @param {Object} [overrides={}] - Rendering options
+ * @returns {{format: Function}} Formatter-shaped adapter
+ */
+function sarifFormatter(overrides = {}) {
+  return {
+    format: (input) => renderInput(input, { format: 'sarif', ...overrides }),
+  };
+}
 
 describe('SARIF Formatter', () => {
   // Mock stage for formatter tests
@@ -18,8 +35,7 @@ describe('SARIF Formatter', () => {
 
   describe('format()', () => {
     it('should generate valid SARIF v2.1.0 structure', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -62,8 +78,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should include results for each file', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -101,8 +116,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should include line regions for files with content', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -128,8 +142,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should not include regions for binary files', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -153,8 +166,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should include file properties', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -182,8 +194,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should include git metadata in run properties', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -211,8 +222,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should include profile and file count in run properties', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -233,8 +243,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should include invocations with working directory', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test/project',
@@ -254,8 +263,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should handle git status in file properties', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -279,8 +287,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should handle binary categories', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -304,8 +311,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should handle truncated files', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -331,8 +337,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should use uriBaseId for relative paths', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -357,8 +362,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should filter out null files', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -379,8 +383,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should pretty-print JSON by default', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -396,8 +399,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should respect onlyTree option', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage, onlyTree: true });
+      const formatter = sarifFormatter({ onlyTree: true });
 
       const input = {
         basePath: '/test',
@@ -421,8 +423,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should use package version if input.version not provided', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -471,8 +472,7 @@ describe('SARIF Formatter', () => {
 
   describe('SARIF Compliance', () => {
     it('should have all required SARIF v2.1.0 root properties', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -490,8 +490,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should have all required run properties', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',
@@ -509,8 +508,7 @@ describe('SARIF Formatter', () => {
     });
 
     it('should have all required tool.driver properties', async () => {
-      const stage = createMockStage();
-      const formatter = new SARIFFormatter({ stage });
+      const formatter = sarifFormatter();
 
       const input = {
         basePath: '/test',

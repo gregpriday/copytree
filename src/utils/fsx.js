@@ -50,9 +50,12 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   statSync,
   Stats,
+  utimesSync,
+  writeFileSync,
 } from 'node:fs';
 import {
   close as closeCb,
@@ -187,6 +190,7 @@ export {
   existsSync,
   lstat,
   mkdir,
+  mkdirSync,
   open,
   openSync,
   pathExists,
@@ -202,6 +206,7 @@ export {
   realpathSync,
   remove,
   rename,
+  renameSync,
   rmdir,
   removeSync,
   rm,
@@ -209,7 +214,9 @@ export {
   stat,
   Stats,
   statSync,
+  utimesSync,
   writeFile,
+  writeFileSync,
   writeJson,
 };
 
@@ -224,6 +231,7 @@ export default {
   existsSync,
   lstat,
   mkdir,
+  mkdirSync,
   open,
   openSync,
   pathExists,
@@ -239,6 +247,7 @@ export default {
   realpathSync,
   remove,
   rename,
+  renameSync,
   rmdir,
   removeSync,
   rm,
@@ -246,6 +255,8 @@ export default {
   stat,
   Stats,
   statSync,
+  utimesSync,
   writeFile,
+  writeFileSync,
   writeJson,
 };

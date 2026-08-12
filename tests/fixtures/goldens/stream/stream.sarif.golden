@@ -128,7 +128,6 @@
       "properties": {
         "profile": "default",
         "fileCount": 3,
-        "skippedFiles": 0,
         "totalSize": 77,
         "git": null
       }

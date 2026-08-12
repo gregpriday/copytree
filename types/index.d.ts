@@ -5,7 +5,6 @@
  * Full IntelliSense support for TypeScript consumers including Canopy.
  *
  * @module copytree
- * @version 0.17.0
  */
 
 // ============================================================================
@@ -29,14 +28,20 @@ export interface ProgressEvent {
    * Fires during discovery as well as formatting.
    */
   stage?: PipelineStageId;
-  /** Files processed so far */
-  filesProcessed?: number;
-  /** Total files estimated */
-  totalFiles?: number;
-  /** Current file being processed */
-  currentFile?: string;
-  /** Timestamp of the progress event */
-  timestamp?: number;
+  /**
+   * The coarse phase this stage belongs to — the handful of steps a person
+   * actually distinguishes, rather than one per stage.
+   */
+  phase?: 'prepare' | 'discover' | 'select' | 'read' | 'render';
+  /**
+   * How many items this stage has finished, when it knows its denominator.
+   * Absent for stages that cannot count ahead.
+   */
+  completed?: number;
+  /** The denominator for `completed`, when known. */
+  total?: number;
+  /** The item currently being processed, usually a POSIX file path. */
+  item?: string;
 }
 
 /**
@@ -53,12 +58,9 @@ export type ProgressCallback = (progress: ProgressEvent) => void;
  */
 export type PipelineStageId =
   | 'discover'
-  | 'alwaysInclude'
   | 'gitFilter'
-  | 'filter'
   | 'sort'
   | 'budget'
-  | 'limit'
   | 'load'
   | 'secrets'
   | 'transform'
@@ -69,9 +71,6 @@ export type PipelineStageId =
   | 'unknown';
 
 export const PIPELINE_STAGES: Readonly<Record<string, PipelineStageId>>;
-
-/** Map a stage class name to its stable identifier. */
-export function stageIdFor(stageName: string): PipelineStageId;
 
 // ============================================================================
 // Exclusion Accounting
@@ -100,7 +99,13 @@ export type ExclusionReason =
   | 'scopeFilter'
   | 'gitFilter'
   | 'duplicate'
-  | 'unreadable';
+  | 'unreadable'
+  // Secret handling. Omitted before, so an exhaustive `switch` over the
+  // reasons a file was dropped had no case for the three that matter most to
+  // anyone auditing what left their machine.
+  | 'secretFile'
+  | 'secretUnscannable'
+  | 'symlinkEscape';
 
 export const EXCLUSION_REASONS: Readonly<Record<string, ExclusionReason>>;
 
@@ -147,11 +152,24 @@ export interface ExclusionSummary {
  * `excluded:<reason>` uses the {@link ExclusionReason} keys.
  */
 export type ManifestOutcome =
-  | 'included'
-  | 'structure-only'
-  | 'binary-placeholder'
-  | 'truncated'
-  | `excluded:${string}`;
+  'included' | 'structure-only' | 'binary-placeholder' | 'truncated' | `excluded:${string}`;
+
+/**
+ * Build the lightweight manifest `copy()` returns.
+ *
+ * Entries never carry content, so a manifest is safe to retain in a long-lived
+ * process without holding megabytes of file bodies.
+ */
+export function buildManifest(
+  files: FileResult[],
+  options?: { structureOnlyPatterns?: string[]; binaryExtensions?: Record<string, string[]> },
+): ManifestEntry[];
+
+/** Classify one file into its manifest outcome. */
+export function classifyOutcome(
+  file: FileResult,
+  options?: { structureOnlyPatterns?: string[]; binaryExtensions?: Record<string, string[]> },
+): ManifestOutcome;
 
 export const MANIFEST_OUTCOMES: Readonly<Record<string, ManifestOutcome>>;
 
@@ -176,62 +194,6 @@ export function estimateOutputChars(
   files: Array<Pick<FileResult, 'path' | 'size'> & { content?: string; isBinary?: boolean }>,
   options?: { format?: string; onlyTree?: boolean; addLineNumbers?: boolean },
 ): number;
-
-// ============================================================================
-// Scope
-// ============================================================================
-
-/** A resolved `scope` entry. */
-export interface ScopeEntry {
-  /** Platform-native absolute path */
-  absolutePath: string;
-  /** POSIX path relative to the base path */
-  relativePath: string;
-  /** Whether the entry is a directory */
-  isDirectory: boolean;
-}
-
-/**
- * Resolve, validate, and normalize a scope selection.
- *
- * Entries are literal paths, not globs. Duplicates are removed and a parent
- * subsumes its children.
- *
- * @throws ScopeError `ERR_SCOPE_OUTSIDE_ROOT` when an entry escapes the base path
- * @throws ScopeError `ERR_PATH_NOT_FOUND` when an entry does not exist
- */
-export function resolveScope(
-  basePath: string,
-  scope: string | string[],
-  options?: { followSymlinks?: boolean },
-): Promise<ScopeEntry[]>;
-
-/**
- * Classify a file extension without touching the filesystem.
- * Returns null for unknown extensions and for source-code extensions that must
- * never be treated as binary (`.ts`, `.h`, `.html`, ...).
- */
-export function categorizeByExt(
-  ext: string,
-  groups?: Record<string, string[]>,
-): string | null;
-
-/** Detect whether a file is binary. Extension first, content sniff only when unknown. */
-export function detectBinary(
-  filePath: string,
-  options?: {
-    sampleBytes?: number;
-    nonPrintableThreshold?: number;
-    extensions?: Record<string, string[]>;
-  },
-): Promise<{
-  isBinary: boolean;
-  category: string;
-  reason: 'extension' | 'magic' | 'null-byte' | 'ratio' | 'textual' | 'error';
-  ext: string;
-  name?: string;
-  error?: string;
-}>;
 
 // ============================================================================
 // Logger Types
@@ -310,8 +272,17 @@ export interface FileResult {
   size: number;
   /** Last modified timestamp */
   modified: Date;
-  /** File content (string for text files, Buffer for binary if included, null for excluded binaries) */
-  content?: string | Buffer | null;
+  /**
+   * File content: a string for text, bytes for binary content that was
+   * included, `null` for an excluded binary, absent when nothing was read.
+   *
+   * Typed as `Uint8Array` rather than `Buffer` deliberately. These declarations
+   * must compile in a consumer that has not installed `@types/node` — the
+   * package does not depend on it, so referring to Node's ambient types here
+   * made the published `.d.ts` uncompilable in a strict project with
+   * `types: []`. Every `Buffer` is a `Uint8Array`, so nothing is lost.
+   */
+  content?: string | Uint8Array | null;
   /** Whether file is binary */
   isBinary: boolean;
   /** Character encoding for text files */
@@ -612,7 +583,13 @@ export interface ScanSummary {
 
 /**
  * Scan a directory and return an async iterable of FileResult objects.
- * Files are yielded as soon as they are discovered and processed.
+ *
+ * **Buffering:** the selection is resolved in full before the first file is
+ * yielded. It has to be — sorting is global, and the file-count and total-size
+ * budgets decide which files survive by position in the sorted order, so
+ * neither question can be answered one file at a time. The iterable is a
+ * convenience over a completed selection, not a producer stream, and peak
+ * memory is proportional to the selection.
  *
  * @param basePath - Path to directory to scan
  * @param options - Scan options
@@ -620,10 +597,7 @@ export interface ScanSummary {
  * @throws ValidationError `ERR_PATH_NOT_FOUND` when basePath does not exist
  * @throws ScopeError `ERR_SCOPE_OUTSIDE_ROOT` / `ERR_PATH_NOT_FOUND` for bad scope entries
  */
-export function scan(
-  basePath: string,
-  options?: ScanOptions,
-): AsyncIterable<FileResult>;
+export function scan(basePath: string, options?: ScanOptions): AsyncIterable<FileResult>;
 
 // ============================================================================
 // Format API
@@ -695,9 +669,17 @@ export interface FormatStreamOptions extends FormatOptions {
 }
 
 /**
- * Format a collection of files as a streaming async generator.
- * Yields formatted output chunks incrementally, enabling memory-efficient
- * processing of large file collections.
+ * Format a collection of files as chunks, rather than as one string.
+ *
+ * Concatenating the chunks equals `format()` of the same inputs, byte for byte.
+ *
+ * **What this bounds, and what it does not.** The input collection is drained
+ * before the first chunk, because the document header carries a file count and
+ * a total size. Peak memory therefore remains proportional to the selection.
+ * What chunking saves is the second contiguous copy of the whole document, and
+ * it lets output start reaching a socket, a PTY or a file before the last file
+ * is rendered. This is chunked output generation, not a bounded-memory
+ * pipeline.
  *
  * @param files - Files to format (array or async iterable)
  * @param options - Format options
@@ -902,10 +884,7 @@ export interface CopyResult {
  * @param options - Combined options
  * @returns Copy result with output and stats
  */
-export function copy(
-  basePath: string,
-  options?: CopyOptions,
-): Promise<CopyResult>;
+export function copy(basePath: string, options?: CopyOptions): Promise<CopyResult>;
 
 // ============================================================================
 // Streaming Copy API
@@ -945,8 +924,10 @@ export interface CopyStreamOptions extends ScanOptions, FormatOptions {
  * formatted document, not the pipeline feeding it.
  *
  * What that does buy you:
- * - The full output document is never assembled as one string, so a large
- *   export does not need a contiguous allocation the size of the result.
+ * - The output document is emitted in pieces rather than assembled as one
+ *   string, so a large export does not need a contiguous allocation the size
+ *   of the result. SARIF is the exception: it is one JSON object with a
+ *   required envelope, and is serialized whole.
  * - Chunks reach a writable stream or a PTY as they are produced, so the host
  *   process is not blocked assembling output before anything is written.
  * - Chunks never split a UTF-16 surrogate pair, so each one is valid text.
@@ -986,10 +967,7 @@ export interface CopyStreamOptions extends ScanOptions, FormatOptions {
  *   output += chunk;
  * }
  */
-export function copyStream(
-  basePath: string,
-  options?: CopyStreamOptions,
-): AsyncGenerator<string>;
+export function copyStream(basePath: string, options?: CopyStreamOptions): AsyncGenerator<string>;
 
 // ============================================================================
 // Pipeline Statistics and Metrics
@@ -998,11 +976,30 @@ export function copyStream(
 /**
  * Memory usage metrics captured during stage execution
  */
+/**
+ * A snapshot of process memory, matching what `process.memoryUsage()` returns.
+ *
+ * Spelled out rather than referencing `NodeJS.MemoryUsage`, so these
+ * declarations compile without `@types/node` installed.
+ */
+export interface MemorySnapshot {
+  /** Resident set size in bytes */
+  rss: number;
+  /** Total heap allocated in bytes */
+  heapTotal: number;
+  /** Heap in use in bytes */
+  heapUsed: number;
+  /** Memory used by C++ objects bound to JavaScript objects */
+  external: number;
+  /** Memory allocated for `ArrayBuffer`s and `SharedArrayBuffer`s */
+  arrayBuffers?: number;
+}
+
 export interface MemoryUsage {
   /** Memory usage before stage execution */
-  before: NodeJS.MemoryUsage;
+  before: MemorySnapshot;
   /** Memory usage after stage execution */
-  after: NodeJS.MemoryUsage;
+  after: MemorySnapshot;
   /** Delta (difference) in memory usage */
   delta: {
     /** Resident set size delta in bytes */
@@ -1066,6 +1063,28 @@ export interface PipelineStats {
   duration?: number;
   /** Success rate (0-1) - calculated */
   successRate?: number;
+}
+
+/**
+ * Options for Pipeline construction
+ */
+export interface PipelineOptions {
+  /**
+   * ConfigManager instance for isolated configuration.
+   * If not provided, an isolated instance will be created during initialization.
+   * This enables concurrent pipeline operations with different configurations.
+   */
+  config?: ConfigManager;
+  /** Continue processing after stage failures (default: false) */
+  continueOnError?: boolean;
+  /** Emit progress events (default: true) */
+  emitProgress?: boolean;
+  /** Enable parallel stage processing (default: false) */
+  parallel?: boolean;
+  /** Maximum concurrent operations (default: 5) */
+  maxConcurrency?: number;
+  /** Progress callback function */
+  onProgress?: ProgressCallback;
 }
 
 // ============================================================================
@@ -1249,418 +1268,6 @@ export interface PipelineEvent {
 }
 
 // ============================================================================
-// Pipeline Core Classes
-// ============================================================================
-
-/**
- * Pipeline context provided to stages during initialization and execution
- */
-export interface PipelineContext {
-  /** Logger instance for stage logging */
-  logger: Logger;
-  /** Pipeline options */
-  options: PipelineOptions;
-  /** Pipeline statistics (live, updated during execution) */
-  stats: PipelineStats;
-  /** Configuration manager instance */
-  config: ConfigManager;
-  /** Reference to parent pipeline for event emission */
-  pipeline: Pipeline;
-}
-
-/**
- * Options for Pipeline construction
- */
-export interface PipelineOptions {
-  /**
-   * ConfigManager instance for isolated configuration.
-   * If not provided, an isolated instance will be created during initialization.
-   * This enables concurrent pipeline operations with different configurations.
-   */
-  config?: ConfigManager;
-  /** Continue processing after stage failures (default: false) */
-  continueOnError?: boolean;
-  /** Emit progress events (default: true) */
-  emitProgress?: boolean;
-  /** Enable parallel stage processing (default: false) */
-  parallel?: boolean;
-  /** Maximum concurrent operations (default: 5) */
-  maxConcurrency?: number;
-  /** Progress callback function */
-  onProgress?: ProgressCallback;
-}
-
-/**
- * Stage options passed to stage constructor
- */
-export interface StageOptions {
-  /** Reference to parent pipeline for event emission */
-  pipeline?: Pipeline;
-  /** ConfigManager instance (optional, will be set via onInit context) */
-  config?: ConfigManager;
-  /** Additional stage-specific options */
-  [key: string]: unknown;
-}
-
-/**
- * Pipeline for orchestrating file processing stages.
- * Implements the event-driven pipeline architecture described in the architecture docs.
- */
-export class Pipeline {
-  /** Create a new Pipeline instance */
-  constructor(options?: PipelineOptions);
-
-  /**
-   * Add stages to the pipeline
-   * @param stages - Stage class(es), instance(s), or functions to add
-   * @returns Pipeline instance for chaining
-   */
-  through(
-    stages:
-      | Stage
-      | Stage[]
-      | (new (options?: StageOptions) => Stage)
-      | Array<new (options?: StageOptions) => Stage>
-      | ((input: unknown) => Promise<unknown> | unknown)
-      | Array<Stage | (new (options?: StageOptions) => Stage) | ((input: unknown) => Promise<unknown> | unknown)>
-  ): Pipeline;
-
-  /**
-   * Process input through all pipeline stages
-   * @param input - Initial input to process
-   * @returns Final processed output
-   */
-  process<TInput = unknown, TOutput = unknown>(input: TInput): Promise<TOutput>;
-
-  /**
-   * Get pipeline statistics
-   * @returns Current pipeline stats
-   */
-  getStats(): PipelineStats;
-
-  /**
-   * Subscribe to pipeline events
-   * @param event - Event name
-   * @param listener - Event listener function
-   * @returns Pipeline instance for chaining
-   */
-  on(event: 'pipeline:start', listener: (data: PipelineStartEvent) => void): this;
-  on(event: 'pipeline:complete', listener: (data: PipelineCompleteEvent) => void): this;
-  on(event: 'pipeline:error', listener: (data: PipelineErrorEvent) => void): this;
-  on(event: 'stage:start', listener: (data: StageStartEvent) => void): this;
-  on(event: 'stage:complete', listener: (data: StageCompleteEvent) => void): this;
-  on(event: 'stage:error', listener: (data: StageErrorEvent) => void): this;
-  on(event: 'stage:recover', listener: (data: StageRecoverEvent) => void): this;
-  on(event: 'stage:progress', listener: (data: StageProgressEvent) => void): this;
-  on(event: 'file:batch', listener: (data: FileBatchEvent) => void): this;
-  on(event: 'stage:log', listener: (data: StageLogEvent) => void): this;
-  on(event: string, listener: (...args: unknown[]) => void): this;
-
-  /**
-   * Subscribe to pipeline events (once)
-   * @param event - Event name
-   * @param listener - Event listener function
-   * @returns Pipeline instance for chaining
-   */
-  once(event: 'pipeline:start', listener: (data: PipelineStartEvent) => void): this;
-  once(event: 'pipeline:complete', listener: (data: PipelineCompleteEvent) => void): this;
-  once(event: 'pipeline:error', listener: (data: PipelineErrorEvent) => void): this;
-  once(event: 'stage:start', listener: (data: StageStartEvent) => void): this;
-  once(event: 'stage:complete', listener: (data: StageCompleteEvent) => void): this;
-  once(event: 'stage:error', listener: (data: StageErrorEvent) => void): this;
-  once(event: 'stage:recover', listener: (data: StageRecoverEvent) => void): this;
-  once(event: 'stage:progress', listener: (data: StageProgressEvent) => void): this;
-  once(event: 'file:batch', listener: (data: FileBatchEvent) => void): this;
-  once(event: 'stage:log', listener: (data: StageLogEvent) => void): this;
-  once(event: string, listener: (...args: unknown[]) => void): this;
-
-  /**
-   * Emit a pipeline event
-   * @param event - Event name
-   * @param args - Event arguments
-   * @returns true if event had listeners
-   */
-  emit(event: string, ...args: unknown[]): boolean;
-
-  /**
-   * Remove an event listener
-   * @param event - Event name
-   * @param listener - Event listener to remove
-   * @returns Pipeline instance for chaining
-   */
-  removeListener(event: 'pipeline:start', listener: (data: PipelineStartEvent) => void): this;
-  removeListener(event: 'pipeline:complete', listener: (data: PipelineCompleteEvent) => void): this;
-  removeListener(event: 'pipeline:error', listener: (data: PipelineErrorEvent) => void): this;
-  removeListener(event: 'stage:start', listener: (data: StageStartEvent) => void): this;
-  removeListener(event: 'stage:complete', listener: (data: StageCompleteEvent) => void): this;
-  removeListener(event: 'stage:error', listener: (data: StageErrorEvent) => void): this;
-  removeListener(event: 'stage:recover', listener: (data: StageRecoverEvent) => void): this;
-  removeListener(event: 'stage:progress', listener: (data: StageProgressEvent) => void): this;
-  removeListener(event: 'file:batch', listener: (data: FileBatchEvent) => void): this;
-  removeListener(event: 'stage:log', listener: (data: StageLogEvent) => void): this;
-  removeListener(event: string, listener: (...args: unknown[]) => void): this;
-
-  /**
-   * Create a new pipeline instance (static factory)
-   * @param options - Pipeline options
-   * @returns New pipeline instance
-   */
-  static create(options?: PipelineOptions): Pipeline;
-
-  /**
-   * Laravel-style fluent pipeline interface
-   * @param passable - Data to process
-   * @returns Fluent interface for chaining
-   */
-  send<T>(passable: T): {
-    through(stages: Stage[] | Array<new (options?: StageOptions) => Stage>): {
-      then<TResult>(callback?: (result: T) => TResult): Promise<TResult>;
-      thenReturn(): Promise<T>;
-    };
-  };
-}
-
-/**
- * Base class for pipeline stages.
- * All pipeline stages should extend this class.
- */
-export class Stage {
-  /** Stage name (defaults to constructor name) */
-  readonly name: string;
-  /** Stage options */
-  protected options: StageOptions;
-  /** Reference to parent pipeline for event emission */
-  protected pipeline?: Pipeline;
-  /** Configuration manager instance (available after onInit) */
-  protected get config(): ConfigManager;
-
-  /** Create a new Stage instance */
-  constructor(options?: StageOptions);
-
-  /**
-   * Process input data (must be implemented by subclasses)
-   * @param input - Input data from previous stage
-   * @returns Processed output for next stage
-   */
-  process(input: unknown): Promise<unknown> | unknown;
-
-  /**
-   * Validate input before processing (optional but recommended)
-   * Called automatically by Pipeline before process()
-   * @param input - Input to validate
-   * @returns true if valid, false/undefined otherwise
-   * @throws Error if validation fails
-   */
-  validate?(input: unknown): boolean | void | Promise<boolean | void>;
-
-  /**
-   * Handle errors during processing with recovery mechanism
-   * If recovery is possible, return a valid result to continue pipeline
-   * @param error - Error that occurred during stage processing
-   * @param input - Input data being processed when error occurred
-   * @returns Recovered result to continue pipeline
-   * @throws Error if recovery is not possible
-   */
-  handleError?(error: Error, input: unknown): Promise<unknown> | unknown;
-
-  /**
-   * Initialize stage with pipeline context
-   * Called once when pipeline is created, before any processing
-   * @param context - Pipeline context with shared resources
-   */
-  onInit?(context: PipelineContext): Promise<void> | void;
-
-  /**
-   * Called before each stage execution
-   * @param input - Input data about to be processed
-   */
-  beforeRun?(input: unknown): Promise<void> | void;
-
-  /**
-   * Called after successful stage execution
-   * @param output - Output data from stage processing
-   */
-  afterRun?(output: unknown): Promise<void> | void;
-
-  /**
-   * Called when stage encounters an error (before handleError)
-   * @param error - Error that occurred
-   * @param input - Input data being processed when error occurred
-   */
-  onError?(error: Error, input: unknown): Promise<void> | void;
-
-  /**
-   * Log a message and emit stage events
-   * @param message - Message to log
-   * @param level - Log level (default: 'info')
-   */
-  protected log(message: string, level?: 'info' | 'warn' | 'error' | 'debug'): void;
-
-  /**
-   * Emit progress update for current stage
-   * @param progress - Progress percentage (0-100)
-   * @param message - Optional progress message
-   */
-  protected emitProgress(progress: number, message?: string): void;
-
-  /**
-   * Emit file processing event (throttled for performance)
-   * @param filePath - Path of file being processed
-   * @param action - Action being performed (default: 'processed')
-   */
-  protected emitFileEvent(filePath: string, action?: string): void;
-
-  /**
-   * Get elapsed time since a start time
-   * @param startTime - Start time from Date.now()
-   * @returns Formatted elapsed time string
-   */
-  protected getElapsedTime(startTime: number): string;
-
-  /**
-   * Format bytes to human readable string
-   * @param bytes - Number of bytes
-   * @returns Formatted string
-   */
-  protected formatBytes(bytes: number): string;
-}
-
-// ============================================================================
-// Progress Tracker
-// ============================================================================
-
-/**
- * Options for constructing a ProgressTracker
- */
-export interface ProgressTrackerOptions {
-  /** Total number of pipeline stages (default: 1) */
-  totalStages?: number;
-  /** Progress callback function */
-  onProgress?: ProgressCallback;
-  /** Minimum milliseconds between throttled emissions (default: 100) */
-  throttleMs?: number;
-}
-
-/**
- * Normalizes pipeline events into simple progress updates.
- *
- * Translates detailed pipeline events (stage:start, stage:complete, file:batch,
- * stage:progress) into a simple { percent, message } format for UI consumers.
- *
- * Progress guarantees:
- * - Always starts at 0%
- * - Always ends at 100% on success
- * - Monotonically increasing (never goes backward)
- * - Throttled to avoid overwhelming UI (default 100ms)
- */
-export class ProgressTracker {
-  /** Total number of pipeline stages */
-  totalStages: number;
-  /** Progress callback function */
-  onProgress: ProgressCallback;
-  /** Throttle interval in milliseconds */
-  throttleMs: number;
-
-  /** Create a new ProgressTracker instance */
-  constructor(options?: ProgressTrackerOptions);
-
-  /**
-   * Attach event listeners to a pipeline instance.
-   * Once attached, the tracker will listen to pipeline events and
-   * invoke the onProgress callback with normalized progress updates.
-   * @param pipeline - Pipeline instance to track
-   */
-  attach(pipeline: Pipeline): void;
-}
-
-// ============================================================================
-// Transformer Classes
-// ============================================================================
-
-/**
- * Transformer trait definitions
- */
-export interface TransformerTraits {
-  /** Input content types (e.g., ['text', 'binary']) */
-  inputTypes: string[];
-  /** Output content types */
-  outputTypes: string[];
-  /** Whether the transformer is idempotent (can be safely reapplied) */
-  idempotent: boolean;
-  /** Whether the transformer is resource-intensive */
-  heavy: boolean;
-  /** Required external tools (e.g., ['pandoc']) */
-  dependencies?: string[];
-}
-
-/**
- * Base transformer class for file content transformation
- */
-export class BaseTransformer {
-  /** Transformer name (kebab-case identifier) */
-  readonly name: string;
-  /** Transformer traits */
-  readonly traits: TransformerTraits;
-
-  /** Create a new transformer instance */
-  constructor(options?: Record<string, unknown>);
-
-  /**
-   * Transform a file
-   * @param file - File to transform
-   * @returns Transformed file
-   */
-  transform(file: FileResult): Promise<FileResult>;
-}
-
-/**
- * Options for creating a TransformerRegistry
- */
-export interface TransformerRegistryOptions {
-  /** ConfigManager instance for isolated configuration */
-  config?: ConfigManager;
-}
-
-/**
- * Transformer registry for managing and scheduling transformers
- */
-export class TransformerRegistry {
-  /**
-   * Create the default registry with all built-in transformers
-   * @param options - Registry options
-   * @returns Initialized registry
-   */
-  static createDefault(options?: TransformerRegistryOptions): Promise<TransformerRegistry>;
-
-  /**
-   * Register a transformer
-   * @param name - Transformer name
-   * @param transformer - Transformer instance
-   */
-  register(name: string, transformer: BaseTransformer): void;
-
-  /**
-   * Get a transformer by name
-   * @param name - Transformer name
-   * @returns Transformer instance or undefined
-   */
-  get(name: string): BaseTransformer | undefined;
-
-  /**
-   * Get all registered transformers
-   * @returns Array of all transformer instances
-   */
-  getAll(): BaseTransformer[];
-
-  /**
-   * Check if a transformer is registered
-   * @param name - Transformer name
-   * @returns true if registered
-   */
-  has(name: string): boolean;
-}
-
-// ============================================================================
 // Configuration
 // ============================================================================
 
@@ -1687,6 +1294,18 @@ export interface ConfigManagerOptions {
    * and continuing with a partial (possibly empty) configuration.
    */
   strict?: boolean;
+  /**
+   * Override the data configuration directory — the platform's conventional
+   * location, holding `config.yaml`. Distinct from `userConfigPath`, which is
+   * the legacy executable `~/.copytree` directory.
+   */
+  dataConfigPath?: string;
+  /**
+   * Where non-fatal load warnings go. Defaults to stderr; an embedded
+   * application passes its own sink so a desktop app is not writing to the
+   * host console uninvited.
+   */
+  onWarning?: (message: string) => void;
 }
 
 /**
@@ -1788,24 +1407,6 @@ export class ConfigManager {
    */
   isValidationEnabled(): boolean;
 }
-
-/**
- * Get or create the singleton ConfigManager instance.
- *
- * @deprecated Use `ConfigManager.create()` instead for new code. The singleton
- * pattern prevents safe concurrent operations with different configurations.
- * This function will be removed in the next major version.
- */
-export function config(options?: { noValidate?: boolean }): ConfigManager;
-
-/**
- * Async version of config() that ensures full initialization.
- *
- * @deprecated Use `ConfigManager.create()` instead for new code. The singleton
- * pattern prevents safe concurrent operations with different configurations.
- * This function will be removed in the next major version.
- */
-export function configAsync(options?: { noValidate?: boolean }): Promise<ConfigManager>;
 
 // ============================================================================
 // Error Classes

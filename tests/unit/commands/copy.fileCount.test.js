@@ -13,10 +13,12 @@ import { jest } from '@jest/globals';
 jest.unmock('../../../src/utils/fsx.js');
 
 let OutputFormattingStage;
+let calculateTotalSize;
 
 beforeAll(async () => {
   const module = await import('../../../src/pipeline/stages/OutputFormattingStage.js');
   OutputFormattingStage = module.default;
+  ({ calculateTotalSize } = await import('../../../src/formatters/document.js'));
 });
 
 describe('File count calculation with null placeholders (using real OutputFormattingStage)', () => {
@@ -114,7 +116,7 @@ describe('File count calculation with null placeholders (using real OutputFormat
       expect(result.output.length).toBeGreaterThan(0);
 
       // Verify total size calculation (100 + 200 + 300 = 600)
-      const totalSize = stage.calculateTotalSize([
+      const totalSize = calculateTotalSize([
         { path: 'file1.txt', size: 100 },
         null,
         { path: 'file2.txt', size: 200 },
@@ -125,9 +127,7 @@ describe('File count calculation with null placeholders (using real OutputFormat
     });
 
     it('should handle files without size property', () => {
-      const stage = new OutputFormattingStage({ format: 'json' });
-
-      const totalSize = stage.calculateTotalSize([
+      const totalSize = calculateTotalSize([
         { path: 'file1.txt', size: 0 }, // Size 0 instead of undefined
         { path: 'file2.txt', size: 200 },
         null,
@@ -137,9 +137,7 @@ describe('File count calculation with null placeholders (using real OutputFormat
     });
 
     it('should return zero for all null files', () => {
-      const stage = new OutputFormattingStage({ format: 'json' });
-
-      const totalSize = stage.calculateTotalSize([null, null, null]);
+      const totalSize = calculateTotalSize([null, null, null]);
       expect(totalSize).toBe(0);
     });
   });

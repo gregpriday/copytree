@@ -30,9 +30,12 @@ describe('version consistency', () => {
     expect(packageVersion).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
   });
 
-  test('the type definitions declare the same version', () => {
-    const declared = readRepoFile('types/index.d.ts').match(/@version\s+(\S+)/)?.[1];
-    expect(declared).toBe(packageVersion);
+  test('the type definitions carry no version of their own', () => {
+    // Stronger than checking that a hand-maintained `@version` matches: there
+    // is no second copy to drift. The declarations describe a shape, and the
+    // shape does not have a version — the package does.
+    expect(readRepoFile('types/index.d.ts')).not.toMatch(/@version\s+\d+\.\d+\.\d+/);
+    expect(readRepoFile('types/advanced.d.ts')).not.toMatch(/@version\s+\d+\.\d+\.\d+/);
   });
 
   test('the CLI reports the same version', async () => {

@@ -10,6 +10,11 @@
       "import": "./src/index.js",
       "default": "./src/index.js"
     },
+    "./advanced": {
+      "types": "./types/advanced.d.ts",
+      "import": "./src/advanced.js",
+      "default": "./src/advanced.js"
+    },
     "./package.json": "./package.json"
   },
   "bin": {
@@ -40,11 +45,15 @@
     "lint:fix": "eslint src/ bin/ --fix",
     "format": "prettier --write \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\"",
-    "prepublishOnly": "npm run lint && npm run docs:cli:check && npm run test && npm run typecheck",
+    "prepublishOnly": "npm run verify:release",
     "benchmark:latency-ab": "node tests/performance/latency-ab.bench.js",
     "knip": "knip",
     "docs:cli": "node scripts/generate-cli-docs.js",
-    "docs:cli:check": "node scripts/generate-cli-docs.js --check"
+    "docs:cli:check": "node scripts/generate-cli-docs.js --check",
+    "knip:production": "knip --production --strict --include dependencies,unlisted,unresolved",
+    "test:package": "node scripts/verify-package.js",
+    "verify:release": "npm run lint && npm run format:check && npm run docs:cli:check && npm run docs:links && npm run typecheck && npm run knip && npm run knip:production && npm run test:coverage && npm run test:package",
+    "docs:links": "node scripts/check-docs-links.js"
   },
   "keywords": [
     "cli",
@@ -93,7 +102,8 @@
     "micromatch": "^4.0.8",
     "minimatch": "^10.2.5",
     "p-limit": "^7.3.1",
-    "simple-git": "^3.36.0"
+    "simple-git": "^3.36.0",
+    "strip-ansi": "^7.2.0"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.29.7",
@@ -109,7 +119,6 @@
     "knip": "^6.32.0",
     "lodash": "^4.18.1",
     "prettier": "^3.9.6",
-    "strip-ansi": "^7.2.0",
     "typescript": "^7.0.2"
   },
   "overrides": {

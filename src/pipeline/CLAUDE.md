@@ -39,7 +39,7 @@ and reported once, with a remediation, by the reporter.
 ## Performance Rules
 
 - Stream files >10MB (use `StreamingFileLoader` transformer)
-- Process files in batches for memory efficiency
+- Process files in batches to keep transient allocation down
 - Emit progress every 10% or 100 files
 - Monitor memory deltas in `afterRun()`
 

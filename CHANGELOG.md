@@ -1,5 +1,94 @@
 # Changelog
 
+## [Unreleased]
+
+A contract-hardening pass toward 1.0. Little new capability; a deliberate
+narrowing of what CopyTree promises, so that what remains is true, tested and
+provable from the published tarball.
+
+Full upgrade notes: [docs/reference/migrating-to-1.0.md](docs/reference/migrating-to-1.0.md).
+
+### Fixed
+
+- **Streamed and buffered output are now byte-identical.** Each format had three
+  independent implementations — the buffered formatters, `api/formatStream.js`,
+  and the transform streams inside `StreamingOutputStage` — and they had
+  drifted. Streamed XML omitted the directory structure and the entire
+  instructions block. Streamed JSON emitted `metadata.directoryStructure` as a
+  comma-joined string where the CLI emitted a rendered tree, and invented a
+  `profile` field. Streamed SARIF reported the tool version as `0.0.0`. There is
+  now one serializer per format, an async generator of chunks: buffered output
+  is defined as the concatenation of the same chunks a streamed run writes.
+- **Gitleaks can no longer fail open.** Exit code 1 means "secrets found"; if the
+  report could not be parsed, the adapter returned an empty finding list — a
+  clean verdict at the moment there was most reason for concern. It now falls
+  back to the built-in scanner and records the downgrade in
+  `stats.secretsGuard.degraded`. Unparseable output on a clean exit is likewise
+  treated as a scanner malfunction, not as "no secrets".
+- **Documents no longer vanish from exports.** The default document policy was
+  `convert`, which loaded raw bytes for a converter that was never registered;
+  the secrets guard then dropped the file as unscannable. Documents are now
+  rendered as placeholders, like every other binary.
+- **Export output is atomic.** Every path that writes a *copy* — buffered,
+  streamed, and the temporary reference file — goes to a private (mode `0600`)
+  sibling with an unpredictable name and is renamed over the destination, so a
+  failed or cancelled run cannot truncate an existing export or leave half a
+  document behind. Ancillary writes (`config migrate`, `ignore init`, profiler
+  output) are unchanged and remain ordinary writes.
+- **Ctrl+C cancels instead of exiting.** The first signal aborts through an
+  `AbortSignal` so writers, child processes and temporary files unwind; a second
+  forces exit. Exit code 130, no stack trace.
+- `strip-ansi` was imported by runtime code but declared as a development
+  dependency, so a production-only install shipped a package that could not
+  start.
+- The published declarations required `@types/node` without depending on it, so
+  they did not compile in a strict consumer project.
+
+### Changed — breaking
+
+- **The package root exports 35 values instead of 47.** Extension points moved to
+  `copytree/advanced`: `Pipeline`, `Stage`, `TransformerRegistry`,
+  `BaseTransformer`, `ProgressTracker`, `stageIdFor`, `ExclusionReport`,
+  `resolveScope`, `detectBinary`, `categorizeByExt`.
+- **SDK calls are hermetic by default.** `copy()`, `scan()` and `copyStream()`
+  with no `config` read only the packaged defaults — no home directory, and no
+  executing `~/.copytree/*.js` inside the host process. Pass a `ConfigManager`
+  to opt in. The CLI is unchanged.
+- **`config()` and `configAsync()` are no longer exported.** Both were already
+  deprecated.
+- **`--binary convert` and the `convert` policy value were removed.** The CLI
+  names the replacement.
+- **The configuration schema is closed and no longer coerces types.** An unknown
+  key or a wrong type is reported instead of being silently discarded.
+- `ConfigManager.migrateConfig()` — a public stub that printed "not implemented
+  yet" — was removed.
+- `ProgressEvent` declares the fields the runtime actually emits (`phase`,
+  `completed`, `total`, `item`) rather than four that were never set.
+- The `alwaysInclude`, `filter` and `limit` stage identifiers were removed; they
+  named stages that no longer exist.
+
+### Added
+
+- `npm run verify:release` — one gate covering lint, formatting, generated-document
+  drift, documentation links, types, dead code, the full suite with coverage, and
+  the packed tarball. `prepublishOnly` runs it.
+- `npm run test:package` — packs the tarball, installs it into an empty project
+  with production dependencies only, and exercises it as a consumer: ESM import,
+  strict TypeScript, and CLI smoke tests. Nothing here imports by relative path.
+- A buffered/chunked parity matrix across every format and option combination,
+  including hostile content and non-ASCII paths.
+- `docs/reference/environment.md`, replacing a `.env.example` that advertised a
+  Gemini API key and an AI cache, none of which any shipped code reads.
+- `docs/reference/migrating-to-1.0.md`.
+
+### Security
+
+- Reference and output files are created with mode `0600` and unpredictable
+  temporary names, rather than a fixed `<target>.partial` in a shared directory.
+- Gitleaks child processes are bounded (output size, timeout, SIGTERM then
+  SIGKILL) and accept an `AbortSignal`. Scanner stdout — which can contain the
+  matched secret — is never interpolated into an error message.
+
 ## [0.17.0] - 2026-08-07
 
 A performance and terminal-output release. Nothing in the selection logic or the

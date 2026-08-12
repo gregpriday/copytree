@@ -2,17 +2,26 @@
 
 ## Supported Versions
 
-CopyTree is currently in **pre-release** (0.x versions). Security updates are provided for:
+Security updates are provided for the latest release only.
 
-| Version | Supported          | Notes                                    |
-| ------- | ------------------ | ---------------------------------------- |
-| 0.x     | :white_check_mark: | Latest 0.x release only (pre-release)    |
-| < 0.x   | :x:                | Upgrade to latest 0.x                    |
+| Version    | Supported          | Notes                             |
+| ---------- | ------------------ | --------------------------------- |
+| Latest 1.x | :white_check_mark: | Fixes ship in a new patch release |
+| Older 1.x  | :x:                | Upgrade to the latest 1.x         |
+| 0.x        | :x:                | Upgrade to 1.x                    |
 
-**Post-1.0 Support Policy**: Once we release 1.0.0, we will adopt an LTS (Long Term Support) approach with:
-- Security updates for all 1.x minor versions for 12 months
-- Critical security fixes backported to the previous major version for 6 months
-- Clear end-of-life dates announced in advance
+**This is a deliberately narrow promise.** CopyTree is maintained by one person.
+A stated LTS window with backports to previous majors would be a commitment that
+could not be honoured under load, and a support policy that is quietly missed is
+worse than a modest one that is kept. If you need a longer window than this, say
+so on the issue tracker rather than assuming it.
+
+What is promised:
+
+- A security fix ships as a patch release on the current minor, normally within
+  a few days of a confirmed report.
+- Breaking changes are never introduced in a security patch.
+- The advisory names the affected versions and the first fixed version.
 
 ## Node.js Version Support
 
@@ -29,6 +38,7 @@ We take security vulnerabilities seriously. If you discover a security issue in 
 Instead, please email security reports to: **greg@siteorigin.com**
 
 Include in your report:
+
 - Description of the vulnerability
 - Steps to reproduce the issue
 - Potential impact
@@ -74,7 +84,7 @@ When `followSymlinks` is enabled, traversal is still contained:
 - Every followed link is resolved with `realpath` and must land inside the real
   repository root. A link pointing outside is skipped and recorded in the
   exclusion report under `symlinkEscape`.
-- The root is compared after resolution, so a repository you reached *through*
+- The root is compared after resolution, so a repository you reached _through_
   a symlink still works normally.
 - Directories reached through a link are tracked by device and inode (falling
   back to canonical path where inode is unavailable), so self-references,
@@ -84,6 +94,7 @@ When `followSymlinks` is enabled, traversal is still contained:
 ### Configuration Files
 
 User configuration files are stored in:
+
 - `~/.copytree/` (global)
 - `.copytree/` (project-specific)
 
@@ -94,8 +105,8 @@ hermetic configuration that never reads them:
 
 ```js
 const config = await ConfigManager.create({
-  userConfig: false,  // skip ~/.copytree entirely
-  strict: true,       // fail loudly rather than continuing with a partial config
+  userConfig: false, // skip ~/.copytree entirely
+  strict: true, // fail loudly rather than continuing with a partial config
 });
 ```
 
@@ -127,6 +138,7 @@ When using CopyTree:
 ## Updates
 
 Security updates will be published via:
+
 - GitHub Security Advisories
 - npm package updates
 - CHANGELOG.md entries marked with `[SECURITY]`

@@ -532,17 +532,22 @@ class ConfigManager {
           allErrors: true,
           removeAdditional: false,
           strict: false,
-          coerceTypes: true,
+          // No coercion. With it on, `maxFileSize: "10MB"` became the number 10
+          // and validated cleanly — the user's stated intent silently replaced
+          // by something they did not write and cannot see, in the one
+          // subsystem whose job is to tell them when their configuration is
+          // wrong. A type error should be reported, not repaired by guesswork.
+          coerceTypes: false,
         });
         addFormats(this.ajv);
 
         this.validate = this.ajv.compile(uniqueSchema);
       } else {
-        console.warn('Configuration schema not found. Validation disabled.');
+        this._warn('Configuration schema not found. Validation disabled.');
         this.validationEnabled = false;
       }
     } catch (error) {
-      console.warn(`Failed to load configuration schema: ${error.message}`);
+      this._warn(`Failed to load configuration schema: ${error.message}`);
       this.validationEnabled = false;
     }
   }
@@ -595,19 +600,19 @@ class ConfigManager {
     return this.validationEnabled && this.validate !== null;
   }
 
-  /**
-   * Migrate configuration to newer schema version
-   * @param {Object} config - Configuration to migrate
-   * @param {string} fromVersion - Source schema version
-   * @param {string} toVersion - Target schema version
-   * @returns {Object} Migrated configuration
-   */
-  migrateConfig(config, fromVersion, toVersion) {
-    // Schema migration logic can be added here
-    // For now, just return the config unchanged
-    console.log(`Config migration from ${fromVersion} to ${toVersion} not implemented yet`);
-    return config;
-  }
+  // `migrateConfig(config, fromVersion, toVersion)` used to live here. It was a
+  // public method that printed "not implemented yet" to the console and
+  // returned its input unchanged — an unfinished stub on the public surface, in
+  // a library that must not write to the host's console uninvited, and nothing
+  // in the codebase called it.
+  //
+  // There is also nothing for it to do. The configuration schema has exactly
+  // one version, so there is no version pair to migrate between. The migration
+  // that does exist is a different operation entirely — moving the legacy
+  // executable `~/.copytree/*.js` directory to the data configuration file —
+  // and it lives in `copytree config migrate`, where it is implemented, tested
+  // and reachable. A second, empty migration API alongside it was only ever
+  // going to be mistaken for the real one.
 
   /**
    * Get schema information

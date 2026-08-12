@@ -1,21 +1,14 @@
 import { XMLValidator, XMLParser } from 'fast-xml-parser';
-import XMLFormatter from '../../../../src/pipeline/formatters/XMLFormatter.js';
-import { formatStream } from '../../../../src/api/formatStream.js';
+import { renderInput } from '../../../src/formatters/index.js';
+import { formatStream } from '../../../src/api/formatStream.js';
 
 /**
- * Minimal `stage` shim matching what the formatters expect.
- * @returns {Object} Stage shim
+ * Render a document through the canonical XML serializer.
+ * @param {Object} input - Document input
+ * @returns {Promise<string>} XML text
  */
-function stubStage() {
-  return {
-    config: { get: (_key, fallback) => fallback },
-    calculateTotalSize: (files) => files.reduce((sum, f) => sum + (f?.size || 0), 0),
-    generateDirectoryStructure: () => 'src/\n  a&b/',
-    addLineNumbersToContent: (content) => content,
-    buildTreeStructure: () => ({}),
-    renderTree: () => {},
-    formatBytes: (n) => `${n} B`,
-  };
+function renderXml(input) {
+  return renderInput(input, { format: 'xml' });
 }
 
 // Filenames are attacker-adjacent input: they come from the repository, not
@@ -81,17 +74,13 @@ function parseStrict(xml) {
 
 describe('XML escaping', () => {
   test('the buffered formatter emits a parseable document for hostile metadata', async () => {
-    const formatter = new XMLFormatter({ stage: stubStage() });
-
-    const xml = await formatter.format(HOSTILE_INPUT);
+    const xml = await renderXml(HOSTILE_INPUT);
 
     expect(() => parseStrict(xml)).not.toThrow();
   });
 
   test('attribute values round-trip through a parser unchanged', async () => {
-    const formatter = new XMLFormatter({ stage: stubStage() });
-
-    const parsed = parseStrict(await formatter.format(HOSTILE_INPUT));
+    const parsed = parseStrict(await renderXml(HOSTILE_INPUT));
     const files = parsed['ct:directory']['ct:files']['ct:file'];
     const paths = files.map((entry) => entry['@path']);
 
@@ -101,9 +90,7 @@ describe('XML escaping', () => {
   });
 
   test('text nodes survive markup characters', async () => {
-    const formatter = new XMLFormatter({ stage: stubStage() });
-
-    const parsed = parseStrict(await formatter.format(HOSTILE_INPUT));
+    const parsed = parseStrict(await renderXml(HOSTILE_INPUT));
     const metadata = parsed['ct:directory']['ct:metadata'];
 
     expect(metadata['ct:profile']).toBe('profile<with>markup');
@@ -123,9 +110,8 @@ describe('XML escaping', () => {
   });
 
   test('buffered and streaming agree on the file paths they emit', async () => {
-    const formatter = new XMLFormatter({ stage: stubStage() });
     const buffered = parseStrict(
-      await formatter.format({ ...HOSTILE_INPUT, profile: null, gitMetadata: null }),
+      await renderXml({ ...HOSTILE_INPUT, profile: null, gitMetadata: null }),
     );
 
     let streamText = '';
@@ -144,9 +130,7 @@ describe('XML escaping', () => {
   });
 
   test('a CDATA terminator inside content does not break the document', async () => {
-    const formatter = new XMLFormatter({ stage: stubStage() });
-
-    const xml = await formatter.format({
+    const xml = await renderXml({
       basePath: '/repo',
       files: [
         {

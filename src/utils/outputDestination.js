@@ -2,6 +2,7 @@ import os from 'os';
 import path from 'path';
 import { randomBytes } from 'crypto';
 import fs from './fsx.js';
+import { writeFileAtomic } from './atomicWrite.js';
 import { ERROR_CODES, ValidationError } from './errors.js';
 
 /**
@@ -99,11 +100,11 @@ export function referenceFilePath(basePath, format) {
  */
 export async function writeReferenceFile(output, basePath, format) {
   const target = referenceFilePath(basePath, format);
-  await fs.ensureDir(path.dirname(target));
-
-  const pending = `${target}.partial`;
-  await fs.writeFile(pending, output, { encoding: 'utf8', mode: 0o600 });
-  await fs.rename(pending, target);
+  // Through the shared atomic writer: mode 0600, an unpredictable temporary
+  // name, and a rename over the destination. The temporary name matters here in
+  // particular — this lives in a shared temp directory, so a fixed
+  // `<target>.partial` is a path another local user can create first.
+  await writeFileAtomic(target, output);
   return target;
 }
 

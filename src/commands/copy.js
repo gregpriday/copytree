@@ -50,6 +50,7 @@ import {
 } from '../selection/selection.js';
 import { FORMATS } from '../cli/schema.js';
 import { VERSION } from '../version.js';
+import { writeFileAtomic } from '../utils/atomicWrite.js';
 
 const pkg = { version: VERSION };
 
@@ -64,11 +65,6 @@ const BINARY_ACTIONS = Object.freeze({
   comment: 'comment',
   placeholder: 'placeholder',
   base64: 'base64',
-  // `convert` runs the registered document converters and falls back to a
-  // placeholder for the media they cannot read — it does not base64 arbitrary
-  // binaries. The converting half is the `forceTransform` flag below; this is
-  // only what happens to what is left.
-  convert: 'placeholder',
 });
 
 /**
@@ -77,6 +73,7 @@ const BINARY_ACTIONS = Object.freeze({
  * @param {Object} request - Canonical request from the CLI parser or an embedder
  * @param {Object} [context={}] - Execution context
  * @param {Array} [context.notices] - Parse-time deprecation and security notices
+ * @param {AbortSignal} [context.signal] - Cancels the run; the CLI aborts this on SIGINT
  * @returns {Promise<Object|undefined>} The pipeline result, when one was produced
  */
 export default async function copyCommand(request, context = {}) {
@@ -137,6 +134,7 @@ export default async function copyCommand(request, context = {}) {
     // anchored the way every other run anchors them.
     const resolved = await resolveTarget(request, {
       onClone: (url) => reporter.note(`Cloning ${url}`),
+      signal: context.signal,
     });
     root = resolved.root;
     request = resolved.request;
@@ -162,6 +160,7 @@ export default async function copyCommand(request, context = {}) {
       config: cfg,
       startTime,
       reporter,
+      signal: context.signal,
     });
 
     if (profiler) {
@@ -324,16 +323,36 @@ function applyBinaryPolicy(config, policy) {
  * @param {Object} params - Inputs
  * @returns {Promise<Object>} Pipeline result
  */
-async function runPipeline({ root, request, profile, budgets, config, startTime, reporter }) {
+async function runPipeline({
+  root,
+  request,
+  profile,
+  budgets,
+  config,
+  startTime,
+  reporter,
+  signal,
+}) {
   const pipeline = new Pipeline({
     config,
     measureMemory: Boolean(request.profiler),
     continueOnError: true,
     emitProgress: true,
     quiet: reporter.quiet,
+    // Ctrl+C has to reach the work, not just the terminal. Without this the
+    // signal handler printed "Cancelled" while discovery, loading, the secret
+    // scanner and the writer all carried on to completion.
+    signal,
   });
 
-  const stages = await buildPipelineStages({ root, request, profile, budgets, config });
+  const stages = await buildPipelineStages({
+    root,
+    request,
+    profile,
+    budgets,
+    config,
+    signal,
+  });
   pipeline.through(stages);
 
   const tracker = new ProgressTracker({
@@ -382,7 +401,7 @@ async function runPipeline({ root, request, profile, budgets, config, startTime,
  * @param {Object} params - Inputs
  * @returns {Promise<Array>} Ordered stages
  */
-async function buildPipelineStages({ root, request, profile, budgets, config }) {
+async function buildPipelineStages({ root, request, profile, budgets, config, signal }) {
   const { stages } = await buildSelectionStages({
     root,
     request,
@@ -413,10 +432,6 @@ async function buildPipelineStages({ root, request, profile, budgets, config }) 
           return TransformerRegistry.createDefault({ config });
         },
         transformers: profile.transformers || {},
-        // `--binary convert` is a request for the converters to run, so the
-        // stage's "is there anything worth building a registry for" shortcut is
-        // not allowed to answer no.
-        force: request.content.binary === 'convert',
         noCache: request.transformCache === false,
       }),
     );
@@ -448,6 +463,9 @@ async function buildPipelineStages({ root, request, profile, budgets, config }) 
         redactionMode:
           request.security.redaction || config.get('secretsGuard.redactionMode', 'typed'),
         failOnSecrets: request.security.secrets === 'fail',
+        // Scanning spawns a child process per file; a cancelled run must stop
+        // spawning them and kill the one in flight.
+        signal,
       }),
     );
   }
@@ -478,6 +496,8 @@ async function buildPipelineStages({ root, request, profile, budgets, config }) 
         // The path, not an open stream: the stage opens it once it is about to
         // write, so assembling the pipeline never touches the filesystem.
         outputPath: request.destination.type === 'file' ? request.destination.path : null,
+        // Discards the temporary file and leaves the previous export intact.
+        signal,
       }),
     );
   } else {
@@ -680,8 +700,8 @@ async function deliverOutput(result, request, root, reporter) {
 
   if (destination.type === 'file') {
     const outputPath = path.resolve(destination.path);
-    await fs.ensureDir(path.dirname(outputPath));
-    await fs.writeFile(outputPath, output, 'utf8');
+    // Atomic: a failed or cancelled run must not truncate an existing export.
+    await writeFileAtomic(outputPath, output);
     await revealIfRequested(outputPath, destination);
     return {
       requested: 'file',

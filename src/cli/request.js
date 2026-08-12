@@ -10,7 +10,13 @@
 
 import path from 'path';
 import { ERROR_CODES, ValidationError, PolicyError } from '../utils/errors.js';
-import { LEGACY_PROFILER_VALUES, longFlagOf, optionsOf, REMOVED_COPY_OPTIONS } from './schema.js';
+import {
+  LEGACY_PROFILER_VALUES,
+  longFlagOf,
+  optionsOf,
+  REMOVED_COPY_OPTIONS,
+  REMOVED_OPTION_VALUES,
+} from './schema.js';
 
 /**
  * @typedef {Object} Notice
@@ -108,6 +114,35 @@ export function rejectRemovedOptions(argv) {
       value: long,
       suggestion: removed.replacedBy ? `Use ${removed.replacedBy}. ${removed.note}` : removed.note,
     });
+  }
+
+  rejectRemovedValues(argv);
+}
+
+/**
+ * Reject an option *value* that was removed, naming its replacement.
+ *
+ * A removed value falls through to the enum check otherwise, which reports it
+ * as invalid alongside a list of the valid ones — true, and no help at all to
+ * someone whose script has said `--binary convert` since last month.
+ *
+ * @param {string[]} argv - Raw argument vector
+ */
+function rejectRemovedValues(argv) {
+  for (const [optionId, values] of Object.entries(REMOVED_OPTION_VALUES)) {
+    const long = `--${optionId}`;
+
+    for (const [value, detail] of Object.entries(values)) {
+      const used = argv.some(
+        (arg, index) => arg === `${long}=${value}` || (arg === long && argv[index + 1] === value),
+      );
+      if (!used) continue;
+
+      usageError(`${long} ${value} has been removed`, ERROR_CODES.DEPRECATED_OPTION, {
+        value,
+        suggestion: `Use ${long} ${detail.replacement} — ${detail.reason}.`,
+      });
+    }
   }
 }
 

@@ -6,103 +6,196 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
-  quality-checks:
-    name: Quality Checks
+  # One job, on purpose.
+  #
+  # This used to be three: quality checks, publish, and create-release — with
+  # `create-release` depending on the *checks* rather than on the publish. A
+  # failed or rejected publish therefore still produced a public GitHub release
+  # announcing a version that did not exist on the registry, and the only way to
+  # find out was for someone to try installing it.
+  #
+  # Splitting also meant the tarball was built twice: once implicitly by
+  # `npm publish`, once never tested at all. Here the artifact is packed once,
+  # verified, and that exact file is what gets published.
+  release:
+    name: Verify and publish
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Check out the tag
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          node-version: '22'
-          cache: 'npm'
+          fetch-depth: 0
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run linter
-        run: npm run lint
-
-      - name: Check formatting
-        run: npm run format:check
-
-      - name: Run all tests
-        run: npm test
-
-      - name: Check coverage
-        run: npm run test:coverage
-
-  publish:
-    name: Publish to NPM
-    runs-on: ubuntu-latest
-    needs: quality-checks
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
-      - name: Upgrade npm for OIDC support
-        run: npm install -g npm@latest
+      - name: Confirm the tag matches the package version
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+        id: version
 
-      - name: Install dependencies
+      - name: Install from the lockfile
         run: npm ci
 
-      - name: Publish to NPM
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
+
+      # The complete gate: lint, formatting, generated-document drift,
+      # documentation links, types, dead code, the full suite with coverage,
+      # and the packed-tarball consumer tests.
+      #
+      # `--out` keeps the tarball those consumer tests ran against. Packing
+      # again afterwards would produce a different file that nothing has
+      # exercised — same inputs, but "probably identical" is not the claim this
+      # job exists to make.
+      - name: Verify the release
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          LATEST=$(npm view copytree version 2>/dev/null || echo "0.0.0")
-          if [ "$(npx semver "$VERSION" "$LATEST" | tail -1)" != "$VERSION" ]; then
-            echo "::warning::Publishing $VERSION with --tag hotfix (latest is $LATEST). Run 'npm dist-tag add copytree@$VERSION latest' manually after publish."
-            npm publish --access public --tag hotfix
-          else
-            npm publish --access public
+          mkdir -p dist
+          npm run lint
+          npm run format:check
+          npm run docs:cli:check
+          npm run docs:links
+          npm run typecheck
+          npm run knip
+          npm run knip:production
+          npm run test:coverage
+          node scripts/verify-package.js --out dist
+
+      - name: Record the verified artifact
+        id: pack
+        run: |
+          FILE="$(ls dist/*.tgz)"
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          # npm's own integrity format, so it can be compared against what the
+          # registry reports after publication.
+          INTEGRITY="sha512-$(openssl dgst -sha512 -binary "$FILE" | base64 -w0 2>/dev/null || openssl dgst -sha512 -binary "$FILE" | base64)"
+          echo "integrity=$INTEGRITY" >> "$GITHUB_OUTPUT"
+          shasum -a 256 "$FILE" | tee "$FILE.sha256"
+
+      - name: Decide the dist-tag
+        id: disttag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Any SemVer prerelease — anything after the first `-` — must never
+          # become `latest` by default. Matching a list of known identifiers
+          # (alpha/beta/rc/next) let `1.0.0-preview.1` and `1.0.0-canary` fall
+          # through into the stable path.
+          case "$VERSION" in
+            *-*)
+              echo "tag=next" >> "$GITHUB_OUTPUT"
+              echo "prerelease=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              # A registry lookup that *fails* must not read as "nothing is
+              # published" — that would let a network blip move `latest`
+              # backwards. Only a genuine 404 means the package is new;
+              # anything else is an unknown, and an unknown is not a licence
+              # to guess.
+              if ! LATEST="$(npm view copytree version 2>/tmp/npmview.err)"; then
+                if grep -q 'E404' /tmp/npmview.err; then
+                  LATEST='0.0.0'
+                else
+                  echo "::error::Could not read the published version; refusing to guess a dist-tag"
+                  cat /tmp/npmview.err
+                  exit 1
+                fi
+              fi
+              HIGHEST="$(printf '%s\n%s\n' "$VERSION" "$LATEST" | sort -V | tail -1)"
+              if [ "$HIGHEST" != "$VERSION" ]; then
+                # Publishing below the current latest is either a deliberate
+                # hotfix to an older line or a mistake. Either way it must not
+                # silently move `latest` backwards for every installer.
+                echo "::warning::$VERSION is below the published latest ($LATEST); publishing under the 'hotfix' tag"
+                echo "tag=hotfix" >> "$GITHUB_OUTPUT"
+              else
+                echo "tag=latest" >> "$GITHUB_OUTPUT"
+              fi
+              echo "prerelease=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      # Publishes the exact file that was just packed and verified, rather than
+      # re-packing from the working tree.
+      # Idempotent: a rerun after a partial success (published, but the release
+      # step failed) must be able to finish rather than dying on an immutable
+      # version it already created.
+      - name: Publish to npm
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if npm view "copytree@$VERSION" version >/dev/null 2>&1; then
+            echo "::warning::copytree@$VERSION is already published; skipping publish and verifying instead"
+            exit 0
           fi
+          npm publish "${{ steps.pack.outputs.file }}" --access public --provenance --tag "${{ steps.disttag.outputs.tag }}"
 
-  create-release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: quality-checks
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Generate changelog
-        id: changelog
+      - name: Confirm the registry has the bytes we tested
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          VERSION="${{ steps.version.outputs.version }}"
+          EXPECTED="${{ steps.pack.outputs.integrity }}"
 
+          for attempt in 1 2 3 4 5 6; do
+            PUBLISHED="$(npm view "copytree@$VERSION" dist.integrity 2>/dev/null || true)"
+            if [ -n "$PUBLISHED" ]; then
+              # Existence is not enough. This is the assertion the whole
+              # pack-once arrangement exists to make: the artifact on the
+              # registry is the artifact the consumer tests passed against.
+              if [ "$PUBLISHED" != "$EXPECTED" ]; then
+                echo "::error::Registry integrity $PUBLISHED does not match the verified artifact $EXPECTED"
+                exit 1
+              fi
+              echo "Registry reports $VERSION with matching integrity"
+              exit 0
+            fi
+            echo "Not visible yet; retrying in 10s ($attempt/6)"
+            sleep 10
+          done
+          echo "::error::copytree@$VERSION is not on the registry after publish"
+          exit 1
+
+      - name: Build the release notes
+        run: |
+          PREV_TAG="$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')"
           if [ -z "$PREV_TAG" ]; then
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" HEAD)
+            git log --pretty=format:"- %s (%h)" HEAD > changelog.txt
           else
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD)
+            git log --pretty=format:"- %s (%h)" "$PREV_TAG..HEAD" > changelog.txt
           fi
+          {
+            echo ""
+            echo ""
+            echo "### Artifact"
+            echo ""
+            echo '```'
+            cat "${{ steps.pack.outputs.file }}.sha256"
+            echo '```'
+          } >> changelog.txt
 
-          echo "$CHANGELOG" > changelog.txt
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v3
+      # Last, and only now: the release cannot exist unless the package does.
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           body_path: changelog.txt
+          files: |
+            ${{ steps.pack.outputs.file }}
+            ${{ steps.pack.outputs.file }}.sha256
           draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-          generate_release_notes: true
+          prerelease: ${{ steps.disttag.outputs.prerelease == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

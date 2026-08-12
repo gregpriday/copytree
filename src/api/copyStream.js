@@ -6,6 +6,7 @@ import { buildManifest } from '../utils/manifest.js';
 import { buildEstimates } from '../utils/estimate.js';
 import { versionFor } from '../utils/outputVersion.js';
 import { summaryStats } from './resultStats.js';
+import { resolveOperationConfig } from './operationConfig.js';
 
 /**
  * @typedef {import('./scan.js').ScanOptions} ScanOptions
@@ -85,7 +86,7 @@ export async function* copyStream(basePath, options = {}) {
   }
 
   // Create isolated config instance for this operation if not provided
-  const configInstance = options.config || (await ConfigManager.create());
+  const configInstance = await resolveOperationConfig(options);
 
   // Normalize format option
   const rawFormat = (options.format || 'xml').toString().toLowerCase();
@@ -184,6 +185,14 @@ export async function* copyStream(basePath, options = {}) {
     instructions: options.instructions,
     showSize: options.showSize,
     prettyPrint: options.prettyPrint,
+    includeMetadata: options.includeMetadata,
+    reproducible: options.reproducible,
+    withGitStatus: options.withGitStatus,
+    // Exactly what `copy()` passes. An empty selection produces an empty
+    // document rather than an exception: "nothing to copy here" is an outcome,
+    // not a failure — and it has to be the same outcome in both APIs, or the
+    // parity guarantee holds only for non-empty projects.
+    allowEmpty: true,
     config: configInstance,
     onProgress: options.onProgress,
   });

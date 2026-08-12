@@ -36,6 +36,7 @@ import Pipeline from '../pipeline/Pipeline.js';
  * @param {string} target - Path or GitHub URL
  * @param {Object} [hooks={}] - Optional callbacks
  * @param {Function} [hooks.onClone] - Called with the URL before cloning
+ * @param {AbortSignal} [hooks.signal] - Cancels a clone or fetch in progress
  * @returns {Promise<string>} Absolute canonical root
  */
 export async function resolveRoot(target, hooks = {}) {
@@ -45,7 +46,10 @@ export async function resolveRoot(target, hooks = {}) {
     const { default: GitHubUrlHandler } = await import('../services/GitHubUrlHandler.js');
     if (GitHubUrlHandler.isGitHubUrl(target)) {
       hooks.onClone?.(target);
-      return new GitHubUrlHandler(target).getFiles();
+      // Cloning happens before the pipeline exists, so the pipeline's own
+      // cancellation cannot reach it. A repository large enough to be worth
+      // cloning is exactly the case where someone reaches for Ctrl+C.
+      return new GitHubUrlHandler(target, { signal: hooks.signal }).getFiles();
     }
   }
 

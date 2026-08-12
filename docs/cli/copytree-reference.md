@@ -83,7 +83,7 @@ copytree [path] [options]   # the command name is optional
 | `--format <type>` | Output format: xml, markdown, json, ndjson, sarif, tree | default: `xml` |
 | `--no-content` | Include structure and metadata, but not file bodies |  |
 | `--line-numbers` | Add line numbers to text bodies | advanced |
-| `--binary <policy>` | Binary/document policy: default, omit, comment, placeholder, base64, convert | advanced; default: `default` |
+| `--binary <policy>` | Binary/document policy: default, omit, comment, placeholder, base64 | advanced; default: `default` |
 | `--git-status` | Attach Git status to selected files | advanced |
 | `--metadata` | Include optional rich metadata where the format supports it | advanced |
 | `--no-metadata` | Omit optional metadata; required schema metadata is kept | advanced |

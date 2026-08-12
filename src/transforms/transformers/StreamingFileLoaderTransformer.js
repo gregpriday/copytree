@@ -3,13 +3,26 @@ import fs from '../../utils/fsx.js';
 import { Readable } from 'stream';
 
 /**
- * Streaming File Loader Transformer - Loads file content using streams
- * Optimized for large files and memory efficiency
+ * Loads file content through a read stream rather than a single `readFile`.
+ *
+ * **"Streaming" here describes the read, not the result.** Chunks arrive
+ * incrementally and are bounded by `bufferSize`, but they are accumulated and
+ * joined, so the complete content is resident when this returns — exactly as it
+ * is for the plain loader. Peak memory is proportional to file size either way.
+ *
+ * The header used to claim "optimized for large files and memory efficiency",
+ * which reads as a bound this does not provide. What it actually provides is an
+ * incremental read with a bounded transient buffer, and a `maxSize` gate above
+ * which a file is refused rather than loaded.
+ *
+ * A genuinely bounded-memory loader would have to hand content downstream in
+ * pieces, which the formatter, the secret scanner and the deduplicator all
+ * currently require whole.
  */
 class StreamingFileLoaderTransformer extends BaseTransformer {
   constructor(options = {}) {
     super(options);
-    this.description = 'Loads file content using streams for memory efficiency';
+    this.description = 'Loads file content through a bounded-buffer read stream';
     this.bufferSize = options.bufferSize || 64 * 1024; // 64KB chunks
     this.maxSize = options.maxSize || this.config.get('copytree.maxFileSize', 10 * 1024 * 1024);
     this.encoding = options.encoding || 'utf8';
