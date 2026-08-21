@@ -365,8 +365,8 @@ async function configMigrate(request, context) {
 
   // Serialized from the loaded user configuration rather than from the files,
   // so an executable config is captured as the values it actually produced.
-  const { default: yaml } = await import('js-yaml');
-  const document = yaml.dump(config.userConfig, { noRefs: true, sortKeys: true });
+  const { dumpYaml } = await import('../utils/yaml.js');
+  const document = await dumpYaml(config.userConfig, { noRefs: true, sortKeys: true });
   model.yaml = document;
 
   if (!request.report.write) {

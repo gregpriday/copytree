@@ -382,8 +382,8 @@ class ConfigManager {
         } else {
           // Loaded on demand: most runs have no data configuration at all, and
           // a YAML parser is a real import.
-          const { default: yaml } = await import('js-yaml');
-          data = yaml.load(fs.readFileSync(filePath, 'utf8')) || {};
+          const { loadYaml } = await import('../utils/yaml.js');
+          data = (await loadYaml(fs.readFileSync(filePath, 'utf8'))) || {};
         }
 
         if (!data || typeof data !== 'object' || Array.isArray(data)) {

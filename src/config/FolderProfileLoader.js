@@ -192,9 +192,9 @@ class FolderProfileLoader {
         // Loaded here rather than at module scope: `js-yaml` is a parser most
         // runs never need, because most projects have no folder profile and a
         // JSON or INI-style one needs no YAML support at all.
-        const { default: yaml } = await import('js-yaml');
-        data = yaml.load(content);
-        // YAML parsing empty file returns null/undefined, treat as empty object
+        const { loadYaml } = await import('../utils/yaml.js');
+        data = await loadYaml(content);
+        // An empty profile file is an empty profile, not a parse failure.
         if (!data) {
           data = {};
         }
