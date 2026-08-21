@@ -7,7 +7,7 @@ Learn how to create custom profiles to tailor CopyTree's file selection for your
 The default profile works great for general use, but you might want a custom profile to:
 
 - **Focus on specific features or modules** (e.g., only authentication code)
-- **Apply transformers** (extract text from PDFs, run OCR on images)
+- **Set budgets and output format** (a size cap, Markdown instead of XML)
 - **Include external sources** (GitHub repos, other directories)
 - **Override default exclusions** (include lock files, test files, etc.)
 - **Share team configurations** (commit profiles to version control)
@@ -167,29 +167,19 @@ always:
 
 ## Advanced Features
 
-### Using Transformers
+### Transformers
 
-Add transformers to handle file loading:
+There are none. CopyTree ships no transformer, so a profile's `transformers:`
+block does nothing unless an embedder has registered one through
+`copytree/experimental`.
 
-```yaml
-name: with-transformers
-description: Profile with file loading
+Reading file content, classifying binaries and applying the binary policy all
+happen in the pipeline itself. This section used to list `file-loader`, `binary`
+and `streaming-file-loader` as built-ins; the first two duplicated work the
+pipeline had already done, and the third buffered whole files despite its name.
 
-include:
-  - '**/*.{md,txt,js,ts}'
-  - 'docs/**/*'
-
-transformers:
-  # Load file content
-  file-loader:
-    enabled: true
-```
-
-Built-in transformers:
-
-- **file-loader**: Loads text file content
-- **binary**: Handles binary files (placeholder or base64)
-- **streaming-file-loader**: Streams large files (>10MB)
+To control how binaries are handled, use `--binary` or the `binaryPolicy`
+configuration key — see [the CLI reference](../cli/copytree-reference.md).
 
 ### Profile Inheritance
 

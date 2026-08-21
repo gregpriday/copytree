@@ -60,6 +60,12 @@ export const EXCLUSION_REASONS = Object.freeze({
   SECRET_FILE: 'secretFile',
   /** Too large for the secret scanner to inspect, so not emitted unscanned */
   SECRET_UNSCANNABLE: 'secretUnscannable',
+  /**
+   * A secret was detected in the content and the file was removed rather than
+   * emitted. Either inline redaction is off, or a detected span could not be
+   * proven redacted.
+   */
+  SECRET_DETECTED: 'secretDetected',
   /** A symlink resolved outside the real repository root, or could not be resolved */
   SYMLINK_ESCAPE: 'symlinkEscape',
 });

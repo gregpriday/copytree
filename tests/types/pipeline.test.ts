@@ -7,7 +7,7 @@
  * If this file compiles without errors, the types are correct.
  */
 
-// Pipeline composition lives behind `copytree/advanced` from 1.0: everything
+// Pipeline composition lives behind `copytree/experimental` from 1.0: everything
 // reachable from the package root is semver-stable, and these extension points
 // are not ready to carry that promise.
 import {
@@ -33,7 +33,7 @@ import {
   PipelineStartEvent,
   PipelineCompleteEvent,
   PipelineErrorEvent,
-} from 'copytree/advanced';
+} from 'copytree/experimental';
 import { ConfigManager, Logger, ProgressCallback, FileResult } from 'copytree';
 
 // ============================================================================
@@ -46,6 +46,7 @@ function testPipelineStats() {
     endTime: Date.now() + 1000,
     stagesCompleted: 5,
     stagesFailed: 1,
+    stagesRecovered: 0,
     errors: [
       {
         stage: 'TransformStage',
@@ -124,14 +125,13 @@ function testPipelineEvents() {
   const stageStart: StageStartEvent = {
     stage: 'FileDiscoveryStage',
     index: 0,
-    input: { basePath: './src' },
+    inputCount: 0,
   };
 
   // Test StageCompleteEvent
   const stageComplete: StageCompleteEvent = {
     stage: 'FileDiscoveryStage',
     index: 0,
-    output: { files: [] },
     duration: 100,
     inputSize: 0,
     outputSize: 100,
@@ -155,7 +155,7 @@ function testPipelineEvents() {
     stage: 'TransformStage',
     index: 2,
     originalError: new Error('Transform failed'),
-    recoveredResult: { files: [], recoveredFromError: true },
+    recoveredCount: 0,
   };
 
   // Test StageProgressEvent
@@ -163,6 +163,9 @@ function testPipelineEvents() {
     stage: 'FileLoadingStage',
     progress: 50,
     message: 'Loading files...',
+    completed: 50,
+    total: 100,
+    item: 'src/index.ts',
     timestamp: Date.now(),
   };
 
@@ -185,24 +188,27 @@ function testPipelineEvents() {
 
   // Test PipelineStartEvent
   const pipelineStart: PipelineStartEvent = {
-    input: { basePath: './src' },
+    inputCount: 0,
     stages: 5,
     options: { continueOnError: true },
   };
 
   // Test PipelineCompleteEvent
   const pipelineComplete: PipelineCompleteEvent = {
-    result: { output: '<xml/>' },
+    resultCount: 42,
     stats: {
       startTime: Date.now(),
       endTime: Date.now(),
       stagesCompleted: 5,
       stagesFailed: 0,
+      stagesRecovered: 0,
       errors: [],
       perStageTimings: {},
       perStageMetrics: {},
       totalStageTime: 500,
       averageStageTime: 100,
+      duration: 500,
+      successRate: 1,
     },
   };
 
@@ -214,11 +220,14 @@ function testPipelineEvents() {
       endTime: Date.now(),
       stagesCompleted: 2,
       stagesFailed: 1,
+      stagesRecovered: 0,
       errors: [{ stage: 'TestStage', error: 'Failed' }],
       perStageTimings: {},
       perStageMetrics: {},
       totalStageTime: 200,
       averageStageTime: 100,
+      duration: 500,
+      successRate: 1,
     },
   };
 
@@ -243,7 +252,9 @@ async function testPipelineClass() {
     emitProgress: true,
     parallel: false,
     maxConcurrency: 5,
-    onProgress: (progress) => console.log(progress.percent),
+    // No `onProgress`: `Pipeline` copies it into `this.options` and never
+    // calls it. Progress reaches a consumer through the `stage:progress` event
+    // or through `ProgressTracker`.
   };
   const pipeline = new Pipeline(options);
 
@@ -460,11 +471,14 @@ function testPipelineContext() {
       endTime: null,
       stagesCompleted: 0,
       stagesFailed: 0,
+      stagesRecovered: 0,
       errors: [],
       perStageTimings: {},
       perStageMetrics: {},
       totalStageTime: 0,
       averageStageTime: 0,
+      duration: 500,
+      successRate: 1,
     },
     config: {} as ConfigManager,
     pipeline: new Pipeline(),

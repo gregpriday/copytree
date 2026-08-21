@@ -1,30 +1,69 @@
+/**
+ * Read a positive integer from the environment, or `null` for "not set".
+ *
+ * `null` rather than `undefined`: an `undefined` value does not survive the
+ * merge into the effective configuration, so the key vanishes from
+ * `config show --sources` entirely and the reader cannot tell whether the
+ * setting exists.
+ *
+ * @param {string} name - Environment variable name
+ * @returns {number|null} The value, or null
+ */
+function positiveIntFromEnv(name) {
+  const value = Number.parseInt(process.env[name], 10);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
 export default {
   // 1. JUNK: Files that should never exist in output (complete noise)
   // Global excluded directories (always excluded regardless of location)
   globalExcludedDirectories: [
     // Version control
-    '.git', '.svn', '.hg', '.bzr', 'CVS', '_darcs',
+    '.git',
+    '.svn',
+    '.hg',
+    '.bzr',
+    'CVS',
+    '_darcs',
 
     // IDE/Editor directories
-    '.idea', '.vscode', '.eclipse', '.settings',
+    '.idea',
+    '.vscode',
+    '.eclipse',
+    '.settings',
 
     // Dependencies
-    'node_modules', 'bower_components', 'jspm_packages', 'vendor',
+    'node_modules',
+    'bower_components',
+    'jspm_packages',
+    'vendor',
 
     // Build artifacts
-    'dist', 'build', 'out', 'target', '.next', '.nuxt', '.output',
+    'dist',
+    'build',
+    'out',
+    'target',
+    '.next',
+    '.nuxt',
+    '.output',
 
     // Test coverage
-    'coverage', '.nyc_output',
+    'coverage',
+    '.nyc_output',
 
     // Python cache
-    '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache',
+    '__pycache__',
+    '.pytest_cache',
+    '.mypy_cache',
+    '.ruff_cache',
 
     // Other caches
-    '.sass-cache', '.cache',
+    '.sass-cache',
+    '.cache',
 
     // Infrastructure temp
-    '.vagrant', '.serverless',
+    '.vagrant',
+    '.serverless',
   ],
 
   // Base path excluded directories (only excluded at project root)
@@ -40,50 +79,124 @@ export default {
     '.copytreeinclude',
 
     // Environment files with secrets
-    '.env', '.env.local', '.env.*.local',
+    '.env',
+    '.env.local',
+    '.env.*.local',
 
     // OS metadata (pure noise)
-    '.DS_Store', 'Thumbs.db', 'desktop.ini', '.directory',
-    '$RECYCLE.BIN', 'ehthumbs.db', 'ehthumbs_vista.db',
+    '.DS_Store',
+    'Thumbs.db',
+    'desktop.ini',
+    '.directory',
+    '$RECYCLE.BIN',
+    'ehthumbs.db',
+    'ehthumbs_vista.db',
 
     // Logs and dumps (high token usage, low AI value)
-    '*.log', '*.pid', '*.seed', '*.pid.lock',
-    'npm-debug.log*', 'yarn-debug.log*', 'yarn-error.log*',
-    'lerna-debug.log*', 'pnpm-debug.log*',
+    '*.log',
+    '*.pid',
+    '*.seed',
+    '*.pid.lock',
+    'npm-debug.log*',
+    'yarn-debug.log*',
+    'yarn-error.log*',
+    'lerna-debug.log*',
+    'pnpm-debug.log*',
 
     // Map files (high token usage, AI can't read them)
-    '*.map', '*.css.map', '*.js.map',
+    '*.map',
+    '*.css.map',
+    '*.js.map',
 
     // Minified code (AI can't read this effectively)
-    '*.min.js', '*.min.css',
+    '*.min.js',
+    '*.min.css',
 
     // Editor backup/temp files
-    '*~', '*.swp', '*.swo', '*.bak', '*.tmp', '*.orig',
-    '*.sublime-workspace', '*.sublime-project',
+    '*~',
+    '*.swp',
+    '*.swo',
+    '*.bak',
+    '*.tmp',
+    '*.orig',
+    '*.sublime-workspace',
+    '*.sublime-project',
 
     // Compiled files (binary noise)
-    '*.pyc', '*.pyo', '*.pyd',
-    '*.class', '*.jar', '*.war', '*.ear',
-    '*.o', '*.obj', '*.exe', '*.dll', '*.so', '*.dylib',
-    '*.ncb', '*.sdf', '*.suo', '*.pdb', '*.idb',
+    '*.pyc',
+    '*.pyo',
+    '*.pyd',
+    '*.class',
+    '*.jar',
+    '*.war',
+    '*.ear',
+    '*.o',
+    '*.obj',
+    '*.exe',
+    '*.dll',
+    '*.so',
+    '*.dylib',
+    '*.ncb',
+    '*.sdf',
+    '*.suo',
+    '*.pdb',
+    '*.idb',
 
     // Archives (binary data)
-    '*.7z', '*.dmg', '*.gz', '*.iso', '*.rar', '*.tar', '*.zip',
+    '*.7z',
+    '*.dmg',
+    '*.gz',
+    '*.iso',
+    '*.rar',
+    '*.tar',
+    '*.zip',
 
     // Media files (binary, high token usage)
-    '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.ico',
-    '*.mp3', '*.mp4', '*.avi', '*.mov', '*.wmv', '*.flv', '*.webm',
-    '*.wav', '*.flac', '*.aac', '*.ogg', '*.wma',
+    '*.jpg',
+    '*.jpeg',
+    '*.png',
+    '*.gif',
+    '*.bmp',
+    '*.ico',
+    '*.mp3',
+    '*.mp4',
+    '*.avi',
+    '*.mov',
+    '*.wmv',
+    '*.flv',
+    '*.webm',
+    '*.wav',
+    '*.flac',
+    '*.aac',
+    '*.ogg',
+    '*.wma',
   ],
 
   // 2. STRUCTURE ONLY: Files to include in tree but exclude content (token optimization)
   // These files provide important structural context but waste tokens if read fully
   structureOnlyPatterns: [
     // Lock files (show dependency state exists, but hash content is useless)
-    'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'shrinkwrap.yaml',
-    'composer.lock', 'Gemfile.lock', 'Pipfile.lock', 'poetry.lock', 'uv.lock', 'pdm.lock', 'requirements.lock',
-    'Cargo.lock', 'go.sum', 'mix.lock', 'flake.lock',
-    'pubspec.lock', 'Podfile.lock', 'Cartfile.resolved', 'Package.resolved', 'deno.lock',
+    'package-lock.json',
+    'yarn.lock',
+    'pnpm-lock.yaml',
+    'bun.lockb',
+    'shrinkwrap.yaml',
+    'composer.lock',
+    'Gemfile.lock',
+    'Pipfile.lock',
+    'poetry.lock',
+    'uv.lock',
+    'pdm.lock',
+    'requirements.lock',
+    'Cargo.lock',
+    'go.sum',
+    'mix.lock',
+    'flake.lock',
+    'pubspec.lock',
+    'Podfile.lock',
+    'Cartfile.resolved',
+    'Package.resolved',
+    'deno.lock',
 
     // SVG (often extremely verbose, low AI value)
     '*.svg',
@@ -92,16 +205,16 @@ export default {
   // 3. ESSENTIAL DOTFILES: Force-include these even if includeHidden is false
   // These provide high-value context about how to run/deploy the app
   forceIncludeDotfiles: [
-    '.env.example',      // Safe environment template (no secrets)
-    '.editorconfig',     // Code style
-    '.eslintrc*',        // Linting rules
-    '.prettierrc*',      // Formatting rules
-    '.babelrc*',         // Transpilation config
-    '.dockerignore',     // Docker context
-    '.github/**',        // GitHub Actions/workflows (high value)
-    '.gitlab-ci.yml',    // GitLab CI
-    '.travis.yml',       // Travis CI
-    'circle.yml',        // CircleCI
+    '.env.example', // Safe environment template (no secrets)
+    '.editorconfig', // Code style
+    '.eslintrc*', // Linting rules
+    '.prettierrc*', // Formatting rules
+    '.babelrc*', // Transpilation config
+    '.dockerignore', // Docker context
+    '.github/**', // GitHub Actions/workflows (high value)
+    '.gitlab-ci.yml', // GitLab CI
+    '.travis.yml', // Travis CI
+    'circle.yml', // CircleCI
   ],
 
   // File size limits
@@ -117,14 +230,18 @@ export default {
   // Set to 0 or false to disable.
   sizeGate: 256 * 1024, // 256KB
 
-  // Output limits
-  maxOutputSize: 50 * 1024 * 1024, // 50MB
-  maxCharacterLimit: 2000000, // 2M chars
+  // Largest binary a `--binary base64` run will inline. Beyond it the file is
+  // reported rather than embedded: base64 costs a third more than the bytes it
+  // encodes, and an agent cannot read it anyway.
+  maxBase64Size: 1024 * 1024,
 
   // Processing options
   followSymlinks: false,
   includeHidden: false,
-  preserveEmptyDirs: false,
+
+  // Honour `.gitignore`, `.git/info/exclude` and the user's global gitignore.
+  // A layer in the one exclusion evaluator, not a separate pass.
+  respectGitignore: true,
 
   // Gitignore fidelity. CopyTree never shells out to `git check-ignore` and never
   // requires a git repository; these are all plain filesystem reads.
@@ -153,6 +270,11 @@ export default {
   exclusionReport: {
     // How many of the largest exclusions to retain under `explain: true`.
     topN: 50,
+
+    // Ceiling on retained decisions under `all` retention (`plan --explain`,
+    // `explain`). Beyond it the report sets `truncated` and counts what it
+    // dropped, rather than quietly reading as "that is everything".
+    maxEntries: 100000,
   },
 
   // Binary file handling
@@ -196,90 +318,383 @@ export default {
   // They are bounded by `sizeGate` instead.
   binaryExtensions: {
     video: [
-      '.mp4', '.m4v', '.mov', '.avi', '.mkv', '.webm', '.wmv', '.flv', '.f4v',
-      '.mpg', '.mpeg', '.m2v', '.mts', '.m2ts', '.3gp', '.3g2', '.ogv', '.vob',
-      '.rm', '.rmvb', '.divx', '.asf', '.mxf', '.r3d', '.braw',
+      '.mp4',
+      '.m4v',
+      '.mov',
+      '.avi',
+      '.mkv',
+      '.webm',
+      '.wmv',
+      '.flv',
+      '.f4v',
+      '.mpg',
+      '.mpeg',
+      '.m2v',
+      '.mts',
+      '.m2ts',
+      '.3gp',
+      '.3g2',
+      '.ogv',
+      '.vob',
+      '.rm',
+      '.rmvb',
+      '.divx',
+      '.asf',
+      '.mxf',
+      '.r3d',
+      '.braw',
     ],
     audio: [
-      '.mp3', '.wav', '.flac', '.aac', '.ogg', '.oga', '.opus', '.m4a', '.m4b',
-      '.m4p', '.wma', '.aiff', '.aif', '.aifc', '.alac', '.amr', '.ape', '.dsf',
-      '.dff', '.mid', '.midi', '.caf', '.au', '.voc',
+      '.mp3',
+      '.wav',
+      '.flac',
+      '.aac',
+      '.ogg',
+      '.oga',
+      '.opus',
+      '.m4a',
+      '.m4b',
+      '.m4p',
+      '.wma',
+      '.aiff',
+      '.aif',
+      '.aifc',
+      '.alac',
+      '.amr',
+      '.ape',
+      '.dsf',
+      '.dff',
+      '.mid',
+      '.midi',
+      '.caf',
+      '.au',
+      '.voc',
     ],
     image: [
-      '.png', '.jpg', '.jpeg', '.jpe', '.gif', '.bmp', '.dib', '.tif', '.tiff',
-      '.webp', '.avif', '.heic', '.heif', '.jxl', '.ico', '.icns', '.cur',
-      '.tga', '.exr', '.hdr', '.pbm', '.pgm', '.ppm', '.raw', '.cr2', '.cr3',
-      '.nef', '.arw', '.orf', '.rw2', '.raf', '.dng', '.sr2', '.pef',
+      '.png',
+      '.jpg',
+      '.jpeg',
+      '.jpe',
+      '.gif',
+      '.bmp',
+      '.dib',
+      '.tif',
+      '.tiff',
+      '.webp',
+      '.avif',
+      '.heic',
+      '.heif',
+      '.jxl',
+      '.ico',
+      '.icns',
+      '.cur',
+      '.tga',
+      '.exr',
+      '.hdr',
+      '.pbm',
+      '.pgm',
+      '.ppm',
+      '.raw',
+      '.cr2',
+      '.cr3',
+      '.nef',
+      '.arw',
+      '.orf',
+      '.rw2',
+      '.raf',
+      '.dng',
+      '.sr2',
+      '.pef',
     ],
     design: [
-      '.psd', '.psb', '.ai', '.indd', '.indt', '.xcf', '.sketch', '.fig',
-      '.afdesign', '.afphoto', '.afpub', '.cdr', '.clip', '.procreate',
-      '.swf', '.fla',
+      '.psd',
+      '.psb',
+      '.ai',
+      '.indd',
+      '.indt',
+      '.xcf',
+      '.sketch',
+      '.fig',
+      '.afdesign',
+      '.afphoto',
+      '.afpub',
+      '.cdr',
+      '.clip',
+      '.procreate',
+      '.swf',
+      '.fla',
     ],
     model3d: [
-      '.blend', '.c4d', '.ma', '.mb', '.max', '.fbx', '.glb', '.gltf', '.usd',
-      '.usda', '.usdc', '.usdz', '.stl', '.3ds', '.dae', '.abc', '.ply',
-      '.prproj', '.aep', '.aet', '.fcpxml', '.drp', '.veg', '.als', '.flp',
-      '.logicx', '.band',
+      '.blend',
+      '.c4d',
+      '.ma',
+      '.mb',
+      '.max',
+      '.fbx',
+      '.glb',
+      '.gltf',
+      '.usd',
+      '.usda',
+      '.usdc',
+      '.usdz',
+      '.stl',
+      '.3ds',
+      '.dae',
+      '.abc',
+      '.ply',
+      '.prproj',
+      '.aep',
+      '.aet',
+      '.fcpxml',
+      '.drp',
+      '.veg',
+      '.als',
+      '.flp',
+      '.logicx',
+      '.band',
     ],
     font: [
-      '.ttf', '.otf', '.woff', '.woff2', '.eot', '.ttc', '.otc', '.pfb',
-      '.pfm', '.fon', '.dfont',
+      '.ttf',
+      '.otf',
+      '.woff',
+      '.woff2',
+      '.eot',
+      '.ttc',
+      '.otc',
+      '.pfb',
+      '.pfm',
+      '.fon',
+      '.dfont',
     ],
     archive: [
-      '.zip', '.zipx', '.tar', '.gz', '.tgz', '.bz2', '.tbz', '.tbz2', '.xz',
-      '.txz', '.zst', '.zstd', '.7z', '.rar', '.lz', '.lz4', '.lzma', '.lzo',
-      '.br', '.cab', '.arj', '.ace', '.z', '.cpio', '.pax',
+      '.zip',
+      '.zipx',
+      '.tar',
+      '.gz',
+      '.tgz',
+      '.bz2',
+      '.tbz',
+      '.tbz2',
+      '.xz',
+      '.txz',
+      '.zst',
+      '.zstd',
+      '.7z',
+      '.rar',
+      '.lz',
+      '.lz4',
+      '.lzma',
+      '.lzo',
+      '.br',
+      '.cab',
+      '.arj',
+      '.ace',
+      '.z',
+      '.cpio',
+      '.pax',
     ],
     diskImage: [
-      '.dmg', '.iso', '.img', '.vhd', '.vhdx', '.vmdk', '.vdi', '.qcow2',
-      '.sparseimage', '.sparsebundle', '.toast',
+      '.dmg',
+      '.iso',
+      '.img',
+      '.vhd',
+      '.vhdx',
+      '.vmdk',
+      '.vdi',
+      '.qcow2',
+      '.sparseimage',
+      '.sparsebundle',
+      '.toast',
     ],
     package: [
-      '.pkg', '.mpkg', '.deb', '.rpm', '.apk', '.aab', '.ipa', '.msi', '.msix',
-      '.msixbundle', '.appx', '.appxbundle', '.snap', '.flatpak', '.appimage',
-      '.crx', '.xpi', '.vsix', '.nupkg', '.whl', '.egg', '.gem', '.jar',
-      '.war', '.ear', '.aar', '.xcarchive',
+      '.pkg',
+      '.mpkg',
+      '.deb',
+      '.rpm',
+      '.apk',
+      '.aab',
+      '.ipa',
+      '.msi',
+      '.msix',
+      '.msixbundle',
+      '.appx',
+      '.appxbundle',
+      '.snap',
+      '.flatpak',
+      '.appimage',
+      '.crx',
+      '.xpi',
+      '.vsix',
+      '.nupkg',
+      '.whl',
+      '.egg',
+      '.gem',
+      '.jar',
+      '.war',
+      '.ear',
+      '.aar',
+      '.xcarchive',
     ],
     executable: [
-      '.exe', '.com', '.scr', '.dll', '.so', '.dylib', '.bundle', '.a', '.lib',
-      '.o', '.obj', '.node', '.wasm', '.class', '.pyc', '.pyo', '.pyd', '.elf',
-      '.ko', '.rlib', '.rmeta', '.beam', '.nexe',
+      '.exe',
+      '.com',
+      '.scr',
+      '.dll',
+      '.so',
+      '.dylib',
+      '.bundle',
+      '.a',
+      '.lib',
+      '.o',
+      '.obj',
+      '.node',
+      '.wasm',
+      '.class',
+      '.pyc',
+      '.pyo',
+      '.pyd',
+      '.elf',
+      '.ko',
+      '.rlib',
+      '.rmeta',
+      '.beam',
+      '.nexe',
     ],
     debug: [
-      '.pdb', '.dSYM', '.idb', '.ilk', '.exp', '.heapsnapshot', '.heapprofile',
-      '.cpuprofile', '.trace', '.etl', '.nettrace', '.dtps', '.dump', '.core',
-      '.mdmp', '.minidump',
+      '.pdb',
+      '.dSYM',
+      '.idb',
+      '.ilk',
+      '.exp',
+      '.heapsnapshot',
+      '.heapprofile',
+      '.cpuprofile',
+      '.trace',
+      '.etl',
+      '.nettrace',
+      '.dtps',
+      '.dump',
+      '.core',
+      '.mdmp',
+      '.minidump',
     ],
     database: [
-      '.sqlite', '.sqlite3', '.sqlitedb', '.db', '.db3', '.mdb', '.accdb',
-      '.dbf', '.realm', '.ldb', '.sst', '.mdf', '.ldf', '.ibd', '.frm', '.myd',
-      '.myi', '.rdb', '.aof', '.pack', '.idx',
+      '.sqlite',
+      '.sqlite3',
+      '.sqlitedb',
+      '.db',
+      '.db3',
+      '.mdb',
+      '.accdb',
+      '.dbf',
+      '.realm',
+      '.ldb',
+      '.sst',
+      '.mdf',
+      '.ldf',
+      '.ibd',
+      '.frm',
+      '.myd',
+      '.myi',
+      '.rdb',
+      '.aof',
+      '.pack',
+      '.idx',
     ],
     mlWeights: [
-      '.pt', '.pth', '.ckpt', '.safetensors', '.gguf', '.ggml', '.onnx', '.pb',
-      '.tflite', '.mlmodel', '.mlpackage', '.h5', '.hdf5', '.caffemodel',
-      '.params', '.npz', '.npy', '.joblib', '.pkl', '.pickle',
+      '.pt',
+      '.pth',
+      '.ckpt',
+      '.safetensors',
+      '.gguf',
+      '.ggml',
+      '.onnx',
+      '.pb',
+      '.tflite',
+      '.mlmodel',
+      '.mlpackage',
+      '.h5',
+      '.hdf5',
+      '.caffemodel',
+      '.params',
+      '.npz',
+      '.npy',
+      '.joblib',
+      '.pkl',
+      '.pickle',
     ],
     dataBlob: [
-      '.parquet', '.orc', '.avro', '.arrow', '.feather', '.msgpack', '.bson',
-      '.protobuf', '.mat', '.sav', '.rds', '.rdata', '.dta', '.por',
-      '.sas7bdat', '.fst',
+      '.parquet',
+      '.orc',
+      '.avro',
+      '.arrow',
+      '.feather',
+      '.msgpack',
+      '.bson',
+      '.protobuf',
+      '.mat',
+      '.sav',
+      '.rds',
+      '.rdata',
+      '.dta',
+      '.por',
+      '.sas7bdat',
+      '.fst',
     ],
     // Convertible documents. `.html`/`.htm` are deliberately NOT here: HTML is
     // source code in most repos we touch and must be read as text.
     document: [
-      '.pdf', '.doc', '.docx', '.dot', '.dotx', '.xls', '.xlsx', '.xlsm',
-      '.xlsb', '.ppt', '.pptx', '.pps', '.odt', '.ods', '.odp', '.odg', '.rtf',
-      '.pages', '.numbers', '.key', '.epub', '.mobi', '.azw', '.azw3', '.fb2',
-      '.djvu', '.chm', '.one', '.onepkg', '.vsd', '.vsdx',
+      '.pdf',
+      '.doc',
+      '.docx',
+      '.dot',
+      '.dotx',
+      '.xls',
+      '.xlsx',
+      '.xlsm',
+      '.xlsb',
+      '.ppt',
+      '.pptx',
+      '.pps',
+      '.odt',
+      '.ods',
+      '.odp',
+      '.odg',
+      '.rtf',
+      '.pages',
+      '.numbers',
+      '.key',
+      '.epub',
+      '.mobi',
+      '.azw',
+      '.azw3',
+      '.fb2',
+      '.djvu',
+      '.chm',
+      '.one',
+      '.onepkg',
+      '.vsd',
+      '.vsdx',
     ],
     // Excluded for two reasons at once: binary, and key material.
     // NOTE: `.key` also appears under `document` (Apple Keynote). Some projects
     // use `.key` for non-secret text; those should override the `cert` group.
     cert: [
-      '.pem', '.der', '.crt', '.cer', '.p7b', '.p7c', '.p12', '.pfx', '.jks',
-      '.keystore', '.kdbx', '.gpg', '.asc', '.kbx', '.ppk',
+      '.pem',
+      '.der',
+      '.crt',
+      '.cer',
+      '.p7b',
+      '.p7c',
+      '.p12',
+      '.pfx',
+      '.jks',
+      '.keystore',
+      '.kdbx',
+      '.gpg',
+      '.asc',
+      '.kbx',
+      '.ppk',
     ],
     other: ['.dat', '.bin', '.blob', '.cache', '.DS_Store', '.sublime-workspace'],
   },
@@ -329,7 +744,6 @@ export default {
   lineNumberFormat: '%4d: ', // printf-style format
 
   // Tree view options
-  treeIndent: '  ',
   treeConnectors: {
     middle: '├── ',
     last: '└── ',
@@ -344,25 +758,32 @@ export default {
     maxDelay: 2000, // Maximum delay cap in milliseconds
   },
 
-  // File discovery configuration
+  // File discovery configuration.
+  //
+  // The three environment variables read here are the whole of CopyTree's
+  // environment interface, and they are operational rather than semantic: they
+  // tune how hard the walker works, never which files it selects or what the
+  // output contains. That line is deliberate — a colleague reproducing your
+  // export should not need your shell to do it. `copytree doctor --format json`
+  // reports their effective values.
   discovery: {
-    // Enable parallel directory traversal (default: false for gradual rollout)
+    // Parallel directory traversal. Off by default; COPYTREE_DISCOVERY_PARALLEL.
     parallelEnabled: ['1', 'true', 'TRUE', 'True'].includes(
       process.env.COPYTREE_DISCOVERY_PARALLEL,
     ),
 
-    // Maximum concurrent directory operations
-    // Falls back to app.maxConcurrency if not specified
-    maxConcurrency: (() => {
-      const val = parseInt(process.env.COPYTREE_DISCOVERY_CONCURRENCY, 10);
-      return Number.isInteger(val) && val > 0 ? val : undefined;
-    })(),
+    // Concurrent directory operations. COPYTREE_DISCOVERY_CONCURRENCY.
+    //
+    // `null` means "follow app.maxConcurrency", which is the actual default and
+    // is why this is not simply the number 5. It used to be `undefined`, which
+    // reads identically in JavaScript and does not survive into the merged
+    // configuration at all — so `config show --sources` had no row for it and a
+    // reader could not discover the setting existed.
+    maxConcurrency: positiveIntFromEnv('COPYTREE_DISCOVERY_CONCURRENCY'),
 
-    // Backpressure threshold (default: 2x concurrency)
-    // Pauses scheduling when buffered results exceed this
-    highWaterMark: (() => {
-      const val = parseInt(process.env.COPYTREE_DISCOVERY_HIGH_WATER_MARK, 10);
-      return Number.isInteger(val) && val > 0 ? val : undefined;
-    })(),
+    // Backpressure threshold; scheduling pauses above it.
+    // `null` means "twice the effective concurrency".
+    // COPYTREE_DISCOVERY_HIGH_WATER_MARK.
+    highWaterMark: positiveIntFromEnv('COPYTREE_DISCOVERY_HIGH_WATER_MARK'),
   },
 };

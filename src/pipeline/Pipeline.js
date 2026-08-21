@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { ConfigManager } from '../config/ConfigManager.js';
 import { PipelineError, ValidationError, isAbortError } from '../utils/errors.js';
 import { logger as defaultLogger } from '../utils/logger.js';
+import { DEGRADATION_CODES } from './Stage.js';
 
 /**
  * Marks an error as a lifecycle-contract failure rather than a processing one.
@@ -99,6 +100,7 @@ class Pipeline extends EventEmitter {
       endTime: null,
       stagesCompleted: 0,
       stagesFailed: 0,
+      stagesRecovered: 0,
       errors: [],
       perStageTimings: {},
       perStageMetrics: {},
@@ -471,7 +473,7 @@ class Pipeline extends EventEmitter {
             );
             result = this._recordDegradation(result, {
               stage: stageName,
-              code: 'STAGE_AFTER_RUN_FAILED',
+              code: DEGRADATION_CODES.STAGE_AFTER_RUN_FAILED,
               message: `${stageName} afterRun hook failed: ${hookError.message}`,
             });
           }
@@ -571,11 +573,17 @@ class Pipeline extends EventEmitter {
                 recoveredResult,
                 {
                   stage: stageName,
-                  code: error.code || 'STAGE_RECOVERED',
+                  code: error.code || DEGRADATION_CODES.STAGE_RECOVERED,
                   message: `${stageName} failed: ${error.message}`,
                 },
                 carriedOver,
               );
+              // Counted. A recovered stage was neither completed nor failed, so
+              // it fell out of `successRate` entirely: a run in which every
+              // stage recovered reported `null`, and one success beside one
+              // recovery reported 1 — "every stage succeeded", about a run
+              // where one did not.
+              this.stats.stagesRecovered++;
               continue; // Continue with recovered result
             }
           } catch (handlerError) {
@@ -711,17 +719,23 @@ class Pipeline extends EventEmitter {
    */
   getStats() {
     // Calculate average stage time if we have completed stages
-    const totalStages = this.stats.stagesCompleted + this.stats.stagesFailed;
+    const totalStages =
+      this.stats.stagesCompleted + this.stats.stagesFailed + this.stats.stagesRecovered;
     if (totalStages > 0 && this.stats.totalStageTime > 0) {
       this.stats.averageStageTime = this.stats.totalStageTime / totalStages;
     }
 
     return {
       ...this.stats,
-      duration: this.stats.endTime
-        ? this.stats.endTime - this.stats.startTime
-        : Date.now() - this.stats.startTime,
-      successRate: totalStages > 0 ? this.stats.stagesCompleted / totalStages : 1,
+      // `null` before the run starts, not a number. `Date.now() - null` is
+      // `Date.now()`, so a pipeline that had never run reported a duration of
+      // fifty-six years; and a success rate of 1 for zero stages said every
+      // stage had succeeded when none had been attempted. Both read as data.
+      duration:
+        this.stats.startTime === null
+          ? null
+          : (this.stats.endTime ?? Date.now()) - this.stats.startTime,
+      successRate: totalStages > 0 ? this.stats.stagesCompleted / totalStages : null,
     };
   }
 

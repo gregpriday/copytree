@@ -82,6 +82,15 @@ const ERROR_CODES = Object.freeze({
   OUTPUT_WRITE: 'ERR_OUTPUT_WRITE',
   /** A value failed validation and has no more specific code */
   VALIDATION: 'ERR_VALIDATION',
+  /**
+   * A public entry point failed for a reason with no more specific code.
+   *
+   * The catch-all, so that `error.code` is always present. `scan()` used to
+   * wrap an unexpected failure in a bare `Error` with a `cause`, which left the
+   * one instruction the documentation gives consumers — switch on `code`, never
+   * on the message — unsatisfiable for exactly the failures nobody anticipated.
+   */
+  OPERATION_FAILED: 'ERR_OPERATION_FAILED',
 });
 
 /**
@@ -494,10 +503,19 @@ function describeError(error, context = {}) {
       );
 
     case ERROR_CODES.CONFIG_INVALID:
+      // A configuration failure that already says what is wrong keeps its own
+      // words. "CopyTree configuration is invalid — run config validate for
+      // details" is the right line for a schema failure with a list of errors
+      // behind it, and the wrong one for "this file declares schemaVersion
+      // 3.1.0, which this build cannot read" or for a migration refusing a
+      // value in a directory it has not written to yet: both replaced a
+      // sentence that ends the question with one that starts a search.
       return describe(
-        'CopyTree configuration is invalid',
+        details.suggestion ? error.message : 'CopyTree configuration is invalid',
         details.configKey || null,
-        'Run copytree config:validate for details',
+        // The canonical spelling. The colon form still parses and names its
+        // replacement, which makes it fine to type and wrong to recommend.
+        details.suggestion || 'Run copytree config validate for details',
       );
 
     case ERROR_CODES.SECRETS_DETECTED: {

@@ -1,4 +1,4 @@
-import Stage from '../Stage.js';
+import Stage, { DEGRADATION_CODES } from '../Stage.js';
 import GitleaksAdapter from '../../services/GitleaksAdapter.js';
 import SecretRedactor from '../../utils/SecretRedactor.js';
 import { SecretsDetectedError, isAbortError } from '../../utils/errors.js';
@@ -53,6 +53,9 @@ class SecretsGuardStage extends Stage {
     // not at construction — see `_resolveScanner()`.
     this._scannerResolved = false;
     this._gitleaksFailureReported = false;
+    // Whether the built-in scanner has actually been used, as opposed to merely
+    // being the scanner that would be used next. `_scannerName()` reports it.
+    this._builtinScanned = false;
     // Set when the preferred scanner failed mid-run and the built-in scanner
     // took over. A degraded scan is still a scan, but the caller has to be able
     // to tell the difference — silently downgrading the guard and reporting a
@@ -158,6 +161,8 @@ class SecretsGuardStage extends Stage {
     let redactionCount = 0;
     let excludedCount = 0;
     let unscannableCount = 0;
+    let excludedWithSecrets = 0;
+    let redactionFailures = 0;
     // Which files, not just how many. "1 secret-prone file left out" tells the
     // reader something happened but not whether it mattered; naming `.env` ends
     // the question. Capped so a repository full of key material cannot turn one
@@ -165,6 +170,7 @@ class SecretsGuardStage extends Stage {
     const excludedPaths = [];
     const unscannablePaths = [];
     const redactedPaths = [];
+    const excludedWithSecretsPaths = [];
     const remember = (list, filePath) => {
       if (list.length < MAX_REPORTED_PATHS) list.push(filePath);
     };
@@ -265,45 +271,40 @@ class SecretsGuardStage extends Stage {
       // The first file with content to scan is what decides which scanner runs.
       await this._resolveScanner();
 
-      let fileFindings = [];
-      let scanned = false;
+      const scan = await this._scan(file.content, filePath);
 
-      if (this.useGitleaks) {
-        try {
-          fileFindings = await this.gitleaks.scanString(file.content, filePath, {
-            signal: this.options?.signal,
-          });
-          scanned = true;
-        } catch (error) {
-          // A cancellation is not a scanner failure. The adapter rethrows it
-          // unwrapped for exactly this reason; catching it here would turn an
-          // abandoned run into a "degraded scan" and then carry on scanning
-          // every remaining file with the fallback.
-          if (isAbortError(error)) throw error;
-
-          // Said once, not once per file. The adapter opens its circuit on an
-          // operational failure, so the condition that produced this will
-          // produce it again for every remaining file — and a warning repeated
-          // a thousand times buries the one line that explains the run.
-          if (!this._gitleaksFailureReported) {
-            this._gitleaksFailureReported = true;
-            this._degradation = {
-              from: 'gitleaks',
-              to: 'builtin',
-              reason: error.message,
-            };
-            this.log(
-              `Gitleaks scan failed (${error.message}); using the built-in scanner for the rest of this run`,
-              'warn',
-            );
-          }
-          this.useGitleaks = false;
+      // Gitleaks said this file contains a secret and then could not tell us
+      // which one. That is not the same as a scanner that failed to run: a
+      // positive verdict already exists, and the fallback scanner coming back
+      // clean is a weaker tool disagreeing with a stronger one after the fact.
+      // Emitting the file on the strength of the weaker answer is how the
+      // guard's own detection ends up in the output.
+      if (scan.detectedWithoutFindings) {
+        // A detection is a detection. `--secrets fail` promises a non-zero exit
+        // for any secret found, and "found one but could not say which" is not
+        // the exception that promise carries.
+        if (this.failOnSecrets) {
+          throw new SecretsDetectedError(
+            `Secrets detected in ${filePath}, but the scanner could not report which`,
+            [],
+            { file: filePath, reason: 'detectedWithoutFindings' },
+          );
         }
+
+        this.log(`Excluding ${filePath}: a secret was detected but could not be located`, 'warn');
+        report?.add({
+          path: filePath,
+          size: file.size || 0,
+          reason: EXCLUSION_REASONS.SECRET_DETECTED,
+          rule: 'secretsGuard.detectedWithoutFindings',
+        });
+        redactionFailures++;
+        excludedWithSecrets++;
+        remember(excludedWithSecretsPaths, filePath);
+        continue;
       }
 
-      if (!scanned) {
-        fileFindings = this._basicScan(file);
-      }
+      const fileFindings = scan.findings;
 
       if (fileFindings.length > 0) {
         // Raw findings carry the matched bytes, which redaction needs to locate
@@ -320,16 +321,94 @@ class SecretsGuardStage extends Stage {
         }
 
         if (this.redactInline) {
-          const { content, count } = SecretRedactor.redact(
+          // Only the built-in scanner reports the bytes it matched. Gitleaks
+          // runs with `--redact`, so telling the redactor to trust its `Match`
+          // would have it search the file for a mask — and, in a file that
+          // happens to contain one, redact that decoy and leave the credential.
+          const rawMatch = scan.scanner === 'builtin';
+          const { content, count, covered, failed, markers } = SecretRedactor.redact(
             file.content,
             fileFindings,
             this.redactionMode,
+            { rawMatch },
           );
+
+          // Redaction is not proof of redaction. The scanner is the only thing
+          // that can say whether a credential is still in the content, so it
+          // gets the last word: whatever the coordinates claimed, the redacted
+          // bytes go back through the same scanner, and anything it still finds
+          // — that is not simply the marker the guard just wrote — means the
+          // replacement missed. This is what makes the Gitleaks path
+          // trustworthy at all; its masked matches leave every other check an
+          // argument about coordinates rather than a measurement.
+          let residue = [];
+          let verificationFailed = false;
+
+          if (covered) {
+            const verification = await this._scan(content, filePath);
+
+            // A verification is only evidence when the scanner that found the
+            // secret is the one that says it is gone. If Gitleaks dies during
+            // verification, the built-in scanner takes over and will happily
+            // report a Gitleaks-only credential as clean — a weaker tool
+            // overruling a stronger one, which is the same fail-open as
+            // downgrading the original scan. The fallback still serves every
+            // later file; this one is dropped.
+            verificationFailed =
+              verification.detectedWithoutFindings || verification.scanner !== scan.scanner;
+
+            residue = SecretRedactor.residualFindings(content, verification.findings, markers, {
+              rawMatch: verification.scanner === 'builtin',
+            });
+          }
+
+          const proven = covered && !verificationFailed && residue.length === 0;
+
+          // `covered` is the whole reason the redactor reports spans rather than
+          // a count. A finding the redactor could not locate — drifted
+          // coordinates, a match that survives outside every replaced region —
+          // used to be skipped silently while the file went out stamped
+          // `redacted: true`. Dropping the file is the only answer that keeps
+          // the label honest.
+          if (!proven) {
+            const unresolved = covered ? residue.length || 1 : failed.length;
+            this.log(
+              `Excluding ${filePath}: ${unresolved} detected secret(s) could not be redacted`,
+              'warn',
+            );
+            report?.add({
+              path: filePath,
+              size: file.size || 0,
+              reason: EXCLUSION_REASONS.SECRET_DETECTED,
+              rule: covered ? 'secretsGuard.redactionUnverified' : 'secretsGuard.redactionFailed',
+            });
+            redactionFailures += unresolved;
+            excludedWithSecrets++;
+            remember(excludedWithSecretsPaths, filePath);
+            continue;
+          }
+
           redactionCount += count;
           remember(redactedPaths, filePath);
           processedFiles.push({ ...file, content, redacted: true });
           continue;
         }
+
+        // `redactInline: false` means "exclude rather than redact in place". It
+        // used to mean "detect, report, and emit unchanged": execution fell
+        // through to the push below with the credential still in the content,
+        // while the run reported the finding as though the guard had acted on
+        // it.
+        this.log(`Excluding ${filePath}: secrets detected and inline redaction is off`, 'warn');
+        report?.add({
+          path: filePath,
+          size: file.size || 0,
+          reason: EXCLUSION_REASONS.SECRET_DETECTED,
+          rule: 'secretsGuard.redactInline',
+        });
+        excludedWithSecrets++;
+        remember(excludedWithSecretsPaths, filePath);
+        continue;
       }
 
       processedFiles.push(file);
@@ -346,6 +425,33 @@ class SecretsGuardStage extends Stage {
       );
     }
 
+    const degradations = [];
+
+    if (this._degradation) {
+      degradations.push({
+        stage: this.name,
+        code: DEGRADATION_CODES.SECRET_SCANNER_DEGRADED,
+        message:
+          `${this._degradation.from} failed, so the rest of this run was scanned ` +
+          `by the ${this._degradation.to} scanner: ${this._degradation.reason}`,
+      });
+    }
+
+    // A file dropped because its secrets could not be redacted is a safe
+    // outcome, not a correct one: the caller asked for that file and did not
+    // get it, and the reason is that the guard could not do its job on it.
+    // `--strict` is exactly the flag for "tell me when the result is not the
+    // one I asked for".
+    if (redactionFailures > 0) {
+      degradations.push({
+        stage: this.name,
+        code: DEGRADATION_CODES.SECRET_REDACTION_FAILED,
+        message:
+          `${redactionFailures} detected secret(s) could not be redacted, so ` +
+          `${excludedWithSecrets} file(s) were excluded instead of redacted`,
+      });
+    }
+
     return {
       ...input,
       files: processedFiles,
@@ -357,19 +463,8 @@ class SecretsGuardStage extends Stage {
         // list, and "the credential scanner you asked for failed and a weaker
         // one finished the run" is the single degradation most worth refusing
         // a run over — it was the one the flag could not see.
-        ...(this._degradation
-          ? {
-              degradations: [
-                ...(input.stats?.degradations || []),
-                {
-                  stage: this.name,
-                  code: 'SECRET_SCANNER_DEGRADED',
-                  message:
-                    `${this._degradation.from} failed, so the rest of this run was scanned ` +
-                    `by the ${this._degradation.to} scanner: ${this._degradation.reason}`,
-                },
-              ],
-            }
+        ...(degradations.length > 0
+          ? { degradations: [...(input.stats?.degradations || []), ...degradations] }
           : {}),
         secretsGuard: {
           enabled: true,
@@ -385,10 +480,16 @@ class SecretsGuardStage extends Stage {
           redacted: redactionCount,
           excludedSecretFiles: excludedCount,
           excludedUnscannable: unscannableCount,
+          // Files that held a detected secret and were removed rather than
+          // emitted: either inline redaction is off, or a span could not be
+          // proven redacted. `redactionFailures` counts the latter's findings.
+          excludedWithSecrets,
+          redactionFailures,
           // Sample paths, for a status line that can name what it is talking
           // about. Truncated at MAX_REPORTED_PATHS; the counts above are exact.
           excludedSecretFilePaths: excludedPaths,
           excludedUnscannablePaths: unscannablePaths,
+          excludedWithSecretsPaths,
           redactedPaths,
           // `--secrets-report` reads this. The findings are already stripped of
           // the matched bytes, so the report is safe to write to a file or to
@@ -453,11 +554,74 @@ class SecretsGuardStage extends Stage {
    */
   _scannerName() {
     if (this.planOnly || !this._scannerResolved) return 'none';
-    return this.useGitleaks ? 'gitleaks' : 'builtin';
+    if (this.useGitleaks) return 'gitleaks';
+    // Gitleaks can fail on the only file of a run and be disabled without the
+    // fallback ever running — a file excluded on a positive-but-unreadable
+    // verdict never reaches a second scanner. Naming one then reported
+    // protection that had been applied to nothing.
+    return this._builtinScanned ? 'builtin' : 'none';
   }
 
-  _basicScan(file) {
-    return scanContent(file.content, file.relativePath || file.path);
+  /**
+   * Scan one piece of content with whichever scanner this run is using.
+   *
+   * Shared by the initial scan and by the verification re-scan of redacted
+   * content, deliberately: a verification performed by a different scanner than
+   * the one that found the secret proves nothing about that secret.
+   *
+   * A Gitleaks failure downgrades the run to the built-in scanner once, and is
+   * reported once — the adapter opens its circuit on an operational failure, so
+   * the condition will recur for every remaining file and a warning repeated a
+   * thousand times buries the one line that explains the run.
+   *
+   * @param {string} content - Content to scan
+   * @param {string} filePath - Logical path, for the scanner's report
+   * @returns {Promise<{findings: Array, scanner: 'gitleaks'|'builtin', detectedWithoutFindings: boolean}>} Verdict
+   * @private
+   */
+  async _scan(content, filePath) {
+    if (this.useGitleaks) {
+      try {
+        const findings = await this.gitleaks.scanString(content, filePath, {
+          signal: this.options?.signal,
+        });
+        return { findings, scanner: 'gitleaks', detectedWithoutFindings: false };
+      } catch (error) {
+        // A cancellation is not a scanner failure. The adapter rethrows it
+        // unwrapped for exactly this reason; catching it here would turn an
+        // abandoned run into a "degraded scan" and then carry on scanning every
+        // remaining file with the fallback.
+        if (isAbortError(error)) throw error;
+
+        const detectedWithoutFindings = error.detectedWithoutFindings === true;
+
+        if (!this._gitleaksFailureReported) {
+          this._gitleaksFailureReported = true;
+          this._degradation = {
+            from: 'gitleaks',
+            to: 'builtin',
+            reason: error.message,
+          };
+          this.log(
+            `Gitleaks scan failed (${error.message}); using the built-in scanner for the rest of this run`,
+            'warn',
+          );
+        }
+        this.useGitleaks = false;
+
+        if (detectedWithoutFindings) {
+          return { findings: [], scanner: 'gitleaks', detectedWithoutFindings: true };
+        }
+      }
+    }
+
+    this._builtinScanned = true;
+
+    return {
+      findings: scanContent(content, filePath),
+      scanner: 'builtin',
+      detectedWithoutFindings: false,
+    };
   }
 }
 

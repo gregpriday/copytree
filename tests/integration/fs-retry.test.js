@@ -11,7 +11,6 @@ let recordSuccessAfterRetry;
 let summarize;
 let reset;
 let walkWithIgnore;
-let FileLoader;
 
 beforeAll(async () => {
   jest.unmock('../../src/utils/fsx.js');
@@ -20,7 +19,6 @@ beforeAll(async () => {
   ({ recordRetry, recordGiveUp, recordPermanent, recordSuccessAfterRetry, summarize, reset } =
     await import('../../src/utils/fsErrorReport.js'));
   ({ walkWithIgnore } = await import('../../src/utils/ignoreWalker.js'));
-  ({ default: FileLoader } = await import('../../src/utils/fileLoader.js'));
 });
 
 describe('Filesystem Retry Integration Tests', () => {
@@ -132,72 +130,6 @@ describe('Filesystem Retry Integration Tests', () => {
     });
   });
 
-  describe('FileLoader with retry and error reporting', () => {
-    it('should load files successfully', async () => {
-      const testDir = path.join(os.tmpdir(), `test-loader-${randomUUID()}`);
-      await fs.mkdir(testDir, { recursive: true });
-      const testFile = path.join(testDir, 'test.txt');
-      await fs.writeFile(testFile, 'test content', 'utf8');
-
-      try {
-        const loader = new FileLoader({
-          basePath: testDir,
-          config: {
-            copytree: {
-              fs: {
-                retryAttempts: 3,
-                retryDelay: 10,
-                maxDelay: 100,
-              },
-            },
-          },
-        });
-
-        const file = await loader.loadFile('test.txt');
-
-        expect(file).toBeDefined();
-        expect(file.content).toBe('test content');
-
-        // No errors should be reported
-        const summary = summarize();
-        expect(summary.failed).toBe(0);
-        expect(summary.permanent).toBe(0);
-      } finally {
-        await fs.rm(testDir, { recursive: true, force: true });
-      }
-    });
-
-    it('should handle missing files and report errors', async () => {
-      const testDir = path.join(os.tmpdir(), `test-loader-${randomUUID()}`);
-      await fs.mkdir(testDir, { recursive: true });
-
-      try {
-        const loader = new FileLoader({
-          basePath: testDir,
-          config: {
-            copytree: {
-              fs: {
-                retryAttempts: 3,
-                retryDelay: 10,
-                maxDelay: 100,
-              },
-            },
-          },
-        });
-
-        const file = await loader.loadFile('does-not-exist.txt');
-
-        expect(file).toBeNull();
-
-        // Should report permanent error for ENOENT
-        const summary = summarize();
-        expect(summary.permanent).toBeGreaterThan(0);
-      } finally {
-        await fs.rm(testDir, { recursive: true, force: true });
-      }
-    });
-  });
-
   describe('error aggregation across operations', () => {
     it('should aggregate errors from multiple operations', async () => {
       // Simulate various error scenarios
@@ -292,24 +224,23 @@ describe('Filesystem Retry Integration Tests', () => {
         );
         await Promise.all(filePromises);
 
-        const loader = new FileLoader({
+        // Through `FileLoadingStage`, which is the only thing that reads file
+        // content. The `FileLoader` utility this used to exercise was a second
+        // implementation of the same job, reached by nothing but its own tests.
+        const { default: FileLoadingStage } =
+          await import('../../src/pipeline/stages/FileLoadingStage.js');
+        const stage = new FileLoadingStage({});
+        const result = await stage.process({
           basePath: testDir,
-          config: {
-            copytree: {
-              fs: {
-                retryAttempts: 3,
-                retryDelay: 10,
-                maxDelay: 100,
-              },
-            },
-          },
+          files: Array.from({ length: 10 }, (_, i) => ({
+            path: `file${i}.txt`,
+            absolutePath: path.join(testDir, `file${i}.txt`),
+            size: 10,
+          })),
+          stats: {},
         });
 
-        // Load all files
-        const loadPromises = Array.from({ length: 10 }, (_, i) => loader.loadFile(`file${i}.txt`));
-        const results = await Promise.all(loadPromises);
-
-        expect(results.filter((r) => r !== null)).toHaveLength(10);
+        expect(result.files.filter((f) => typeof f.content === 'string')).toHaveLength(10);
 
         // Should complete without errors
         const summary = summarize();

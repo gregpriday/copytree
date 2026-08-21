@@ -166,14 +166,28 @@ describe('TransformerRegistry', () => {
   });
 
   describe('createDefault', () => {
-    test('should create registry with default transformers', async () => {
+    test('registers nothing, because nothing converts content in this release', async () => {
       const defaultRegistry = await TransformerRegistry.createDefault();
 
-      // Should have loaded the essential transformers
-      expect(defaultRegistry.transformers.size).toBe(3);
-      expect(defaultRegistry.has('file-loader')).toBe(true);
-      expect(defaultRegistry.has('streaming-file-loader')).toBe(true);
-      expect(defaultRegistry.has('binary')).toBe(true);
+      // It used to register three, none of which could do anything:
+      // `file-loader` and `streaming-file-loader` reloaded content
+      // `FileLoadingStage` had already read, and `binary` was registered for
+      // `.doc`, `.zip`, `.exe` and their kin while returning `null` for every
+      // file that is not an image. Reading, classification and binary policy
+      // belong to `FileLoadingStage`; a real converter registers here when
+      // there is one.
+      expect(defaultRegistry.transformers.size).toBe(0);
+      expect(defaultRegistry.extensionMap.size).toBe(0);
+    });
+
+    test('still accepts a transformer an embedder registers', async () => {
+      // The extension point is the point. An empty default registry is a
+      // statement about what CopyTree ships, not about what it supports.
+      const defaultRegistry = await TransformerRegistry.createDefault();
+      defaultRegistry.register('custom', new TestTransformer(), { extensions: ['.custom'] });
+
+      expect(defaultRegistry.has('custom')).toBe(true);
+      expect(defaultRegistry.getForFile({ path: 'a.custom' })).toBeDefined();
     });
   });
 
@@ -396,8 +410,7 @@ describe('TransformerRegistry', () => {
       expect(result2.issues.some((issue) => issue.type === 'ordering')).toBe(true);
     });
 
-    test('should detect resource requirement issues', () => {
-      // Create a transformer that specifically requires an API key
+    test('reports a declared requirement without pretending to have checked it', () => {
       registry.register(
         'api-transformer',
         new TestTransformer(),
@@ -405,26 +418,36 @@ describe('TransformerRegistry', () => {
         {
           inputTypes: ['text'],
           outputTypes: ['text'],
-          requirements: { apiKey: true },
+          requirements: { apiKey: true, network: true },
         },
       );
 
-      // Mock environment to not have API key
-      const originalGemini = process.env.GEMINI_API_KEY;
-      const originalOpenAI = process.env.OPENAI_API_KEY;
-      delete process.env.GEMINI_API_KEY;
-      delete process.env.OPENAI_API_KEY;
-
       const result = registry.validatePlan(['api-transformer']);
-      expect(result.issues.some((issue) => issue.type === 'missing_resource')).toBe(true);
+      const declared = result.issues.find((issue) => issue.type === 'declared_requirement');
 
-      // Restore environment
-      if (originalGemini !== undefined) {
-        process.env.GEMINI_API_KEY = originalGemini;
-      }
-      if (originalOpenAI !== undefined) {
-        process.env.OPENAI_API_KEY = originalOpenAI;
-      }
+      // This used to report `missing_resource` at `severity: 'error'`, saying
+      // "requires an API key but none is configured" — without looking for one.
+      // The old test deleted `GEMINI_API_KEY` and `OPENAI_API_KEY` to simulate
+      // the absence, and passed because the code produced the error either way.
+      expect(declared).toBeDefined();
+      expect(declared.severity).toBe('info');
+      expect(declared.requirements).toEqual(['apiKey', 'network']);
+      expect(result.valid).toBe(true);
+    });
+
+    test('does not fail a plan for a requirement the registry cannot verify', () => {
+      // Whether a key is configured is a question about the transformer's own
+      // configuration; whether the network is reachable is not answerable in
+      // advance at all. Either way the transformer raises the real error at the
+      // point it needs the thing and finds it missing.
+      registry.register(
+        'needs-key',
+        new TestTransformer(),
+        {},
+        { inputTypes: ['text'], outputTypes: ['text'], requirements: { apiKey: true } },
+      );
+
+      expect(registry.validatePlan(['needs-key']).valid).toBe(true);
     });
 
     test('should generate performance warnings', () => {

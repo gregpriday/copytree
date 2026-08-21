@@ -19,10 +19,12 @@
  */
 
 import { readFileSync } from 'fs';
+import { stripCommentLines } from '../../helpers/sourceScan.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as root from '../../../src/index.js';
-import * as advanced from '../../../src/advanced.js';
+import * as experimental from '../../../src/experimental.js';
+import { PHASES } from '../../../src/ui/feedback/messages.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -43,6 +45,7 @@ const STABLE_ROOT_API = [
   // Configuration
   'ConfigManager',
   // Stable vocabularies
+  'DEGRADATION_CODES',
   'EXCLUSION_REASONS',
   'MANIFEST_OUTCOMES',
   'buildManifest',
@@ -75,7 +78,7 @@ const STABLE_ROOT_API = [
 ];
 
 /** The extension points, versioned separately and allowed to move in a minor. */
-const ADVANCED_API = [
+const EXPERIMENTAL_API = [
   'Pipeline',
   'Stage',
   'TransformerRegistry',
@@ -208,14 +211,14 @@ describe('the package root', () => {
   });
 });
 
-describe('the advanced subpath', () => {
+describe('the experimental subpath', () => {
   it('exports exactly the approved extension points', () => {
-    expect(Object.keys(advanced).sort()).toEqual([...ADVANCED_API].sort());
+    expect(Object.keys(experimental).sort()).toEqual([...EXPERIMENTAL_API].sort());
   });
 
   it('matches its declaration file exactly', () => {
-    const declared = declaredValueExports(path.join(repoRoot, 'types/advanced.d.ts'));
-    const runtime = new Set(Object.keys(advanced));
+    const declared = declaredValueExports(path.join(repoRoot, 'types/experimental.d.ts'));
+    const runtime = new Set(Object.keys(experimental));
 
     const undeclared = [...runtime].filter((name) => !declared.has(name)).sort();
     const phantom = [...declared].filter((name) => !runtime.has(name)).sort();
@@ -234,6 +237,81 @@ describe('declared runtime behaviour matches the runtime', () => {
       // exhaustive `switch` in a consumer's code fail to compile — or worse,
       // silently fall through.
       expect(union).toContain(`'${reason}'`);
+    }
+  });
+
+  it('depends on a small, long-stable slice of the Node type surface', () => {
+    // `@types/node` is pinned far ahead of the minimum runtime CopyTree
+    // supports, so `npm run typecheck` will happily accept a declaration
+    // referring to an API that does not exist in Node 22.12 — the version
+    // `engines` promises. Rather than run a second toolchain against older
+    // types, this pins the surface: all three of these predate the minimum by
+    // years, and anything new here is a deliberate decision about the floor.
+    const allowed = new Set(['Buffer', 'AbortSignal', 'NodeJS.MemoryUsage']);
+
+    const used = new Set();
+
+    for (const file of ['types/index.d.ts', 'types/experimental.d.ts']) {
+      // Comments stripped: `Buffer` and `NodeJS.MemoryUsage` appear in prose
+      // explaining a decision, and counting those would make this test measure
+      // the documentation rather than the declarations.
+      const text = stripCommentLines(readFileSync(path.join(repoRoot, file), 'utf8'));
+
+      // `NodeJS.X`, and the two globals in the allowlist. `[A-Za-z0-9_]` so
+      // `NodeJS.MemoryUsage2` is not truncated into the allowed name.
+      for (const match of text.matchAll(/\bNodeJS\.[A-Za-z0-9_]+|\bAbortSignal\b|\bBuffer\b/g)) {
+        used.add(match[0]);
+      }
+
+      // Every other route a Node type can enter a `.d.ts`: a triple-slash
+      // reference, an import from a built-in, or an inline `import('node:x')`.
+      // These are not allowlisted at all — reaching for one is a decision about
+      // the minimum runtime, and should be made deliberately.
+      expect({ file, tripleSlash: /\/\/\/\s*<reference types="node"/.test(text) }).toEqual({
+        file,
+        tripleSlash: false,
+      });
+
+      const imports = [
+        ...text.matchAll(/(?:^|\n)\s*(?:import|export)\s+type\s+[^;]*?from\s+'([^']+)'/g),
+        ...text.matchAll(/\bimport\('([^']+)'\)/g),
+      ].map((match) => match[1]);
+
+      const builtins = imports.filter(
+        (name) => name.startsWith('node:') || /^(fs|stream|events|buffer|os|path|util)$/.test(name),
+      );
+
+      expect({ file, builtins }).toEqual({ file, builtins: [] });
+    }
+
+    expect([...used].filter((name) => !allowed.has(name)).sort()).toEqual([]);
+  });
+
+  it('declares every progress phase the runtime can report', () => {
+    const declaration = readFileSync(path.join(repoRoot, 'types/index.d.ts'), 'utf8');
+    const union = declaration.match(/phase\?:([\s\S]*?);/)?.[1] ?? '';
+
+    // `read` and `render` were declared and are emitted by nothing; `load`,
+    // `transform`, `context`, `secrets`, `format` and `deliver` are emitted and
+    // were not declared. A consumer switching on the phase to pick a label got
+    // no compiler help for any of the six that actually occur.
+    for (const phase of Object.values(PHASES)) {
+      expect(union).toContain(`'${phase}'`);
+    }
+
+    const declared = [...union.matchAll(/'([a-z]+)'/g)].map((match) => match[1]);
+    const actual = new Set(Object.values(PHASES));
+    expect(declared.filter((phase) => !actual.has(phase))).toEqual([]);
+  });
+
+  it('declares every degradation code the runtime can record', () => {
+    const declaration = readFileSync(path.join(repoRoot, 'types/index.d.ts'), 'utf8');
+    const union = declaration.match(/export type DegradationCode =([\s\S]*?);/)?.[1] ?? '';
+
+    for (const code of Object.values(root.DEGRADATION_CODES)) {
+      // `--strict` refuses a run that recorded any degradation, so a consumer
+      // deciding which ones it tolerates switches on this code.
+      expect(union).toContain(`'${code}'`);
     }
   });
 

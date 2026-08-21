@@ -5,6 +5,7 @@
  * for deterministic golden file comparisons.
  */
 
+import os from 'os';
 import path from 'path';
 import { readFileSync } from 'fs';
 import { spawn } from 'child_process';
@@ -38,6 +39,10 @@ export function runCli(args = [], options = {}) {
         TZ: 'UTC',
         LANG: 'C',
         LC_ALL: 'C',
+        // A repository cache the suite owns. `os.homedir()` ignores `HOME` on
+        // macOS, so without this a cache command run from an end-to-end test
+        // reaches the developer's real clones.
+        COPYTREE_REPO_CACHE_PATH: options.repoCache || path.join(os.tmpdir(), 'copytree-e2e-repos'),
         // Suppress info/warn log output in E2E tests: these tests verify
         // stdout program output (golden files), not log verbosity.
         // Error-level messages still appear so that negative test cases work.

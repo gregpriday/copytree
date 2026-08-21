@@ -45,6 +45,7 @@ const KNOWN_PROFILE_OPTIONS = new Set([
   'maxTotalSize',
   'maxFileCount',
   'charLimit',
+  'retainOversizedFirstFile',
   'maxDepth',
   'respectGitignore',
   'includeHidden',

@@ -32,7 +32,17 @@ const CLI = path.resolve(process.cwd(), 'bin/copytree.js');
 function doctorWithHome(home) {
   const result = spawnSync(process.execPath, [CLI, 'doctor', '--format', 'json'], {
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, USERPROFILE: home, NO_COLOR: '1' },
+    env: {
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      NO_COLOR: '1',
+      // `os.homedir()` reads the password database and ignores `HOME` on macOS,
+      // so setting `HOME` alone left the repository-cache check reporting the
+      // developer's own clones — from a test whose whole subject is a machine
+      // that has never run CopyTree.
+      COPYTREE_REPO_CACHE_PATH: path.join(home, '.copytree', 'repos'),
+    },
   });
 
   return { status: result.status, checks: JSON.parse(result.stdout).checks };

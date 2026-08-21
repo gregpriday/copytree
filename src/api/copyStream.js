@@ -6,6 +6,8 @@ import { buildManifest } from '../utils/manifest.js';
 import { buildEstimates } from '../utils/estimate.js';
 import { versionFor } from '../utils/outputVersion.js';
 import { summaryStats } from './resultStats.js';
+import { notify } from './callbacks.js';
+import { createProgressCoordinator } from './progress.js';
 import { resolveOperationConfig } from './operationConfig.js';
 
 /**
@@ -112,48 +114,57 @@ export async function* copyStream(basePath, options = {}) {
   const seen = [];
   let outputChars = 0;
 
+  // The same bands `copy()` reports. Previously the caller's callback went
+  // straight into `scan()`, which reports its own work as 0–100%, so a
+  // streaming consumer was told the operation was finished before the first
+  // chunk existed — and then heard nothing again, because `formatStream()`
+  // accepted an `onProgress` it never called.
+  const progress = createProgressCoordinator(options.onProgress);
+
   const scanOptions = {
     ...options,
     config: configInstance,
+    onProgress: progress ? (update) => progress.scan(update) : undefined,
     onSummary: (value) => {
       summary = value;
-      if (options.onSummary) {
-        try {
-          options.onSummary(value);
-        } catch {
-          // A buggy summary callback must not fail the stream.
-        }
-      }
+      notify('onSummary', options.onSummary, value);
     },
   };
 
+  progress?.start();
+
   const finish = () => {
-    if (!options.onComplete) return;
+    if (!options.onComplete) {
+      progress?.complete();
+      return;
+    }
 
     const manifest = buildManifest(seen, manifestOptions);
     const totalSize = seen.reduce((sum, file) => sum + (file.size || 0), 0);
 
-    try {
-      options.onComplete({
-        outputFormatVersion: versionFor(formatType),
-        manifest,
-        stats: {
-          totalFiles: seen.length,
-          duration: Date.now() - startTime,
-          totalSize,
-          ...buildEstimates(seen, {
-            format: formatType,
-            onlyTree: options.onlyTree,
-            addLineNumbers: options.addLineNumbers || options.withLineNumbers,
-            ...(options.dryRun ? {} : { actualChars: outputChars }),
-          }),
-          ...(options.dryRun ? { dryRun: true } : {}),
-          ...summaryStats(summary, seen),
-        },
-      });
-    } catch {
-      // A buggy completion callback must not fail the stream.
-    }
+    notify('onComplete', options.onComplete, {
+      outputFormatVersion: versionFor(formatType),
+      manifest,
+      stats: {
+        totalFiles: seen.length,
+        duration: Date.now() - startTime,
+        totalSize,
+        ...buildEstimates(seen, {
+          format: formatType,
+          onlyTree: options.onlyTree,
+          addLineNumbers: options.addLineNumbers || options.withLineNumbers,
+          ...(options.dryRun ? {} : { actualChars: outputChars }),
+        }),
+        ...(options.dryRun ? { dryRun: true } : {}),
+        ...summaryStats(summary, seen),
+      },
+    });
+
+    // Last. Reached only by the natural end of the generator — a consumer who
+    // breaks out of the loop, or cancels, never gets here — and only once the
+    // manifest and estimates above have been built, because a throw in that
+    // bookkeeping would otherwise reject a run that had already reported 100%.
+    progress?.complete();
   };
 
   // A dry run plans the selection and reports it; there is nothing to stream.
@@ -175,6 +186,13 @@ export async function* copyStream(basePath, options = {}) {
       seen.push(stripContent(file));
       yield file;
     }
+
+    // Here, not before `formatStream()` is called. `tapped()` is lazy: nothing
+    // runs until the formatter pulls the first file, so announcing the render
+    // phase at the call site would report 80% before the scan had started — and
+    // the coordinator is monotonic, so every scan update after it would be
+    // clamped flat. Exhausting this generator is the moment rendering begins.
+    progress?.rendering();
   }
 
   const chunks = formatStream(tapped(), {
@@ -194,7 +212,6 @@ export async function* copyStream(basePath, options = {}) {
     // parity guarantee holds only for non-empty projects.
     allowEmpty: true,
     config: configInstance,
-    onProgress: options.onProgress,
   });
 
   // `onComplete` reports a finished run. It must not fire when the consumer
@@ -202,9 +219,15 @@ export async function* copyStream(basePath, options = {}) {
   // and a caller that renders "47 files copied" from a half-written stream is
   // reporting something that did not happen.
   for await (const chunk of surrogateSafe(chunks)) {
+    // Checked per chunk. Cancellation was only observed inside the scan, so a
+    // consumer who aborted while the document was being rendered received the
+    // rest of it and then a completion.
+    options.signal?.throwIfAborted();
     outputChars += chunk.length;
     yield chunk;
   }
+
+  options.signal?.throwIfAborted();
 
   finish();
 }

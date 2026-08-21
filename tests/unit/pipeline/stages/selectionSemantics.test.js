@@ -104,10 +104,21 @@ describe('total size budget', () => {
     expect(result.stats.truncated).toBeUndefined();
   });
 
-  test('reports an oversized first file separately from truncation', async () => {
-    // Returning nothing is a worse answer than overshooting, but the overshoot
-    // has to be visible rather than looking like a clean run.
+  test('drops an oversized first file, because a maximum is a maximum', async () => {
     const stage = new BudgetStage({ maxTotalSize: 5 });
+
+    const result = await stage.process({
+      files: [file('huge', { size: 500 })],
+    });
+
+    expect(result.files).toHaveLength(0);
+    expect(result.stats.budgetExceeded).toBeUndefined();
+  });
+
+  test('reports an oversized first file separately from truncation, when asked to keep it', async () => {
+    // The overshoot is opt-in, and has to be visible rather than looking like a
+    // clean run.
+    const stage = new BudgetStage({ maxTotalSize: 5, retainOversizedFirstFile: true });
 
     const result = await stage.process({
       files: [file('huge', { size: 500 })],

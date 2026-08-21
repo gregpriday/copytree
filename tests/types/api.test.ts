@@ -142,7 +142,9 @@ async function testScanApi() {
     changed: 'main',
     maxDepth: 5,
     transform: true,
-    transformers: ['markdown', 'csv'],
+    // Keyed by name, not an array: the runtime calls `Object.entries()` on
+    // this and reads each entry's `enabled`.
+    transformers: { markdown: { enabled: true }, csv: { enabled: false } },
     includeHidden: false,
     followSymlinks: false,
     maxFileSize: 10 * 1024 * 1024,
@@ -247,7 +249,7 @@ async function testCopyApi() {
     changed: 'develop',
     maxDepth: 10,
     transform: true,
-    transformers: ['markdown'],
+    transformers: { markdown: { enabled: true } },
     includeHidden: false,
     followSymlinks: false,
     maxFileSize: 5 * 1024 * 1024,
@@ -268,7 +270,8 @@ async function testCopyApi() {
     format: 'json',
     onlyTree: false,
     addLineNumbers: true,
-    basePath: '/project',
+    // No `basePath`: it is `copy()`'s first argument, and the option was
+    // unconditionally overwritten.
     instructions: 'Code review',
     showSize: true,
     prettyPrint: true,
@@ -278,10 +281,9 @@ async function testCopyApi() {
     display: false,
     clipboard: false,
     stream: false,
-    secretsReport: './secrets.json',
-    info: true,
+    // `secretsReport`, `info` and `verbose` were declared here and never
+    // implemented by `copy()`. They are CLI concerns and live only on the CLI.
     dryRun: false,
-    verbose: true,
     charLimit: 10000,
     withLineNumbers: true,
   };
@@ -356,7 +358,7 @@ async function testScopedCopy() {
   const scoped: string[] | undefined = result.stats.scope;
 
   // Scope entries can also be resolved directly, from the advanced subpath.
-  const { resolveScope } = await import('copytree/advanced');
+  const { resolveScope } = await import('copytree/experimental');
   const entries = await resolveScope('/repo', ['src']);
   const abs: string = entries[0].absolutePath;
   const rel: string = entries[0].relativePath;

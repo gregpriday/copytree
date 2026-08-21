@@ -91,17 +91,37 @@ describe('completion models', () => {
     expect(model.notes).toEqual(notices);
   });
 
-  // A finding that could NOT be redacted is the opposite: the credential is
-  // still in the output.
-  it('warns when a finding could not be redacted', () => {
-    const result = { stats: { secretsGuard: { findings: 4, redacted: 1 } } };
+  // A file whose secrets could NOT be removed is the opposite: it was dropped,
+  // so the warning is about the gap in the export rather than a leak in it.
+  it('warns when a file was left out because its secrets could not be redacted', () => {
+    const result = {
+      stats: {
+        secretsGuard: {
+          findings: 4,
+          redacted: 1,
+          excludedWithSecrets: 2,
+          excludedWithSecretsPaths: ['src/keys.js', 'src/aws.js'],
+        },
+      },
+    };
     const warnings = classifyWarnings(result);
 
     expect(warnings[0].code).toBe(WARNING_CODES.SECRETS_REDACTED);
-    expect(warnings[0].message).toContain('3 possible secrets could not be redacted');
+    expect(warnings[0].message).toContain('2 files held a secret that could not be redacted');
 
     const model = buildCompletionModel({ delivery: { actual: 'reference' }, stats, warnings });
-    expect(model.headline).toBe('File reference copied with secrets still present');
+    expect(model.headline).toBe('File reference copied with unredactable files left out');
+  });
+
+  // The old warning was `findings - redacted`, which counted detections against
+  // replaced regions. Two findings over one credential are one replacement, so
+  // a perfectly clean run reported a secret left in the output.
+  it('does not warn when every finding was redacted in fewer regions', () => {
+    const result = {
+      stats: { secretsGuard: { findings: 4, redacted: 1, excludedWithSecrets: 0 } },
+    };
+
+    expect(classifyWarnings(result)).toEqual([]);
   });
 
   it('reports a clipboard fallback as one outcome, not three lines', () => {

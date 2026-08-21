@@ -1,11 +1,11 @@
 /**
- * CopyTree extension points — `copytree/advanced`.
+ * CopyTree extension points — `copytree/experimental`.
  *
  * Lower level than the package root, and versioned less conservatively: a minor
- * release may change anything here. See `src/advanced.js` for why these live
+ * release may change anything here. See `src/experimental.js` for why these live
  * behind a separate import rather than on the root.
  *
- * @module copytree/advanced
+ * @module copytree/experimental
  */
 
 import type {
@@ -493,6 +493,37 @@ export interface TransformerTraits {
   tags: string[];
 }
 
+/**
+ * One thing the traits system noticed about a plan.
+ *
+ * Severity is the whole contract: `error` means the plan cannot run as given,
+ * and is what `valid` reflects. `warning` and `info` are advice — a declared
+ * resource requirement the registry cannot verify, a heavy transformer that
+ * could run later — and used to make a plan invalid for telling you something
+ * useful about it.
+ */
+export interface TransformerPlanIssue {
+  /** What kind of issue, e.g. `conflict`, `ordering`, `declared_requirement` */
+  type: string;
+  severity: 'error' | 'warning' | 'info';
+  /** Human-readable description */
+  message: string;
+  /** Transformers involved */
+  transformers: string[];
+  /** For `declared_requirement`: what the transformer says it needs */
+  requirements?: string[];
+}
+
+/** The result of {@link TransformerRegistry.validatePlan}. */
+export interface TransformerPlanValidation {
+  /** False only when an `error`-severity issue was found */
+  valid: boolean;
+  /** Conflicts, ordering notes and declared requirements */
+  issues: TransformerPlanIssue[];
+  /** Optimization suggestions */
+  warnings: TransformerPlanIssue[];
+}
+
 /** Registration options for a transformer. */
 export interface TransformerRegistration {
   /** Claim these file extensions */
@@ -555,11 +586,26 @@ export class TransformerRegistry {
   /** Turn plan validation on or off. */
   setValidationEnabled(enabled: boolean): void;
 
-  /** Check that every declared dependency is registered. */
-  validateDependencies(): { valid: boolean; errors: string[]; warnings: string[] };
+  /**
+   * Resolve the declared dependency graph into an execution order.
+   *
+   * Throws on a cycle or a missing dependency. It was declared as returning
+   * `{ valid, errors, warnings }` and returns an ordered array of transformer
+   * names, so a consumer following the declaration read `.valid` off an array
+   * and got `undefined` — which is falsy, so the careful ones concluded every
+   * graph was invalid.
+   */
+  validateDependencies(): string[];
 
-  /** Validate an ordered plan against the traits system. */
-  validatePlan(plan: string[]): { valid: boolean; errors: string[]; warnings: string[] };
+  /**
+   * Check an ordered plan against the traits system.
+   *
+   * `valid` is false only when an `error`-severity issue was found. `issues`
+   * also carries advisory entries — a declared resource requirement, an
+   * ordering note — at `info`, so a plan can be valid and still have issues
+   * worth reading.
+   */
+  validatePlan(plan: string[]): TransformerPlanValidation;
 
   /** Reorder a plan so heavy transformers run last and conflicts are avoided. */
   optimizePlan(plan: string[]): string[];

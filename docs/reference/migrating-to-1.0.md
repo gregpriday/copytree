@@ -107,14 +107,19 @@ Extension points moved to a subpath:
 import { Pipeline, Stage, TransformerRegistry, BaseTransformer } from 'copytree';
 
 // After
-import { Pipeline, Stage, TransformerRegistry, BaseTransformer } from 'copytree/advanced';
+import { Pipeline, Stage, TransformerRegistry, BaseTransformer } from 'copytree/experimental';
 ```
 
 Also moved: `ProgressTracker`, `stageIdFor`, `ExclusionReport`, `resolveScope`,
 `detectBinary`, `categorizeByExt`.
 
-`copytree/advanced` is versioned less conservatively than the root — **a minor
-release may change it**. If you depend on it, pin accordingly.
+`copytree/experimental` is versioned less conservatively than the root — **a
+minor release may change it**. If you depend on it, pin accordingly.
+
+It was called `copytree/advanced` in the release candidates. "Advanced"
+describes who the audience is; the thing worth saying in an import statement is
+that a 1.0 package's SemVer promise does not reach this subpath. It shipped in
+no stable release, so there is nothing to migrate unless you tried an RC.
 
 ### `config()` and `configAsync()` were removed
 
@@ -252,6 +257,109 @@ null`, and `NodeJS.MemoryUsage` is spelled out as `MemorySnapshot`. Every
 published declarations now compile in a strict project that has not installed
 Node's types.
 
+## Hardening before the stable tag
+
+The release candidates changed further. These are the ones that can change what
+a working setup does.
+
+### `--max-total-size` is a maximum
+
+A single file larger than the whole budget used to be kept regardless, on the
+reasoning that returning nothing is unhelpful. The cost was that a caller who
+set the budget to protect a context window or an API bill could be handed
+forty times it, having asked for a limit and been given a suggestion.
+
+It is now dropped like any other file that does not fit, and the selection can
+legitimately come back empty. `copytree plan . --explain` names the file and the
+budget that dropped it — plain `plan` reports the count only, because retaining
+per-file detail costs something. To keep the old behaviour, ask for it by name:
+
+```bash
+copytree --max-total-size 2MB --retain-oversized-first-file
+```
+
+### A malformed budget is refused rather than ignored
+
+`--max-chars 1.5` was read as `1`, `'12abc'` as `12`, and a `maxTotalSize` of
+`'garbage'` in a profile silently became "no budget" — a typo produced a
+successful unbounded run. All of these now fail with `ERR_INVALID_OPTION`.
+`0`, `false` and `null` still mean "no budget" for `--max-files` and
+`--max-total-size`, as they always have. `--max-chars 0` is different and
+deliberate: it is a real budget of zero characters, not an absent one.
+
+### A profile's `charLimit` now applies
+
+It reached `resolveBudgets()`, was reported by every command that reports
+budgets, and was dropped before the pipeline. If a profile of yours sets it, the
+export will now be shorter than it was.
+
+### Sixteen configuration keys were removed
+
+`app.defaultCommand`, `app.interactiveMode`, `app.chunkSize`, `app.defaultOutput`,
+`app.outputEncoding`, `app.exitOnError`, `app.name`, `app.version`,
+`app.description`, `app.env`, `app.basePath`, `app.userConfigPath`,
+`copytree.maxOutputSize`, `copytree.maxCharacterLimit`,
+`copytree.preserveEmptyDirs` and `copytree.treeIndent` had no runtime consumer
+between them. The schema is closed, so a configuration setting one of them is
+now rejected by name.
+
+`copytree config migrate` drops them for you and says which it dropped.
+
+### `schemaVersion` does something
+
+A configuration declaring a **newer major** than the installed CopyTree
+understands is refused. Same or older is accepted. It could not previously even
+be written: the loader merged a root-level scalar into an object and produced
+`{}`, so it always failed as "must be string".
+
+### `copytree/advanced` is now `copytree/experimental`
+
+```js
+// Before
+import { Pipeline, Stage } from 'copytree/advanced';
+// After
+import { Pipeline, Stage } from 'copytree/experimental';
+```
+
+The subpath shipped in no stable release. "Advanced" describes the audience; the
+thing worth saying in an import statement is that a 1.0 package's SemVer promise
+does not reach it.
+
+### There are no built-in transformers
+
+`file-loader`, `binary` and `streaming-file-loader` are gone. The first two
+reloaded content the pipeline had already read; the third buffered whole files
+despite its name; and `binary` was registered for `.doc`, `.zip`, `.exe` and
+their kin while returning `null` for anything that is not an image — which fails
+validation, so **including a `.zip` was enough to make `copytree --strict` exit
+non-zero**. A profile naming a transformer that is not registered is now
+reported rather than ignored.
+
+Reading, binary classification and binary policy live in the pipeline. Use
+`--binary` or `copytree.binaryPolicy`.
+
+### The secrets guard never emits what it could not clean
+
+`secretsGuard.redactInline: false` is documented as "exclude the file rather
+than redact in place" and used to mean "detect, report, and emit unchanged". It
+now excludes. So does a finding that cannot be proven redacted, and a Gitleaks
+detection whose findings could not be read. Runs that previously succeeded with
+a credential in the output will now be missing that file, and will say so.
+
+### Cache commands cover the clones
+
+`copytree cache status` now reports the repository cache under
+`~/.copytree/repos` alongside the others — on the machine this was written on,
+it had reached a gigabyte with nothing that would report or reclaim it.
+`cache clear` and `cache gc` need `--repositories` to touch it.
+
+### A remote whose default branch cannot be read fails
+
+`copytree https://github.com/user/repo` used to guess `main` when
+`ls-remote` failed, turning an authentication or network problem into "Branch
+'main' not found" and failing outright for repositories that use another name.
+The real error is now reported.
+
 ## Behaviour that was wrong and is now right
 
 These are not migrations. They are defects whose corrected behaviour you may
@@ -292,7 +400,7 @@ notice.
 ```bash
 copytree config validate     # closed schema, no coercion
 copytree doctor              # installation, clipboard, Git, effective policies
-copytree plan .              # the exact selection, without reading contents
+copytree plan .              # the selection, without reading contents
 ```
 
 For the SDK, the fastest check is that your build still type-checks: most of the

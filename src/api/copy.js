@@ -1,14 +1,16 @@
 import { scan } from './scan.js';
 import { summaryStats } from './resultStats.js';
 import { format } from './format.js';
+import { assertFormat } from '../formatters/index.js';
 import { ValidationError, ERROR_CODES, isAbortError } from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
 import { buildManifest } from '../utils/manifest.js';
 import { buildEstimates } from '../utils/estimate.js';
 import { versionFor } from '../utils/outputVersion.js';
-import { PIPELINE_STAGES } from '../utils/ProgressTracker.js';
 import fs from '../utils/fsx.js';
 import { writeFileAtomic } from '../utils/atomicWrite.js';
+import { notify } from './callbacks.js';
+import { createProgressCoordinator } from './progress.js';
 import path from 'path';
 import Clipboard from '../utils/clipboard.js';
 import { resolveOperationConfig } from './operationConfig.js';
@@ -24,14 +26,11 @@ import { resolveOperationConfig } from './operationConfig.js';
  * @property {boolean} [display=false] - Display output to console
  * @property {boolean} [clipboard=false] - Copy output to clipboard (programmatic default: false)
  * @property {boolean} [stream=false] - Stream output to stdout
- * @property {string} [secretsReport] - Path to write secrets report
- * @property {boolean} [info=false] - Include summary information
  * @property {boolean} [dryRun=false] - Plan the run without reading or formatting content.
  *   Every stat-based budget (`sizeGate`, `maxFileSize`, `maxFileCount`, `maxTotalSize`) applies
  *   exactly as in a real run, so the selection is identical. `charLimit` is planned from byte
  *   size, which matches character length for ASCII but overestimates for multi-byte text, and
  *   `dedupe` cannot run at all without content — with either option the preview is an estimate.
- * @property {boolean} [verbose=false] - Verbose error output
  * @property {number} [charLimit] - Character budget across all file content
  * @property {string} [instructions] - Instructions to include in output
  * @property {boolean} [explain=false] - Collect per-file exclusion detail in `stats.excluded.largest`
@@ -153,44 +152,15 @@ export async function copy(basePath, options = {}) {
     binaryExtensions: configInstance.get('copytree.binaryExtensions', undefined),
   };
 
-  // Build progress wrapper: scan gets 0-80%, format gets 80-100%
-  const { onProgress, progressThrottleMs } = options;
-  let scanProgress = null;
-  let lastEmittedPercent = -1;
+  // Selection, rendering and delivery each get a band of the scale. The model is
+  // shared with `copyStream()`: two entry points that report progress
+  // differently for the same work are two entry points a UI cannot use
+  // interchangeably.
+  const { progressThrottleMs } = options;
+  const progress = createProgressCoordinator(options.onProgress);
+  const scanProgress = progress ? (update) => progress.scan(update) : null;
 
-  /**
-   * Emit progress with a monotonic guard so percent never decreases.
-   *
-   * Every field the scan reported is carried through. Rebuilding the object
-   * from `percent` and `message` alone dropped `stage`, so the stable stage id
-   * that `PIPELINE_STAGES` exists to publish was invisible to exactly the
-   * callers most likely to render it.
-   *
-   * Swallows exceptions so a buggy callback never breaks the operation.
-   *
-   * @param {number} percent - Progress 0-100
-   * @param {string} message - Human-readable status
-   * @param {Object} [source] - Underlying progress object to carry through
-   */
-  const emitProgress = onProgress
-    ? (percent, message, source = {}) => {
-        const clamped = Math.max(percent, lastEmittedPercent);
-        lastEmittedPercent = clamped;
-        try {
-          onProgress({ ...source, percent: clamped, message });
-        } catch {
-          // Swallow callback exceptions
-        }
-      }
-    : null;
-
-  if (emitProgress) {
-    emitProgress(0, 'Starting...', { stage: PIPELINE_STAGES.UNKNOWN });
-    scanProgress = (progress) => {
-      // Scale scan progress to 0-80%
-      emitProgress(Math.round(progress.percent * 0.8), progress.message, progress);
-    };
-  }
+  progress?.start();
 
   let summary = null;
   const captureSummary = (value) => {
@@ -199,14 +169,14 @@ export async function copy(basePath, options = {}) {
     // `onSummary` there replaces whatever the caller passed. Chain instead: a
     // caller who asks for the summary and also reads `result.stats` should get
     // both.
-    if (typeof options.onSummary === 'function') {
-      try {
-        options.onSummary(value);
-      } catch {
-        // A buggy summary callback must not fail the copy.
-      }
-    }
+    notify('onSummary', options.onSummary, value);
   };
+
+  // Validated before anything else runs, including the dry-run branch. A
+  // preview that accepts a format the real run rejects is worse than no
+  // preview: `copy(root, { dryRun: true, format: 'nope' })` reported 100% and
+  // returned a plan, and the identical non-dry call threw.
+  assertFormat(options.format ?? 'xml', 'copy');
 
   // Handle dry run
   if (options.dryRun) {
@@ -229,9 +199,7 @@ export async function copy(basePath, options = {}) {
     const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
     const manifest = buildManifest(files, manifestOptions);
 
-    if (emitProgress) {
-      emitProgress(100, 'Complete', { stage: PIPELINE_STAGES.UNKNOWN });
-    }
+    progress?.complete();
 
     return {
       output: '',
@@ -282,12 +250,15 @@ export async function copy(basePath, options = {}) {
     }
   }
 
+  // Cancellation is only checked inside the scan, so a run abandoned while it
+  // was formatting or being delivered carried on to the end and reported 100%.
+  // A cancelled run must never come back as a success.
+  options.signal?.throwIfAborted();
+
   // Calculate stats
   const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
 
-  if (emitProgress) {
-    emitProgress(80, 'Formatting output...', { stage: PIPELINE_STAGES.FORMAT });
-  }
+  progress?.rendering();
 
   // Format output. An empty selection produces an empty document rather than an
   // exception: "nothing to copy here" is an outcome, not a failure.
@@ -310,9 +281,12 @@ export async function copy(basePath, options = {}) {
 
   const manifest = buildManifest(files, manifestOptions);
 
-  if (emitProgress) {
-    emitProgress(95, 'Finalizing...', { stage: PIPELINE_STAGES.FORMAT });
-  }
+  // Again before the side effects. Formatting a large selection takes real
+  // time, and writing a file or replacing the clipboard on behalf of a run the
+  // caller has already abandoned is the side effect they cancelled to avoid.
+  options.signal?.throwIfAborted();
+
+  progress?.finalizing();
 
   // Build result
   const result = {
@@ -361,9 +335,9 @@ export async function copy(basePath, options = {}) {
     }
   }
 
-  if (emitProgress) {
-    emitProgress(100, 'Complete', { stage: PIPELINE_STAGES.UNKNOWN });
-  }
+  // Last, and only on the way out. Everything above can still throw, and a run
+  // that reports 100% and then rejects has told the caller something untrue.
+  progress?.complete();
 
   return result;
 }

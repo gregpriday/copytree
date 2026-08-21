@@ -691,13 +691,64 @@ describe('GitHubUrlHandler', () => {
       expect(branch).toBe('main');
     });
 
-    it('should fallback to main on error', async () => {
+    it('reports a failure to reach the remote, rather than guessing main', async () => {
+      // Guessing turned an unreachable network, a missing token or an absent
+      // repository into "Branch 'main' not found" — an error about the wrong
+      // thing, sent to someone whose problem was none of those.
       execFileSync.mockImplementation(() => {
         throw new Error('Network error');
       });
 
-      const branch = await handler.detectDefaultBranch();
-      expect(branch).toBe('main');
+      await expect(handler.detectDefaultBranch()).rejects.toThrow(/Failed to reach repository/);
+    });
+
+    it('reports an authentication failure as one', async () => {
+      execFileSync.mockImplementation(() => {
+        throw new Error('fatal: Authentication failed for https://github.com/user/repo');
+      });
+
+      await expect(handler.detectDefaultBranch()).rejects.toThrow(/Access denied/);
+    });
+
+    it('keeps a cancellation as a cancellation', async () => {
+      // Classified as a remote failure it became "Failed to reach repository",
+      // which describes the network rather than the Ctrl+C that caused it.
+      const aborted = new Error('The operation was aborted');
+      aborted.name = 'AbortError';
+      execFileSync.mockImplementation(() => {
+        throw aborted;
+      });
+
+      await expect(handler.detectDefaultBranch()).rejects.toMatchObject({ name: 'AbortError' });
+    });
+
+    it('does not report an empty branch name before a ref is resolved', async () => {
+      // `this.branch` is empty until a ref has been resolved, and the classifier
+      // runs during that resolution — so a bare repository URL produced
+      // "Branch '' not found", which reads as a bug in CopyTree.
+      execFileSync.mockImplementation(() => {
+        throw new Error('fatal: Remote branch xyz not found in upstream origin');
+      });
+
+      await expect(handler.detectDefaultBranch()).rejects.toThrow(
+        /The requested branch was not found/,
+      );
+    });
+
+    it('distinguishes a remote with no default branch from a failure', async () => {
+      // An empty repository answers, and has no HEAD to advertise. That is a
+      // fact about the repository, not about the connection.
+      execFileSync.mockReturnValue('');
+
+      await expect(handler.detectDefaultBranch()).rejects.toThrow(
+        /did not advertise a default branch/,
+      );
+    });
+
+    it('follows a remote HEAD that is not main', async () => {
+      execFileSync.mockReturnValue('ref: refs/heads/trunk\tHEAD\n');
+
+      expect(await handler.detectDefaultBranch()).toBe('trunk');
     });
   });
 

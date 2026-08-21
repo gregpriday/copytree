@@ -19,7 +19,7 @@ class HeavyTransformer {
   async flush() {}
 }
 
-function makeRegistry(mapByPath, allTransformers = []) {
+function makeRegistry(mapByPath, allTransformers = [], registered = []) {
   return {
     getForFile(file) {
       if (mapByPath[file.path]) {
@@ -29,6 +29,9 @@ function makeRegistry(mapByPath, allTransformers = []) {
     },
     getAllTransformers() {
       return allTransformers;
+    },
+    has(name) {
+      return registered.includes(name);
     },
   };
 }
@@ -243,5 +246,56 @@ describe('TransformStage (real)', () => {
     });
 
     expect(stage.getTransformerForFile({ path: 'missing.txt' })).toBeNull();
+  });
+});
+
+describe('a transformer named in a profile but not registered', () => {
+  test('is reported as a degradation rather than silently ignored', async () => {
+    // Nothing looked the name up until a file with a matching extension
+    // arrived, and the lookup failure was swallowed — so a profile asking for
+    // `pdf` produced a run identical to one that did not, with no way to tell.
+    const stage = new TransformStage({
+      registry: makeRegistry({}, [], ['markdown']),
+      transformers: { pdf: { enabled: true }, markdown: { enabled: true } },
+    });
+
+    const result = await stage.process({
+      files: [{ path: 'a.txt', content: 'x' }],
+      stats: {},
+    });
+
+    expect(result.stats.degradations).toEqual([
+      expect.objectContaining({ message: expect.stringContaining('pdf') }),
+    ]);
+    // The registered one is not named: it was applied, or would have been.
+    expect(result.stats.degradations[0].message).not.toContain('markdown');
+  });
+
+  test('says nothing when every named transformer is registered', async () => {
+    const stage = new TransformStage({
+      registry: makeRegistry({}, [], ['markdown']),
+      transformers: { markdown: { enabled: true } },
+    });
+
+    const result = await stage.process({
+      files: [{ path: 'a.txt', content: 'x' }],
+      stats: {},
+    });
+
+    expect(result.stats.degradations).toBeUndefined();
+  });
+
+  test('says nothing about one the profile explicitly disabled', async () => {
+    const stage = new TransformStage({
+      registry: makeRegistry({}, [], []),
+      transformers: { pdf: { enabled: false } },
+    });
+
+    const result = await stage.process({
+      files: [{ path: 'a.txt', content: 'x' }],
+      stats: {},
+    });
+
+    expect(result.stats.degradations).toBeUndefined();
   });
 });

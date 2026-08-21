@@ -18,6 +18,16 @@ import TransformStage from '../../../src/pipeline/stages/TransformStage.js';
  * and the stage silently never runs for PDFs. Nothing else would fail.
  *
  * This makes that drift a test failure instead.
+ *
+ * Both are currently empty, and the pairing is the point: `createDefault()`
+ * registers nothing because there is no content-to-content transformer in this
+ * release, and the list agrees. It used to claim `.zip`, `.docx` and their kin
+ * on behalf of a transformer that returns `null` for anything that is not an
+ * image — and a null result is rejected by `BaseTransformer.validateOutput()`,
+ * so each of those files raised a `TransformError`, was recorded as a
+ * degradation, and failed the run under `--strict`. Including a `.zip` was
+ * enough to make `copytree --strict` exit non-zero for no reason a user could
+ * act on.
  */
 describe('transform candidate extensions', () => {
   it('covers every extension a non-default transformer claims', async () => {
@@ -72,8 +82,13 @@ describe('TransformStage.hasWorkToDo', () => {
     ).toBe(true);
   });
 
-  it('runs for an extension a transformer claims', () => {
-    expect(stage().hasWorkToDo([{ path: 'archive.zip', content: '[binary]' }])).toBe(true);
+  it('skips a binary extension, now that no transformer claims one', () => {
+    // `FileLoadingStage` classifies binaries and applies the binary policy.
+    // Nothing downstream converts them, so building the subsystem to find that
+    // out was pure cost — and the transformer it was built to reach failed the
+    // file. The drift test above is what makes this flip back to `true` the
+    // moment a transformer claims `.zip` again.
+    expect(stage().hasWorkToDo([{ path: 'archive.zip', content: '[binary]' }])).toBe(false);
   });
 
   it('runs when content was never loaded', () => {
@@ -96,7 +111,14 @@ describe('TransformStage.hasWorkToDo', () => {
     ).toBe(false);
   });
 
-  it('matches extensions case-insensitively', () => {
-    expect(stage().hasWorkToDo([{ path: 'Report.DOCX', content: 'x' }])).toBe(true);
+  it('lower-cases an extension before consulting the list', () => {
+    // Asserted against a list with something in it, so it cannot pass by both
+    // sides being false. Comparing two empty-set lookups would still have
+    // passed with the lower-casing removed entirely.
+    const claimed = new Set(['.docx']);
+    const uppercase = 'Report.DOCX'.match(/\.[^.\\/]+$/)[0];
+
+    expect(claimed.has(uppercase)).toBe(false);
+    expect(claimed.has(uppercase.toLowerCase())).toBe(true);
   });
 });

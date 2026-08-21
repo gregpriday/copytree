@@ -2,12 +2,14 @@ import Pipeline from '../pipeline/Pipeline.js';
 import {
   ValidationError,
   FileSystemError,
+  PipelineError,
   ERROR_CODES,
   createAbortError,
 } from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
 import { ProgressTracker } from '../utils/ProgressTracker.js';
 import { ExclusionReport } from '../utils/exclusionReport.js';
+import { notify } from './callbacks.js';
 import {
   buildSelectionStages,
   loadSelectionProfile,
@@ -26,6 +28,10 @@ import { resolveOperationConfig } from './operationConfig.js';
  * it silently.
  */
 export const FORWARDED_STAT_KEYS = Object.freeze([
+  // What the run could not do as asked. `--strict` reads this on the CLI, and
+  // an embedder has the same decision to make — but a streaming consumer, whose
+  // only view of the run is `onSummary`, could not see it at all.
+  'degradations',
   'secretsGuard',
   'oversizedFirstFileRetained',
   'truncatedByCountBudget',
@@ -122,6 +128,8 @@ export function pickForwardedStats(source) {
  * @property {ConfigManager} [config] - ConfigManager instance for isolated configuration.
  *   If not provided, an isolated instance will be created. This enables concurrent
  *   scan operations with different configurations.
+ * @property {boolean} [retainOversizedFirstFile=false] - Keep a first file that alone
+ *   exceeds `maxTotalSize`, rather than returning an empty selection
  * @property {Function} [onProgress] - Progress callback ({ percent, message }).
  *   Called periodically during scanning with normalized progress updates (0-100%).
  * @property {number} [progressThrottleMs=100] - Minimum ms between progress emissions.
@@ -279,6 +287,7 @@ export async function* scan(basePath, options = {}) {
       maxTotalSize: options.maxTotalSize ?? null,
       maxFiles: options.maxFileCount ?? null,
       maxChars: options.charLimit ?? null,
+      retainOversizedFirstFile: options.retainOversizedFirstFile ?? null,
     },
     content: { format: options.format ?? 'xml', includeContent: options.includeContent !== false },
   };
@@ -337,9 +346,19 @@ export async function* scan(basePath, options = {}) {
 
     if (options.transform) {
       const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
-      const TransformerRegistry = (await import('../transforms/TransformerRegistry.js')).default;
-      // Pass config to registry for isolation
-      const registry = await TransformerRegistry.createDefault({ config: configInstance });
+
+      // The caller's registry when they built one, and only then a fresh
+      // default. Without this there was no way to reach the stage at all:
+      // `createDefault()` registers nothing, so `transformers: { pdf: … }`
+      // named something that could not exist, and the option documented as
+      // "a transformer you registered through `copytree/experimental`"
+      // described a route that was not connected to anything.
+      let registry = options.registry;
+
+      if (!registry) {
+        const TransformerRegistry = (await import('../transforms/TransformerRegistry.js')).default;
+        registry = await TransformerRegistry.createDefault({ config: configInstance });
+      }
 
       stages.push(
         new TransformStage({
@@ -374,6 +393,10 @@ export async function* scan(basePath, options = {}) {
           options.secretsRedactMode || configInstance.get('secretsGuard.redactionMode', 'typed'),
         failOnSecrets:
           options.failOnSecrets ?? configInstance.get('secretsGuard.failOnSecrets', false),
+        // Scanning spawns a child process per file, exactly as it does on the
+        // CLI. Without the signal a cancelled scan kept starting them, and the
+        // one in flight ran to completion.
+        signal: options.signal,
       }),
     );
   }
@@ -384,7 +407,10 @@ export async function* scan(basePath, options = {}) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(
       new CharLimitStage({
-        limit: parseInt(charLimit, 10),
+        // Passed through, not parsed. `parseInt` read `1.5` as `1` and
+        // `'12abc'` as `12`, so a malformed budget silently became a
+        // plausible one; the stage validates and refuses instead.
+        limit: charLimit,
         // Without content loaded (dry run) the budget is planned from byte size
         // so the dry run still selects the same files as the real run.
         plan: options.includeContent === false,
@@ -411,7 +437,16 @@ export async function* scan(basePath, options = {}) {
 
   // Setup event forwarding
   if (options.onEvent) {
+    // Every event `PipelineEventMap` declares. The three pipeline-level ones
+    // were declared and never forwarded, so an SDK consumer could type a
+    // handler for `pipeline:complete`, compile, and never see it fire.
+    //
+    // `pipeline:error` is safe to forward: EventEmitter's crash-on-unhandled
+    // behaviour is specific to the event literally named `error`.
     const events = [
+      'pipeline:start',
+      'pipeline:complete',
+      'pipeline:error',
       'stage:start',
       'stage:complete',
       'stage:error',
@@ -423,7 +458,11 @@ export async function* scan(basePath, options = {}) {
 
     for (const event of events) {
       pipeline.on(event, (data) => {
-        options.onEvent({ type: event, data });
+        // Isolated, like every other observational callback. A listener that
+        // threw here propagated through the EventEmitter and took down the
+        // scan — so an `onEvent` that logged to a broken transport failed the
+        // export, while the identical bug in `onSummary` was ignored.
+        notify('onEvent', options.onEvent, { type: event, data });
       });
     }
   }
@@ -486,11 +525,7 @@ export async function* scan(basePath, options = {}) {
         ...pickForwardedStats(result.stats),
       };
 
-      try {
-        options.onSummary(summary);
-      } catch {
-        // A buggy summary callback must not fail the scan.
-      }
+      notify('onSummary', options.onSummary, summary);
     }
 
     for (const file of files) {
@@ -513,10 +548,14 @@ export async function* scan(basePath, options = {}) {
       throw error;
     }
 
-    // Wrap other errors with context
-    const scanError = new Error(`Scan failed: ${error.message}`);
-    scanError.cause = error;
-    throw scanError;
+    // Wrap other errors with context, but keep them typed. A bare `Error` here
+    // meant that the failures nobody anticipated — the ones a consumer most
+    // needs to branch on — were the only ones without a `code`, while the
+    // published guidance says to switch on `code` and never on the message.
+    throw new PipelineError(`Scan failed: ${error.message}`, 'scan', {
+      code: ERROR_CODES.OPERATION_FAILED,
+      cause: error,
+    });
   }
 }
 

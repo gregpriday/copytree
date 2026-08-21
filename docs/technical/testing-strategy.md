@@ -459,7 +459,8 @@ it('clones and caches local git repo', async () => {
 - Symlink loops
 - Malformed files (corrupt PDFs, invalid CSV, broken images)
 - Non-UTF8 content
-- Files > 10MB (streaming threshold)
+- Files > 10MB (no streaming threshold exists; they are read whole, so this is
+  a memory and budget case rather than a mode switch)
 - Zero-byte files
 - Case-insensitive collisions
 - Deep nesting (> 100 levels)

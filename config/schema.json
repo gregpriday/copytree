@@ -15,36 +15,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "name": {
-          "type": "string"
-        },
-        "version": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "env": {
-          "type": "string",
-          "enum": [
-            "development",
-            "production",
-            "test"
-          ]
-        },
         "debug": {
-          "type": "boolean"
-        },
-        "basePath": {
-          "type": "string"
-        },
-        "userConfigPath": {
-          "type": "string"
-        },
-        "defaultCommand": {
-          "type": "string"
-        },
-        "interactiveMode": {
           "type": "boolean"
         },
         "maxConcurrency": {
@@ -52,35 +23,11 @@
           "minimum": 1,
           "maximum": 1024
         },
-        "chunkSize": {
-          "type": "integer",
-          "minimum": 1024
-        },
-        "defaultOutput": {
-          "type": "string",
-          "enum": [
-            "clipboard",
-            "file",
-            "display",
-            "stream",
-            "reference"
-          ]
-        },
-        "outputEncoding": {
-          "type": "string",
-          "enum": [
-            "utf8",
-            "utf-8"
-          ]
-        },
         "prettyPrint": {
           "type": "boolean"
         },
         "defaultInstructions": {
           "type": "string"
-        },
-        "exitOnError": {
-          "type": "boolean"
         },
         "verboseErrors": {
           "type": "boolean"
@@ -180,14 +127,6 @@
           "type": "integer",
           "minimum": 0
         },
-        "maxOutputSize": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "maxCharacterLimit": {
-          "type": "integer",
-          "minimum": 0
-        },
         "maxBase64Size": {
           "type": "integer",
           "minimum": 0,
@@ -197,9 +136,6 @@
           "type": "boolean"
         },
         "includeHidden": {
-          "type": "boolean"
-        },
-        "preserveEmptyDirs": {
           "type": "boolean"
         },
         "respectGitignore": {
@@ -286,9 +222,6 @@
           "type": "boolean"
         },
         "lineNumberFormat": {
-          "type": "string"
-        },
-        "treeIndent": {
           "type": "string"
         },
         "treeConnectors": {

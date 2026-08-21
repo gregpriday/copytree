@@ -4,6 +4,34 @@ import { logger as defaultLogger } from '../utils/logger.js';
  * Base class for pipeline stages
  * All pipeline stages should extend this class
  */
+/**
+ * The machine vocabulary for degradations.
+ *
+ * A degradation says the run finished but not as asked. `--strict` refuses a
+ * run that recorded any, and an embedder switching on `code` needs the set to
+ * be stable rather than inferred from message text.
+ *
+ * `STAGE_RECOVERED` is the open end of the set: when a stage recovers from a
+ * typed error, that error's own `ERR_*` code is carried through in preference,
+ * because it says more than "something was recovered".
+ *
+ * @enum {string}
+ */
+export const DEGRADATION_CODES = Object.freeze({
+  /** A stage could not do what was asked and passed its input through */
+  STAGE_DEGRADED: 'STAGE_DEGRADED',
+  /** A stage threw and its `handleError()` returned a usable result */
+  STAGE_RECOVERED: 'STAGE_RECOVERED',
+  /** A stage's `afterRun()` hook threw after the stage itself succeeded */
+  STAGE_AFTER_RUN_FAILED: 'STAGE_AFTER_RUN_FAILED',
+  /** A Git selector or annotation could not be applied */
+  GIT_FILTER_FAILED: 'GIT_FILTER_FAILED',
+  /** The preferred secret scanner failed and a weaker one finished the run */
+  SECRET_SCANNER_DEGRADED: 'SECRET_SCANNER_DEGRADED',
+  /** Detected secrets could not be redacted, so their files were excluded */
+  SECRET_REDACTION_FAILED: 'SECRET_REDACTION_FAILED',
+});
+
 class Stage {
   /**
    * Create a new Stage instance
@@ -281,10 +309,11 @@ class Stage {
    * The reporter turns these into warnings on the completion line.
    *
    * @param {Object} input - The stage input being passed through
-   * @param {string} message - What could not be done, in user terms
+   * @param {string} rawMessage - What could not be done, in user terms
+   * @param {string} [code=DEGRADATION_CODES.STAGE_DEGRADED] - Stable machine code
    * @returns {Object} `input` with the degradation recorded on its stats
    */
-  degrade(input, rawMessage) {
+  degrade(input, rawMessage, code = DEGRADATION_CODES.STAGE_DEGRADED) {
     // First line only. A git failure arrives with several lines of the
     // command's own advice attached, and pasting that into a status line buries
     // the sentence that matters underneath it.
@@ -294,7 +323,12 @@ class Stage {
       ...input,
       stats: {
         ...(input?.stats || {}),
-        degradations: [...(input?.stats?.degradations || []), { stage: this.name, message }],
+        // `code` is not optional. Entries recorded here carried only a stage
+        // and a message, while every other producer of a degradation carried a
+        // code as well — so a consumer switching on `code`, which is the whole
+        // point of having one, hit `undefined` for exactly the degradations
+        // stages raise about themselves.
+        degradations: [...(input?.stats?.degradations || []), { stage: this.name, code, message }],
       },
     };
   }

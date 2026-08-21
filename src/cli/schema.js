@@ -276,6 +276,13 @@ const BUDGET_OPTIONS = {
       visibility: 'common',
     },
     {
+      id: 'retainOversizedFirstFile',
+      flags: '--retain-oversized-first-file',
+      description: 'Keep a first file that alone exceeds --max-total-size',
+      value: 'boolean',
+      visibility: 'advanced',
+    },
+    {
       id: 'sort',
       flags: '--sort <by>',
       description: `Selection order: ${SORT_KEYS.join(', ')}`,
@@ -1384,6 +1391,13 @@ const CACHE_CATEGORY_OPTIONS = [
     visibility: 'common',
   },
   {
+    id: 'repositories',
+    flags: '--repositories',
+    description: 'Only the cloned repositories (clear needs this explicitly)',
+    value: 'boolean',
+    visibility: 'common',
+  },
+  {
     id: 'references',
     flags: '--references',
     description: 'Only the temporary reference files (clear needs this explicitly)',
@@ -1416,14 +1430,18 @@ const CACHE_CLEAR_COMMAND = {
     },
     FEEDBACK_OPTIONS,
   ],
-  examples: ['copytree cache clear', 'copytree cache clear --transformations'],
+  examples: [
+    'copytree cache clear',
+    'copytree cache clear --transformations',
+    'copytree cache clear --repositories',
+  ],
   outputSchemas: ['copytree-cache@1'],
 };
 
 const CACHE_GC_COMMAND = {
   id: 'cache.gc',
   path: ['cache', 'gc'],
-  summary: 'Remove expired entries and stale reference files',
+  summary: 'Remove expired entries, stale reference files and unused clones',
   handler: 'commands/cache.js',
   optionGroups: [
     {

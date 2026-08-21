@@ -168,6 +168,7 @@ function buildRequest(spec, invocation) {
   if (spec.path[0] === 'cache') {
     request.report.transformations = options.transformations === true;
     request.report.references = options.references === true;
+    request.report.repositories = options.repositories === true;
     request.report.retentionDays = options.retentionDays ?? null;
   }
   if (spec.path[0] === 'config') {

@@ -14,9 +14,10 @@ import fs from '../utils/fsx.js';
 import { ConfigManager, defaultDataConfigPath } from '../config/ConfigManager.js';
 import { REFERENCE_ROOT } from '../utils/outputDestination.js';
 import { Feedback, writePayload } from '../cli/io.js';
-import { json } from '../cli/render/format.js';
+import { formatBytes, json } from '../cli/render/format.js';
 import { VERSION } from '../version.js';
 import { PolicyError } from '../utils/errors.js';
+import { describeEnvironment } from '../config/environment.js';
 
 /** Schema identifier for the machine-readable diagnosis. */
 export const DOCTOR_SCHEMA = 'copytree-doctor@1';
@@ -42,6 +43,7 @@ export default async function doctorCommand(request, context = {}) {
   await checkInstallation(add);
   await checkConfiguration(add);
   await checkWritableDirectories(add);
+  await checkRepositoryCache(add);
   await checkClipboard(add);
   await checkGit(add);
   await checkGitleaks(add);
@@ -60,6 +62,12 @@ export default async function doctorCommand(request, context = {}) {
     failures,
     warnings,
     checks,
+    // The whole environment interface, with effective values. An operational
+    // surprise — a run that is unexpectedly quiet, a reference file in an
+    // unexpected place — is answerable from here without knowing which module
+    // reads which variable. Every entry is operational by construction, so
+    // none of them carries a credential.
+    environment: describeEnvironment(),
   };
 
   feedback.detail(`Ran ${checks.length} checks on ${model.platform}, Node ${model.node}`);
@@ -251,6 +259,41 @@ async function isWritable(dir) {
  * Check that a file reference can be placed on the clipboard.
  * @param {Function} add - Check recorder
  */
+/**
+ * Report the size of the repository clone cache.
+ *
+ * It holds whole checkouts and nothing bounded it: no command reported it, so
+ * it grew until someone went looking for their disk space by hand. A gigabyte
+ * of clones is not a failure — it is a cache doing its job — but it is worth
+ * saying out loud, with the command that reclaims it.
+ *
+ * @param {Function} add - Check recorder
+ * @returns {Promise<void>} Resolves when the check is recorded
+ */
+async function checkRepositoryCache(add) {
+  try {
+    const { repositoryStatus } = await import('../services/repositoryStore.js');
+    const status = await repositoryStatus();
+
+    if (status.entries === 0) {
+      add('repository cache', 'pass', `empty (${status.path})`);
+      return;
+    }
+
+    const size = formatBytes(status.bytes);
+    add(
+      'repository cache',
+      status.bytes > 2 * 1024 * 1024 * 1024 ? 'warn' : 'pass',
+      `${status.entries} cached ${status.entries === 1 ? 'repository' : 'repositories'}, ${size} at ${status.path}`,
+      status.bytes > 2 * 1024 * 1024 * 1024
+        ? 'Reclaim unused clones with: copytree cache gc --repositories'
+        : null,
+    );
+  } catch (error) {
+    add('repository cache', 'warn', `could not be read: ${error.message}`);
+  }
+}
+
 async function checkClipboard(add) {
   try {
     const { default: clipboard } = await import('../utils/clipboard.js');
@@ -416,10 +459,27 @@ function renderDoctorText(model) {
       const remediation = check.remediation ? `\n       ${check.remediation}` : '';
       return `${mark[check.status]} ${check.name}: ${check.detail}${remediation}`;
     }),
+    // Only the ones actually set. Listing thirteen unset variables on every
+    // run buries the checks above them; the full list with its descriptions is
+    // in `--format json`, and in the configuration reference.
+    ...environmentLines(model.environment),
     '',
     model.healthy
       ? `Healthy${model.warnings > 0 ? ` (${model.warnings} warning${model.warnings === 1 ? '' : 's'})` : ''}`
       : `${model.failures} check${model.failures === 1 ? '' : 's'} failed`,
   ];
   return `${lines.join('\n')}\n`;
+}
+
+/**
+ * The environment variables that are set, for the text report.
+ *
+ * @param {Array<{name: string, value: string|null}>} environment - Rows from `describeEnvironment()`
+ * @returns {string[]} Lines, or nothing when no variable is set
+ */
+function environmentLines(environment) {
+  const set = (environment || []).filter((entry) => entry.value !== null);
+  if (set.length === 0) return [];
+
+  return ['', 'Environment:', ...set.map((entry) => `  ${entry.name}=${entry.value}`)];
 }

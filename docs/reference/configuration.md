@@ -82,6 +82,25 @@ copytree config show --sources
 
 ## Keys
 
+### `schemaVersion`
+
+| Key             | Type   | Default | Meaning                                   |
+| --------------- | ------ | ------- | ----------------------------------------- |
+| `schemaVersion` | string | —       | The schema major this file is written for |
+
+Optional, and checked before anything else. A file declaring a **newer major**
+than this build understands is refused by name, because a future major is
+exactly the release that may have changed what an existing key means — reading
+it anyway and guessing is how a budget or an exclusion list quietly comes to
+mean something else. The same or an older major is accepted; the closed schema
+below still rejects any key that has since been removed, naming it.
+
+```yaml
+schemaVersion: '1.0.0'
+copytree:
+  includeHidden: true
+```
+
 ### `copytree`
 
 Selection, budgets and rendering.
@@ -97,16 +116,15 @@ Selection, budgets and rendering.
 | `maxTotalSize`                                 | integer  | 104857600                    | Total bytes across the selection            |
 | `maxFileCount`                                 | integer  | 10000                        | Files in the selection                      |
 | `sizeGate`                                     | integer  | 262144                       | Per-file gate, applied before opening       |
-| `maxOutputSize`                                | integer  | 52428800                     | Largest document produced                   |
-| `maxCharacterLimit`                            | integer  | —                            | Character budget across all content         |
+| `maxBase64Size`                                | integer  | 1048576                      | Largest binary inlined under `--binary base64` |
 | `followSymlinks`                               | boolean  | false                        | Follow links that stay inside the root      |
 | `includeHidden`                                | boolean  | false                        | Include dotfiles                            |
-| `preserveEmptyDirs`                            | boolean  | false                        | Keep empty directories in the tree          |
+| `respectGitignore`                             | boolean  | true                         | Honour gitignore files                      |
 | `gitignore.nested`                             | boolean  | true                         | Read `.gitignore` at every depth            |
 | `gitignore.infoExclude`                        | boolean  | true                         | Read `.git/info/exclude`                    |
 | `gitignore.globalExcludesFile`                 | boolean  | true                         | Read the user's global gitignore            |
 | `exclusionReport.topN`                         | integer  | 50                           | Largest exclusions retained under `top`     |
-| `exclusionReport.maxEntries`                   | integer  | —                            | Cap on retained detail under `all`          |
+| `exclusionReport.maxEntries`                   | integer  | 100000                       | Cap on retained detail under `all`          |
 | `binaryFileAction`                             | enum     | `placeholder`                | Default binary policy                       |
 | `binaryPolicy`                                 | object   | per category                 | Overrides keyed by binary category          |
 | `binaryPlaceholderText`                        | string   | `[Binary file not included]` | Placeholder body                            |
@@ -116,9 +134,11 @@ Selection, budgets and rendering.
 | `binaryExtensions`                             | object   | per category                 | Extension lists per binary category         |
 | `addLineNumbers`                               | boolean  | false                        | Prefix text content with line numbers       |
 | `lineNumberFormat`                             | string   | `%4d: `                      | Line-number template                        |
-| `treeIndent` / `treeConnectors.*`              | string   | box drawing                  | Tree rendering characters                   |
+| `treeConnectors.*`                             | string   | box drawing                  | Tree rendering characters                   |
 | `fs.retryAttempts` / `retryDelay` / `maxDelay` | integer  | 3 / 100 / 2000               | Transient I/O retry                         |
 | `discovery.parallelEnabled`                    | boolean  | false                        | Parallel directory traversal                |
+| `discovery.maxConcurrency`                     | integer  | null                         | Concurrent directory reads; null follows `app.maxConcurrency` |
+| `discovery.highWaterMark`                      | integer  | null                         | Backpressure threshold; null is twice the concurrency |
 
 Binary policies are `skip`, `comment`, `placeholder` and `base64`.
 
@@ -137,11 +157,11 @@ Binary policies are `skip`, `comment`, `placeholder` and `base64`.
 
 | Key                   | Type    | Default     | Meaning                        |
 | --------------------- | ------- | ----------- | ------------------------------ |
+| `debug`               | boolean | false       | Extra internal logging         |
 | `maxConcurrency`      | integer | 5           | Concurrent file operations     |
 | `prettyPrint`         | boolean | true        | Indent JSON and SARIF          |
-| `defaultOutput`       | enum    | `clipboard` | Destination when none is given |
 | `defaultInstructions` | string  | `default`   | Instructions block to load     |
-| `chunkSize`           | integer | 1048576     | Read chunk size                |
+| `verboseErrors`       | boolean | false       | Include stack traces in errors |
 
 ### `cache`
 
@@ -150,7 +170,10 @@ Binary policies are `skip`, `comment`, `placeholder` and `base64`.
 | `enabled`                          | boolean           | true                | Master switch                |
 | `driver`                           | enum              | `file`              | `file`, `memory` or `none`   |
 | `defaultTtl`                       | integer           | 3600                | Seconds                      |
+| `prefix`                           | string            | `copytree_`         | Cache key prefix             |
 | `file.path`                        | string            | `~/.copytree/cache` | Cache directory              |
+| `file.extension`                   | string            | `.cache`            | Cache file extension         |
+| `file.gcProbability`               | number            | 0.01                | Chance a run collects garbage |
 | `file.maxAge`                      | integer           | 604800000           | Milliseconds before eviction |
 | `transformations.enabled` / `.ttl` | boolean / integer | true / 86400        | Transformation cache         |
 
@@ -163,6 +186,30 @@ Binary policies are `skip`, `comment`, `placeholder` and `base64`.
 | `colorize`    | enum    | `auto`   | `auto`, `always`, `never`        |
 | `timestamp`   | boolean | true     | ISO timestamp in JSON entries    |
 | `destination` | enum    | `stderr` | `stderr` or `stdout`             |
+
+### `secretsGuard`
+
+Secret detection and redaction. A top-level section rather than part of
+`copytree`, because it is a policy rather than a selection setting.
+
+| Key                  | Type    | Default             | Meaning                                             |
+| -------------------- | ------- | ------------------- | --------------------------------------------------- |
+| `enabled`            | boolean | true                | Run the guard at all                                |
+| `exclude`            | array   | `.env`, `*.pem`, …  | Filename globs excluded outright as secret-prone    |
+| `redactInline`       | boolean | true                | Redact in place; `false` excludes the whole file    |
+| `redactionMode`      | enum    | `typed`             | `typed`, `generic` or `hash`                        |
+| `maxFileBytes`       | integer | 5000000             | Largest file handed to a scanner                    |
+| `failOnSecrets`      | boolean | false               | Exit non-zero on the first finding                  |
+| `oversizePolicy`     | enum    | `exclude`           | `exclude`, `scan` or `fail`, for an unscannable file |
+| `gitleaks.binaryPath` | string | `gitleaks`          | External scanner, resolved on `PATH`                |
+| `gitleaks.configPath` | string | —                   | Custom Gitleaks ruleset                             |
+| `gitleaks.extraArgs`  | array  | `[]`                | Extra arguments for the scanner                     |
+| `gitleaks.logLevel`   | string | `fatal`             | Gitleaks log level                                  |
+
+The guard never emits a file whose secrets it could not remove. `redactInline:
+false` excludes the file; so does a finding that cannot be proven redacted, and
+so does a Gitleaks detection whose findings it could not read. See
+[the secrets guard](../usage/secrets-guard.md).
 
 ## Environment variables
 

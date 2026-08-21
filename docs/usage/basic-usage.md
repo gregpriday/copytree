@@ -330,29 +330,21 @@ copytree --no-metadata
 
 ### Transformations
 
-Transformers are configured in profiles, not via CLI flags. To enable transformations like PDF-to-text or image OCR, configure them in your profile:
+**CopyTree ships no transformers.** There is no PDF-to-text, no image OCR, and
+no document conversion in this release — `copytree doctor` says so, and a
+document reaching the export is named in the tree with a placeholder body rather
+than converted.
 
-```yaml
-# In your profile (e.g., .copytree/myprofile.yml)
-transformers:
-  pdf:
-    enabled: true
-    options:
-      maxPages: 50
+A profile's `transformers:` block is an extension point for an embedder who has
+registered their own through `copytree/experimental`. Naming a transformer that
+is not registered is reported as a degradation — visible on the completion line,
+and enough to fail `--strict` — rather than ignored.
 
-  image:
-    enabled: true
-    options:
-      extractText: true
-```
-
-Then use the profile:
-
-```bash
-copytree --profile myprofile
-```
-
-Built-in transformers: file-loader, binary, streaming-file-loader.
+This section previously showed `pdf` and `image` transformers with options, and
+listed `file-loader`, `binary` and `streaming-file-loader` as built-ins. None of
+the four existed in a working form: the first two were never implemented, and
+the loaders duplicated work `FileLoadingStage` had already done. They have been
+removed rather than documented.
 
 ## Working with External Sources
 

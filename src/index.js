@@ -14,7 +14,7 @@
  * Extension points now live behind an explicit subpath:
  *
  * ```js
- * import { Pipeline, Stage } from 'copytree/advanced';
+ * import { Pipeline, Stage } from 'copytree/experimental';
  * ```
  *
  * That import states what it is. It can also evolve on its own schedule without
@@ -48,6 +48,7 @@ export { ConfigManager } from './config/ConfigManager.js';
 // ---------------------------------------------------------------------------
 //
 // The values a machine consumer switches on. Each is frozen and versioned.
+export { DEGRADATION_CODES } from './pipeline/Stage.js';
 export { EXCLUSION_REASONS } from './utils/exclusionReport.js';
 export { MANIFEST_OUTCOMES, buildManifest, classifyOutcome } from './utils/manifest.js';
 export { OUTPUT_FORMAT_VERSIONS, versionFor } from './utils/outputVersion.js';

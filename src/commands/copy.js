@@ -47,8 +47,8 @@ import {
   loadSelectionProfile,
   resolveBudgets,
   resolveTarget,
+  withEffectiveFormat,
 } from '../selection/selection.js';
-import { FORMATS } from '../cli/schema.js';
 import { VERSION } from '../version.js';
 import { writeFileAtomic } from '../utils/atomicWrite.js';
 
@@ -378,7 +378,7 @@ async function runPipeline({
       withGitStatus: request.selection.gitStatus || Boolean(request.selection.git),
       includeMetadata: request.content.metadata,
       reproducible: request.content.reproducible,
-      charLimit: request.budgets.maxChars,
+      charLimit: budgets.maxChars.value,
       noInstructions: !request.content.includeInstructions,
       instructions: request.content.instructions,
     },
@@ -468,10 +468,16 @@ async function buildPipelineStages({ root, request, profile, budgets, config, si
     );
   }
 
-  // Nullish rather than truthy, so `--max-chars 0` is honoured as a budget.
-  if (request.budgets.maxChars != null) {
+  // The *resolved* budget, not the raw request. `request.budgets` holds only
+  // what was typed on the command line, so a profile's `charLimit` reached
+  // `resolveBudgets()`, was reported by `inspect --view budgets`, and was then
+  // silently dropped here — `--max-chars 200` truncated and an equivalent
+  // profile did nothing.
+  //
+  // Nullish rather than truthy, so a budget of 0 is honoured as a budget.
+  if (budgets.maxChars.value != null) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
-    stages.push(new CharLimitStage({ limit: request.budgets.maxChars }));
+    stages.push(new CharLimitStage({ limit: budgets.maxChars.value }));
   }
 
   if (request.content.includeInstructions) {
@@ -516,44 +522,6 @@ async function buildPipelineStages({ root, request, profile, budgets, config, si
   }
 
   return stages;
-}
-
-/**
- * Fold a profile's declared output format into the request.
- *
- * Precedence: CLI over profile over the packaged default. Returns the request
- * unchanged when the CLI named a format or the profile did not.
- *
- * @param {Object} request - Canonical request
- * @param {Object} profile - Effective profile
- * @returns {Object} Request with the effective format
- */
-function withEffectiveFormat(request, profile) {
-  if (request.content.formatExplicit) return request;
-
-  const format = normalizeProfileFormat(profile.options.format);
-  if (!format || format === request.content.format) return request;
-
-  return {
-    ...request,
-    content: {
-      ...request.content,
-      format,
-      // `--format tree` never emits file bodies, however the format was chosen.
-      includeContent: format === 'tree' ? false : request.content.includeContent,
-    },
-  };
-}
-
-/**
- * Normalize a profile's declared output format.
- * @param {*} format - Raw profile value
- * @returns {string|null} Canonical format name, or null when absent or unknown
- */
-function normalizeProfileFormat(format) {
-  if (typeof format !== 'string') return null;
-  const canonical = format.toLowerCase() === 'md' ? 'markdown' : format.toLowerCase();
-  return FORMATS.includes(canonical) ? canonical : null;
 }
 
 /**
@@ -623,9 +591,16 @@ async function writeSecretsReport(result, request, reporter) {
     return;
   }
 
+  // Atomic and private, like every other artefact that describes credentials.
+  // `writeJson` truncated the destination first, so an interrupted run left a
+  // half-written report that still parsed as far as the truncation; and it
+  // created the file world-readable, which is the wrong default for a document
+  // whose whole subject is where the secrets in this repository are.
   const reportPath = path.resolve(target);
-  await fs.ensureDir(path.dirname(reportPath));
-  await fs.writeJson(reportPath, result.stats.secretsGuard.report, { spaces: 2 });
+  await writeFileAtomic(
+    reportPath,
+    `${JSON.stringify(result.stats.secretsGuard.report, null, 2)}\n`,
+  );
   reporter.note(`Secrets report written to ${reportPath}`);
 }
 

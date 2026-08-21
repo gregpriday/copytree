@@ -9,10 +9,23 @@ class InstructionsStage extends Stage {
   constructor(options = {}) {
     super(options);
     this.instructionsLoader = new InstructionsLoader();
+    // Set per run, in `process()`: whether the caller named a set decides
+    // whether a failure here may be recovered from. See below.
+    this.fatal = false;
   }
 
   async process(input) {
     const startTime = Date.now();
+
+    // Conditional, like `GitFilterStage`. A missing *default* instructions
+    // block costs polish and the run should continue. A block the caller named
+    // is different: the code below already throws for it, deliberately and with
+    // a comment saying why — and `continueOnError` swallowed that throw, so
+    // `--instructions house-style` on a typo produced a document with no
+    // instructions, no warning, and exit 0. The stage's own intent was defeated
+    // by a flag set in its constructor.
+    this.fatal =
+      typeof input.options?.instructions === 'string' && input.options.instructions !== '';
 
     // Check if instructions are disabled
     if (input.options?.noInstructions || input.options?.instructions === false) {

@@ -10,10 +10,10 @@
       "import": "./src/index.js",
       "default": "./src/index.js"
     },
-    "./advanced": {
-      "types": "./types/advanced.d.ts",
-      "import": "./src/advanced.js",
-      "default": "./src/advanced.js"
+    "./experimental": {
+      "types": "./types/experimental.d.ts",
+      "import": "./src/experimental.js",
+      "default": "./src/experimental.js"
     },
     "./package.json": "./package.json"
   },
@@ -41,10 +41,10 @@
     "benchmark:discovery": "node tests/performance/file-discovery.bench.js",
     "benchmark:latency": "node tests/performance/latency.bench.js",
     "test:performance": "jest --config jest.performance.config.js --runInBand",
-    "lint": "eslint src/ bin/",
-    "lint:fix": "eslint src/ bin/ --fix",
-    "format": "prettier --write \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\"",
-    "format:check": "prettier --check \"src/**/*.js\" \"bin/**/*.js\" \"tests/**/*.js\"",
+    "lint": "eslint src/ bin/ config/ scripts/",
+    "lint:fix": "eslint src/ bin/ config/ scripts/ --fix",
+    "format": "prettier --write \"src/**/*.js\" \"bin/**/*.js\" \"config/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"bin/**/*.js\" \"config/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\"",
     "prepublishOnly": "npm run verify:release",
     "benchmark:latency-ab": "node tests/performance/latency-ab.bench.js",
     "knip": "knip",

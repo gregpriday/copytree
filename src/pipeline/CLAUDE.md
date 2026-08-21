@@ -38,7 +38,10 @@ and reported once, with a remediation, by the reporter.
 
 ## Performance Rules
 
-- Stream files >10MB (use `StreamingFileLoader` transformer)
+- There is no streaming file loader. `FileLoadingStage` reads each file whole,
+  and the size gate plus the total-size budget are what bound memory. The
+  `StreamingFileLoaderTransformer` this used to name buffered the entire file
+  despite its name, and has been removed
 - Process files in batches to keep transient allocation down
 - Emit progress every 10% or 100 files
 - Monitor memory deltas in `afterRun()`

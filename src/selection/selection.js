@@ -19,6 +19,7 @@ import { toPosix } from '../utils/pathUtils.js';
 import { buildManifest, classifyOutcome, MANIFEST_OUTCOMES } from '../utils/manifest.js';
 import { estimateOutputChars, estimateTokens } from '../utils/estimate.js';
 import Pipeline from '../pipeline/Pipeline.js';
+import { FORMATS } from '../cli/schema.js';
 
 /**
  * @typedef {Object} SelectionProfile
@@ -213,10 +214,68 @@ export function resolveBudgets(request, profile, config) {
     maxTotalSize: pick(budgets.maxTotalSize, profile.options.maxTotalSize, copytree.maxTotalSize),
     maxFiles: pick(budgets.maxFiles, profile.options.maxFileCount, copytree.maxFileCount),
     maxChars: pick(budgets.maxChars, profile.options.charLimit, null),
+    // Opt-in overshoot: keep a first file that alone exceeds `maxTotalSize`,
+    // rather than returning an empty selection. Off by default, because a
+    // maximum a caller cannot rely on is not a maximum.
+    retainOversizedFirstFile: pick(
+      budgets.retainOversizedFirstFile,
+      profile.options.retainOversizedFirstFile,
+      false,
+    ),
     // A memory-safety ceiling, not a context budget. No ordinary copy option
     // lifts it, which is why it is reported separately.
     hardFileLimit: { value: copytree.maxFileSize ?? null, source: 'default' },
   };
+}
+
+/**
+ * Fold a profile's declared output format into the request.
+ *
+ * Precedence: CLI over profile over the packaged default. Returns the request
+ * unchanged when the CLI named a format or the profile did not.
+ *
+ * Lives in the selection engine because the answer changes what gets selected,
+ * not only how it is rendered: `tree` never loads a body, so no content stage
+ * runs and no content-derived budget applies. It was local to the copy command,
+ * which is why `plan` applied a character budget to a tree-format profile that
+ * `copy` passed straight through — a preview and a run disagreeing about the
+ * file list, from a helper one of them could not see.
+ *
+ * @param {Object} request - Canonical request
+ * @param {Object} profile - Effective profile
+ * @returns {Object} Request with the effective format
+ */
+export function withEffectiveFormat(request, profile) {
+  // `plan` and `inspect` build a request with no `content` block at all: they
+  // never emit a document, so they never had a format to resolve. They still
+  // need the answer, because it decides whether the run being previewed would
+  // read content.
+  const content = request.content ?? {};
+  if (content.formatExplicit) return request;
+
+  const format = normalizeProfileFormat(profile.options?.format);
+  if (!format || format === content.format) return request;
+
+  return {
+    ...request,
+    content: {
+      ...content,
+      format,
+      // `--format tree` never emits file bodies, however the format was chosen.
+      includeContent: format === 'tree' ? false : content.includeContent,
+    },
+  };
+}
+
+/**
+ * Normalize a profile's declared output format.
+ * @param {*} format - Raw profile value
+ * @returns {string|null} Canonical format name, or null when absent or unknown
+ */
+function normalizeProfileFormat(format) {
+  if (typeof format !== 'string') return null;
+  const canonical = format.toLowerCase() === 'md' ? 'markdown' : format.toLowerCase();
+  return FORMATS.includes(canonical) ? canonical : null;
 }
 
 /**
@@ -322,6 +381,7 @@ export async function buildSelectionStages({
     new BudgetStage({
       maxFileCount: budgets.maxFiles.value,
       maxTotalSize: budgets.maxTotalSize.value,
+      retainOversizedFirstFile: budgets.retainOversizedFirstFile.value === true,
     }),
   );
 
@@ -381,7 +441,11 @@ export async function buildSelectionPlan({
   secretsPolicy = null,
 }) {
   const profile = await loadSelectionProfile(root, request.selection);
-  const budgets = resolveBudgets(request, profile, config);
+  // The same resolution `copy` performs, and for the same reason: a profile's
+  // `format: tree` means the run reads no content, which decides whether a
+  // content-derived budget applies at all.
+  const planned = withEffectiveFormat(request, profile);
+  const budgets = resolveBudgets(planned, profile, config);
   const effectiveSecretsPolicy =
     secretsPolicy ??
     (config.get('secretsGuard.enabled', true) ? (request.security?.secrets ?? 'redact') : 'off');
@@ -395,6 +459,23 @@ export async function buildSelectionPlan({
     skipCopytreeIgnore,
     secretsPolicy: effectiveSecretsPolicy,
   });
+
+  // The character budget, planned from byte size. A plan that reported the
+  // budget as `estimated-from-bytes` and then did not apply it was describing a
+  // selection the copy would not produce — the one thing a preview may not do —
+  // and it meant a malformed budget in a profile was accepted by `plan` and
+  // rejected by `copy`, which is the same divergence wearing a different hat.
+  //
+  // Only when the run would have content. With `--no-content`, or a profile
+  // whose format is `tree`, `copy` never loads a byte and its character stage
+  // passes everything through — so applying a byte-estimated budget here would
+  // have the preview drop files the copy keeps.
+  const willReadContent = planned.content ? planned.content.includeContent !== false : true;
+
+  if (budgets.maxChars.value != null && willReadContent) {
+    const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
+    stages.push(new CharLimitStage({ limit: budgets.maxChars.value, plan: true }));
+  }
 
   const pipeline = new Pipeline({
     config,
@@ -455,6 +536,11 @@ export async function buildSelectionPlan({
       truncated: result.stats?.truncated === true,
       truncatedBy: result.stats?.truncatedBy ?? null,
       truncatedCount: result.stats?.truncatedCount ?? 0,
+      // Without these a plan could show `selectedBytes` above `maxTotalSize`
+      // with `truncated: false` and no reason given — a preview that looks like
+      // the budget simply did not work.
+      ...(result.stats?.budgetExceeded ? { budgetExceeded: true } : {}),
+      ...(result.stats?.oversizedFirstFileRetained ? { oversizedFirstFileRetained: true } : {}),
       decisionsTruncated: report?.truncated === true,
       decisionsOmitted: report?.omittedEntries ?? 0,
     },
@@ -462,11 +548,20 @@ export async function buildSelectionPlan({
     // guessed from byte counts should never look the same in a report a person
     // is about to make a decision from.
     exactness: {
-      pathSelection: 'exact',
+      // Exact, unless a character budget decided part of it. That budget is
+      // planned from byte size, so for multi-byte text it over-counts and can
+      // stop one file earlier than the copy will — and a plan that says
+      // `exact` about a set it estimated is making the same overstatement the
+      // character budget's own label exists to avoid.
+      pathSelection:
+        budgets.maxChars.value != null && willReadContent ? 'estimated-from-bytes' : 'exact',
       fileCountBudget: 'exact',
       totalSizeBudget: 'exact',
       sizeGate: 'exact',
-      characterBudget: request.budgets?.maxChars != null ? 'estimated-from-bytes' : 'not-evaluated',
+      characterBudget:
+        budgets.maxChars.value != null && willReadContent
+          ? 'estimated-from-bytes'
+          : 'not-evaluated',
       deduplication: 'not-evaluated',
       // Path-level secret exclusions are applied here, so the selection is
       // exact. Content-level redaction is not, and cannot be without reading.

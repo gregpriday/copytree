@@ -33,8 +33,8 @@ const REQUIRED_ENTRIES = [
   'package/src/index.js',
   'package/bin/copytree.js',
   'package/types/index.d.ts',
-  'package/types/advanced.d.ts',
-  'package/src/advanced.js',
+  'package/types/experimental.d.ts',
+  'package/src/experimental.js',
 ];
 
 /** Exports a consumer is entitled to find on the package root. */
@@ -218,7 +218,7 @@ try {
     path.join(consumer, 'consumer.mjs'),
     [
       "import * as copytree from 'copytree';",
-      "import * as advanced from 'copytree/advanced';",
+      "import * as experimental from 'copytree/experimental';",
       `const required = ${JSON.stringify(REQUIRED_EXPORTS)};`,
       'const missing = required.filter((name) => copytree[name] === undefined);',
       'if (missing.length > 0) {',
@@ -229,10 +229,10 @@ try {
       // cleanly and still fail the moment it touches a missing dependency.
       "const result = await copytree.copy(process.cwd(), { format: 'json' });",
       'if (typeof result.output !== "string") { console.error("no output"); process.exit(1); }',
-      // The advanced subpath has to resolve too — a declared export map entry
-      // that does not resolve is a broken package, not a broken import.
+      // The experimental subpath has to resolve too — a declared export map
+      // entry that does not resolve is a broken package, not a broken import.
       'for (const name of ["Pipeline", "Stage", "TransformerRegistry", "serialize"]) {',
-      '  if (advanced[name] === undefined) { console.error(`advanced missing ${name}`); process.exit(1); }',
+      '  if (experimental[name] === undefined) { console.error(`experimental missing ${name}`); process.exit(1); }',
       '}',
       'if (!result.outputFormatVersion) { console.error("no format version"); process.exit(1); }',
       'console.log("consumer ok");',
@@ -247,7 +247,7 @@ try {
     path.join(consumer, 'consumer.ts'),
     [
       "import { copy, scan, ConfigManager, ERROR_CODES, isAbortError } from 'copytree';",
-      "import { Pipeline, serialize } from 'copytree/advanced';",
+      "import { Pipeline, serialize } from 'copytree/experimental';",
       'export async function main(root: string): Promise<number> {',
       '  const config = await ConfigManager.create({ userConfig: false });',
       '  const result = await copy(root, { config, format: "json" });',

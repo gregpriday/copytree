@@ -22,12 +22,28 @@ describe('BudgetStage', () => {
     expect(result.stats.truncated).toBeUndefined();
   });
 
-  it('treats zero, negative, null and false as "no budget"', async () => {
-    for (const value of [0, -1, null, false, undefined]) {
+  it('treats zero, null, false and undefined as "no budget"', async () => {
+    for (const value of [0, null, false, undefined]) {
       const stage = new BudgetStage({ maxFileCount: value, maxTotalSize: value });
       const result = await stage.process(makeInput(makeFiles([10, 20])));
       expect(result.files).toHaveLength(2);
     }
+  });
+
+  it.each([-1, 1.5, Infinity, NaN, 'garbage', '12abc'])(
+    'refuses %p rather than silently disabling the budget',
+    (value) => {
+      // Coercing and falling back to "no budget" meant a typo in a profile
+      // produced a successful unbounded run — the same fail-open the budget
+      // exists to prevent, reached from the configuration side.
+      expect(() => new BudgetStage({ maxTotalSize: value })).toThrow(
+        expect.objectContaining({ code: 'ERR_INVALID_OPTION' }),
+      );
+    },
+  );
+
+  it('accepts a numeric string, because YAML and argv both deliver one', () => {
+    expect(new BudgetStage({ maxTotalSize: '2048' }).maxTotalSize).toBe(2048);
   });
 
   it('enforces maxFileCount and reports the truncation', async () => {
@@ -50,13 +66,47 @@ describe('BudgetStage', () => {
     expect(result.stats.budgetedSize).toBe(30);
   });
 
-  it('keeps the first file even when it alone exceeds the size budget', async () => {
-    // Returning nothing at all is a worse answer than returning one file.
+  it('drops a first file that alone exceeds the size budget', async () => {
+    // A maximum is a maximum. Keeping it regardless meant a caller who set the
+    // budget to protect a context window could be handed twenty times it,
+    // having asked for a limit and been given a suggestion.
     const stage = new BudgetStage({ maxTotalSize: 5 });
+    const result = await stage.process(makeInput(makeFiles([100, 200])));
+
+    expect(result.files).toHaveLength(0);
+    expect(result.stats.truncatedCount).toBe(2);
+    expect(result.stats.budgetedSize).toBe(0);
+    expect(result.stats.budgetExceeded).toBeUndefined();
+  });
+
+  it('records the dropped oversized file, so an empty result is explainable', async () => {
+    const stage = new BudgetStage({ maxTotalSize: 5 });
+    const report = new ExclusionReport({ retention: 'all' });
+    const result = await stage.process(makeInput(makeFiles([100]), { exclusionReport: report }));
+
+    expect(result.files).toHaveLength(0);
+    expect(report.toJSON().byReason.totalSizeBudget).toBe(1);
+  });
+
+  it('keeps an oversized first file when the caller asks for it by name', async () => {
+    const stage = new BudgetStage({ maxTotalSize: 5, retainOversizedFirstFile: true });
     const result = await stage.process(makeInput(makeFiles([100, 200])));
 
     expect(result.files).toHaveLength(1);
     expect(result.stats.truncatedCount).toBe(1);
+    // The overshoot is reported, not hidden.
+    expect(result.stats.budgetExceeded).toBe(true);
+    expect(result.stats.oversizedFirstFileRetained).toBe(true);
+  });
+
+  it('does not overshoot for a later file, even with the opt-in set', async () => {
+    // The exception is for the *first* file only: once something fits, the
+    // budget is doing its job and nothing may exceed it.
+    const stage = new BudgetStage({ maxTotalSize: 50, retainOversizedFirstFile: true });
+    const result = await stage.process(makeInput(makeFiles([10, 500])));
+
+    expect(result.files.map((f) => f.size)).toEqual([10]);
+    expect(result.stats.budgetExceeded).toBeUndefined();
   });
 
   it('applies the count budget before the size budget', async () => {

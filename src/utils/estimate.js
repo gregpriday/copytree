@@ -104,7 +104,11 @@ export function estimateOutputChars(files, options = {}) {
         total += countLines(file.content) * 6;
       }
     } else if (!file.isBinary) {
-      const size = file.size || 0;
+      // `plannedLength` when a plan has already decided this file will be cut
+      // short. Without it, a 1 MB file the character budget projects down to
+      // 100 characters still contributed a megabyte to the estimate, so the
+      // plan reported a document far larger than the run it was previewing.
+      const size = file.plannedLength ?? file.size ?? 0;
       total += size;
       if (options.addLineNumbers) {
         // ~40 characters per line is a reasonable average for source files
