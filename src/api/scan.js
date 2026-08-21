@@ -346,9 +346,19 @@ export async function* scan(basePath, options = {}) {
 
     if (options.transform) {
       const { default: TransformStage } = await import('../pipeline/stages/TransformStage.js');
-      const TransformerRegistry = (await import('../transforms/TransformerRegistry.js')).default;
-      // Pass config to registry for isolation
-      const registry = await TransformerRegistry.createDefault({ config: configInstance });
+
+      // The caller's registry when they built one, and only then a fresh
+      // default. Without this there was no way to reach the stage at all:
+      // `createDefault()` registers nothing, so `transformers: { pdf: … }`
+      // named something that could not exist, and the option documented as
+      // "a transformer you registered through `copytree/experimental`"
+      // described a route that was not connected to anything.
+      let registry = options.registry;
+
+      if (!registry) {
+        const TransformerRegistry = (await import('../transforms/TransformerRegistry.js')).default;
+        registry = await TransformerRegistry.createDefault({ config: configInstance });
+      }
 
       stages.push(
         new TransformStage({

@@ -392,6 +392,23 @@ export interface ScanOptions {
    * registered is reported as a degradation rather than ignored.
    */
   transformers?: Record<string, { enabled?: boolean; options?: Record<string, unknown> }>;
+  /**
+   * A registry of your own transformers, from `copytree/experimental`.
+   *
+   * CopyTree registers none, so without this `transform` has nothing to do and
+   * `transformers` can only name something that does not exist. Build one,
+   * register what you need, and pass it:
+   *
+   * ```js
+   * import { TransformerRegistry, BaseTransformer } from 'copytree/experimental';
+   *
+   * const registry = new TransformerRegistry();
+   * registry.register('rst', new MyRstConverter(), { extensions: ['.rst'] });
+   *
+   * await copy(root, { transform: true, registry, transformers: { rst: { enabled: true } } });
+   * ```
+   */
+  registry?: unknown;
   /** Include hidden files (default: false) */
   includeHidden?: boolean;
   /** Follow symbolic links (default: false) */
@@ -1183,6 +1200,14 @@ export interface PipelineStats {
   stagesCompleted: number;
   /** Number of stages that failed */
   stagesFailed: number;
+  /**
+   * Stages that threw and whose `handleError()` returned a usable result.
+   *
+   * Counted separately because a recovered stage is neither a success nor a
+   * failure: it did something other than what was asked. Omitting it made
+   * `successRate` report 1 for a run in which a stage had recovered.
+   */
+  stagesRecovered: number;
   /** Collection of errors from failed stages */
   errors: StageError[];
   /** Execution time per stage (stage name -> milliseconds) */
@@ -1193,10 +1218,23 @@ export interface PipelineStats {
   totalStageTime: number;
   /** Average time per stage (milliseconds) */
   averageStageTime: number;
-  /** Total pipeline duration (milliseconds) - calculated */
-  duration?: number;
-  /** Success rate (0-1) - calculated */
-  successRate?: number;
+  /**
+   * Total pipeline duration in milliseconds, or `null` before the run starts.
+   *
+   * Not optional and not always a number: `Date.now() - null` is `Date.now()`,
+   * so a pipeline that had never run reported a duration of fifty-six years.
+   */
+  duration: number | null;
+  /**
+   * Completed stages over attempted, or `null` when none were attempted.
+   *
+   * "Attempted" counts completed, failed and recovered stages.
+   *
+   * `1` for zero stages claimed every stage had succeeded when none had been
+   * tried, which is the difference between "nothing went wrong" and "nothing
+   * happened".
+   */
+  successRate: number | null;
 }
 
 /**

@@ -68,6 +68,44 @@ describe('version consistency', () => {
     expect(VERSION).toBe(packageVersion);
   });
 
+  test('the security support table matches the line being released', () => {
+    // `SECURITY.md` deliberately describes the *published* line, which during
+    // the release candidates is still `0.x`. It has to move to `1.x` in the
+    // same commit that sets the version to `1.0.0` — a stable tag whose
+    // security policy still points at `0.x` tells people to upgrade to a line
+    // they are already past, and one that points at `1.x` before that release
+    // exists sends them looking for something that does not.
+    //
+    // Neither is a mistake anyone would catch by reading, which is why it is
+    // asserted here rather than left to the release checklist.
+    const security = readRepoFile('SECURITY.md');
+    const major = packageVersion.split('.')[0];
+    const isPrerelease = packageVersion.includes('-');
+
+    // The table is parsed, not scanned for a token. Matching `Latest N.x`
+    // anywhere would pass a file listing two supported majors, a `Latest 9.x`
+    // in a sentence, or a `Latest 1.x` row explicitly marked *unsupported* —
+    // the support column was never read.
+    const rows = [...security.matchAll(/^\|\s*(?!-+)([^|]+?)\s*\|\s*(:[a-z_]+:)\s*\|/gm)]
+      .map(([, version, mark]) => ({ version, supported: mark === ':white_check_mark:' }))
+      .filter(({ version }) => /\d/.test(version));
+
+    expect(rows.length).toBeGreaterThan(1);
+
+    const supported = rows.filter((row) => row.supported);
+
+    // "Security updates are provided for the latest release only" — one row.
+    expect(supported).toHaveLength(1);
+
+    if (isPrerelease) {
+      // A prerelease may keep describing the currently published stable line.
+      expect(supported[0].version).toMatch(/^Latest \d+\.x$/);
+      return;
+    }
+
+    expect(supported[0].version).toBe(`Latest ${major}.x`);
+  });
+
   test('the changelog documents the current version', () => {
     const changelog = readRepoFile('CHANGELOG.md');
     expect(changelog).toContain(packageVersion);

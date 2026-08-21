@@ -11,7 +11,8 @@ Rules and constraints for working with CopyTree. Keep this file lean; detailed d
 <critical_notes>
 **MUST:**
 - Use ESM exclusively (`import`/`export`). Never `require()`/`module.exports`.
-- Respect file/size limits; auto-stream files >10MB; avoid heavy transformers unless requested.
+- Respect file/size limits. Budgets are what bound memory — there is no automatic streaming of
+  large files; every file is read whole. Avoid heavy transformers unless requested.
 - Use custom error classes from `@src/utils/errors.js` and central logger service.
 - Follow Git Flow: develop → feature/* → develop → release/* → main.
 - Achieve 80% test coverage (global threshold).
@@ -131,7 +132,7 @@ Increase adherence by starting sessions with:
 
 ## Key Architecture (Details in Docs)
 
-- **Pipeline**: Event-driven stages, streaming >10MB (`@src/pipeline/Pipeline.js`, `@docs/technical/architecture.md`)
+- **Pipeline**: Event-driven stages, chunked output generation (`@src/pipeline/Pipeline.js`, `@docs/technical/architecture.md`)
 - **Configuration**: Hierarchical (CLI > named profile > project profile > user data config > packaged defaults) (`@src/config/ConfigManager.js`, `@config/schema.json`)
 - **Profiles**: YAML-based file selection (`@src/config/FolderProfileLoader.js`)
 - **Transformers**: File processors with traits system (`@src/transforms/transformers/`)
@@ -170,7 +171,7 @@ Increase adherence by starting sessions with:
 
 - Process 10,000 files in <30s
 - Memory usage <500MB for large projects
-- Stream files >10MB automatically
+- Bound memory with `--max-total-size`, `--max-files` and `--size-gate`, not with streaming
 
 ## Module-Specific Context
 

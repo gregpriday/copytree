@@ -337,7 +337,8 @@ than converted.
 
 A profile's `transformers:` block is an extension point for an embedder who has
 registered their own through `copytree/experimental`. Naming a transformer that
-is not registered does nothing.
+is not registered is reported as a degradation — visible on the completion line,
+and enough to fail `--strict` — rather than ignored.
 
 This section previously showed `pdf` and `image` transformers with options, and
 listed `file-loader`, `binary` and `streaming-file-loader` as built-ins. None of

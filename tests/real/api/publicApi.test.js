@@ -19,6 +19,7 @@
  */
 
 import { readFileSync } from 'fs';
+import { stripCommentLines } from '../../helpers/sourceScan.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as root from '../../../src/index.js';
@@ -237,6 +238,53 @@ describe('declared runtime behaviour matches the runtime', () => {
       // silently fall through.
       expect(union).toContain(`'${reason}'`);
     }
+  });
+
+  it('depends on a small, long-stable slice of the Node type surface', () => {
+    // `@types/node` is pinned far ahead of the minimum runtime CopyTree
+    // supports, so `npm run typecheck` will happily accept a declaration
+    // referring to an API that does not exist in Node 22.12 — the version
+    // `engines` promises. Rather than run a second toolchain against older
+    // types, this pins the surface: all three of these predate the minimum by
+    // years, and anything new here is a deliberate decision about the floor.
+    const allowed = new Set(['Buffer', 'AbortSignal', 'NodeJS.MemoryUsage']);
+
+    const used = new Set();
+
+    for (const file of ['types/index.d.ts', 'types/experimental.d.ts']) {
+      // Comments stripped: `Buffer` and `NodeJS.MemoryUsage` appear in prose
+      // explaining a decision, and counting those would make this test measure
+      // the documentation rather than the declarations.
+      const text = stripCommentLines(readFileSync(path.join(repoRoot, file), 'utf8'));
+
+      // `NodeJS.X`, and the two globals in the allowlist. `[A-Za-z0-9_]` so
+      // `NodeJS.MemoryUsage2` is not truncated into the allowed name.
+      for (const match of text.matchAll(/\bNodeJS\.[A-Za-z0-9_]+|\bAbortSignal\b|\bBuffer\b/g)) {
+        used.add(match[0]);
+      }
+
+      // Every other route a Node type can enter a `.d.ts`: a triple-slash
+      // reference, an import from a built-in, or an inline `import('node:x')`.
+      // These are not allowlisted at all — reaching for one is a decision about
+      // the minimum runtime, and should be made deliberately.
+      expect({ file, tripleSlash: /\/\/\/\s*<reference types="node"/.test(text) }).toEqual({
+        file,
+        tripleSlash: false,
+      });
+
+      const imports = [
+        ...text.matchAll(/(?:^|\n)\s*(?:import|export)\s+type\s+[^;]*?from\s+'([^']+)'/g),
+        ...text.matchAll(/\bimport\('([^']+)'\)/g),
+      ].map((match) => match[1]);
+
+      const builtins = imports.filter(
+        (name) => name.startsWith('node:') || /^(fs|stream|events|buffer|os|path|util)$/.test(name),
+      );
+
+      expect({ file, builtins }).toEqual({ file, builtins: [] });
+    }
+
+    expect([...used].filter((name) => !allowed.has(name)).sort()).toEqual([]);
   });
 
   it('declares every progress phase the runtime can report', () => {

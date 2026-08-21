@@ -189,7 +189,11 @@ export function classifyWarnings(result = {}, extra = {}) {
   if (stats.transformErrors > 0) {
     warnings.push({
       code: WARNING_CODES.TRANSFORM_FAILED,
-      message: `${plural(stats.transformErrors, 'file')} could not be converted; an error marker stands in for their content`,
+      // Not "an error marker stands in for their content". Substituting the
+      // error message destroyed the very content the transform was supposed to
+      // improve, so `TransformStage` now keeps the original — and this line
+      // went on describing the behaviour that was removed.
+      message: `${plural(stats.transformErrors, 'file')} could not be converted; their original content was kept`,
       data: { count: stats.transformErrors },
     });
   }

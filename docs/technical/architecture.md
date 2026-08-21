@@ -34,23 +34,43 @@ implementation is the only way to guarantee it cannot happen.
 
 | #   | Stage                | Always?                                                       | Responsibility                                                                                 |
 | --- | -------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| 1   | `FileDiscoveryStage` | yes                                                           | Layered ignore evaluation, include narrowing, scope traversal, size gate, exclusion accounting |
-| 2   | `AlwaysIncludeStage` | when force-includes exist                                     | Marks force-included files                                                                     |
-| 3   | `GitFilterStage`     | with `--modified` / `--staged` / `--changed` / `--git-status` | Git filtering, and Git status annotation independent of it                                     |
-| 4   | `SortFilesStage`     | yes                                                           | Establishes the order budgets will truncate from                                               |
-| 5   | `BudgetStage`        | yes                                                           | `maxFiles`, then `maxTotalSize`                                                                |
+| 1   | `FileDiscoveryStage` | yes                                                           | Layered ignore evaluation, include narrowing, force-inclusion, scope traversal, size gate, exclusion accounting |
+| 2   | `GitFilterStage`     | with `--modified` / `--staged` / `--changed` / `--git-status` | Git filtering, and Git status annotation independent of it                                     |
+| 3   | `SortFilesStage`     | yes                                                           | Establishes the order budgets will truncate from                                               |
+| 4   | `BudgetStage`        | yes                                                           | `maxFiles`, then `maxTotalSize`                                                                |
 
-**Content stages** (appended by `copy` only):
+There is no `AlwaysIncludeStage`. Force-inclusion is layer 11 of the one
+exclusion evaluator, applied inside discovery, which is what lets
+`.copytreeinclude` override a `.gitignore` rule several directories deeper.
+Documenting it as a separate stage described a two-pass design the code
+deliberately does not have.
 
-| #   | Stage                                            | Always?                    | Responsibility                             |
-| --- | ------------------------------------------------ | -------------------------- | ------------------------------------------ |
-| 6   | `FileLoadingStage`                               | unless `--no-content`      | Reads content, classifies binaries         |
-| 7   | `TransformStage`                                 | when transformers apply    | Document conversion, etc.                  |
-| 8   | `DeduplicateFilesStage`                          | with `--dedupe`            | Content-hash dedup                         |
-| 9   | `SecretsGuardStage`                              | unless `--secrets off`     | Detection and redaction                    |
-| 10  | `CharLimitStage`                                 | with `--max-chars`         | Character budget, line-boundary truncation |
-| 11  | `InstructionsStage`                              | unless `--no-instructions` | Loads the instructions block               |
-| 12  | `OutputFormattingStage` / `StreamingOutputStage` | yes                        | Renders the versioned output               |
+**What each entry point appends after that.** There is no single list: `plan`
+never reads content, and a dry `scan()` reads none either, so the stages that
+need bytes are absent from both. A table that showed one order for all of them
+was wrong for every one of them.
+
+| Stage                                            | `copy`                     | `plan`                | `scan()`              | `scan({ includeContent: false })` |
+| ------------------------------------------------ | -------------------------- | --------------------- | --------------------- | --------------------------------- |
+| `FileLoadingStage`                               | unless `--no-content`      | never                 | unless disabled       | never                             |
+| `TransformStage`                                 | with content               | never                 | with `transform`      | never                             |
+| `DeduplicateFilesStage`                          | with `--dedupe`            | never                 | with `dedupe`         | with `dedupe` (a no-op)           |
+| `SecretsGuardStage`                              | unless `--secrets off`     | plan mode             | unless disabled       | plan mode                         |
+| `CharLimitStage`                                 | with `--max-chars`         | plan mode, with content | with `charLimit`    | plan mode                         |
+| `InstructionsStage`                              | unless `--no-instructions` | never                 | never                 | never                             |
+| `OutputFormattingStage` / `StreamingOutputStage` | yes                        | never                 | never                 | never                             |
+
+"Plan mode" means the stage applies only what is decidable from `stat()`: the
+secrets guard drops secret-prone filenames and files too large to scan, and the
+character budget is computed from byte size.
+
+**A plan is exact about paths, and estimated about content.** Byte size equals
+character count for ASCII and overstates it for multi-byte text, so a character
+budget can stop a plan one file earlier than the copy. `plan --format json`
+reports this in `exactness`: `pathSelection` becomes `estimated-from-bytes` as
+soon as a character budget is in play, rather than claiming `exact` about a set
+it estimated. Deduplication and content-level secret redaction cannot be planned
+at all.
 
 There is no second exclusion pass. `ProfileFilterStage` used to re-apply the caller's exclude
 patterns through `minimatch` after discovery had already applied them through the Git-ignore
@@ -113,7 +133,43 @@ A silent cap would read as "that is everything", so `all` reports `truncated` an
 
 Both entry points run with `continueOnError: true`, so a stage that throws is normally logged, skipped, and the run still reports success. That is right for a stage whose absence costs only polish, and wrong for one whose absence changes what gets emitted.
 
-Stages set `this.fatal = true` to opt out of that recovery, and the pipeline rethrows for them regardless of `continueOnError`. Currently fatal: `FileDiscoveryStage`, `FileLoadingStage`, `SecretsGuardStage`, and `OutputFormattingStage`. Everything else may degrade gracefully via `handleError()` — `SortFilesStage` returns files unsorted, `BudgetStage` passes them through.
+Stages set `this.fatal = true` to opt out of that recovery, and the pipeline
+rethrows for them regardless of `continueOnError`.
+
+<!-- fatal-stage-table:start -->
+
+| Stage                    | Fatal       | Because                                                                |
+| ------------------------ | ----------- | ---------------------------------------------------------------------- |
+| `FileDiscoveryStage`     | yes         | No selection is not an empty selection                                 |
+| `GitFilterStage`         | conditional | Fatal for a selector (`--modified`), recoverable for `--git-status`    |
+| `SortFilesStage`         | yes         | Budgets truncate from the tail, so an undefined order changes the set  |
+| `BudgetStage`            | yes         | It answered a failure by returning every file: `--max-total-size 2MB` could exit 0 having produced 40MB |
+| `FileLoadingStage`       | yes         | A document with no content is not the document that was asked for      |
+| `TransformStage`         | yes         | Skipping it emits untransformed content as though it were transformed  |
+| `DeduplicateFilesStage`  | yes         | Silently keeping duplicates spends a budget the caller was managing    |
+| `SecretsGuardStage`      | yes         | Skipping it emits unredacted credentials with a success exit code      |
+| `CharLimitStage`         | yes         | `maxChars` is a context-window and cost boundary, not presentation     |
+| `InstructionsStage`      | conditional | Fatal for `--instructions <name>`, recoverable for the default block   |
+| `OutputFormattingStage`  | yes         | See below                                                              |
+| `StreamingOutputStage`   | yes         | As above, for the streaming path                                       |
+
+<!-- fatal-stage-table:end -->
+
+The pattern: a stage is fatal when its absence changes *what gets emitted* while
+still looking like success. Two stages split the difference, and both split it
+on the same line — whether the caller asked for the thing by name.
+`GitFilterStage` is fatal for a *selector*, which would otherwise silently copy
+the whole repository, and recoverable for a `--git-status` annotation that
+changes nothing about the selection. `InstructionsStage` is fatal for
+`--instructions <name>`, because a document missing the instructions the caller
+believes are in it is not the document they asked for, and recoverable for the
+configured default.
+
+`tests/real/pipeline/stageFatality.test.js` compares this table against the
+runtime flags, because the previous version of this paragraph named four fatal
+stages when there were eleven, and described `SortFilesStage` and `BudgetStage`
+as degrading gracefully after both had been made fatal precisely because
+degrading gracefully was the bug.
 
 `OutputFormattingStage` in particular no longer answers a formatting failure by emitting a different format. A caller who asked for XML and received JSON has a parse failure on output that reported success.
 
@@ -382,7 +438,7 @@ The pipeline emits comprehensive events for monitoring, debugging, and integrati
   stage: string;           // Stage name that recovered
   index: number;           // Stage position in pipeline
   originalError: Error;    // Original error that occurred
-  recoveredResult: any;    // Result returned by error handler
+  recoveredCount: number;  // Files the error handler returned — not the result
 }
 ```
 
@@ -564,8 +620,10 @@ Based on the project requirements in `CLAUDE.md`:
 - **Throughput**: Process 10,000 files in < 30 seconds
 - **Memory Usage**: < 500MB for large projects
 - **Project Size**: Support projects up to 100MB total size
-- **Chunked reads**: files > 10MB are read through a bounded buffer. The
-  content is still resident once read — the budgets are what bound memory
+- **Reads are not chunked**: every file is read whole by `FileLoadingStage`.
+  There is no size above which CopyTree switches to a streaming read, and the
+  transformer that once claimed to provide one buffered the entire file anyway.
+  `--size-gate`, `--max-total-size` and `--max-files` are what bound memory
 
 ### Performance Optimization Patterns
 
@@ -733,7 +791,12 @@ function createPipeline(config) {
 pipeline.on('stage:complete', (data) => {
   // Send metrics to monitoring service
   metrics.timing(`pipeline.stage.${data.stage}.duration`, data.duration);
-  metrics.gauge(`pipeline.stage.${data.stage}.memory`, data.memoryUsage.delta.heapUsed);
+  // `memoryUsage` is null unless memory sampling is on (`measureMemory`, or
+  // COPYTREE_PERFORMANCE=true), which it is not by default — so this example
+  // threw as written.
+  if (data.memoryUsage) {
+    metrics.gauge(`pipeline.stage.${data.stage}.memory`, data.memoryUsage.delta.heapUsed);
+  }
 });
 
 pipeline.on('pipeline:error', (data) => {

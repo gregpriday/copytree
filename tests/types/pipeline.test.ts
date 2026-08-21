@@ -46,6 +46,7 @@ function testPipelineStats() {
     endTime: Date.now() + 1000,
     stagesCompleted: 5,
     stagesFailed: 1,
+    stagesRecovered: 0,
     errors: [
       {
         stage: 'TransformStage',
@@ -200,11 +201,14 @@ function testPipelineEvents() {
       endTime: Date.now(),
       stagesCompleted: 5,
       stagesFailed: 0,
+      stagesRecovered: 0,
       errors: [],
       perStageTimings: {},
       perStageMetrics: {},
       totalStageTime: 500,
       averageStageTime: 100,
+      duration: 500,
+      successRate: 1,
     },
   };
 
@@ -216,11 +220,14 @@ function testPipelineEvents() {
       endTime: Date.now(),
       stagesCompleted: 2,
       stagesFailed: 1,
+      stagesRecovered: 0,
       errors: [{ stage: 'TestStage', error: 'Failed' }],
       perStageTimings: {},
       perStageMetrics: {},
       totalStageTime: 200,
       averageStageTime: 100,
+      duration: 500,
+      successRate: 1,
     },
   };
 
@@ -464,11 +471,14 @@ function testPipelineContext() {
       endTime: null,
       stagesCompleted: 0,
       stagesFailed: 0,
+      stagesRecovered: 0,
       errors: [],
       perStageTimings: {},
       perStageMetrics: {},
       totalStageTime: 0,
       averageStageTime: 0,
+      duration: 500,
+      successRate: 1,
     },
     config: {} as ConfigManager,
     pipeline: new Pipeline(),

@@ -38,6 +38,11 @@ const errors = [];
 async function runTests() {
   console.log('\n🧪 CopyTree Electron Integration Tests\n');
   console.log(`📁 Project root: ${projectRoot}`);
+  // Stated, because the compatibility matrix in the integration guide is a
+  // claim about this pairing. Electron 28 bundles Node 18, which is below the
+  // `engines` floor of 22.12 — so this suite does not currently exercise the
+  // configuration the package says it supports.
+  console.log(`   Electron ${process.versions.electron} bundles Node ${process.versions.node}`);
   console.log(`📁 Fixtures path: ${fixturesPath}\n`);
 
   // Test 1: ESM imports work
@@ -71,14 +76,32 @@ async function runTests() {
   });
 
   // Test 3: scan() works
-  await runTest('scan() returns file list', async () => {
+  await runTest('scan() yields files', async () => {
     const { scan } = await import('copytree');
 
-    const result = await scan(fixturesPath);
+    // `scan()` is an async generator, not a function returning `{ files }`.
+    // `await`-ing it returns the generator object, whose `.files` is undefined
+    // — so this asserted `Array.isArray(undefined)` and had been failing since
+    // the API became streaming.
+    const files = [];
+    let summaryAtFirstYield;
+    let summary = null;
 
-    assert.ok(result, 'scan should return a result');
-    assert.ok(Array.isArray(result.files), 'result.files should be an array');
-    assert.ok(result.files.length > 0, 'files array should not be empty');
+    for await (const file of scan(fixturesPath, { onSummary: (s) => (summary = s) })) {
+      // Captured on the first iteration: `onSummary` is documented as firing
+      // before the first yield, and checking it after the loop would pass even
+      // if it fired last.
+      if (summaryAtFirstYield === undefined) summaryAtFirstYield = summary;
+      files.push(file);
+    }
+
+    assert.ok(files.length > 0, 'scan should yield at least one file');
+    assert.ok(
+      files.every((file) => typeof file.path === 'string' && !file.path.includes('\\')),
+      'every file should carry a POSIX path',
+    );
+    assert.ok(summaryAtFirstYield, 'onSummary should fire before the first yield');
+    assert.strictEqual(summary.totalFiles, files.length, 'summary should match what was yielded');
   });
 
   // Test 4: ConfigManager isolation

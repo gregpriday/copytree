@@ -147,6 +147,46 @@ describe('the operation configuration reaches the transformers', () => {
     expect(transformer.cacheEnabled).toBe(false);
   });
 
+  it('runs a registry the caller built, which is the whole extension point', async () => {
+    const fs = await import('fs');
+    const os = await import('os');
+    const path = await import('path');
+    const { copy } = await import('../../../src/index.js');
+    const { default: BaseTransformer } = await import('../../../src/transforms/BaseTransformer.js');
+
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copytree-registry-'));
+    fs.writeFileSync(path.join(root, 'doc.rst'), 'title\n');
+
+    try {
+      const config = await ConfigManager.create({ userConfig: false });
+      const registry = new TransformerRegistry();
+
+      class Upper extends BaseTransformer {
+        async doTransform(file) {
+          return { ...file, content: file.content.toUpperCase(), transformed: true };
+        }
+      }
+
+      registry.register('upper', new Upper(), { extensions: ['.rst'] });
+
+      // Without an injection point the option documented as "a transformer you
+      // registered through `copytree/experimental`" described a route that was
+      // not connected to anything: `scan()` always built its own registry, and
+      // that registry is deliberately empty.
+      const result = await copy(root, {
+        config,
+        transform: true,
+        registry,
+        transformers: { upper: { enabled: true } },
+      });
+
+      expect(result.output).toContain('TITLE');
+      expect(result.stats.degradations).toBeUndefined();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('tolerates a transformer that is not a BaseTransformer', async () => {
     const registryConfig = await ConfigManager.create({ userConfig: false });
     const registry = await TransformerRegistry.createDefault({ config: registryConfig });

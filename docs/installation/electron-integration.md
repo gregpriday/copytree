@@ -1,10 +1,14 @@
 # Electron Integration Guide
 
-CopyTree works seamlessly in Electron ≥28 main processes. This guide covers installation, usage patterns, and common troubleshooting scenarios.
+CopyTree runs in an Electron main process. This guide covers installation, usage
+patterns, and common troubleshooting scenarios.
 
 ## Requirements
 
-- **Electron ≥34** (Node.js 22+)
+- **Electron ≥35**, which is the first line bundling Node 22 — the runtime
+  `engines` requires. This page previously said ≥28 in one place and ≥34 in
+  another, and its compatibility matrix called Electron 28 with Node 20 "full
+  support"; none of the three agreed with `package.json`.
 - **ESM-enabled main process** (recommended) or dynamic imports for CommonJS
 
 ## Installation
@@ -212,32 +216,41 @@ const result = await copy(projectPath);
 
 **Symptoms:** High memory usage or crashes with large codebases.
 
-**Solutions:**
+**Solution: set budgets.** They are the only thing that bounds memory.
 
-1. Use streaming mode:
-   ```javascript
-   for await (const chunk of copyStream(path)) {
-     // Process chunks incrementally
-   }
-   ```
-2. Set file limits:
-   ```javascript
-   await copy(path, { maxTotalSize: 10 * 1024 * 1024 }); // 10MB limit
-   ```
+```javascript
+await copy(path, {
+  maxTotalSize: 10 * 1024 * 1024, // stop selecting past 10MB
+  maxFileCount: 2000,
+  charLimit: 400_000,
+});
+```
+
+`copyStream()` is **not** a memory solution, and recommending it as one here was
+wrong. It drains the whole selection before the first chunk — the document
+header carries a file count and a total size — so peak memory is the same. What
+it saves is the second contiguous copy of the finished document, and it lets
+output start reaching a socket or a file before the last file is rendered.
 
 ## Compatibility Matrix
 
-| Electron Version | Node.js | CopyTree Support |
-| ---------------- | ------- | ---------------- |
-| ≥28 (LTS)        | ≥20     | ✅ Full support  |
-| 24-27            | 18-19   | ⚠️ May work      |
-| <24              | <18     | ❌ Not supported |
+| Electron Version | Bundled Node | CopyTree Support                        |
+| ---------------- | ------------ | --------------------------------------- |
+| ≥35              | ≥22.14       | ✅ Supported — meets `engines`          |
+| 30–34            | 20.x         | ⚠️ May work; below the declared minimum |
+| <30              | ≤18.x        | ❌ Not supported                        |
+
+> **Known gap.** `npm run test:electron` still pins Electron 28, which bundles
+> Node 18.18 — so the smoke suite does not currently exercise the supported
+> configuration. The suite prints the pairing it ran on. Raising the pin is
+> tracked separately; it needs a CI runner that can download the newer binary.
 
 ## Best Practices
 
 1. **Main Process Only:** Run CopyTree in the main process, not the renderer
 2. **Use IPC:** Communicate results via IPC to renderer processes
-3. **Stream Large Projects:** Use `copyStream()` for projects >10MB
+3. **Bound Large Projects:** Use `maxTotalSize`, `maxFileCount` and `charLimit`.
+   `copyStream()` avoids a second copy of the output, not the selection
 4. **Isolate Configs:** Create separate `ConfigManager` instances for concurrent operations
 5. **Handle Errors:** Wrap CopyTree calls in try-catch for graceful error handling
 

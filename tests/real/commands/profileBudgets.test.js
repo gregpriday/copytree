@@ -164,3 +164,23 @@ describe('a profile total-size budget', () => {
     expect(result.stdout).toContain('data.txt');
   });
 });
+
+describe('a named instructions block that does not exist', () => {
+  it('fails the run rather than emitting a document without it', () => {
+    // `InstructionsStage` already threw for this, deliberately and with a
+    // comment saying why — and `continueOnError` swallowed the throw because
+    // the stage was not marked fatal. So `--instructions house-style` on a typo
+    // produced a document with no instructions, no warning, and exit 0.
+    const result = run(['--instructions', 'definitely-not-a-real-block', '--stdout']);
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('ERR_INSTRUCTIONS');
+  });
+
+  it('still falls back silently for the configured default', () => {
+    // A missing *default* block costs polish, and the run should continue.
+    const result = run(['--stdout']);
+
+    expect(result.status).toBe(0);
+  });
+});
