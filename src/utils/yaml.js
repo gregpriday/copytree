@@ -1,7 +1,8 @@
 /**
  * The YAML surface CopyTree uses, over `js-yaml`.
  *
- * Two things are worth centralising rather than repeating at each call site.
+ * Three things are worth centralising rather than repeating at each call site,
+ * and all three are ways `js-yaml` 5 differs from the 4.x this used to be.
  *
  * **The import shape.** `js-yaml` 5 is a TypeScript rewrite with flat named
  * exports and no default export, so the `const { default: yaml } = await
@@ -17,11 +18,34 @@
  * `loadYaml` restores the old answer for that one case, and leaves every other
  * `YAMLException` alone.
  *
+ * **Merge keys.** 5.x loads with `CORE_SCHEMA` (YAML 1.2), which has no
+ * `!!merge` tag; 4.x's default schema had one. So a `<<: *anchor` silently
+ * stopped merging and stayed in the mapping as a literal `"<<"` key — which
+ * every profile and configuration validator then rejected as an unknown
+ * setting. `loadYaml` adds `mergeTag` back, and *only* `mergeTag`.
+ *
+ * `YAML11_SCHEMA` would also restore merge, and is the wrong instrument: it
+ * brings back YAML 1.1 scalar rules with it, so `yes`/`no`/`on`/`off` become
+ * booleans, `012` is read as octal, and a bare date becomes a `Date`. That
+ * would change how every existing profile parses in order to fix anchors in
+ * the few that use them.
+ *
  * The import stays dynamic and inside the functions on purpose: a YAML parser
  * is a real import, most runs have neither a data configuration nor a folder
  * profile, and pulling it in at module scope would charge every invocation —
  * `copytree --version` included — for a file it never reads.
  */
+
+/**
+ * `CORE_SCHEMA` plus the merge tag, built on first use and kept.
+ *
+ * Module-scoped rather than per call, and deliberately not built at import
+ * time: the whole reason the `js-yaml` import is dynamic is that most runs
+ * never parse YAML at all.
+ *
+ * @type {import('js-yaml').Schema | undefined}
+ */
+let mergeSchema;
 
 /**
  * Parse a YAML document, treating empty input as an absent document.
@@ -33,9 +57,13 @@
 export async function loadYaml(content) {
   if (typeof content !== 'string' || content.trim() === '') return undefined;
 
-  const { load } = await import('js-yaml');
+  const { load, CORE_SCHEMA, mergeTag } = await import('js-yaml');
+  // Built once. `withTags()` constructs a fresh `Schema` on every call, and
+  // `loadYaml` runs per configuration file and per profile.
+  mergeSchema ??= CORE_SCHEMA.withTags([mergeTag]);
+
   try {
-    return load(content);
+    return load(content, { schema: mergeSchema });
   } catch (error) {
     // A document consisting only of comments and whitespace is empty to the
     // parser but not to `trim()`, so the check above cannot catch it.

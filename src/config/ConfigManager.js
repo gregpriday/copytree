@@ -41,6 +41,14 @@ function cacheSegments(path) {
 const CONFIG_SOURCES = Object.freeze(['defaults', 'user']);
 
 /**
+ * Sections reserved for the file's author, and ignored by CopyTree.
+ *
+ * A place to define a YAML anchor without claiming a section name. Profiles
+ * reserve the same prefix — see `FolderProfileLoader`.
+ */
+const EXTENSION_SECTION = /^x-/;
+
+/**
  * The conventional per-user configuration directory for this platform.
  *
  * Data configuration lives here. The legacy `~/.copytree` directory is still
@@ -433,6 +441,15 @@ class ConfigManager {
         // `config.yaml` carries sections; `copytree.yaml` is one section.
         const sections = stem === 'config' ? data : { [stem]: data };
         for (const [section, value] of Object.entries(sections)) {
+          // `x-` is reserved for the file's author and read by nothing. YAML
+          // shares settings through an anchor, and an anchor has to be defined
+          // on some key — but every section name here means something, and the
+          // schema is closed, so without a reserved prefix there is nowhere to
+          // put one. The merge that reads it has already been resolved by the
+          // parser, so dropping the holder now loses nothing. Profiles reserve
+          // the same prefix, for the same reason.
+          if (EXTENSION_SECTION.test(section)) continue;
+
           // A scalar at the top level is assigned, not merged. `merge()` folds
           // a source into a target object and drops a primitive source
           // entirely, so `schemaVersion: '1.0.0'` — the one root-level scalar

@@ -15,6 +15,13 @@ const EXTENSIONS = Object.freeze(['.yml', '.yaml', '.json', '']);
  * a different tool, and silently ignoring it means the author believes a rule
  * is in force that is not.
  */
+/**
+ * Top-level keys reserved for the profile author, and ignored by CopyTree.
+ *
+ * A place to define a YAML anchor without claiming a setting name.
+ */
+const EXTENSION_KEY = /^x-/;
+
 const KNOWN_PROFILE_KEYS = new Set([
   'version',
   'name',
@@ -238,7 +245,18 @@ class FolderProfileLoader {
     // A key nobody reads is a setting the author believes is in effect. Naming
     // the file and the field is the difference between a one-line fix and an
     // afternoon wondering why the profile "does nothing".
-    const unknown = Object.keys(data).filter((key) => !KNOWN_PROFILE_KEYS.has(key));
+    //
+    // `x-` keys are the one exception, and exist so a merge key has somewhere
+    // to point. YAML shares settings through an anchor, and an anchor has to be
+    // defined on *some* key — so without a reserved prefix the only anchorable
+    // keys are the ones that already mean something, and `x-defaults: &d` is
+    // rejected before the merge that reads it is ever evaluated. docker-compose
+    // and GitHub Actions reserve `x-` for exactly this. They are read by
+    // nothing: the profile below is built from named fields, so an `x-` block
+    // is dropped once the anchors in it have been resolved.
+    const unknown = Object.keys(data).filter(
+      (key) => !KNOWN_PROFILE_KEYS.has(key) && !EXTENSION_KEY.test(key),
+    );
     if (unknown.length > 0) {
       throw new ProfileError(
         `Unknown profile ${unknown.length === 1 ? 'key' : 'keys'} in ${filePath}: ${unknown.join(', ')}`,

@@ -390,38 +390,81 @@ async function configMigrate(request, context) {
   const { kept, dropped } = pruneToSchema(config.userConfig, await loadSchemaProperties());
   model.droppedKeys = dropped;
 
+  /**
+   * Run a set of sections through the schema, in the migration's voice.
+   *
+   * The bare configuration error says "CopyTree configuration is invalid" and
+   * advises running `config validate`, which is advice about a file this
+   * command has not written yet — so the reader goes looking for a problem in
+   * a configuration that is, as far as they can tell, fine.
+   *
+   * @param {Object} sections - Configuration sections to check
+   * @returns {Promise<void>} Resolves when valid
+   * @throws {ValidationError} When the schema rejects a value
+   */
+  async function assertAcceptable(sections) {
+    const check = new ConfigManager({ userConfig: false, dataConfigPath: null });
+    await check.loadConfiguration();
+    for (const [section, value] of Object.entries(sections)) {
+      check.set(section, value);
+    }
+    await check.loadSchema();
+
+    try {
+      check.validateConfig();
+    } catch (error) {
+      throw new ValidationError(
+        `${legacyDir} contains a value CopyTree cannot accept: ${error.message.replace(/^Configuration validation failed: /, '')}`,
+        'config-migrate',
+        legacyDir,
+        {
+          code: ERROR_CODES.CONFIG_INVALID,
+          suggestion: `Correct it in ${legacyDir}, then run the migration again`,
+        },
+      );
+    }
+  }
+
   // Validated before it is offered, let alone written. Pruning removes keys the
   // schema does not know; it cannot fix a value of the wrong type or outside
   // its range, and a migration whose output the next run rejects has not
   // migrated anything.
-  const check = new ConfigManager({ userConfig: false, dataConfigPath: null });
-  await check.loadConfiguration();
-  for (const [section, value] of Object.entries(kept)) {
-    check.set(section, value);
-  }
-  await check.loadSchema();
+  await assertAcceptable(kept);
 
+  const { dumpYaml, loadYaml } = await import('../utils/yaml.js');
+  const document = await dumpYaml(kept, { noRefs: true, sortKeys: true });
+
+  // Read back exactly what is about to be written, and check that too.
+  //
+  // The validation above ran on values held in memory, and a value can be
+  // acceptable in memory and unwritable: a legacy `.js` configuration is
+  // executed, so it can export anything JavaScript can express. A `Set`
+  // satisfies AJV's idea of an object — no own enumerable properties, so
+  // nothing to reject — survives pruning, and then serialises as `!!set`, a
+  // tag the loader does not accept. The result was a `config.yaml` this
+  // command wrote and the next run could not parse.
+  //
+  // Reloading is the only check that covers the whole class, because it asks
+  // the question the user's next run will ask.
+  let reloaded;
   try {
-    check.validateConfig();
+    reloaded = await loadYaml(document);
   } catch (error) {
-    // Re-thrown with the migration's context. The bare configuration error says
-    // "CopyTree configuration is invalid" and advises running `config
-    // validate`, which is advice about the file this command has not written
-    // yet — so the reader goes looking for a problem in a configuration that
-    // is, as far as they can tell, fine.
     throw new ValidationError(
-      `${legacyDir} contains a value CopyTree cannot accept: ${error.message.replace(/^Configuration validation failed: /, '')}`,
+      `${legacyDir} contains a value CopyTree cannot write as YAML: ${error.message}`,
       'config-migrate',
       legacyDir,
       {
         code: ERROR_CODES.CONFIG_INVALID,
-        suggestion: `Correct it in ${legacyDir}, then run the migration again`,
+        suggestion:
+          `Replace it in ${legacyDir} with plain data — a string, number, boolean, ` +
+          `array or object — then run the migration again`,
       },
     );
   }
 
-  const { dumpYaml } = await import('../utils/yaml.js');
-  const document = await dumpYaml(kept, { noRefs: true, sortKeys: true });
+  await assertAcceptable(reloaded ?? {});
+
   model.yaml = document;
 
   if (dropped.length > 0) {

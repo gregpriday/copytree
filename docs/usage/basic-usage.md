@@ -363,16 +363,15 @@ copytree https://github.com/user/repo/tree/main/src
 
 ### Multiple Sources
 
-Create a profile with external sources:
+A profile cannot pull in a second repository. There is no `external:` block —
+this guide used to describe one, and a profile containing it is rejected with
+`Unknown profile key`.
 
-```yaml
-name: with-docs
-external:
-  - source: https://github.com/org/docs
-    destination: docs/external
-    rules:
-      - '*.md'
-      - '**/*.md'
+Run CopyTree once per source instead, and concatenate:
+
+```bash
+copytree --stdout --format markdown > context.md
+copytree https://github.com/org/docs --stdout --format markdown >> context.md
 ```
 
 ## Performance Tips
