@@ -22,7 +22,7 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as root from '../../../src/index.js';
-import * as advanced from '../../../src/advanced.js';
+import * as experimental from '../../../src/experimental.js';
 import { PHASES } from '../../../src/ui/feedback/messages.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -77,7 +77,7 @@ const STABLE_ROOT_API = [
 ];
 
 /** The extension points, versioned separately and allowed to move in a minor. */
-const ADVANCED_API = [
+const EXPERIMENTAL_API = [
   'Pipeline',
   'Stage',
   'TransformerRegistry',
@@ -210,14 +210,14 @@ describe('the package root', () => {
   });
 });
 
-describe('the advanced subpath', () => {
+describe('the experimental subpath', () => {
   it('exports exactly the approved extension points', () => {
-    expect(Object.keys(advanced).sort()).toEqual([...ADVANCED_API].sort());
+    expect(Object.keys(experimental).sort()).toEqual([...EXPERIMENTAL_API].sort());
   });
 
   it('matches its declaration file exactly', () => {
-    const declared = declaredValueExports(path.join(repoRoot, 'types/advanced.d.ts'));
-    const runtime = new Set(Object.keys(advanced));
+    const declared = declaredValueExports(path.join(repoRoot, 'types/experimental.d.ts'));
+    const runtime = new Set(Object.keys(experimental));
 
     const undeclared = [...runtime].filter((name) => !declared.has(name)).sort();
     const phantom = [...declared].filter((name) => !runtime.has(name)).sort();

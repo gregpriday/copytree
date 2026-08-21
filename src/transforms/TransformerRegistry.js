@@ -4,15 +4,14 @@ import { logger } from '../utils/logger.js';
 /**
  * Extensions that a non-default transformer in `createDefault()` claims.
  *
- * This exists so a caller can answer "is there anything here to transform?"
- * without building the registry, because building it means importing every
- * transformer module. On an ordinary source-code copy the answer is always no,
- * and the whole transformation subsystem — registry, cache service, traits
- * scheduling — was being constructed and walked to discover that.
- *
- * The default transformer is deliberately excluded. It claims every file and
- * returns already-loaded content unchanged, so its presence is not evidence
- * that a run needs the stage at all.
+ * Empty, because `createDefault()` registers nothing: there is no content-to-
+ * content transformer in this release. `TransformStage` reads this to answer
+ * "is there anything here to transform?" without building the registry, which
+ * means importing every transformer module, constructing the cache service and
+ * walking the traits scheduler. On an ordinary source-code copy the answer was
+ * always no; it was `.zip` and `.docx` — claimed by a transformer that returns
+ * `null` for both — that made the run pay for the whole subsystem to discover
+ * it.
  *
  * `transformerCandidateExtensions.test.js` asserts this stays in step with what
  * `createDefault()` actually registers, so adding a transformer that claims a
@@ -20,23 +19,7 @@ import { logger } from '../utils/logger.js';
  *
  * @type {ReadonlySet<string>}
  */
-export const CANDIDATE_EXTENSIONS = Object.freeze(
-  new Set([
-    '.doc',
-    '.docx',
-    '.xls',
-    '.xlsx',
-    '.zip',
-    '.tar',
-    '.gz',
-    '.rar',
-    '.7z',
-    '.exe',
-    '.dll',
-    '.so',
-    '.dylib',
-  ]),
-);
+export const CANDIDATE_EXTENSIONS = Object.freeze(new Set());
 
 /**
  * Registry for file transformers
@@ -74,6 +57,22 @@ class TransformerRegistry {
   register(name, transformer, options = {}, traits = null) {
     if (this.transformers.has(name)) {
       this.logger.warn(`Overwriting existing transformer: ${name}`);
+    }
+
+    // Adopt the registry's configuration, unless the transformer brought its
+    // own. A transformer constructed without one falls through to the
+    // process-wide singleton and is isolated from nothing: an embedder running
+    // two operations under different `ConfigManager` instances would have both
+    // transform under whichever was installed globally. That used to be handled
+    // by passing `{ config }` into each built-in transformer at construction;
+    // with no built-ins left, the guarantee has to live where third-party
+    // transformers actually arrive.
+    //
+    // Delegated to the transformer rather than assigned here, because adopting
+    // a configuration means re-deriving what was read from the previous one —
+    // which is the transformer's business, not the registry's.
+    if (this.config && typeof transformer?.adoptConfig === 'function') {
+      transformer.adoptConfig(this.config);
     }
 
     this.transformers.set(name, {
@@ -326,7 +325,10 @@ class TransformerRegistry {
     warnings.push(...optimizationWarnings);
 
     return {
-      valid: issues.length === 0,
+      // Errors only. `issues` carries advisory entries too — a declared
+      // resource requirement, an ordering note — and counting those made a
+      // plan invalid for telling the caller something useful about it.
+      valid: !issues.some((issue) => issue.severity === 'error'),
       issues,
       warnings,
     };
@@ -552,35 +554,46 @@ class TransformerRegistry {
   }
 
   /**
-   * Validate resource requirements
+   * Report the external resources a plan declares it needs.
+   *
+   * Reporting, not verifying. The distinction was collapsed: an `apiKey`
+   * requirement produced `severity: 'error'` reading "requires an API key but
+   * none is configured" without ever looking for one, so a correctly
+   * configured transformer failed validation and an unconfigured one failed it
+   * for the wrong reason. The `network` requirement was an empty block with a
+   * comment saying a check could go here.
+   *
+   * A registry cannot check these. Whether an API key is present is a question
+   * about a transformer's own configuration, which only the transformer can
+   * answer; whether the network is reachable is not answerable in advance at
+   * all. So this states what the plan will need, at `info`, and the transformer
+   * raises a real error at the point it actually needs the thing and finds it
+   * missing.
+   *
+   * @param {string[]} stages - Transformer names in execution order
+   * @returns {Object[]} Advisory issues
    * @private
    */
   _validateResources(stages) {
     const issues = [];
-    const requiredResources = new Set();
 
     for (const stage of stages) {
       const traits = this.traits.get(stage);
       if (!traits) continue;
 
-      // Check for required dependencies
-      for (const dep of traits.dependencies) {
-        requiredResources.add(dep);
-      }
+      const declared = Object.entries(traits.requirements ?? {})
+        .filter(([, required]) => required)
+        .map(([name]) => name);
 
-      // Check specific requirements
-      if (traits.requirements.apiKey) {
-        issues.push({
-          type: 'missing_resource',
-          severity: 'error',
-          message: `Transformer '${stage}' requires an API key but none is configured`,
-          transformers: [stage],
-        });
-      }
+      if (declared.length === 0) continue;
 
-      if (traits.requirements.network) {
-        // Could add network connectivity checks here
-      }
+      issues.push({
+        type: 'declared_requirement',
+        severity: 'info',
+        message: `Transformer '${stage}' declares that it needs ${declared.sort().join(', ')}`,
+        transformers: [stage],
+        requirements: declared.sort(),
+      });
     }
 
     return issues;
@@ -658,104 +671,30 @@ class TransformerRegistry {
     const registry = new TransformerRegistry();
     registry.config = options.config || null;
 
-    // Passed to every transformer, not merely stored on the registry.
+    // Nothing is registered. That is the honest state of the transform
+    // subsystem, and stating it here is clearer than three registrations that
+    // cannot do anything:
     //
-    // It used to be only stored. The transformers below were constructed with
-    // no arguments, so `BaseTransformer` fell through to the process-wide
-    // `config()` singleton — and an operation running with its own
-    // `ConfigManager` had its selection and formatting governed by that
-    // instance while its transformation cache and binary policy came from
-    // another. Two concurrent operations with contradictory configurations
-    // could therefore transform each other's files under the wrong settings,
-    // which is exactly the isolation the SDK advertises.
-    const shared = registry.config ? { config: registry.config } : {};
-
-    // Register default transformers - using dynamic imports for better ESM compatibility
-    const { default: FileLoaderTransformer } =
-      await import('./transformers/FileLoaderTransformer.js');
-    const { default: StreamingFileLoaderTransformer } =
-      await import('./transformers/StreamingFileLoaderTransformer.js');
-    const { default: BinaryTransformer } = await import('./transformers/BinaryTransformer.js');
-
-    // File Loader - default transformer
-    registry.register(
-      'file-loader',
-      new FileLoaderTransformer(shared),
-      {
-        isDefault: true,
-        priority: 0,
-      },
-      {
-        inputTypes: ['any'],
-        outputTypes: ['text', 'binary'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: false,
-        stateful: false,
-        dependencies: [],
-        conflictsWith: [],
-        requirements: {},
-        tags: ['loader', 'default'],
-      },
-    );
-
-    // Streaming File Loader - for large files
-    registry.register(
-      'streaming-file-loader',
-      new StreamingFileLoaderTransformer(shared),
-      {
-        priority: 0,
-      },
-      {
-        inputTypes: ['any'],
-        outputTypes: ['text', 'binary'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: false,
-        stateful: false,
-        dependencies: [],
-        conflictsWith: [],
-        requirements: {},
-        tags: ['loader', 'streaming'],
-      },
-    );
-
-    // Binary transformer
-    registry.register(
-      'binary',
-      new BinaryTransformer(shared),
-      {
-        extensions: [
-          '.doc',
-          '.docx',
-          '.xls',
-          '.xlsx',
-          '.zip',
-          '.tar',
-          '.gz',
-          '.rar',
-          '.7z',
-          '.exe',
-          '.dll',
-          '.so',
-          '.dylib',
-        ],
-        priority: 5,
-      },
-      {
-        inputTypes: ['binary'],
-        outputTypes: ['text'],
-        idempotent: true,
-        orderSensitive: false,
-        heavy: false,
-        stateful: false,
-        dependencies: [],
-        conflictsWith: [],
-        requirements: {},
-        tags: ['binary-handler', 'placeholder'],
-      },
-    );
-
+    // - `file-loader` reloaded content `FileLoadingStage` had already read, so
+    //   with content always present it returned its input untouched.
+    // - `streaming-file-loader` did the same, having buffered the whole file
+    //   despite its name.
+    // - `binary` was registered for `.doc`, `.zip`, `.exe` and their kin, and
+    //   its first act is to return `null` for any file that is not an image —
+    //   so it was registered for exactly the extensions it refuses to handle.
+    //   Worse than a no-op: `BaseTransformer.validateOutput()` rejects a null
+    //   result, so every one of those files raised a `TransformError`, was
+    //   marked `transformError`, counted in `transformErrors`, recorded as a
+    //   degradation, and failed the run under `--strict`. Including a `.zip`
+    //   was enough to make `copytree --strict` exit non-zero for no reason a
+    //   user could act on. Its extension list is also what made
+    //   `TransformStage` build this registry, the cache service and the traits
+    //   scheduler for that `.zip` in the first place.
+    //
+    // Reading, binary classification and binary policy belong to
+    // `FileLoadingStage`, which is where they actually happen. A content-to-
+    // content converter — a real document transformer — registers here when
+    // there is one; `copytree doctor` already reports that there is not.
     return registry;
   }
 }

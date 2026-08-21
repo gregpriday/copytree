@@ -1,6 +1,27 @@
 # Transformer Traits System
 
-The transformer traits system provides advanced validation and optimization capabilities for transformer execution plans. This system helps prevent conflicts, optimize performance, and ensure proper resource allocation.
+> **Experimental.** This lives behind `copytree/experimental`, and a minor
+> release may change it. Read what follows as advisory lint rather than as a
+> guarantee: the registry reports what a plan declares about itself, and cannot
+> verify most of it.
+
+Transformer traits are metadata describing what a transformer needs and what it
+does to its input. The registry uses them to spot conflicts between transformers
+in one plan, to suggest an execution order, and to report the external resources
+a plan says it will need.
+
+**What it does not do.** It does not check that those resources exist. Whether
+an API key is configured is a question about a transformer's own configuration,
+which only that transformer can answer; whether the network is reachable is not
+answerable in advance at all. Both used to be reported as errors — one
+unconditionally, without looking, and the other from an empty code block — so
+`validatePlan` could fail a correctly configured plan and pass a broken one.
+Declared requirements are now reported at `info`, and the transformer raises the
+real error at the point it needs the thing and finds it missing.
+
+Nor is the ordering advice dependency-aware beyond the declared graph: it moves
+heavy transformers later, which is a heuristic, not a proof that the result is
+equivalent.
 
 ## Overview
 
@@ -69,10 +90,10 @@ const registry = new TransformerRegistry();
 
 // Register transformer with traits
 registry.register(
-  'binary',
-  new BinaryTransformer(),
+  'my-converter',
+  new MyConverter(),
   {
-    extensions: ['.zip'],
+    extensions: ['.rst'],
     priority: 20,
   },
   {
@@ -90,38 +111,20 @@ registry.register(
 );
 ```
 
-### Default Transformer Traits
+### There are no built-in transformers
 
-The system includes predefined traits for built-in transformers:
+`TransformerRegistry.createDefault()` registers nothing, and that is the honest
+state of this subsystem: CopyTree ships no content-to-content transformer.
 
-```javascript
-// File Loader
-{
-  inputTypes: ['any'],
-  outputTypes: ['text', 'binary'],
-  idempotent: true,
-  heavy: false,
-  tags: ['loader', 'default']
-}
+It used to register three. `file-loader` and `streaming-file-loader` reloaded
+content `FileLoadingStage` had already read, so with content always present they
+returned their input untouched; `binary` was registered for `.doc`, `.zip`,
+`.exe` and their kin, and returns `null` for any file that is not an image — so
+it was registered for exactly the extensions on which it does nothing. Reading,
+binary classification and binary policy belong to `FileLoadingStage`.
 
-// Binary Transformer
-{
-  inputTypes: ['binary'],
-  outputTypes: ['text'],
-  idempotent: true,
-  heavy: false,
-  tags: ['binary', 'placeholder']
-}
-
-// Streaming File Loader
-{
-  inputTypes: ['any'],
-  outputTypes: ['text', 'binary'],
-  idempotent: true,
-  heavy: false,
-  tags: ['loader', 'streaming', 'large-files']
-}
-```
+The registry is therefore an extension point rather than a shipped feature.
+Register your own, and it runs.
 
 ## Plan Validation
 
@@ -131,10 +134,14 @@ The system includes predefined traits for built-in transformers:
 const plan = ['pdf', 'first-lines', 'markdown'];
 const result = registry.validatePlan(plan);
 
-console.log(result.valid); // true/false
-console.log(result.issues); // Array of validation issues
-console.log(result.warnings); // Array of optimization suggestions
+console.log(result.valid); // false only when an `error`-severity issue was found
+console.log(result.issues); // Conflicts, ordering notes, declared requirements
+console.log(result.warnings); // Optimization suggestions
 ```
+
+`valid` reflects errors alone. Advisory entries — a declared resource
+requirement, an ordering note — appear in `issues` at `info`, and used to make a
+plan invalid for telling you something useful about it.
 
 ### Validation Result Structure
 

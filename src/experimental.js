@@ -1,8 +1,8 @@
 /**
- * CopyTree's extension points.
+ * CopyTree's extension points, which are experimental.
  *
  * ```js
- * import { Pipeline, Stage } from 'copytree/advanced';
+ * import { Pipeline, Stage } from 'copytree/experimental';
  * ```
  *
  * These are lower-level than the package root and are versioned less
@@ -17,7 +17,16 @@
  * those are specified and tested, this subpath is where the honest version of
  * "you can reach in, and it may move" lives.
  *
- * @module copytree/advanced
+ * **Why the name changed.** This was `copytree/advanced` through the release
+ * candidates. "Advanced" describes the audience; a package publishing 1.0 makes
+ * a SemVer promise about everything it exports, and a subpath whose own
+ * documentation says a minor release may break it is not covered by that
+ * promise. Naming it `experimental` is the smallest way to make the exception
+ * legible from the import statement, which is the only place most people will
+ * ever read about it. It appeared in no stable release, so nothing is being
+ * broken — only a name corrected before it could set an expectation.
+ *
+ * @module copytree/experimental
  */
 
 // Pipeline composition

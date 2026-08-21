@@ -14,8 +14,8 @@
       "copytree": [
         "../../types/index.d.ts"
       ],
-      "copytree/advanced": [
-        "../../types/advanced.d.ts"
+      "copytree/experimental": [
+        "../../types/experimental.d.ts"
       ]
     }
   },

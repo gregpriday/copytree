@@ -10,10 +10,10 @@
       "import": "./src/index.js",
       "default": "./src/index.js"
     },
-    "./advanced": {
-      "types": "./types/advanced.d.ts",
-      "import": "./src/advanced.js",
-      "default": "./src/advanced.js"
+    "./experimental": {
+      "types": "./types/experimental.d.ts",
+      "import": "./src/experimental.js",
+      "default": "./src/experimental.js"
     },
     "./package.json": "./package.json"
   },

@@ -107,14 +107,19 @@ Extension points moved to a subpath:
 import { Pipeline, Stage, TransformerRegistry, BaseTransformer } from 'copytree';
 
 // After
-import { Pipeline, Stage, TransformerRegistry, BaseTransformer } from 'copytree/advanced';
+import { Pipeline, Stage, TransformerRegistry, BaseTransformer } from 'copytree/experimental';
 ```
 
 Also moved: `ProgressTracker`, `stageIdFor`, `ExclusionReport`, `resolveScope`,
 `detectBinary`, `categorizeByExt`.
 
-`copytree/advanced` is versioned less conservatively than the root — **a minor
-release may change it**. If you depend on it, pin accordingly.
+`copytree/experimental` is versioned less conservatively than the root — **a
+minor release may change it**. If you depend on it, pin accordingly.
+
+It was called `copytree/advanced` in the release candidates. "Advanced"
+describes who the audience is; the thing worth saying in an import statement is
+that a 1.0 package's SemVer promise does not reach this subpath. It shipped in
+no stable release, so there is nothing to migrate unless you tried an RC.
 
 ### `config()` and `configAsync()` were removed
 

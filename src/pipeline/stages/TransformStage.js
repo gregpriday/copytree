@@ -1,4 +1,4 @@
-import Stage from '../Stage.js';
+import Stage, { DEGRADATION_CODES } from '../Stage.js';
 import { CacheService } from '../../services/CacheService.js';
 import { generateTransformCacheKey } from '../../utils/fileHash.js';
 import { ERROR_CODES, TransformError, isAbortError } from '../../utils/errors.js';
@@ -75,6 +75,28 @@ class TransformStage extends Stage {
     }
 
     this.log(`Transforming ${files.length} files`, 'debug');
+
+    // A transformer named in a profile and not registered is a setting whose
+    // author believes it is in effect. Nothing looked it up until a file with a
+    // matching extension arrived, and the lookup failure was swallowed — so
+    // `transformers: { pdf: { enabled: true } }` produced a run identical to
+    // one without it, and no way to tell.
+    const missing = Object.entries(this.transformerConfig)
+      .filter(([name, entry]) => entry?.enabled !== false && !this.registry.has(name))
+      .map(([name]) => name);
+
+    if (missing.length > 0) {
+      return this.transformFiles(
+        this.degrade(
+          input,
+          `${missing.length === 1 ? 'Transformer' : 'Transformers'} named in the profile ` +
+            `but not registered, so ${missing.length === 1 ? 'it was' : 'they were'} not applied: ` +
+            missing.sort().join(', '),
+          DEGRADATION_CODES.STAGE_DEGRADED,
+        ),
+      );
+    }
+
     return this.transformFiles(input);
   }
 

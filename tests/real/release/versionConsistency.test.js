@@ -35,7 +35,7 @@ describe('version consistency', () => {
     // is no second copy to drift. The declarations describe a shape, and the
     // shape does not have a version — the package does.
     expect(readRepoFile('types/index.d.ts')).not.toMatch(/@version\s+\d+\.\d+\.\d+/);
-    expect(readRepoFile('types/advanced.d.ts')).not.toMatch(/@version\s+\d+\.\d+\.\d+/);
+    expect(readRepoFile('types/experimental.d.ts')).not.toMatch(/@version\s+\d+\.\d+\.\d+/);
   });
 
   test('the CLI reports the same version', async () => {

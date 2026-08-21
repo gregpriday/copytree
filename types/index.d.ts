@@ -2,7 +2,7 @@
  * CopyTree TypeScript Definitions
  *
  * Provides comprehensive type definitions for the CopyTree programmatic API.
- * Full IntelliSense support for TypeScript consumers including Canopy.
+ * Full IntelliSense support for TypeScript consumers.
  *
  * @module copytree
  */
@@ -375,10 +375,23 @@ export interface ScanOptions {
   ext?: string | string[];
   /** Maximum directory depth */
   maxDepth?: number;
-  /** Apply transformers */
+  /**
+   * Run the transformation stage (default: false).
+   *
+   * CopyTree registers no transformers, so this does nothing on its own. It is
+   * meaningful only alongside `transformers`, naming one an embedder has
+   * registered through `copytree/experimental`.
+   */
   transform?: boolean;
-  /** Specific transformers to use (array of transformer names) */
-  transformers?: string[];
+  /**
+   * Per-transformer configuration, keyed by transformer name.
+   *
+   * Declared as `string[]` and read as an object: the runtime calls
+   * `Object.entries()` on it and looks at each entry's `enabled`, so an array
+   * of names enabled the stage and then matched nothing. A name that is not
+   * registered is reported as a degradation rather than ignored.
+   */
+  transformers?: Record<string, { enabled?: boolean; options?: Record<string, unknown> }>;
   /** Include hidden files (default: false) */
   includeHidden?: boolean;
   /** Follow symbolic links (default: false) */

@@ -14,6 +14,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'fs/promises';
 import { resolveOperationConfig } from '../../../src/api/operationConfig.js';
 import { ConfigManager } from '../../../src/config/ConfigManager.js';
 import TransformerRegistry from '../../../src/transforms/TransformerRegistry.js';
+import BaseTransformer from '../../../src/transforms/BaseTransformer.js';
 
 describe('SDK configuration is hermetic by default', () => {
   it('enables only the packaged defaults', async () => {
@@ -66,22 +67,22 @@ describe('SDK configuration is hermetic by default', () => {
 });
 
 describe('the operation configuration reaches the transformers', () => {
-  it('passes the supplied instance to every default transformer', async () => {
+  it('passes the supplied instance to a registered transformer', async () => {
     const config = await ConfigManager.create({ userConfig: false });
     const registry = await TransformerRegistry.createDefault({ config });
 
-    // Storing the config on the registry was not enough: the transformers were
-    // constructed with no arguments and fell through to the process-wide
-    // singleton, so an operation's binary policy and transformation cache came
-    // from a different instance than its selection and formatting did.
-    const transformers = [...registry.transformers.values()].map((entry) =>
-      entry.transformer ? entry.transformer : entry,
-    );
+    // Storing the config on the registry is not enough: a transformer
+    // constructed with no arguments falls through to the process-wide
+    // singleton, so an operation's binary policy and transformation cache would
+    // come from a different instance than its selection and formatting did.
+    //
+    // There are no default transformers any more — nothing in this release
+    // converts content — so the guarantee is checked where third-party
+    // transformers actually arrive.
+    const transformer = new BaseTransformer();
+    registry.register('third-party', transformer, { extensions: ['.xyz'] });
 
-    expect(transformers.length).toBeGreaterThan(0);
-    for (const transformer of transformers) {
-      expect(transformer.config).toBe(config);
-    }
+    expect(transformer.config).toBe(config);
   });
 
   it('keeps two registries with different configurations apart', async () => {
@@ -91,11 +92,69 @@ describe('the operation configuration reaches the transformers', () => {
     const registryA = await TransformerRegistry.createDefault({ config: a });
     const registryB = await TransformerRegistry.createDefault({ config: b });
 
-    const first = [...registryA.transformers.values()][0];
-    const second = [...registryB.transformers.values()][0];
+    const first = new BaseTransformer();
+    const second = new BaseTransformer();
+    registryA.register('t', first);
+    registryB.register('t', second);
 
-    expect((first.transformer ?? first).config).toBe(a);
-    expect((second.transformer ?? second).config).toBe(b);
-    expect((first.transformer ?? first).config).not.toBe((second.transformer ?? second).config);
+    expect(first.config).toBe(a);
+    expect(second.config).toBe(b);
+    expect(first.config).not.toBe(second.config);
+  });
+
+  it('leaves a transformer that brought its own configuration alone', async () => {
+    const mine = await ConfigManager.create({ userConfig: false });
+    const registryConfig = await ConfigManager.create({ userConfig: false });
+    const registry = await TransformerRegistry.createDefault({ config: registryConfig });
+
+    const transformer = new BaseTransformer({ config: mine });
+    registry.register('explicit', transformer);
+
+    // An explicit choice outranks the registry's. Overwriting it would make a
+    // transformer's own configuration depend on which registry it was handed
+    // to, which is the opposite of what passing one means.
+    expect(transformer.config).toBe(mine);
+  });
+
+  it('re-derives what the constructor read from the old configuration', async () => {
+    const registryConfig = await ConfigManager.create({ userConfig: false });
+    registryConfig.set('cache.transformations.enabled', true);
+    registryConfig.set('cache.transformations.ttl', 4242);
+
+    const registry = await TransformerRegistry.createDefault({ config: registryConfig });
+    const transformer = new BaseTransformer();
+
+    // Settled at construction from whatever configuration was in scope then.
+    expect(transformer.cacheTTL).not.toBe(4242);
+
+    registry.register('adopting', transformer);
+
+    // Reassigning `config` alone would leave the transformer reading its
+    // settings from the new instance and its cache policy from the old.
+    expect(transformer.config).toBe(registryConfig);
+    expect(transformer.cacheEnabled).toBe(true);
+    expect(transformer.cacheTTL).toBe(4242);
+  });
+
+  it('does not adopt over an explicit cache option', async () => {
+    const registryConfig = await ConfigManager.create({ userConfig: false });
+    registryConfig.set('cache.transformations.enabled', true);
+
+    const registry = await TransformerRegistry.createDefault({ config: registryConfig });
+    const transformer = new BaseTransformer({ noCache: true });
+    registry.register('no-cache', transformer);
+
+    expect(transformer.cacheEnabled).toBe(false);
+  });
+
+  it('tolerates a transformer that is not a BaseTransformer', async () => {
+    const registryConfig = await ConfigManager.create({ userConfig: false });
+    const registry = await TransformerRegistry.createDefault({ config: registryConfig });
+
+    // A plain object with a `transform` method is a legitimate transformer.
+    // Assigning onto it blindly would have thrown for a getter-only `config`.
+    const plain = { transform: (file) => file };
+
+    expect(() => registry.register('plain', plain)).not.toThrow();
   });
 });

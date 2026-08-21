@@ -7,7 +7,7 @@
  * If this file compiles without errors, the types are correct.
  */
 
-// Pipeline composition lives behind `copytree/advanced` from 1.0: everything
+// Pipeline composition lives behind `copytree/experimental` from 1.0: everything
 // reachable from the package root is semver-stable, and these extension points
 // are not ready to carry that promise.
 import {
@@ -33,7 +33,7 @@ import {
   PipelineStartEvent,
   PipelineCompleteEvent,
   PipelineErrorEvent,
-} from 'copytree/advanced';
+} from 'copytree/experimental';
 import { ConfigManager, Logger, ProgressCallback, FileResult } from 'copytree';
 
 // ============================================================================

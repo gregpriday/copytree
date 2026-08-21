@@ -15,10 +15,13 @@ This guide covers the complete installation process for CopyTree on your system.
 
 ### Optional Dependencies
 
-These tools enhance CopyTree's capabilities but are not required for basic operation:
+- **Gitleaks**: a stronger secret scanner than the built-in one. CopyTree uses
+  it when it is on `PATH` and falls back to its own patterns otherwise, saying
+  which it used.
 
-- **Pandoc**: For advanced document conversion (DOCX, ODT, etc.)
-- **Tesseract**: For OCR capabilities on images
+Pandoc and Tesseract were listed here for document conversion and OCR. CopyTree
+does not use either: it ships no transformer, and `copytree doctor` reports
+document conversion as unavailable. Installing them changes nothing.
 
 ### Checking Prerequisites
 

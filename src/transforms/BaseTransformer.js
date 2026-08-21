@@ -35,6 +35,36 @@ class BaseTransformer {
   }
 
   /**
+   * Adopt an operation's configuration after construction.
+   *
+   * `TransformerRegistry.register()` calls this so a transformer built without
+   * one does not fall through to the process-wide singleton — which would make
+   * two concurrent operations, each with its own `ConfigManager`, transform
+   * under whichever happened to be installed globally.
+   *
+   * It re-derives what the constructor read, rather than only reassigning
+   * `this.config`. `cacheEnabled` and `cacheTTL` are settled at construction:
+   * swapping the config afterwards without recomputing them left a transformer
+   * reading its settings from the new instance and its cache policy from the
+   * old, which is a subtler version of the bug this exists to prevent.
+   * Explicit options still win, exactly as they do in the constructor.
+   *
+   * @param {ConfigManager} next - The operation's configuration
+   * @returns {void}
+   */
+  adoptConfig(next) {
+    if (!next || this.options?.config) return;
+
+    this.config = next;
+    this.cacheEnabled = this.options?.noCache
+      ? false
+      : (this.options?.cache ?? next.get('cache.transformations.enabled', false));
+    this.cacheTTL = this.options?.cacheTTL ?? next.get('cache.transformations.ttl', 86400);
+    // Built from the old configuration, and rebuilt on next use from this one.
+    this.cache = null;
+  }
+
+  /**
    * Initialize cache if needed
    */
   initializeCache() {

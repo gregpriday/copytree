@@ -14,7 +14,7 @@
  * Extension points now live behind an explicit subpath:
  *
  * ```js
- * import { Pipeline, Stage } from 'copytree/advanced';
+ * import { Pipeline, Stage } from 'copytree/experimental';
  * ```
  *
  * That import states what it is. It can also evolve on its own schedule without
