@@ -2,6 +2,183 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.2] - 2026-08-21
+
+The second and, if nothing surfaces, final release candidate for 1.0. An
+independent release audit of `rc.1` returned three P0 findings and a long tail
+of contract defects; this closes all of them.
+
+**This is a prerelease, published under the `next` dist-tag.** `npm install
+copytree` still resolves to the stable `0.x` line; install it deliberately with
+`npm install copytree@next`.
+
+The theme is the same one `rc.1` started and did not finish: **a control that
+disengages exactly when the code enforcing it is in an unexpected state is worse
+than no control, because the caller believes it held.** Six of the defects below
+are that shape, and each of them exited 0.
+
+What stood between `rc.1` and `1.0.0` no longer does. Windows, Ubuntu and macOS
+now run the end-to-end suite on every push, across Node 22.12.0 exactly, 22, 24
+and 26; the publish workflow has performed a real release. What remains is a
+soak: nothing in this candidate has been exercised by anyone but its tests.
+
+Full upgrade notes:
+[docs/reference/migrating-to-1.0.md](docs/reference/migrating-to-1.0.md).
+
+### Security
+
+- **The secrets guard never emits a file whose secrets it could not remove.**
+  `secretsGuard.redactInline: false` is documented as "exclude the file rather
+  than redact in place" and meant "detect, report, and emit unchanged": with
+  `failOnSecrets` off, execution fell through to the untouched file while the
+  run reported the finding. It now excludes.
+- **A redaction that cannot be proven is not a redaction.** `SecretRedactor`
+  skipped findings it could not locate and returned only a count, so the caller
+  could not distinguish "nothing left to do" from "the credential is still
+  there" — and stamped `redacted: true` on both. It now reports which spans it
+  covered and which it could not, and the file is dropped unless every one is
+  accounted for.
+- **The redacted bytes go back through the scanner that found the secret.**
+  Coordinates drift — CRLF, multi-byte characters, inclusive versus exclusive
+  end columns — and a span one character off still counts as a replacement while
+  leaving the credential legible. Anything the re-scan still finds, that is not
+  the guard's own marker, excludes the file. A scanner downgrade mid-verification
+  excludes it too: a weaker tool reporting "clean" is not a verification.
+- **A masked Gitleaks `Match` can no longer relocate a redaction.** Gitleaks runs
+  with `--redact`, so its match is a mask. Searching the file for it could find a
+  literal mask in a documented example, redact that, and leave the real
+  credential — reporting success. Match provenance is now passed explicitly and
+  never inferred.
+- **Gitleaks detecting a secret it cannot describe excludes the file.** "Secrets
+  found, but the report could not be read" fell back to the built-in scanner, and
+  a clean result from the weaker tool overruled the stronger one's positive
+  verdict. Under `--secrets fail` it now fails the run.
+- Overlapping findings merge before replacement; two findings over one credential
+  used to garble each other's output. Secrets reports are written atomically at
+  `0600`.
+
+### Changed — breaking
+
+- **`maxTotalSize` is a maximum.** A single file larger than the whole budget was
+  kept regardless, so a caller who set the budget to protect a context window
+  could be handed forty times it. It is now dropped like any other file that does
+  not fit, and the selection can legitimately come back empty.
+  `--retain-oversized-first-file` asks for the old behaviour by name.
+- **Sixteen configuration keys were removed.** `app.defaultCommand`,
+  `interactiveMode`, `chunkSize`, `defaultOutput`, `outputEncoding`,
+  `exitOnError`, the six `app.*` metadata keys, `copytree.maxOutputSize`,
+  `maxCharacterLimit`, `preserveEmptyDirs` and `treeIndent` had no runtime
+  consumer between them. The schema is closed, so a configuration setting one is
+  now rejected by name — and `config migrate` drops them for you, saying which.
+- **`copytree/advanced` is now `copytree/experimental`.** A 1.0 package makes a
+  SemVer promise about everything it exports, and this subpath's own
+  documentation says a minor release may break it. It shipped in no stable
+  release.
+- **There are no built-in transformers.** `file-loader` and
+  `streaming-file-loader` reloaded content the pipeline had already read; the
+  latter buffered whole files despite its name. `binary` was registered for
+  `.doc`, `.zip`, `.exe` and their kin while returning `null` for anything that
+  is not an image — which fails validation, so **including a `.zip` was enough to
+  make `copytree --strict` exit non-zero** for no reason a user could act on.
+- **`copy()` no longer accepts `secretsReport`, `info` or `verbose`**, which were
+  declared and never implemented, nor `basePath` and `allowEmpty`, which it
+  overwrote. `FormatStreamOptions.onProgress` is gone; `formatStream()` never
+  called it.
+- Pipeline lifecycle events carry counts, never file payloads. The declarations
+  described the payload-carrying shape the runtime had removed for safety, so a
+  consumer following them could not work.
+
+### Fixed
+
+- **A cancelled run no longer succeeds.** The signal was checked only inside the
+  scan, so a run abandoned while formatting carried on, **wrote its output file**,
+  and reported 100%.
+- **A malformed budget is refused rather than ignored.** `--max-chars 1.5` was
+  read as `1`, `'12abc'` as `12`, and a `maxTotalSize` of `'garbage'` in a
+  profile silently became "no budget" — a typo produced a successful unbounded
+  run. `CharLimitStage` is now fatal, like every other budget.
+- **A profile's `charLimit` applies.** It reached the budget resolver, was
+  reported by every command that reports budgets, and was dropped before the
+  pipeline.
+- **`plan` applies the character budget**, so a preview cannot select a different
+  set from the run it previews — and reports `pathSelection` as
+  `estimated-from-bytes` rather than claiming `exact` about a set it estimated.
+- **`--instructions <name>` fails when the block is missing.** The stage threw
+  for it deliberately; `continueOnError` swallowed the throw, so a typo produced
+  a document with no instructions, no warning, and exit 0.
+- **`schemaVersion` works.** A root-level scalar was merged into an object and
+  became `{}`, so the only scalar the schema declares could never be set. It now
+  refuses a configuration written for a newer major.
+- **`cache.driver: none` disables the cache.** Every method guarded on `enabled`
+  and then consulted an in-process map regardless of driver, so `none` disabled
+  only the file half.
+- **A remote whose default branch cannot be read reports why.** `ls-remote`
+  failures were swallowed and `main` guessed, turning an authentication or
+  network problem into "Branch 'main' not found" — and failing outright for
+  repositories that use another name.
+- Every observational callback is isolated, including `async` ones: a rejected
+  promise from `onProgress` was unhandled, and Node's default for that is to
+  terminate the process. An `onEvent` that threw failed the scan outright.
+- Unexpected `scan()` failures stay typed, so `error.code` is always present.
+- The completion line no longer warns that secrets "remain in the output". That
+  count was detections minus replaced regions, so two findings on one credential
+  reported a leak that never happened.
+- `Pipeline.getStats()` before a run reported a duration of fifty-six years and a
+  success rate of 1 for zero stages; recovered stages are now counted.
+
+### Added
+
+- **`copytree cache` covers the repository clones.** Copying a GitHub URL keeps
+  the checkout under `~/.copytree/repos`, and nothing could see it — on one
+  developer machine it had reached a gigabyte. `status`, `clear` and `gc` now
+  report and reclaim it, `doctor` warns above 2 GB, and both destructive actions
+  require `--repositories`.
+- **The SDK accepts a transformer registry.** `transform` and `transformers`
+  described a route that was not connected to anything.
+- `DEGRADATION_CODES` and the `Degradation` type are public; degradations reach
+  `onSummary`, which they never did.
+- `COPYTREE_REPO_CACHE_PATH`, and one published allowlist of every environment
+  variable CopyTree reads, reported by `doctor`.
+- `--retain-oversized-first-file`, and `retainOversizedFirstFile` for profiles
+  and the SDK.
+
+### Changed
+
+- Configuration provenance is tracked per leaf, so two files contributing
+  different keys to one section are attributed individually rather than both to
+  the later file. `set()` reports `runtime`.
+- A validation failure names the offending key instead of "must NOT have
+  additional properties".
+- The repository cache is created `0700`; it holds complete checkouts of
+  repositories that may be private.
+- `validatePlan` no longer claims to check resources it cannot see. It reported
+  "requires an API key but none is configured" without looking, and had an empty
+  block where a network check would go.
+
+### Documentation
+
+- The architecture guide's fatal-stage list named four stages when there were
+  eleven, and described both budget stages as degrading gracefully after they
+  were made fatal precisely because degrading gracefully was the bug. It also
+  listed a stage that does not exist. A test now reads that table and compares
+  it against the code.
+- Nothing streams. `FileLoadingStage` reads every file whole, and budgets are
+  what bound memory; three documents said otherwise, and the Electron guide
+  recommended `copyStream()` as a memory solution while giving three different
+  minimum versions, none matching `engines`.
+- The user guides no longer promise PDF conversion and OCR, and the installation
+  guide no longer asks for Pandoc and Tesseract, which nothing uses.
+
+### Infrastructure
+
+- Contract tests that read the declarations and compare them against a real run:
+  event payloads, option names, configuration keys and defaults, the environment
+  allowlist, stage fatality, and the security support table.
+- The Electron smoke suite runs on Electron 35 / Node 22, the version `engines`
+  requires. It pinned Electron 28, which bundles Node 18.18, and its `scan()`
+  test had been asserting on `undefined` since the API became streaming.
+- `lint` and `format:check` cover `config/` and `scripts/`.
+
 ## [1.0.0-rc.1] - 2026-08-12
 
 The first release candidate for 1.0. A contract-hardening pass: little new
