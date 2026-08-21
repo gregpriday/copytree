@@ -30,7 +30,12 @@ jobs:
         # oldest version the package claims to support was the one version
         # never tested. Minimum-version breakage is usually an API that landed
         # later in the same major, which a current 22.x cannot reveal.
-        node-version: ['22.12.0', 22, 24]
+        #
+        # `26` is the current release, and it is the other end of the same
+        # promise: `engines` says `>=22.12.0`, with no upper bound, so a Node
+        # that removes a deprecated API belongs in the matrix before a user
+        # finds it. 22 and 24 are the maintained LTS lines.
+        node-version: ['22.12.0', 22, 24, 26]
 
     steps:
       - name: Checkout code
