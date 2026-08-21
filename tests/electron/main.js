@@ -39,9 +39,10 @@ async function runTests() {
   console.log('\n🧪 CopyTree Electron Integration Tests\n');
   console.log(`📁 Project root: ${projectRoot}`);
   // Stated, because the compatibility matrix in the integration guide is a
-  // claim about this pairing. Electron 28 bundles Node 18, which is below the
-  // `engines` floor of 22.12 — so this suite does not currently exercise the
-  // configuration the package says it supports.
+  // claim about this pairing, and it had drifted from it in three directions at
+  // once. The pin was Electron 28, which bundles Node 18.18 — below the
+  // `engines` floor of 22.12 — so this suite was proving something about a
+  // configuration the package does not claim to support.
   console.log(`   Electron ${process.versions.electron} bundles Node ${process.versions.node}`);
   console.log(`📁 Fixtures path: ${fixturesPath}\n`);
 

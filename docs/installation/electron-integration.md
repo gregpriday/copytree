@@ -240,10 +240,11 @@ output start reaching a socket or a file before the last file is rendered.
 | 30–34            | 20.x         | ⚠️ May work; below the declared minimum |
 | <30              | ≤18.x        | ❌ Not supported                        |
 
-> **Known gap.** `npm run test:electron` still pins Electron 28, which bundles
-> Node 18.18 — so the smoke suite does not currently exercise the supported
-> configuration. The suite prints the pairing it ran on. Raising the pin is
-> tracked separately; it needs a CI runner that can download the newer binary.
+`npm run test:electron` runs against Electron 35, and prints the pairing it ran
+on so this table cannot drift from what is actually exercised. It previously
+pinned Electron 28, which bundles Node 18.18 — below the `engines` floor — so
+the suite was proving something about a configuration the package does not
+claim to support.
 
 ## Best Practices
 
