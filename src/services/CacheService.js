@@ -51,6 +51,16 @@ class CacheService {
       success: () => {},
     };
 
+    // `none` is a bypass, not a storage choice. Every method below guarded on
+    // `enabled` alone and then consulted `memoryCache` regardless of driver, so
+    // `cache.driver: none` disabled only the *file* half: a run still cached in
+    // process, and a caller who set it to get a cold, reproducible run did not
+    // get one. Folding it into `enabled` is what makes the guards already in
+    // place mean what they say.
+    if (this.driver === 'none') {
+      this.enabled = false;
+    }
+
     // Ensure cache directory exists
     if (this.enabled && this.driver === 'file') {
       try {

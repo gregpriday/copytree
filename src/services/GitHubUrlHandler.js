@@ -351,16 +351,86 @@ class GitHubUrlHandler {
   }
 
   /**
+   * Where cloned repositories are kept.
+   *
+   * A module-level answer, not an instance one, so `copytree cache` can report
+   * and reclaim this without constructing a handler for a URL nobody asked
+   * about.
+   *
+   * @returns {string} Absolute path to the repository cache root
+   */
+  static cacheRoot() {
+    // Overridable, and deliberately so. Without this the only way to exercise
+    // the cache is against the developer's own — `os.homedir()` reads the
+    // password database and ignores `HOME` on macOS, so a test that thought it
+    // had redirected the home directory deleted a gigabyte of real clones
+    // instead. A cache that can only be tested destructively is a cache nobody
+    // writes a test for.
+    //
+    // Resolved to an absolute path, and only honoured when it names a directory
+    // of its own. `cache clear --repositories` removes everything one level
+    // under this root, so a blank or bare relative value would aim that at the
+    // working directory — which is, very often, the project being copied.
+    const raw = process.env.COPYTREE_REPO_CACHE_PATH;
+    if (raw === undefined) return path.join(os.homedir(), '.copytree', 'repos');
+
+    // Present but unusable is an error, not a reason to quietly use the real
+    // cache instead. Falling back was worse than either alternative: someone
+    // who set this to protect their own clones — which is the entire reason it
+    // exists — would have been silently redirected at them.
+    const override = raw.trim();
+
+    if (override === '' || !path.isAbsolute(override)) {
+      throw new CommandError(
+        `COPYTREE_REPO_CACHE_PATH must be an absolute path; received ${JSON.stringify(raw)}`,
+        'repo-cache-path',
+      );
+    }
+
+    const resolved = path.resolve(override);
+
+    // A filesystem root or a home directory is never a cache of its own.
+    if (resolved === path.parse(resolved).root || resolved === os.homedir()) {
+      throw new CommandError(
+        `COPYTREE_REPO_CACHE_PATH must name a directory of its own, not ${resolved}`,
+        'repo-cache-path',
+      );
+    }
+
+    return resolved;
+  }
+
+  /**
    * Set up cache directory for cloned repositories
    */
   setupCacheDirectory() {
-    this.cacheDir = path.join(os.homedir(), '.copytree', 'repos');
+    this.cacheDir = GitHubUrlHandler.cacheRoot();
     try {
-      fs.ensureDirSync(this.cacheDir);
+      // `0700`. This holds complete checkouts of repositories that may be
+      // private, under a directory that would otherwise inherit the umask —
+      // and a world-readable copy of a private repository in a home directory
+      // is a copy the owner does not know they made.
+      fs.ensureDirSync(this.cacheDir, { mode: 0o700 });
+
+      // `mkdir` applies a mode only when it creates the directory, and this one
+      // has existed since before it was created privately. Narrowing it on the
+      // way past is the only thing that fixes an already-loose cache.
+      if (process.platform !== 'win32') {
+        try {
+          fs.chmodSync(this.cacheDir, 0o700);
+        } catch {
+          // A cache directory that cannot be narrowed is still usable, and
+          // failing the copy over it would be a worse outcome than the loose
+          // permissions it is warning about.
+        }
+      }
     } catch (error) {
       throw new CommandError(
         `Failed to create repository cache directory at ${this.cacheDir}: ${error.message}. ` +
-          'Ensure HOME is writable or set a custom cache path via configuration.',
+          // Not "set a custom cache path via configuration": there is no such
+          // key, and sending someone to look for one wastes the time the
+          // remediation was supposed to save.
+          'Ensure your home directory is writable.',
         'GitHubUrlHandler',
         { originalError: error },
       );
@@ -750,8 +820,14 @@ class GitHubUrlHandler {
     }
 
     if (/Remote branch .* not found|Could not find remote branch/i.test(details)) {
+      // `this.branch` is empty until a ref has been resolved, and this
+      // classifier runs during that resolution — so a bare repository URL
+      // produced "Branch '' not found", which reads as a bug in CopyTree
+      // rather than a fact about the remote.
       return new CommandError(
-        `Branch '${this.branch}' not found in ${this.repoUrl}`,
+        this.branch
+          ? `Branch '${this.branch}' not found in ${this.repoUrl}`
+          : `The requested branch was not found in ${this.repoUrl}`,
         'github-branch-not-found',
       );
     }
@@ -827,23 +903,46 @@ class GitHubUrlHandler {
   }
 
   /**
-   * Detect default branch for repository
+   * Ask the remote which branch its HEAD points at.
+   *
+   * Failures are reported, not guessed past. This used to catch everything and
+   * return `'main'`, which turned an authentication failure, an unreachable
+   * network or a missing repository into a later, wronger error — "Branch
+   * 'main' not found" — sent to someone whose actual problem was a missing
+   * token. And plenty of repositories do not use `main`: for those the guess
+   * failed even when everything else worked.
+   *
+   * A remote that answers but advertises no symbolic HEAD is a different case,
+   * and a real one: an empty repository has no default branch to name. That is
+   * reported as itself rather than as a network problem.
+   *
+   * @returns {Promise<string>} The default branch name
+   * @throws {CommandError} If the remote cannot be reached or has no HEAD
    */
   async detectDefaultBranch() {
+    let output;
     try {
-      const output = await this.runGit(['ls-remote', '--symref', this.repoUrl, 'HEAD']);
-
-      const match = output.match(/ref: refs\/heads\/([^\s]+)\s+HEAD/);
-      const branch = match ? match[1] : 'main';
-
-      logger.info('Detected default branch', { branch });
-      return branch;
+      output = await this.runGit(['ls-remote', '--symref', this.repoUrl, 'HEAD']);
     } catch (error) {
-      logger.warn('Failed to detect default branch, using "main"', {
-        error: error.message,
-      });
-      return 'main';
+      // Cancellation is the caller's decision, not a remote failure. Classified
+      // as one it became "Failed to reach repository", which describes the
+      // network rather than the Ctrl+C that caused it.
+      if (error?.name === 'AbortError') throw error;
+      throw this.describeCloneError(error);
     }
+
+    const match = output.match(/ref: refs\/heads\/([^\s]+)\s+HEAD/);
+
+    if (!match) {
+      throw new CommandError(
+        `${this.repoUrl} did not advertise a default branch. The repository may be empty; ` +
+          `name a branch explicitly if it has one.`,
+        'github-no-default-branch',
+      );
+    }
+
+    logger.info('Detected default branch', { branch: match[1] });
+    return match[1];
   }
 
   /**

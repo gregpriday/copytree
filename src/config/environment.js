@@ -49,6 +49,11 @@ export const ENVIRONMENT_VARIABLES = Object.freeze([
     path: true,
   },
   {
+    name: 'COPYTREE_REPO_CACHE_PATH',
+    description: 'Directory for cloned repositories, instead of ~/.copytree/repos',
+    path: true,
+  },
+  {
     name: 'COPYTREE_REFERENCE_PATH',
     description: 'Directory for temporary reference files, instead of the system temp directory',
     path: true,

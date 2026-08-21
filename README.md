@@ -350,8 +350,11 @@ For detailed guides, see the `docs/` directory:
 The colon spellings (`config:validate`, `cache:clear`) still parse and name their replacement.
 
 > **Note:** CopyTree automatically creates required directories (e.g., `~/.copytree/cache/`) on
-> first use. Temporary reference files land in `<temp>/copytree/<project>/` and are reclaimed by
-> `copytree cache gc` on a seven-day retention policy.
+> first use. `copytree cache status` reports all three caches it keeps — transformations,
+> temporary reference files, and cloned repositories under `~/.copytree/repos` — with their size
+> and location. `copytree cache gc` reclaims reference files after seven days and unused clones
+> after thirty. `copytree cache clear` needs `--references` or `--repositories` by name, because
+> re-cloning a repository is minutes of network away.
 
 ## 🐛 Troubleshooting
 

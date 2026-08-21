@@ -14,7 +14,7 @@ import fs from '../utils/fsx.js';
 import { ConfigManager, defaultDataConfigPath } from '../config/ConfigManager.js';
 import { REFERENCE_ROOT } from '../utils/outputDestination.js';
 import { Feedback, writePayload } from '../cli/io.js';
-import { json } from '../cli/render/format.js';
+import { formatBytes, json } from '../cli/render/format.js';
 import { VERSION } from '../version.js';
 import { PolicyError } from '../utils/errors.js';
 import { describeEnvironment } from '../config/environment.js';
@@ -43,6 +43,7 @@ export default async function doctorCommand(request, context = {}) {
   await checkInstallation(add);
   await checkConfiguration(add);
   await checkWritableDirectories(add);
+  await checkRepositoryCache(add);
   await checkClipboard(add);
   await checkGit(add);
   await checkGitleaks(add);
@@ -258,6 +259,41 @@ async function isWritable(dir) {
  * Check that a file reference can be placed on the clipboard.
  * @param {Function} add - Check recorder
  */
+/**
+ * Report the size of the repository clone cache.
+ *
+ * It holds whole checkouts and nothing bounded it: no command reported it, so
+ * it grew until someone went looking for their disk space by hand. A gigabyte
+ * of clones is not a failure — it is a cache doing its job — but it is worth
+ * saying out loud, with the command that reclaims it.
+ *
+ * @param {Function} add - Check recorder
+ * @returns {Promise<void>} Resolves when the check is recorded
+ */
+async function checkRepositoryCache(add) {
+  try {
+    const { repositoryStatus } = await import('../services/repositoryStore.js');
+    const status = await repositoryStatus();
+
+    if (status.entries === 0) {
+      add('repository cache', 'pass', `empty (${status.path})`);
+      return;
+    }
+
+    const size = formatBytes(status.bytes);
+    add(
+      'repository cache',
+      status.bytes > 2 * 1024 * 1024 * 1024 ? 'warn' : 'pass',
+      `${status.entries} cached ${status.entries === 1 ? 'repository' : 'repositories'}, ${size} at ${status.path}`,
+      status.bytes > 2 * 1024 * 1024 * 1024
+        ? 'Reclaim unused clones with: copytree cache gc --repositories'
+        : null,
+    );
+  } catch (error) {
+    add('repository cache', 'warn', `could not be read: ${error.message}`);
+  }
+}
+
 async function checkClipboard(add) {
   try {
     const { default: clipboard } = await import('../utils/clipboard.js');

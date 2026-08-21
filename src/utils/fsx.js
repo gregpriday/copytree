@@ -39,6 +39,7 @@
  */
 
 import {
+  chmodSync,
   closeSync,
   createReadStream,
   createWriteStream,
@@ -113,10 +114,11 @@ function ensureDir(path) {
 /**
  * Create a directory and any missing parents, synchronously.
  * @param {string} path - Directory to create
+ * @param {Object} [options={}] - Options, e.g. `{ mode: 0o700 }`
  * @returns {string|undefined} First directory created, per Node
  */
-function ensureDirSync(path) {
-  return mkdirSync(path, { recursive: true });
+function ensureDirSync(path, options = {}) {
+  return mkdirSync(path, { recursive: true, ...options });
 }
 
 /**
@@ -181,6 +183,7 @@ const read = promisify(readCb);
 
 export {
   close,
+  chmodSync,
   closeSync,
   createReadStream,
   createWriteStream,
@@ -222,6 +225,7 @@ export {
 
 export default {
   close,
+  chmodSync,
   closeSync,
   createReadStream,
   createWriteStream,

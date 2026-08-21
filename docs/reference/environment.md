@@ -31,6 +31,7 @@ this page, so an operational surprise is diagnosable without reading it.
 | `COPYTREE_DATA_CONFIG_PATH`   | Override the data-configuration directory holding `config.yaml` |
 | `COPYTREE_LEGACY_CONFIG_PATH` | Override the legacy `~/.copytree` directory                     |
 | `COPYTREE_REFERENCE_PATH`     | Override where temporary reference files are written            |
+| `COPYTREE_REPO_CACHE_PATH`    | Override where cloned repositories are cached                   |
 | `XDG_CONFIG_HOME`             | Linux: the base for `copytree/config.yaml`                      |
 | `APPDATA`                     | Windows: the base for `CopyTree\config.yaml`                    |
 

@@ -45,7 +45,7 @@ copytree plan .              # preview the exact final export
 | `copytree config migrate` | Convert legacy ~/.copytree configuration into a data file |
 | `copytree cache status` | Report cache contents and location |
 | `copytree cache clear` | Remove cached entries |
-| `copytree cache gc` | Remove expired entries and stale reference files |
+| `copytree cache gc` | Remove expired entries, stale reference files and unused clones |
 | `copytree doctor` | Check CopyTree, clipboard, Git and converters |
 | `copytree completion` | Generate shell completion code |
 | `copytree debug profile` | Capture CPU and/or heap profiles |
@@ -687,6 +687,7 @@ copytree cache clear [options]
 | Option | Meaning | Notes |
 |---|---|---|
 | `--transformations` | Only the transformation cache |  |
+| `--repositories` | Only the cloned repositories (clear needs this explicitly) |  |
 | `--references` | Only the temporary reference files (clear needs this explicitly) |  |
 | `--format <type>` | Report format: text, json | default: `text` |
 
@@ -706,13 +707,14 @@ copytree cache clear [options]
 ```bash
 copytree cache clear
 copytree cache clear --transformations
+copytree cache clear --repositories
 ```
 
 **Machine output**: `copytree-cache@1`
 
 ## `copytree cache gc`
 
-Remove expired entries and stale reference files
+Remove expired entries, stale reference files and unused clones
 
 ```bash
 copytree cache gc [options]
@@ -723,6 +725,7 @@ copytree cache gc [options]
 | Option | Meaning | Notes |
 |---|---|---|
 | `--transformations` | Only the transformation cache |  |
+| `--repositories` | Only the cloned repositories (clear needs this explicitly) |  |
 | `--references` | Only the temporary reference files (clear needs this explicitly) |  |
 | `--retention-days <n>` | Reference-file retention window | advanced; default: `7` |
 | `--format <type>` | Report format: text, json | default: `text` |

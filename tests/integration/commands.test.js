@@ -41,8 +41,14 @@ function runCommand(command, options = {}) {
       // Set dummy API key for tests to avoid AI provider errors
       GEMINI_API_KEY: 'test-api-key-for-integration-tests',
       // A HOME the suite owns, so cache commands cannot reach the real one.
+      //
+      // `HOME` alone does not achieve that: `os.homedir()` reads the password
+      // database and ignores it on macOS, so the repository cache resolved to
+      // the developer's own — and `cache clear --repositories` would have
+      // emptied it. The override is what actually redirects it.
       HOME: SANDBOX_HOME,
       USERPROFILE: SANDBOX_HOME,
+      COPYTREE_REPO_CACHE_PATH: path.join(SANDBOX_HOME, '.copytree', 'repos'),
       // Disable transforms by default to avoid AI calls
       COPYTREE_NO_TRANSFORM: 'true',
     };

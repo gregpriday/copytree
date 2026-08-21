@@ -15,6 +15,11 @@ import {
   collectReferenceFiles,
   referenceStatus,
 } from '../services/referenceStore.js';
+import {
+  DEFAULT_REPOSITORY_RETENTION_DAYS,
+  collectRepositories,
+  repositoryStatus,
+} from '../services/repositoryStore.js';
 import { Feedback, writePayload } from '../cli/io.js';
 import { formatBytes, json, table } from '../cli/render/format.js';
 
@@ -83,14 +88,25 @@ export default async function cacheCommand(request, context = {}) {
  * @returns {{transformations: boolean, git: boolean, references: boolean}} Selection
  */
 function selectedCategories(report, action) {
-  const named = ['transformations', 'references'].filter((name) => report[name] === true);
+  const all = ['transformations', 'references', 'repositories'];
+  const named = all.filter((name) => report[name] === true);
+
   if (named.length === 0) {
-    return { transformations: true, references: action !== 'clear' };
+    // Destructive actions need the expensive categories asked for by name. A
+    // cloned repository is minutes of network away from being rebuilt, and both
+    // `cache clear` and `cache gc` meaning "and delete every checkout you have"
+    // is a surprise nobody wants twice. `status` shows everything, because
+    // looking costs nothing.
+    const destructive = action !== 'status';
+
+    return {
+      transformations: true,
+      references: action === 'gc' ? true : !destructive,
+      repositories: !destructive,
+    };
   }
-  return {
-    transformations: named.includes('transformations'),
-    references: named.includes('references'),
-  };
+
+  return Object.fromEntries(all.map((name) => [name, named.includes(name)]));
 }
 
 /**
@@ -108,6 +124,10 @@ async function status(cache, selected) {
       category: 'transformations',
       location: cacheStatus.path,
       enabled: cacheStatus.enabled,
+      // Named, so a disabled cache does not read as an empty one. `driver:
+      // none` and "the cache directory could not be created" both report zero
+      // entries, and only this tells them apart.
+      driver: cacheStatus.driver,
       entries: cacheStatus.entries,
       bytes: cacheStatus.bytes,
       oldest: cacheStatus.oldest,
@@ -125,6 +145,19 @@ async function status(cache, selected) {
       bytes: refs.bytes,
       oldest: refs.oldest,
       newest: refs.newest,
+    });
+  }
+
+  if (selected.repositories) {
+    const repos = await repositoryStatus();
+    entries.push({
+      category: 'repositories',
+      location: repos.path,
+      enabled: true,
+      entries: repos.entries,
+      bytes: repos.bytes,
+      oldest: repos.oldest,
+      newest: repos.newest,
     });
   }
 
@@ -150,11 +183,16 @@ async function clear(cache, selected) {
     results.push({ category: 'references', removed: reclaimed.removed, bytes: reclaimed.bytes });
   }
 
+  if (selected.repositories) {
+    const reclaimed = await collectRepositories({ all: true });
+    results.push({ category: 'repositories', removed: reclaimed.removed, bytes: reclaimed.bytes });
+  }
+
   return { schema: CACHE_SCHEMA, action: 'clear', categories: results };
 }
 
 /**
- * Remove expired entries and stale reference files.
+ * Remove expired entries, stale reference files and unused clones.
  * @param {CacheService} cache - Cache service
  * @param {Object} selected - Selected categories
  * @param {number} retentionDays - Reference retention window
@@ -178,6 +216,20 @@ async function collect(cache, selected, retentionDays) {
       removed: reclaimed.removed,
       bytes: reclaimed.bytes,
       retentionDays,
+    });
+  }
+
+  if (selected.repositories) {
+    // A longer window than the reference files get. A clone is minutes of
+    // network to rebuild and cheap to keep; a reference file is the opposite.
+    const reclaimed = await collectRepositories({
+      retentionDays: DEFAULT_REPOSITORY_RETENTION_DAYS,
+    });
+    results.push({
+      category: 'repositories',
+      removed: reclaimed.removed,
+      bytes: reclaimed.bytes,
+      retentionDays: DEFAULT_REPOSITORY_RETENTION_DAYS,
     });
   }
 
@@ -221,7 +273,12 @@ function renderCacheText(model) {
     return `${verb} ${entry.removed} ${entry.category} entr${entry.removed === 1 ? 'y' : 'ies'}${bytes}`;
   });
   if (model.action === 'gc') {
-    lines.push(`Reference retention: ${model.retentionDays} days`);
+    // Per category. One line saying "Reference retention" was printed even for
+    // `gc --repositories`, which uses a different window and never appeared.
+    for (const entry of model.categories) {
+      if (entry.retentionDays === undefined) continue;
+      lines.push(`${entry.category} retention: ${entry.retentionDays} days`);
+    }
   }
   return `${lines.join('\n')}\n`;
 }
