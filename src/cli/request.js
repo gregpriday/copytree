@@ -484,6 +484,7 @@ export function buildBudgetRequest(raw) {
     // `--head` was the same operation as `--max-files` with a different name.
     maxFiles: raw.maxFiles ?? raw.head ?? null,
     maxChars: raw.maxChars ?? (raw.charLimit != null ? Number(raw.charLimit) : null),
+    retainOversizedFirstFile: raw.retainOversizedFirstFile ?? null,
   };
 }
 

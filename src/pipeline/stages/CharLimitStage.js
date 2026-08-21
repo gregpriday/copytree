@@ -1,5 +1,6 @@
 import Stage from '../Stage.js';
 import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
+import { ValidationError, ERROR_CODES } from '../../utils/errors.js';
 
 /**
  * CharLimitStage - Enforces a character budget across loaded file content.
@@ -15,6 +16,17 @@ import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 class CharLimitStage extends Stage {
   constructor(options = {}) {
     super(options);
+    // Fatal, like every other budget. The pipeline runs with
+    // `continueOnError: true`, so a stage that throws is normally logged,
+    // skipped, and the run still reports success — which for this stage means
+    // returning a document that ignores the character budget it was given.
+    // `maxChars` is not presentation polish: it is a context-window and cost
+    // boundary, and a successful result that silently exceeds it overflows an
+    // agent's context, costs money, and emits content the caller capped on
+    // purpose. A control that disengages exactly when the code enforcing it is
+    // already in an unexpected state is worse than no control, because the
+    // caller believes it held.
+    this.fatal = true;
     // Nullish, not falsy: `limit: 0` is a real budget ("no file content at
     // all"), and `||` silently promoted it to the 2M default — the one value
     // where the caller most clearly meant something specific.
@@ -22,7 +34,7 @@ class CharLimitStage extends Stage {
     // "Characters" here means UTF-16 code units, matching `String.length`.
     // Truncation still never splits a surrogate pair, so a budget can land
     // mid-pair without producing a lone surrogate.
-    this.limit = options.limit ?? 2000000; // 2M chars default
+    this.limit = normalizeLimit(options.limit ?? 2000000); // 2M chars default
     // Planning mode: content has not been loaded (dry run), so byte size stands
     // in for character length. Near-exact for the UTF-8 text that gets included,
     // which is what keeps a dry run a strict prefix of the real run.
@@ -84,7 +96,15 @@ class CharLimitStage extends Stage {
           continue;
         }
 
-        limitedFiles.push({ ...file, originalLength: contentLength, truncated: true });
+        // `plannedLength` is what this file will contribute once cut short.
+        // The estimator reads it; without it the file counted its whole size
+        // and the plan reported a document the run would never produce.
+        limitedFiles.push({
+          ...file,
+          originalLength: contentLength,
+          plannedLength: remaining,
+          truncated: true,
+        });
         totalChars += remaining;
         truncatedFiles++;
         budgetExhausted = true;
@@ -144,6 +164,39 @@ class CharLimitStage extends Stage {
       },
     };
   }
+}
+
+/**
+ * Accept only a character budget that can actually be enforced.
+ *
+ * `NaN`, `Infinity`, a negative number, a fraction and an unsafe integer all
+ * used to reach the loop below, where `totalChars + contentLength <= this.limit`
+ * silently answers "yes, always" for `NaN` and `Infinity` — so a malformed
+ * `--max-chars` disabled the budget rather than being refused. Rejecting it
+ * before any content is examined is the difference between a typo and an
+ * unbounded document.
+ *
+ * @param {*} limit - The requested budget
+ * @returns {number} The budget, when it is one
+ * @throws {ValidationError} If the value cannot be used as a character budget
+ */
+function normalizeLimit(limit) {
+  // A string is accepted because a profile's YAML and an argv value both arrive
+  // as one, but it is converted rather than parsed. `parseInt` was doing the
+  // conversion at the call site and reads `1.5` as `1` and `"12abc"` as `12`,
+  // so a malformed budget became a plausible one and the caller was never told.
+  const value = typeof limit === 'string' && limit.trim() !== '' ? Number(limit) : limit;
+
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new ValidationError(
+      `Character budget must be a non-negative whole number, received ${String(limit)}`,
+      'CharLimitStage',
+      limit,
+      { code: ERROR_CODES.INVALID_OPTION },
+    );
+  }
+
+  return value;
 }
 
 /**

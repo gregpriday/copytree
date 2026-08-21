@@ -1,3 +1,20 @@
+/**
+ * Read a positive integer from the environment, or `null` for "not set".
+ *
+ * `null` rather than `undefined`: an `undefined` value does not survive the
+ * merge into the effective configuration, so the key vanishes from
+ * `config show --sources` entirely and the reader cannot tell whether the
+ * setting exists.
+ *
+ * @param {string} name - Environment variable name
+ * @returns {number|null} The value, or null
+ */
+function positiveIntFromEnv(name) {
+  const value = Number.parseInt(process.env[name], 10);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+
 export default {
   // 1. JUNK: Files that should never exist in output (complete noise)
   // Global excluded directories (always excluded regardless of location)
@@ -117,14 +134,18 @@ export default {
   // Set to 0 or false to disable.
   sizeGate: 256 * 1024, // 256KB
 
-  // Output limits
-  maxOutputSize: 50 * 1024 * 1024, // 50MB
-  maxCharacterLimit: 2000000, // 2M chars
+  // Largest binary a `--binary base64` run will inline. Beyond it the file is
+  // reported rather than embedded: base64 costs a third more than the bytes it
+  // encodes, and an agent cannot read it anyway.
+  maxBase64Size: 1024 * 1024,
 
   // Processing options
   followSymlinks: false,
   includeHidden: false,
-  preserveEmptyDirs: false,
+
+  // Honour `.gitignore`, `.git/info/exclude` and the user's global gitignore.
+  // A layer in the one exclusion evaluator, not a separate pass.
+  respectGitignore: true,
 
   // Gitignore fidelity. CopyTree never shells out to `git check-ignore` and never
   // requires a git repository; these are all plain filesystem reads.
@@ -153,6 +174,11 @@ export default {
   exclusionReport: {
     // How many of the largest exclusions to retain under `explain: true`.
     topN: 50,
+
+    // Ceiling on retained decisions under `all` retention (`plan --explain`,
+    // `explain`). Beyond it the report sets `truncated` and counts what it
+    // dropped, rather than quietly reading as "that is everything".
+    maxEntries: 100000,
   },
 
   // Binary file handling
@@ -329,7 +355,6 @@ export default {
   lineNumberFormat: '%4d: ', // printf-style format
 
   // Tree view options
-  treeIndent: '  ',
   treeConnectors: {
     middle: '├── ',
     last: '└── ',
@@ -344,25 +369,32 @@ export default {
     maxDelay: 2000, // Maximum delay cap in milliseconds
   },
 
-  // File discovery configuration
+  // File discovery configuration.
+  //
+  // The three environment variables read here are the whole of CopyTree's
+  // environment interface, and they are operational rather than semantic: they
+  // tune how hard the walker works, never which files it selects or what the
+  // output contains. That line is deliberate — a colleague reproducing your
+  // export should not need your shell to do it. `copytree doctor --format json`
+  // reports their effective values.
   discovery: {
-    // Enable parallel directory traversal (default: false for gradual rollout)
+    // Parallel directory traversal. Off by default; COPYTREE_DISCOVERY_PARALLEL.
     parallelEnabled: ['1', 'true', 'TRUE', 'True'].includes(
       process.env.COPYTREE_DISCOVERY_PARALLEL,
     ),
 
-    // Maximum concurrent directory operations
-    // Falls back to app.maxConcurrency if not specified
-    maxConcurrency: (() => {
-      const val = parseInt(process.env.COPYTREE_DISCOVERY_CONCURRENCY, 10);
-      return Number.isInteger(val) && val > 0 ? val : undefined;
-    })(),
+    // Concurrent directory operations. COPYTREE_DISCOVERY_CONCURRENCY.
+    //
+    // `null` means "follow app.maxConcurrency", which is the actual default and
+    // is why this is not simply the number 5. It used to be `undefined`, which
+    // reads identically in JavaScript and does not survive into the merged
+    // configuration at all — so `config show --sources` had no row for it and a
+    // reader could not discover the setting existed.
+    maxConcurrency: positiveIntFromEnv('COPYTREE_DISCOVERY_CONCURRENCY'),
 
-    // Backpressure threshold (default: 2x concurrency)
-    // Pauses scheduling when buffered results exceed this
-    highWaterMark: (() => {
-      const val = parseInt(process.env.COPYTREE_DISCOVERY_HIGH_WATER_MARK, 10);
-      return Number.isInteger(val) && val > 0 ? val : undefined;
-    })(),
+    // Backpressure threshold; scheduling pauses above it.
+    // `null` means "twice the effective concurrency".
+    // COPYTREE_DISCOVERY_HIGH_WATER_MARK.
+    highWaterMark: positiveIntFromEnv('COPYTREE_DISCOVERY_HIGH_WATER_MARK'),
   },
 };

@@ -276,6 +276,13 @@ const BUDGET_OPTIONS = {
       visibility: 'common',
     },
     {
+      id: 'retainOversizedFirstFile',
+      flags: '--retain-oversized-first-file',
+      description: 'Keep a first file that alone exceeds --max-total-size',
+      value: 'boolean',
+      visibility: 'advanced',
+    },
+    {
       id: 'sort',
       flags: '--sort <by>',
       description: `Selection order: ${SORT_KEYS.join(', ')}`,

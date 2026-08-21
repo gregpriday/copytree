@@ -16,6 +16,7 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { stripCommentLines } from '../../helpers/sourceScan.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const declaration = readFileSync(path.join(repoRoot, 'types/index.d.ts'), 'utf8');
@@ -32,10 +33,7 @@ const declaration = readFileSync(path.join(repoRoot, 'types/index.d.ts'), 'utf8'
  * @param {string} relative - Path relative to the repository root
  * @returns {string} File contents, comment-free
  */
-const source = (relative) =>
-  readFileSync(path.join(repoRoot, relative), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
+const source = (relative) => stripCommentLines(readFileSync(path.join(repoRoot, relative), 'utf8'));
 
 /**
  * The option names an interface declares.

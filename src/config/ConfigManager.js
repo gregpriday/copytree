@@ -82,6 +82,22 @@ export function defaultDataConfigPath() {
  * outside the app's control, invisible in its UI, different on every machine —
  * and a `.js` file there is arbitrary code executed in the host process.
  */
+/**
+ * Whether a loaded value should be merged into what is already there.
+ *
+ * Only a plain object. `merge()` folds a source into a target and drops a
+ * primitive source entirely — so a scalar became `{}` — while an array source
+ * is merged element-wise into an object, producing numeric keys. Both are
+ * silent, and both mean a top-level setting written by a user does not survive
+ * loading.
+ *
+ * @param {*} value - Loaded value
+ * @returns {boolean} True when merging is the right operation
+ */
+function isMergeable(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 class ConfigManager {
   constructor(options = {}) {
     this.config = {};
@@ -130,8 +146,16 @@ class ConfigManager {
     this.validate = null;
     this.schemaVersion = '1.0.0';
 
-    // Track configuration sources for provenance
+    // Provenance, per leaf path rather than per section.
+    //
+    // `configSources` records the last file to touch a top-level section, which
+    // is the wrong granularity: when two files each contribute different keys
+    // to `copytree`, the later one is named as the source of keys that came
+    // from the earlier one. `config show --sources` exists to explain surprising
+    // behaviour, and pointing someone at the wrong file is worse than saying
+    // nothing — they edit it, nothing changes, and they stop trusting the tool.
     this.configSources = {};
+    this.leafSources = new Map();
     this.defaultConfig = {};
     this.userConfig = {};
     this.envOverrides = {};
@@ -200,6 +224,13 @@ class ConfigManager {
     // defaults that shipped inside this package — so validating re-proves, on
     // every single invocation, something the test suite already proves once.
     // The cost is a schema read, an Ajv construction and a schema compile.
+    // Before validation, and independent of it. A configuration written against
+    // a schema this build cannot read is not a validation preference — it is a
+    // file whose keys may not mean what this build thinks they mean. Running the
+    // check inside `validateConfig()` meant `noValidate`, `COPYTREE_NO_VALIDATE`
+    // and a schema that failed to compile each turned the guard off.
+    this._assertSchemaVersionSupported();
+
     if (this.validationEnabled && this._hasUntrustedConfig()) {
       await this.loadSchema();
       this.validateConfig();
@@ -280,6 +311,7 @@ class ConfigManager {
         // defeats the isolation that makes concurrent copy() calls safe.
         this.config[configName] = cloneDeep(configData);
         this.defaultConfig[configName] = cloneDeep(configData);
+        this._recordLeafSources(configData, configName, 'packaged-default');
         loaded++;
       } catch (error) {
         this._recordLoadError(configName, error);
@@ -341,9 +373,17 @@ class ConfigManager {
           data = configModule.default || configModule;
         }
 
+        // Same top-level rule as the data loader: a scalar or an array is
+        // assigned, not merged. `merge()` drops a primitive source entirely and
+        // turns an array into an object with numeric keys, so a legacy
+        // `schemaVersion.js` was silently lost and a legacy top-level array was
+        // silently mangled.
         this.userConfig[configName] = cloneDeep(data);
-        this.config[configName] = merge({}, this.config[configName] || {}, data);
+        this.config[configName] = isMergeable(data)
+          ? merge({}, this.config[configName] || {}, data)
+          : cloneDeep(data);
         this.configSources[configName] = filePath;
+        this._recordLeafSources(data, configName, filePath);
         loaded += 1;
       } catch (error) {
         this._recordLoadError(`user:${configName}`, error);
@@ -393,9 +433,22 @@ class ConfigManager {
         // `config.yaml` carries sections; `copytree.yaml` is one section.
         const sections = stem === 'config' ? data : { [stem]: data };
         for (const [section, value] of Object.entries(sections)) {
-          this.userConfig[section] = merge({}, this.userConfig[section] || {}, cloneDeep(value));
-          this.config[section] = merge({}, this.config[section] || {}, value);
+          // A scalar at the top level is assigned, not merged. `merge()` folds
+          // a source into a target object and drops a primitive source
+          // entirely, so `schemaVersion: '1.0.0'` — the one root-level scalar
+          // the schema declares — arrived as `{}` and then failed validation
+          // with "must be string". The key was not merely unread; it could not
+          // be written.
+          if (isMergeable(value)) {
+            this.userConfig[section] = merge({}, this.userConfig[section] || {}, cloneDeep(value));
+            this.config[section] = merge({}, this.config[section] || {}, value);
+          } else {
+            this.userConfig[section] = cloneDeep(value);
+            this.config[section] = cloneDeep(value);
+          }
+
           this.configSources[section] = filePath;
+          this._recordLeafSources(value, section, filePath);
         }
         loaded += 1;
       } catch (error) {
@@ -460,6 +513,10 @@ class ConfigManager {
    */
   set(path, value) {
     pathSet(this.config, path, value);
+    // Recorded, so `config show --sources` says `runtime` rather than
+    // attributing a value the embedder set at run time to the packaged
+    // defaults — sending anyone debugging it to a file that does not contain it.
+    this._recordLeafSources(value, path, 'runtime');
   }
 
   /**
@@ -477,17 +534,6 @@ class ConfigManager {
    */
   all() {
     return cloneDeep(this.config);
-  }
-
-  /**
-   * env() helper - now always returns default value (env vars no longer supported)
-   * @param {string} key - Environment variable key (ignored)
-   * @param {*} defaultValue - Default value
-   * @returns {*} Always returns defaultValue
-   */
-  env(key, defaultValue = null) {
-    // Environment variables are no longer supported - always return default
-    return defaultValue;
   }
 
   /**
@@ -591,8 +637,17 @@ class ConfigManager {
     if (!isValid) {
       const errors = this.validate.errors
         .map((err) => {
-          const path = err.instancePath || '(root)';
-          const message = err.message;
+          // Name the offending key. Ajv reports an unknown key as
+          // `/copytree: must NOT have additional properties`, which tells the
+          // reader that one of forty keys in that section is wrong and not
+          // which — from a schema whose entire design is that unknown keys are
+          // rejected on purpose. The name is in `params`; it just was not being
+          // used.
+          const offending = err.params?.additionalProperty;
+          const path = offending
+            ? `${err.instancePath || ''}/${offending}`
+            : err.instancePath || '(root)';
+          const message = offending ? 'is not a recognised configuration key' : err.message;
           // Scalars only. An `additionalProperties` failure at the root reports
           // `err.data` as the entire configuration object, so rendering it
           // unconditionally put the whole effective config — every path, token
@@ -618,6 +673,64 @@ class ConfigManager {
         schemaVersion: this.schemaVersion,
       });
     }
+  }
+
+  /**
+   * Refuse a configuration written against a schema this build cannot read.
+   *
+   * `schemaVersion` was accepted, pattern-checked, and then ignored: it
+   * selected no schema, triggered no migration, and rejected nothing. A key
+   * whose entire purpose is compatibility, which provides none, is worse than
+   * its absence — it tells the author their file is version-tagged and it is
+   * not.
+   *
+   * The rule is the ordinary one for a declared format. A **newer major**
+   * cannot be read, because a future major is exactly the thing that may have
+   * changed what an existing key means, and guessing is how a budget or an
+   * exclusion list quietly comes to mean something else. Anything else is
+   * accepted: an older or equal version describes a subset of what this build
+   * understands, and the closed schema will reject any key that has since been
+   * removed, with a message naming it.
+   *
+   * @throws {ConfigurationError} If the file declares a newer major version
+   * @private
+   */
+  _assertSchemaVersionSupported() {
+    const declared = this.config?.schemaVersion;
+    if (typeof declared !== 'string') return;
+
+    // Compared as digit strings, then as numbers. A major of three hundred
+    // digits converts to `Infinity`, `Number.isInteger(Infinity)` is false, and
+    // the guard returned — while the schema's `^\d+\.\d+\.\d+$` pattern
+    // accepted the string quite happily.
+    const declaredMajor = /^(\d+)\./.exec(declared)?.[1];
+    if (declaredMajor === undefined) return;
+
+    const supported = Number.parseInt(this.schemaVersion.split('.')[0], 10);
+    const trimmed = declaredMajor.replace(/^0+(?=\d)/, '');
+    const isNewer =
+      trimmed.length > String(supported).length ||
+      (trimmed.length === String(supported).length && trimmed > String(supported));
+
+    if (!isNewer) return;
+
+    throw new ConfigurationError(
+      `Configuration declares schemaVersion ${declared}, which this build of CopyTree ` +
+        `cannot read; it supports schema major ${supported}`,
+      'schemaVersion',
+      {
+        code: ERROR_CODES.CONFIG_INVALID,
+        // Names the key so `config validate` can report this against the schema
+        // version rather than against the packaged defaults, which are fine.
+        configKey: 'schemaVersion',
+        declaredSchemaVersion: declared,
+        schemaVersion: this.schemaVersion,
+        // Deliberately not "set schemaVersion to 1.0.0". Relabelling a file
+        // written for a later schema is exactly what this refuses to do on the
+        // user's behalf, and suggesting they do it by hand defeats the guard.
+        suggestion: 'Upgrade CopyTree, or use a configuration written for schema major 1',
+      },
+    );
   }
 
   /**
@@ -677,6 +790,7 @@ class ConfigManager {
   async reload() {
     this.config = {};
     this.configSources = {};
+    this.leafSources = new Map();
     this.defaultConfig = {};
     this.userConfig = {};
     this.envOverrides = {};
@@ -750,29 +864,42 @@ class ConfigManager {
   _getConfigSource(path, value) {
     // Name the file, not just the tier. "user-config" is not enough to go and
     // change a value, which is the only reason to ask where it came from.
-    if (this._isFromUserConfig(path, value)) {
-      const section = String(path).split('.')[0];
-      return this.configSources[section] || 'user-config';
-    }
+    const recorded = this.leafSources.get(path);
+    if (recorded) return recorded;
 
-    return 'default';
+    // An unrecorded leaf is one nothing wrote: a nested key inside a value a
+    // user file replaced wholesale, or a path that does not exist. The packaged
+    // defaults are the only thing that could have supplied it.
+    return 'packaged-default';
   }
 
   /**
-   * Check if a configuration value comes from user config
+   * Record where each leaf of a loaded value came from.
+   *
+   * Walks to the leaves rather than stopping at the section, because that is
+   * the granularity a reader needs: `copytree.maxFileSize` and
+   * `copytree.sizeGate` can legitimately come from two different files, and
+   * naming one file for both is how someone ends up editing the wrong one.
+   *
+   * Arrays are leaves. A user file that sets `copytree.globalExcludedFiles`
+   * replaces the whole list rather than merging into it, so attributing
+   * individual elements would describe a merge that does not happen.
+   *
+   * @param {*} value - The loaded value
+   * @param {string} prefix - Dotted path of `value`
+   * @param {string} source - `packaged-default`, `runtime`, or a file path
+   * @returns {void}
    * @private
    */
-  _isFromUserConfig(path, value) {
-    const pathParts = path.split('.');
-    const configSection = pathParts[0];
-
-    if (!this.userConfig[configSection]) {
-      return false;
+  _recordLeafSources(value, prefix, source) {
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      for (const [key, child] of Object.entries(value)) {
+        this._recordLeafSources(child, prefix ? `${prefix}.${key}` : key, source);
+      }
+      return;
     }
 
-    // Get the value from user config at this path
-    const userValue = pathGet(this.userConfig, path);
-    return userValue !== undefined && isEqual(userValue, value);
+    this.leafSources.set(prefix, source);
   }
 
   /**
@@ -870,16 +997,4 @@ export async function configAsync(options = {}) {
     }
   }
   return instance;
-}
-
-/**
- * Get environment variable with type conversion
- * NOTE: Environment variables are no longer supported - this always returns defaultValue
- * @param {string} key - Environment variable key (ignored)
- * @param {*} defaultValue - Default value
- * @returns {*} Always returns defaultValue
- */
-export function env(key, defaultValue) {
-  // Environment variables are no longer supported - always return default
-  return defaultValue;
 }

@@ -1,6 +1,6 @@
 import Stage from '../Stage.js';
 import { EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
-import { ValidationError } from '../../utils/errors.js';
+import { ValidationError, ERROR_CODES } from '../../utils/errors.js';
 
 /**
  * BudgetStage - Enforces `maxFileCount` and `maxTotalSize`.
@@ -21,9 +21,17 @@ import { ValidationError } from '../../utils/errors.js';
  * not just the first. The alternative (stop at the first file that does not fit)
  * wastes budget whenever one large file sits in the middle of the sorted order.
  *
- * One exception: if the very first file alone exceeds the budget it is kept
- * anyway, because returning nothing is a worse answer than overshooting. That
- * case is reported as `stats.oversizedFirstFileRetained`.
+ * `maxTotalSize` is a maximum. A single file larger than the whole budget is
+ * dropped like any other file that does not fit, and the selection can come
+ * back empty — which is the honest answer to "give me at most 1MB" when the
+ * only candidate is 40MB. It used to be kept regardless, on the reasoning that
+ * returning nothing is unhelpful; the cost of that reasoning was that a caller
+ * who set the budget to protect a context window or an API bill could be handed
+ * forty times it, having asked for a maximum and been given a suggestion.
+ *
+ * Callers who do want the old behaviour ask for it by name, with
+ * `retainOversizedFirstFile`. It is still reported, as
+ * `stats.oversizedFirstFileRetained`.
  */
 class BudgetStage extends Stage {
   constructor(options = {}) {
@@ -35,8 +43,11 @@ class BudgetStage extends Stage {
     // is already in an unexpected state is worse than no control at all,
     // because the caller believes it held.
     this.fatal = true;
-    this.maxFileCount = normalizeLimit(options.maxFileCount);
-    this.maxTotalSize = normalizeLimit(options.maxTotalSize);
+    this.maxFileCount = normalizeLimit(options.maxFileCount, 'maxFileCount');
+    this.maxTotalSize = normalizeLimit(options.maxTotalSize, 'maxTotalSize');
+    // Off by default: see the class comment. A budget that can be exceeded on
+    // the caller's behalf is not a budget.
+    this.retainOversizedFirstFile = options.retainOversizedFirstFile === true;
   }
 
   async process(input) {
@@ -80,13 +91,17 @@ class BudgetStage extends Stage {
 
       for (const file of kept) {
         const size = file.size || 0;
-        if (totalSize + size > this.maxTotalSize && within.length > 0) {
+        const fits = totalSize + size <= this.maxTotalSize;
+        // The opt-in exception, and only for the first file: keeping one
+        // oversized file is a deliberate overshoot the caller asked for, and
+        // it is reported as `oversizedFirstFileRetained`.
+        const keepAnyway = this.retainOversizedFirstFile && within.length === 0;
+
+        if (!fits && !keepAnyway) {
           dropped.push(file);
           continue;
         }
-        // The first file is always kept even if it alone exceeds the budget:
-        // returning nothing at all is a worse answer than returning one file.
-        // That overshoot is reported rather than hidden — see budgetExceeded.
+
         within.push(file);
         totalSize += size;
       }
@@ -125,8 +140,7 @@ class BudgetStage extends Stage {
     if (budgetExceeded) {
       this.log(
         `Total size budget exceeded: kept ${totalSize} bytes against a budget of ` +
-          `${this.maxTotalSize}. A single file larger than the budget is kept rather than ` +
-          `returning nothing.`,
+          `${this.maxTotalSize}, because retainOversizedFirstFile is set.`,
         'warn',
       );
     }
@@ -137,11 +151,10 @@ class BudgetStage extends Stage {
       stats: {
         ...input.stats,
         budgetedSize: totalSize,
-        // Set when the retained set is larger than maxTotalSize, which happens
-        // only when the very first file alone exceeds it. Named separately from
+        // Set when the retained set is larger than maxTotalSize, which now
+        // happens only under `retainOversizedFirstFile`. Named separately from
         // `truncated` because they mean opposite things: one says files were
-        // dropped, the other says the budget was overshot to avoid returning
-        // nothing at all.
+        // dropped, the other says the budget was deliberately overshot.
         // ...and therefore this branch must not set `truncated`. It did, which
         // contradicted the sentence above: a caller saw `truncated: true` with
         // no `truncatedCount` and no `truncatedBy`, describing a run where
@@ -174,14 +187,40 @@ class BudgetStage extends Stage {
 
 /**
  * Normalize a budget option into a positive number or null.
+ *
+ * `undefined`, `null`, `false` and `0` all mean "no budget" — the convention
+ * this codebase already uses for `sizeGate`, and the reason `--max-files 0` is
+ * refused by the CLI parser rather than silently meaning "select nothing".
+ *
+ * Everything else must be a usable number. It used to be coerced and, on
+ * failure, quietly turned into "no budget": `maxTotalSize: 'garbage'` from a
+ * profile, `-1` from a typo, `Infinity` from a bad computation, all disabled
+ * the cap the caller had asked for and reported a successful unbounded run.
+ * That is the same fail-open a budget exists to prevent, arrived at from the
+ * configuration side instead of the enforcement side.
+ *
  * @param {*} value - Raw option value
+ * @param {string} name - Option name, for the error
  * @returns {number|null} Positive limit, or null when disabled
+ * @throws {ValidationError} If the value is neither a disabler nor a usable limit
  */
-function normalizeLimit(value) {
-  if (value === undefined || value === null || value === false) return null;
-  const num = Number(value);
-  if (!Number.isFinite(num) || num <= 0) return null;
-  return num;
+function normalizeLimit(value, name) {
+  if (value === undefined || value === null || value === false || value === 0) return null;
+
+  // A string is accepted because YAML and argv both deliver one, but it is
+  // converted rather than parsed — `parseInt` reads `'12abc'` as `12`.
+  const num = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+
+  if (!Number.isSafeInteger(num) || num < 0) {
+    throw new ValidationError(
+      `${name} must be a non-negative whole number, received ${String(value)}`,
+      'BudgetStage',
+      value,
+      { code: ERROR_CODES.INVALID_OPTION },
+    );
+  }
+
+  return num === 0 ? null : num;
 }
 
 export default BudgetStage;

@@ -59,9 +59,13 @@ describe('version consistency', () => {
     expect(stdout.trim()).toBe(packageVersion);
   });
 
-  test('the app config resolves the real version, not a hard-coded fallback', async () => {
-    const appConfig = (await import('../../../config/app.js')).default;
-    expect(appConfig.version).toBe(packageVersion);
+  test('the version module resolves the real version, not a hard-coded fallback', async () => {
+    // Read from `src/version.js` rather than from `config/app.js`. The version
+    // is not configuration — nothing read `app.version`, and a public key that
+    // nothing reads is a promise the closed schema does not keep — so it is no
+    // longer a config key at all.
+    const { VERSION } = await import('../../../src/version.js');
+    expect(VERSION).toBe(packageVersion);
   });
 
   test('the changelog documents the current version', () => {

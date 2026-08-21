@@ -399,9 +399,21 @@ export interface ScanOptions {
   sizeGate?: number | false;
   /**
    * Total size budget in bytes across all selected files.
-   * Applied after sorting, so which files survive follows `sort`.
+   *
+   * A hard maximum, applied after sorting so which files survive follows
+   * `sort`. A single file larger than the whole budget is dropped like any
+   * other that does not fit, and the selection can legitimately come back
+   * empty — see `retainOversizedFirstFile` for the opt-out.
    */
   maxTotalSize?: number;
+  /**
+   * Keep a first file that alone exceeds `maxTotalSize` (default: false).
+   *
+   * The escape hatch for "I would rather have one oversized file than nothing".
+   * It applies to the first file only, and the overshoot is reported as
+   * `stats.oversizedFirstFileRetained`.
+   */
+  retainOversizedFirstFile?: boolean;
   /**
    * Maximum number of files.
    * Applied after sorting, so which files survive follows `sort`.
@@ -937,9 +949,10 @@ export interface CopyResult {
     /**
      * Set when the retained set is larger than `maxTotalSize`.
      *
-     * Happens only when the first file alone exceeds the budget: it is kept,
-     * because returning nothing at all is a worse answer, and the overshoot is
-     * reported here rather than hidden.
+     * Happens only under `retainOversizedFirstFile`, which is off by default:
+     * a first file larger than the whole budget is otherwise dropped like any
+     * other that does not fit. The overshoot is reported here rather than
+     * hidden.
      */
     budgetExceeded?: boolean;
     /** Resolved scope entries, when scoped */

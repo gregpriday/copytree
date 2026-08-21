@@ -128,6 +128,8 @@ export function pickForwardedStats(source) {
  * @property {ConfigManager} [config] - ConfigManager instance for isolated configuration.
  *   If not provided, an isolated instance will be created. This enables concurrent
  *   scan operations with different configurations.
+ * @property {boolean} [retainOversizedFirstFile=false] - Keep a first file that alone
+ *   exceeds `maxTotalSize`, rather than returning an empty selection
  * @property {Function} [onProgress] - Progress callback ({ percent, message }).
  *   Called periodically during scanning with normalized progress updates (0-100%).
  * @property {number} [progressThrottleMs=100] - Minimum ms between progress emissions.
@@ -285,6 +287,7 @@ export async function* scan(basePath, options = {}) {
       maxTotalSize: options.maxTotalSize ?? null,
       maxFiles: options.maxFileCount ?? null,
       maxChars: options.charLimit ?? null,
+      retainOversizedFirstFile: options.retainOversizedFirstFile ?? null,
     },
     content: { format: options.format ?? 'xml', includeContent: options.includeContent !== false },
   };
@@ -394,7 +397,10 @@ export async function* scan(basePath, options = {}) {
     const { default: CharLimitStage } = await import('../pipeline/stages/CharLimitStage.js');
     stages.push(
       new CharLimitStage({
-        limit: parseInt(charLimit, 10),
+        // Passed through, not parsed. `parseInt` read `1.5` as `1` and
+        // `'12abc'` as `12`, so a malformed budget silently became a
+        // plausible one; the stage validates and refuses instead.
+        limit: charLimit,
         // Without content loaded (dry run) the budget is planned from byte size
         // so the dry run still selects the same files as the real run.
         plan: options.includeContent === false,

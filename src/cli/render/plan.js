@@ -80,6 +80,7 @@ export function buildPlanModel(plan, request, options = {}) {
       maxTotalSizeBytes: plan.budgets.maxTotalSize.value,
       maxFiles: plan.budgets.maxFiles.value,
       maxChars: plan.budgets.maxChars.value,
+      retainOversizedFirstFile: plan.budgets.retainOversizedFirstFile.value === true,
     },
     exactness: plan.exactness,
     contentRead: false,
@@ -94,6 +95,11 @@ export function buildPlanModel(plan, request, options = {}) {
       truncated: plan.stats.truncated,
       truncatedBy: plan.stats.truncatedBy,
       truncatedCount: plan.stats.truncatedCount,
+      // Why `selectedBytes` can exceed `maxTotalSizeBytes` with nothing
+      // truncated. Without these the plan showed an overshoot and no reason for
+      // it, which reads as the budget simply not working.
+      ...(plan.stats.budgetExceeded ? { budgetExceeded: true } : {}),
+      ...(plan.stats.oversizedFirstFileRetained ? { oversizedFirstFileRetained: true } : {}),
     },
     reportTruncation: {
       truncated: plan.stats.decisionsTruncated,
@@ -248,9 +254,23 @@ export function renderPlanText(model, options = {}) {
   }
 
   if (model.summary.truncated) {
+    // "Dropped" is only true of files the budget removed. The character budget
+    // also *shortens* one file at the boundary and keeps it, and calling that a
+    // drop made the count disagree with the manifest right above it.
+    const shortened = (model.entries ?? []).filter((e) => e.outcome === 'truncated').length;
+    const removed = Math.max(model.summary.truncatedCount - shortened, 0);
+    const parts = [];
+
+    if (removed > 0) parts.push(`${removed} file${removed === 1 ? '' : 's'} dropped`);
+    if (shortened > 0) parts.push(`${shortened} file${shortened === 1 ? '' : 's'} cut short`);
+
+    lines.push(`${parts.join(', ')} by the ${model.summary.truncatedBy} budget.`);
+  }
+
+  if (model.summary.oversizedFirstFileRetained) {
     lines.push(
-      `${model.summary.truncatedCount} file${model.summary.truncatedCount === 1 ? '' : 's'} ` +
-        `dropped by the ${model.summary.truncatedBy} budget.`,
+      `The first file alone exceeds the total-size budget and was kept anyway, ` +
+        `because retainOversizedFirstFile is set.`,
     );
   }
 
@@ -260,7 +280,15 @@ export function renderPlanText(model, options = {}) {
     );
   }
 
-  lines.push('No file contents were read. Character-limit and dedupe effects require a real run.');
+  // The character budget *is* applied here, from byte size, so saying it needs
+  // a real run was wrong twice over: it understated what the plan had done, and
+  // it invited the reader to ignore a truncation the plan had already decided.
+  lines.push(
+    model.exactness.characterBudget === 'estimated-from-bytes'
+      ? 'No file contents were read. The character budget was applied from byte size, so ' +
+          'multi-byte text may fit more than shown. Dedupe effects require a real run.'
+      : 'No file contents were read. Character-limit and dedupe effects require a real run.',
+  );
 
   return `${lines.join('\n')}\n`;
 }

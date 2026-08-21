@@ -18,6 +18,7 @@ import { Feedback, writePayload } from '../cli/io.js';
 import { json, table } from '../cli/render/format.js';
 import { PolicyError, ValidationError, ERROR_CODES } from '../utils/errors.js';
 import { VERSION } from '../version.js';
+import { fileURLToPath } from 'url';
 
 /** Schema identifier for `config show --format json`. */
 export const CONFIG_SCHEMA = 'copytree-config@1';
@@ -186,7 +187,21 @@ async function configValidate(request, context) {
         : 'Reinstall CopyTree; the packaged config directory is missing',
     );
   } catch (error) {
-    record('packaged defaults', 'fail', error.message, 'Reinstall CopyTree');
+    // A schema-version refusal is not a broken installation. It is a *user*
+    // file written for a later CopyTree, and it surfaces here because the
+    // compatibility check runs before anything else can. Reporting it against
+    // "packaged defaults" with "Reinstall CopyTree" sends someone to reinstall
+    // a package that is working perfectly.
+    const isVersion = error.details?.configKey === 'schemaVersion';
+
+    record(
+      isVersion ? 'schema version' : 'packaged defaults',
+      'fail',
+      error.message,
+      isVersion
+        ? (error.details?.suggestion ?? 'Upgrade CopyTree')
+        : 'Reinstall CopyTree; the packaged config directory is missing',
+    );
   }
 
   if (config) {
@@ -365,9 +380,56 @@ async function configMigrate(request, context) {
 
   // Serialized from the loaded user configuration rather than from the files,
   // so an executable config is captured as the values it actually produced.
+  //
+  // Pruned first. The schema is closed, and several keys it used to accept do
+  // nothing and were removed for 1.0 — so copying a legacy file across verbatim
+  // produced a `config.yaml` that the very next run rejected, from a command
+  // whose entire job is to leave the user with a working configuration.
+  // Dropping them is right, and saying which were dropped is what makes it
+  // honest.
+  const { kept, dropped } = pruneToSchema(config.userConfig, await loadSchemaProperties());
+  model.droppedKeys = dropped;
+
+  // Validated before it is offered, let alone written. Pruning removes keys the
+  // schema does not know; it cannot fix a value of the wrong type or outside
+  // its range, and a migration whose output the next run rejects has not
+  // migrated anything.
+  const check = new ConfigManager({ userConfig: false, dataConfigPath: null });
+  await check.loadConfiguration();
+  for (const [section, value] of Object.entries(kept)) {
+    check.set(section, value);
+  }
+  await check.loadSchema();
+
+  try {
+    check.validateConfig();
+  } catch (error) {
+    // Re-thrown with the migration's context. The bare configuration error says
+    // "CopyTree configuration is invalid" and advises running `config
+    // validate`, which is advice about the file this command has not written
+    // yet — so the reader goes looking for a problem in a configuration that
+    // is, as far as they can tell, fine.
+    throw new ValidationError(
+      `${legacyDir} contains a value CopyTree cannot accept: ${error.message.replace(/^Configuration validation failed: /, '')}`,
+      'config-migrate',
+      legacyDir,
+      {
+        code: ERROR_CODES.CONFIG_INVALID,
+        suggestion: `Correct it in ${legacyDir}, then run the migration again`,
+      },
+    );
+  }
+
   const { dumpYaml } = await import('../utils/yaml.js');
-  const document = await dumpYaml(config.userConfig, { noRefs: true, sortKeys: true });
+  const document = await dumpYaml(kept, { noRefs: true, sortKeys: true });
   model.yaml = document;
+
+  if (dropped.length > 0) {
+    feedback.write(
+      `Left out ${dropped.length} setting${dropped.length === 1 ? '' : 's'} CopyTree no longer ` +
+        `recognises: ${dropped.join(', ')}`,
+    );
+  }
 
   if (!request.report.write) {
     const text = request.report.format === 'json' ? json(model) : document;
@@ -407,4 +469,72 @@ async function legacyExecutableConfigs(dir) {
   } catch {
     return [];
   }
+}
+
+/**
+ * The schema's `properties` tree, for pruning a legacy configuration.
+ *
+ * Read from the packaged schema rather than restated, so the migration cannot
+ * drift from what validation will accept.
+ *
+ * @returns {Promise<Object>} The schema root
+ */
+async function loadSchemaProperties() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const schemaPath = path.resolve(here, '../../config/schema.json');
+  return JSON.parse(await fs.readFile(schemaPath, 'utf8'));
+}
+
+/**
+ * Split a configuration into what the schema accepts and what it does not.
+ *
+ * @param {Object} value - Configuration to prune
+ * @param {Object} schemaNode - Schema node describing `value`
+ * @param {string} [prefix=''] - Dotted path of `value`
+ * @returns {{kept: Object, dropped: string[]}} Accepted subtree, and the dotted paths removed
+ */
+function pruneToSchema(value, schemaNode, prefix = '') {
+  // Null prototype. The output is built from keys read out of a user's file,
+  // and assigning `__proto__` into an ordinary object literal mutates the
+  // prototype chain instead of setting a property.
+  const kept = Object.create(null);
+  const dropped = [];
+  const properties = schemaNode?.properties ?? {};
+
+  for (const [key, child] of Object.entries(value ?? {})) {
+    const dotted = prefix ? `${prefix}.${key}` : key;
+
+    // `Object.hasOwn`, not a property read. `properties['constructor']` finds
+    // `Object.prototype.constructor` and would wave through a key named after
+    // anything on the prototype chain.
+    if (!Object.hasOwn(properties, key)) {
+      dropped.push(dotted);
+      continue;
+    }
+
+    const childSchema = properties[key];
+
+    // Recurse only where the schema describes an object with its own
+    // properties. A declared object without `properties`, or any scalar or
+    // array, is a leaf the schema accepts whole.
+    if (
+      childSchema.properties &&
+      child !== null &&
+      typeof child === 'object' &&
+      !Array.isArray(child)
+    ) {
+      const nested = pruneToSchema(child, childSchema, dotted);
+      dropped.push(...nested.dropped);
+      // An object emptied by pruning is not carried over: writing
+      // `app: {}` is noise in a file someone has to read.
+      if (Object.keys(nested.kept).length > 0) kept[key] = nested.kept;
+      continue;
+    }
+
+    kept[key] = child;
+  }
+
+  // Back to an ordinary object for serialization: the null prototype was for
+  // building it safely, and a YAML dumper should not have to reason about it.
+  return { kept: { ...kept }, dropped };
 }

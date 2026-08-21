@@ -272,13 +272,32 @@ describe('budgets actually bind', () => {
     });
   });
 
-  it('reports an overshoot when the first file alone exceeds maxTotalSize', async () => {
-    // The file is kept, because returning nothing is a worse answer. What must
-    // not happen is reporting that silently as if the budget had been honoured.
+  it('honours maxTotalSize even when the only file exceeds it', async () => {
+    // A maximum is a maximum. Keeping the file regardless meant a caller who set
+    // the budget to protect a context window could be handed five hundred times
+    // it, having asked for a limit and been given a suggestion.
     await withTempDir('req-r7-overshoot', async (root) => {
       await fs.outputFile(root + '/only.txt', 'x'.repeat(5000));
 
       const result = await copy(root, { dryRun: true, config, maxTotalSize: 10 });
+
+      expect(result.stats.totalFiles).toBe(0);
+      expect(result.stats.budgetExceeded).toBeUndefined();
+      expect(result.stats.truncated).toBe(true);
+      expect(result.stats.truncatedBy).toBe('maxTotalSize');
+    });
+  });
+
+  it('reports the overshoot when asked to keep an oversized first file', async () => {
+    await withTempDir('req-r7-retain', async (root) => {
+      await fs.outputFile(root + '/only.txt', 'x'.repeat(5000));
+
+      const result = await copy(root, {
+        dryRun: true,
+        config,
+        maxTotalSize: 10,
+        retainOversizedFirstFile: true,
+      });
 
       expect(result.stats.totalFiles).toBe(1);
       expect(result.stats.budgetExceeded).toBe(true);

@@ -120,6 +120,7 @@ copytree [path] [options]   # the command name is optional
 | `--max-total-size <size>` | Limit selected file bytes |  |
 | `--max-files <count>` | Limit selected file count, applied after sorting |  |
 | `--max-chars <count>` | Limit emitted content characters, cut at line boundaries |  |
+| `--retain-oversized-first-file` | Keep a first file that alone exceeds --max-total-size | advanced |
 | `--sort <by>` | Selection order: path, size, modified, name, extension, depth | advanced; default: `path` |
 | `--order <direction>` | Sort direction: asc or desc | advanced; default: `asc` |
 
@@ -220,6 +221,7 @@ copytree plan [path] [options]
 | `--max-total-size <size>` | Limit selected file bytes |  |
 | `--max-files <count>` | Limit selected file count, applied after sorting |  |
 | `--max-chars <count>` | Limit emitted content characters, cut at line boundaries |  |
+| `--retain-oversized-first-file` | Keep a first file that alone exceeds --max-total-size | advanced |
 | `--sort <by>` | Selection order: path, size, modified, name, extension, depth | advanced; default: `path` |
 | `--order <direction>` | Sort direction: asc or desc | advanced; default: `asc` |
 
@@ -363,6 +365,7 @@ copytree explain <entry...> [options]
 | `--max-total-size <size>` | Limit selected file bytes |  |
 | `--max-files <count>` | Limit selected file count, applied after sorting |  |
 | `--max-chars <count>` | Limit emitted content characters, cut at line boundaries |  |
+| `--retain-oversized-first-file` | Keep a first file that alone exceeds --max-total-size | advanced |
 | `--sort <by>` | Selection order: path, size, modified, name, extension, depth | advanced; default: `path` |
 | `--order <direction>` | Sort direction: asc or desc | advanced; default: `asc` |
 

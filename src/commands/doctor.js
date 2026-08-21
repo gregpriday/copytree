@@ -17,6 +17,7 @@ import { Feedback, writePayload } from '../cli/io.js';
 import { json } from '../cli/render/format.js';
 import { VERSION } from '../version.js';
 import { PolicyError } from '../utils/errors.js';
+import { describeEnvironment } from '../config/environment.js';
 
 /** Schema identifier for the machine-readable diagnosis. */
 export const DOCTOR_SCHEMA = 'copytree-doctor@1';
@@ -60,6 +61,12 @@ export default async function doctorCommand(request, context = {}) {
     failures,
     warnings,
     checks,
+    // The whole environment interface, with effective values. An operational
+    // surprise — a run that is unexpectedly quiet, a reference file in an
+    // unexpected place — is answerable from here without knowing which module
+    // reads which variable. Every entry is operational by construction, so
+    // none of them carries a credential.
+    environment: describeEnvironment(),
   };
 
   feedback.detail(`Ran ${checks.length} checks on ${model.platform}, Node ${model.node}`);
@@ -416,10 +423,27 @@ function renderDoctorText(model) {
       const remediation = check.remediation ? `\n       ${check.remediation}` : '';
       return `${mark[check.status]} ${check.name}: ${check.detail}${remediation}`;
     }),
+    // Only the ones actually set. Listing thirteen unset variables on every
+    // run buries the checks above them; the full list with its descriptions is
+    // in `--format json`, and in the configuration reference.
+    ...environmentLines(model.environment),
     '',
     model.healthy
       ? `Healthy${model.warnings > 0 ? ` (${model.warnings} warning${model.warnings === 1 ? '' : 's'})` : ''}`
       : `${model.failures} check${model.failures === 1 ? '' : 's'} failed`,
   ];
   return `${lines.join('\n')}\n`;
+}
+
+/**
+ * The environment variables that are set, for the text report.
+ *
+ * @param {Array<{name: string, value: string|null}>} environment - Rows from `describeEnvironment()`
+ * @returns {string[]} Lines, or nothing when no variable is set
+ */
+function environmentLines(environment) {
+  const set = (environment || []).filter((entry) => entry.value !== null);
+  if (set.length === 0) return [];
+
+  return ['', 'Environment:', ...set.map((entry) => `  ${entry.name}=${entry.value}`)];
 }

@@ -434,7 +434,9 @@ earlier one's position.
 Unchanged in behaviour, but now documented as **greedy fitting**: a file that
 does not fit is skipped and later, smaller files are still considered. Sizes
 6, 6, 1 under a 7-byte budget yield the first and third. An oversized first file
-is still retained, now reported as `stats.oversizedFirstFileRetained`.
+was retained regardless; as of 1.0 it is dropped like any other file that does
+not fit, and `retainOversizedFirstFile` asks for the old behaviour by name.
+Either way the overshoot is reported as `stats.oversizedFirstFileRetained`.
 
 ### Failure semantics
 
