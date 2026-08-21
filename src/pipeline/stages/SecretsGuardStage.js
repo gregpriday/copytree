@@ -1,4 +1,4 @@
-import Stage from '../Stage.js';
+import Stage, { DEGRADATION_CODES } from '../Stage.js';
 import GitleaksAdapter from '../../services/GitleaksAdapter.js';
 import SecretRedactor from '../../utils/SecretRedactor.js';
 import { SecretsDetectedError, isAbortError } from '../../utils/errors.js';
@@ -430,7 +430,7 @@ class SecretsGuardStage extends Stage {
     if (this._degradation) {
       degradations.push({
         stage: this.name,
-        code: 'SECRET_SCANNER_DEGRADED',
+        code: DEGRADATION_CODES.SECRET_SCANNER_DEGRADED,
         message:
           `${this._degradation.from} failed, so the rest of this run was scanned ` +
           `by the ${this._degradation.to} scanner: ${this._degradation.reason}`,
@@ -445,7 +445,7 @@ class SecretsGuardStage extends Stage {
     if (redactionFailures > 0) {
       degradations.push({
         stage: this.name,
-        code: 'SECRET_REDACTION_FAILED',
+        code: DEGRADATION_CODES.SECRET_REDACTION_FAILED,
         message:
           `${redactionFailures} detected secret(s) could not be redacted, so ` +
           `${excludedWithSecrets} file(s) were excluded instead of redacted`,

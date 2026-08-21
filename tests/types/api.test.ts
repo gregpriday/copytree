@@ -268,7 +268,8 @@ async function testCopyApi() {
     format: 'json',
     onlyTree: false,
     addLineNumbers: true,
-    basePath: '/project',
+    // No `basePath`: it is `copy()`'s first argument, and the option was
+    // unconditionally overwritten.
     instructions: 'Code review',
     showSize: true,
     prettyPrint: true,
@@ -278,10 +279,9 @@ async function testCopyApi() {
     display: false,
     clipboard: false,
     stream: false,
-    secretsReport: './secrets.json',
-    info: true,
+    // `secretsReport`, `info` and `verbose` were declared here and never
+    // implemented by `copy()`. They are CLI concerns and live only on the CLI.
     dryRun: false,
-    verbose: true,
     charLimit: 10000,
     withLineNumbers: true,
   };

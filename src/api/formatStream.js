@@ -28,7 +28,10 @@ import { prepareDocument } from './format.js';
  * Format a collection of files, yielding the document in chunks.
  *
  * @param {Array<Object> | AsyncIterable<Object>} files - Files to format
- * @param {FormatOptions} [options={}] - Format options
+ * @param {FormatOptions} [options={}] - Format options. There is no progress
+ *   callback: the whole document is prepared before the first chunk, so a
+ *   render-phase percentage would only ever report 0 and then 100. The
+ *   declaration used to advertise `onProgress` here and silently drop it.
  * @yields {string} Output chunks; concatenating them equals `format()`'s result
  * @throws {ValidationError} If the files or the format are invalid
  *

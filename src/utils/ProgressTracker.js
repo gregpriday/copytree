@@ -1,4 +1,5 @@
 import { PHASES } from '../ui/feedback/messages.js';
+import { notify } from '../api/callbacks.js';
 
 /**
  * Stable pipeline stage identifiers.
@@ -250,11 +251,7 @@ export class ProgressTracker {
 
     this.lastPercent = progress.percent;
     this.lastEmitTime = now;
-    try {
-      this.onProgress({ ...progress, phase: userPhaseFor(progress.stage) });
-    } catch {
-      // Swallow callback exceptions — progress tracking must not fail the operation
-    }
+    notify('onProgress', this.onProgress, { ...progress, phase: userPhaseFor(progress.stage) });
   }
 
   /**
@@ -271,11 +268,7 @@ export class ProgressTracker {
 
     this.lastPercent = progress.percent;
     this.lastEmitTime = Date.now();
-    try {
-      this.onProgress({ ...progress, phase: userPhaseFor(progress.stage) });
-    } catch {
-      // Swallow callback exceptions — progress tracking must not fail the operation
-    }
+    notify('onProgress', this.onProgress, { ...progress, phase: userPhaseFor(progress.stage) });
   }
 }
 

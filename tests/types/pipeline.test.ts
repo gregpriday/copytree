@@ -124,14 +124,13 @@ function testPipelineEvents() {
   const stageStart: StageStartEvent = {
     stage: 'FileDiscoveryStage',
     index: 0,
-    input: { basePath: './src' },
+    inputCount: 0,
   };
 
   // Test StageCompleteEvent
   const stageComplete: StageCompleteEvent = {
     stage: 'FileDiscoveryStage',
     index: 0,
-    output: { files: [] },
     duration: 100,
     inputSize: 0,
     outputSize: 100,
@@ -155,7 +154,7 @@ function testPipelineEvents() {
     stage: 'TransformStage',
     index: 2,
     originalError: new Error('Transform failed'),
-    recoveredResult: { files: [], recoveredFromError: true },
+    recoveredCount: 0,
   };
 
   // Test StageProgressEvent
@@ -163,6 +162,9 @@ function testPipelineEvents() {
     stage: 'FileLoadingStage',
     progress: 50,
     message: 'Loading files...',
+    completed: 50,
+    total: 100,
+    item: 'src/index.ts',
     timestamp: Date.now(),
   };
 
@@ -185,14 +187,14 @@ function testPipelineEvents() {
 
   // Test PipelineStartEvent
   const pipelineStart: PipelineStartEvent = {
-    input: { basePath: './src' },
+    inputCount: 0,
     stages: 5,
     options: { continueOnError: true },
   };
 
   // Test PipelineCompleteEvent
   const pipelineComplete: PipelineCompleteEvent = {
-    result: { output: '<xml/>' },
+    resultCount: 42,
     stats: {
       startTime: Date.now(),
       endTime: Date.now(),
@@ -243,7 +245,9 @@ async function testPipelineClass() {
     emitProgress: true,
     parallel: false,
     maxConcurrency: 5,
-    onProgress: (progress) => console.log(progress.percent),
+    // No `onProgress`: `Pipeline` copies it into `this.options` and never
+    // calls it. Progress reaches a consumer through the `stage:progress` event
+    // or through `ProgressTracker`.
   };
   const pipeline = new Pipeline(options);
 

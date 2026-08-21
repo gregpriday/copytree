@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { ConfigManager } from '../config/ConfigManager.js';
 import { PipelineError, ValidationError, isAbortError } from '../utils/errors.js';
 import { logger as defaultLogger } from '../utils/logger.js';
+import { DEGRADATION_CODES } from './Stage.js';
 
 /**
  * Marks an error as a lifecycle-contract failure rather than a processing one.
@@ -471,7 +472,7 @@ class Pipeline extends EventEmitter {
             );
             result = this._recordDegradation(result, {
               stage: stageName,
-              code: 'STAGE_AFTER_RUN_FAILED',
+              code: DEGRADATION_CODES.STAGE_AFTER_RUN_FAILED,
               message: `${stageName} afterRun hook failed: ${hookError.message}`,
             });
           }
@@ -571,7 +572,7 @@ class Pipeline extends EventEmitter {
                 recoveredResult,
                 {
                   stage: stageName,
-                  code: error.code || 'STAGE_RECOVERED',
+                  code: error.code || DEGRADATION_CODES.STAGE_RECOVERED,
                   message: `${stageName} failed: ${error.message}`,
                 },
                 carriedOver,

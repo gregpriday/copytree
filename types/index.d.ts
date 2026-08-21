@@ -32,7 +32,16 @@ export interface ProgressEvent {
    * The coarse phase this stage belongs to — the handful of steps a person
    * actually distinguishes, rather than one per stage.
    */
-  phase?: 'prepare' | 'discover' | 'select' | 'read' | 'render';
+  phase?:
+    | 'prepare'
+    | 'discover'
+    | 'select'
+    | 'load'
+    | 'transform'
+    | 'context'
+    | 'secrets'
+    | 'format'
+    | 'deliver';
   /**
    * How many items this stage has finished, when it knows its denominator.
    * Absent for stages that cannot count ahead.
@@ -410,7 +419,17 @@ export interface ScanOptions {
   always?: string | string[];
   /** AbortSignal for cancellation */
   signal?: AbortSignal;
-  /** Event callback function */
+  /**
+   * Called for each pipeline lifecycle event.
+   *
+   * **Callback policy.** Every observational callback — this one, `onProgress`,
+   * `onSummary` and `onComplete` — is isolated from the operation: one that
+   * throws is logged at debug level and the run carries on. A watcher cannot
+   * break the thing it is watching. To *stop* a run, pass an `AbortSignal`.
+   *
+   * Events carry counts and metadata, never file payloads. See
+   * {@link PipelineEvent}.
+   */
   onEvent?: (event: PipelineEvent) => void;
   /** Include git status information */
   withGitStatus?: boolean;
@@ -467,8 +486,11 @@ export interface ScanOptions {
   /**
    * Name of a folder profile to load instead of auto-discovering one.
    * A load failure throws, where a failed auto-discovery is ignored.
+   *
+   * `false` disables profile discovery altogether, which is what the CLI's
+   * `--no-profile` does.
    */
-  profile?: string;
+  profile?: string | false;
   /**
    * Suppress pipeline terminal output (default: true).
    *
@@ -563,6 +585,42 @@ export interface SecretsGuardSummary {
   };
 }
 
+/**
+ * The stable machine vocabulary for degradations.
+ *
+ * `STAGE_RECOVERED` is the open end of the set: when a stage recovers from a
+ * typed error, that error's own `ERR_*` code is carried through in preference,
+ * because it says more than "something was recovered". Treat `DegradationCode`
+ * as the known values rather than the only possible ones.
+ */
+export type DegradationCode =
+  | 'STAGE_DEGRADED'
+  | 'STAGE_RECOVERED'
+  | 'STAGE_AFTER_RUN_FAILED'
+  | 'GIT_FILTER_FAILED'
+  | 'SECRET_SCANNER_DEGRADED'
+  | 'SECRET_REDACTION_FAILED';
+
+/** Frozen map of {@link DegradationCode} values. */
+export const DEGRADATION_CODES: Readonly<Record<string, DegradationCode>>;
+
+/**
+ * One thing the run could not do as asked, but carried on from.
+ *
+ * A degradation is not an error: the run completed and returned a result. It is
+ * the record that the result is not the one that was requested — a Git selector
+ * that could not be applied and so selected everything, a scanner that fell
+ * back to a weaker one. `--strict` turns any of these into a non-zero exit.
+ */
+export interface Degradation {
+  /** Stage that recorded it */
+  stage: string;
+  /** Stable machine code; see {@link DegradationCode} */
+  code: DegradationCode | string;
+  /** What could not be done, in user terms */
+  message: string;
+}
+
 /** Summary of a scan, delivered via `ScanOptions.onSummary`. */
 export interface ScanSummary {
   /** Files selected */
@@ -604,6 +662,14 @@ export interface ScanSummary {
   skippedFiles?: number;
   /** Secrets detection summary, present when the guard ran */
   secretsGuard?: SecretsGuardSummary;
+  /**
+   * Things the run could not do as asked, but carried on from.
+   *
+   * Present only when there were any. `copytree --strict` exits non-zero when
+   * this is non-empty; an embedder deciding whether to trust the result should
+   * do the same.
+   */
+  degradations?: Degradation[];
 }
 
 /**
@@ -646,6 +712,15 @@ export interface FormatOptions {
   showSize?: boolean;
   /** Pretty print JSON output (default: true) */
   prettyPrint?: boolean;
+  /** Emit optional per-entry metadata (default: true) */
+  includeMetadata?: boolean;
+  /**
+   * Omit fields that vary between runs (default: false).
+   *
+   * Timestamps and durations are what make two exports of an unchanged tree
+   * differ; dropping them makes the output diffable and cacheable.
+   */
+  reproducible?: boolean;
   /**
    * ConfigManager instance for isolated configuration.
    *
@@ -689,8 +764,6 @@ export interface FormatStreamOptions extends FormatOptions {
    * If not provided, an isolated instance will be created.
    */
   config?: ConfigManager;
-  /** Progress callback function */
-  onProgress?: (progress: { percent: number; message: string }) => void;
 }
 
 /**
@@ -722,7 +795,13 @@ export function formatStream(
 /**
  * Options for the copy() function
  */
-export interface CopyOptions extends ScanOptions, FormatOptions {
+/**
+ * `basePath` and `allowEmpty` are omitted deliberately. `copy()` sets both
+ * itself — the base path is its first argument, and an empty selection always
+ * yields an empty document rather than an exception — so accepting them here
+ * advertised two options whose values were unconditionally replaced.
+ */
+export interface CopyOptions extends ScanOptions, Omit<FormatOptions, 'basePath' | 'allowEmpty'> {
   /** Output file path (if specified, writes to file) */
   output?: string;
   /** Display output to console (default: false) */
@@ -731,10 +810,6 @@ export interface CopyOptions extends ScanOptions, FormatOptions {
   clipboard?: boolean;
   /** Stream output to stdout */
   stream?: boolean;
-  /** Path to write secrets report */
-  secretsReport?: string;
-  /** Include summary information */
-  info?: boolean;
   /**
    * Plan the run without reading or formatting content.
    *
@@ -748,8 +823,6 @@ export interface CopyOptions extends ScanOptions, FormatOptions {
    * With either option set, treat the preview as an estimate.
    */
   dryRun?: boolean;
-  /** Verbose error output */
-  verbose?: boolean;
   /** Character budget across all file content */
   charLimit?: number;
   /** Instructions to include in output */
@@ -896,6 +969,14 @@ export interface CopyResult {
     clipboardError?: string;
     /** Indicates this was a dry run */
     dryRun?: boolean;
+    /**
+     * Things the run could not do as asked, but carried on from.
+     *
+     * Present only when there were any. `copytree --strict` exits non-zero when
+     * this is non-empty; an embedder deciding whether to trust the result
+     * should do the same.
+     */
+    degradations?: Degradation[];
   };
   /** Output file path (if written to file) */
   outputPath?: string;
@@ -918,7 +999,9 @@ export function copy(basePath: string, options?: CopyOptions): Promise<CopyResul
 /**
  * Options for the copyStream() function
  */
-export interface CopyStreamOptions extends ScanOptions, FormatOptions {
+export interface CopyStreamOptions
+  extends ScanOptions,
+    Omit<FormatOptions, 'basePath' | 'allowEmpty'> {
   /**
    * ConfigManager instance for isolated configuration.
    * If not provided, an isolated instance will be created.
@@ -1108,8 +1191,6 @@ export interface PipelineOptions {
   parallel?: boolean;
   /** Maximum concurrent operations (default: 5) */
   maxConcurrency?: number;
-  /** Progress callback function */
-  onProgress?: ProgressCallback;
 }
 
 // ============================================================================
@@ -1117,15 +1198,23 @@ export interface PipelineOptions {
 // ============================================================================
 
 /**
- * Data payload for 'stage:start' event
+ * Data payload for 'stage:start' event.
+ *
+ * Counts, never payloads. Lifecycle events used to carry the pipeline's input
+ * and output, which meant an `onEvent` listener saw every file's content from
+ * every stage — including content that had not yet reached the secrets guard.
+ * An embedder that logged events wrote unredacted credentials to its own logs
+ * while CopyTree reported the export as redacted. Raw values are available only
+ * on the explicitly unstable `stage:debug` event, which the SDK does not
+ * forward.
  */
 export interface StageStartEvent {
   /** Stage name */
   stage: string;
   /** Stage index in pipeline */
   index: number;
-  /** Input data for this stage */
-  input: unknown;
+  /** How many files this stage was handed */
+  inputCount: number;
 }
 
 /**
@@ -1136,16 +1225,19 @@ export interface StageCompleteEvent {
   stage: string;
   /** Stage index in pipeline */
   index: number;
-  /** Output data from this stage */
-  output: unknown;
   /** Execution duration in milliseconds */
   duration: number;
   /** Number of input items */
   inputSize: number;
   /** Number of output items */
   outputSize: number;
-  /** Memory usage metrics */
-  memoryUsage: MemoryUsage;
+  /**
+   * Memory usage metrics, or `null` when they could not be sampled.
+   *
+   * Sampling is best-effort; a host that does not expose `process.memoryUsage`
+   * still runs the pipeline, and this is the field that says so.
+   */
+  memoryUsage: MemoryUsage | null;
   /** Completion timestamp */
   timestamp: number;
 }
@@ -1172,8 +1264,8 @@ export interface StageRecoverEvent {
   index: number;
   /** Original error that occurred */
   originalError: Error;
-  /** Result returned by error handler */
-  recoveredResult: unknown;
+  /** How many files the error handler returned */
+  recoveredCount: number;
 }
 
 /**
@@ -1186,6 +1278,16 @@ export interface StageProgressEvent {
   progress: number;
   /** Optional progress message */
   message?: string;
+  /**
+   * Concrete counts, when the stage knows its denominator.
+   *
+   * A percentage alone cannot be rendered as "312 of 4,000 files", which is
+   * what a progress display actually wants.
+   */
+  completed?: number;
+  total?: number;
+  /** The item being processed when the update was emitted */
+  item?: string;
   /** Progress report timestamp */
   timestamp: number;
 }
@@ -1196,11 +1298,11 @@ export interface StageProgressEvent {
 export interface FileBatchEvent {
   /** Stage processing files */
   stage: string;
-  /** Number of files processed in batch */
+  /** Files processed by this stage so far */
   count: number;
   /** Path of most recent file */
   lastFile: string;
-  /** Action performed (e.g., 'processed', 'transformed') */
+  /** Action performed (e.g. 'processed', 'transformed') */
   action: string;
   /** Batch completion timestamp */
   timestamp: number;
@@ -1214,7 +1316,7 @@ export interface StageLogEvent {
   stage: string;
   /** Log message */
   message: string;
-  /** Log level (info, warn, error, debug) */
+  /** Log level */
   level: 'info' | 'warn' | 'error' | 'debug';
   /** Log timestamp */
   timestamp: number;
@@ -1224,8 +1326,8 @@ export interface StageLogEvent {
  * Data payload for 'pipeline:start' event
  */
 export interface PipelineStartEvent {
-  /** Initial pipeline input */
-  input: unknown;
+  /** How many files the initial input carried */
+  inputCount: number;
   /** Total number of stages */
   stages: number;
   /** Pipeline configuration options */
@@ -1236,8 +1338,8 @@ export interface PipelineStartEvent {
  * Data payload for 'pipeline:complete' event
  */
 export interface PipelineCompleteEvent {
-  /** Final pipeline output */
-  result: unknown;
+  /** How many files the final output carried */
+  resultCount: number;
   /** Complete pipeline statistics */
   stats: PipelineStats;
 }
@@ -1253,44 +1355,51 @@ export interface PipelineErrorEvent {
 }
 
 /**
- * Union type for all pipeline event data
+ * Every pipeline event, mapped to the payload it carries.
+ *
+ * The map is what makes `onEvent` narrowable: switching on `event.type` yields
+ * the matching payload rather than a union of all of them.
  */
-export type PipelineEventData =
-  | StageStartEvent
-  | StageCompleteEvent
-  | StageErrorEvent
-  | StageRecoverEvent
-  | StageProgressEvent
-  | FileBatchEvent
-  | StageLogEvent
-  | PipelineStartEvent
-  | PipelineCompleteEvent
-  | PipelineErrorEvent;
+export interface PipelineEventMap {
+  'pipeline:start': PipelineStartEvent;
+  'pipeline:complete': PipelineCompleteEvent;
+  'pipeline:error': PipelineErrorEvent;
+  'stage:start': StageStartEvent;
+  'stage:complete': StageCompleteEvent;
+  'stage:error': StageErrorEvent;
+  'stage:recover': StageRecoverEvent;
+  'stage:progress': StageProgressEvent;
+  'file:batch': FileBatchEvent;
+  'stage:log': StageLogEvent;
+}
 
 /**
  * Pipeline event types
  */
-export type PipelineEventType =
-  | 'pipeline:start'
-  | 'pipeline:complete'
-  | 'pipeline:error'
-  | 'stage:start'
-  | 'stage:complete'
-  | 'stage:error'
-  | 'stage:recover'
-  | 'stage:progress'
-  | 'file:batch'
-  | 'stage:log';
+export type PipelineEventType = keyof PipelineEventMap;
 
 /**
- * Pipeline event data (generic wrapper for event callbacks)
+ * Union type for all pipeline event data
  */
-export interface PipelineEvent {
-  /** Event type */
-  type: PipelineEventType;
-  /** Event data */
-  data: PipelineEventData;
-}
+export type PipelineEventData = PipelineEventMap[PipelineEventType];
+
+/**
+ * A pipeline event, discriminated by `type`.
+ *
+ * ```ts
+ * scan(root, {
+ *   onEvent: (event) => {
+ *     if (event.type === 'stage:complete') {
+ *       // event.data is StageCompleteEvent here
+ *       console.log(event.data.duration);
+ *     }
+ *   },
+ * });
+ * ```
+ */
+export type PipelineEvent = {
+  [K in PipelineEventType]: { type: K; data: PipelineEventMap[K] };
+}[PipelineEventType];
 
 // ============================================================================
 // Configuration
@@ -1522,7 +1631,8 @@ export type ErrorCode =
   | 'ERR_BUDGET_ENFORCEMENT'
   | 'ERR_CONFIG_SCHEMA_UNAVAILABLE'
   | 'ERR_OUTPUT_WRITE'
-  | 'ERR_VALIDATION';
+  | 'ERR_VALIDATION'
+  | 'ERR_OPERATION_FAILED';
 
 export const ERROR_CODES: Readonly<Record<string, ErrorCode>>;
 

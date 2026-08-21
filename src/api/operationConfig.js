@@ -27,6 +27,7 @@
  */
 
 import { ConfigManager } from '../config/ConfigManager.js';
+import { ValidationError, ERROR_CODES } from '../utils/errors.js';
 
 /**
  * Resolve the configuration for one SDK operation.
@@ -34,9 +35,29 @@ import { ConfigManager } from '../config/ConfigManager.js';
  * @param {Object} [options={}] - Operation options
  * @param {ConfigManager} [options.config] - A configuration the caller supplies
  * @returns {Promise<ConfigManager>} The configuration to run under
+ * @throws {ValidationError} If `config` is present but is not a ConfigManager
  */
 export async function resolveOperationConfig(options = {}) {
-  if (options.config) return options.config;
+  // `!= null`, not truthiness. `config: false` and `config: 0` are mistakes
+  // too, and treating them as "no configuration supplied" silently ran the
+  // operation under packaged defaults instead of saying so.
+  if (options.config != null) {
+    // Checked here rather than discovered later. A plain object reaches the
+    // first `config.get(...)` deep inside a stage and throws a bare `TypeError`
+    // with no `code` — from a public entry point that promises every rejection
+    // carries one, about an option the caller could have been told about before
+    // the run started.
+    if (typeof options.config.get !== 'function') {
+      throw new ValidationError(
+        'config must be a ConfigManager instance; build one with ConfigManager.create()',
+        'config',
+        options.config,
+        { code: ERROR_CODES.INVALID_OPTION },
+      );
+    }
+
+    return options.config;
+  }
 
   return ConfigManager.create({
     // Packaged defaults only: no home directory, no executable user config.

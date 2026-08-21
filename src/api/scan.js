@@ -2,12 +2,14 @@ import Pipeline from '../pipeline/Pipeline.js';
 import {
   ValidationError,
   FileSystemError,
+  PipelineError,
   ERROR_CODES,
   createAbortError,
 } from '../utils/errors.js';
 import { ConfigManager } from '../config/ConfigManager.js';
 import { ProgressTracker } from '../utils/ProgressTracker.js';
 import { ExclusionReport } from '../utils/exclusionReport.js';
+import { notify } from './callbacks.js';
 import {
   buildSelectionStages,
   loadSelectionProfile,
@@ -26,6 +28,10 @@ import { resolveOperationConfig } from './operationConfig.js';
  * it silently.
  */
 export const FORWARDED_STAT_KEYS = Object.freeze([
+  // What the run could not do as asked. `--strict` reads this on the CLI, and
+  // an embedder has the same decision to make — but a streaming consumer, whose
+  // only view of the run is `onSummary`, could not see it at all.
+  'degradations',
   'secretsGuard',
   'oversizedFirstFileRetained',
   'truncatedByCountBudget',
@@ -415,7 +421,16 @@ export async function* scan(basePath, options = {}) {
 
   // Setup event forwarding
   if (options.onEvent) {
+    // Every event `PipelineEventMap` declares. The three pipeline-level ones
+    // were declared and never forwarded, so an SDK consumer could type a
+    // handler for `pipeline:complete`, compile, and never see it fire.
+    //
+    // `pipeline:error` is safe to forward: EventEmitter's crash-on-unhandled
+    // behaviour is specific to the event literally named `error`.
     const events = [
+      'pipeline:start',
+      'pipeline:complete',
+      'pipeline:error',
       'stage:start',
       'stage:complete',
       'stage:error',
@@ -427,7 +442,11 @@ export async function* scan(basePath, options = {}) {
 
     for (const event of events) {
       pipeline.on(event, (data) => {
-        options.onEvent({ type: event, data });
+        // Isolated, like every other observational callback. A listener that
+        // threw here propagated through the EventEmitter and took down the
+        // scan — so an `onEvent` that logged to a broken transport failed the
+        // export, while the identical bug in `onSummary` was ignored.
+        notify('onEvent', options.onEvent, { type: event, data });
       });
     }
   }
@@ -490,11 +509,7 @@ export async function* scan(basePath, options = {}) {
         ...pickForwardedStats(result.stats),
       };
 
-      try {
-        options.onSummary(summary);
-      } catch {
-        // A buggy summary callback must not fail the scan.
-      }
+      notify('onSummary', options.onSummary, summary);
     }
 
     for (const file of files) {
@@ -517,10 +532,14 @@ export async function* scan(basePath, options = {}) {
       throw error;
     }
 
-    // Wrap other errors with context
-    const scanError = new Error(`Scan failed: ${error.message}`);
-    scanError.cause = error;
-    throw scanError;
+    // Wrap other errors with context, but keep them typed. A bare `Error` here
+    // meant that the failures nobody anticipated — the ones a consumer most
+    // needs to branch on — were the only ones without a `code`, while the
+    // published guidance says to switch on `code` and never on the message.
+    throw new PipelineError(`Scan failed: ${error.message}`, 'scan', {
+      code: ERROR_CODES.OPERATION_FAILED,
+      cause: error,
+    });
   }
 }
 

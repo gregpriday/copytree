@@ -1,4 +1,4 @@
-import Stage from '../Stage.js';
+import Stage, { DEGRADATION_CODES } from '../Stage.js';
 import GitUtils from '../../utils/GitUtils.js';
 import { GitError } from '../../utils/errors.js';
 import { toPosix } from '../../utils/pathUtils.js';
@@ -81,6 +81,7 @@ class GitFilterStage extends Stage {
           input,
           `${this.askedFor()} needs a Git repository, and ${this.basePath} is not one, ` +
             `so no git status was attached`,
+          DEGRADATION_CODES.GIT_FILTER_FAILED,
         );
       }
 
@@ -171,6 +172,7 @@ class GitFilterStage extends Stage {
       return this.degrade(
         input,
         `${this.askedFor()} could not be applied, so no git status was attached: ${error.message}`,
+        DEGRADATION_CODES.GIT_FILTER_FAILED,
       );
     }
   }

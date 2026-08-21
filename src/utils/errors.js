@@ -82,6 +82,15 @@ const ERROR_CODES = Object.freeze({
   OUTPUT_WRITE: 'ERR_OUTPUT_WRITE',
   /** A value failed validation and has no more specific code */
   VALIDATION: 'ERR_VALIDATION',
+  /**
+   * A public entry point failed for a reason with no more specific code.
+   *
+   * The catch-all, so that `error.code` is always present. `scan()` used to
+   * wrap an unexpected failure in a bare `Error` with a `cause`, which left the
+   * one instruction the documentation gives consumers — switch on `code`, never
+   * on the message — unsatisfiable for exactly the failures nobody anticipated.
+   */
+  OPERATION_FAILED: 'ERR_OPERATION_FAILED',
 });
 
 /**

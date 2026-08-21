@@ -23,6 +23,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as root from '../../../src/index.js';
 import * as advanced from '../../../src/advanced.js';
+import { PHASES } from '../../../src/ui/feedback/messages.js';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -43,6 +44,7 @@ const STABLE_ROOT_API = [
   // Configuration
   'ConfigManager',
   // Stable vocabularies
+  'DEGRADATION_CODES',
   'EXCLUSION_REASONS',
   'MANIFEST_OUTCOMES',
   'buildManifest',
@@ -234,6 +236,34 @@ describe('declared runtime behaviour matches the runtime', () => {
       // exhaustive `switch` in a consumer's code fail to compile — or worse,
       // silently fall through.
       expect(union).toContain(`'${reason}'`);
+    }
+  });
+
+  it('declares every progress phase the runtime can report', () => {
+    const declaration = readFileSync(path.join(repoRoot, 'types/index.d.ts'), 'utf8');
+    const union = declaration.match(/phase\?:([\s\S]*?);/)?.[1] ?? '';
+
+    // `read` and `render` were declared and are emitted by nothing; `load`,
+    // `transform`, `context`, `secrets`, `format` and `deliver` are emitted and
+    // were not declared. A consumer switching on the phase to pick a label got
+    // no compiler help for any of the six that actually occur.
+    for (const phase of Object.values(PHASES)) {
+      expect(union).toContain(`'${phase}'`);
+    }
+
+    const declared = [...union.matchAll(/'([a-z]+)'/g)].map((match) => match[1]);
+    const actual = new Set(Object.values(PHASES));
+    expect(declared.filter((phase) => !actual.has(phase))).toEqual([]);
+  });
+
+  it('declares every degradation code the runtime can record', () => {
+    const declaration = readFileSync(path.join(repoRoot, 'types/index.d.ts'), 'utf8');
+    const union = declaration.match(/export type DegradationCode =([\s\S]*?);/)?.[1] ?? '';
+
+    for (const code of Object.values(root.DEGRADATION_CODES)) {
+      // `--strict` refuses a run that recorded any degradation, so a consumer
+      // deciding which ones it tolerates switches on this code.
+      expect(union).toContain(`'${code}'`);
     }
   });
 
