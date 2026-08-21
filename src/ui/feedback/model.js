@@ -160,14 +160,29 @@ export function classifyWarnings(result = {}, extra = {}) {
     });
   }
 
-  // A finding the guard could not redact is a different matter again: the
-  // credential is still in the output. That is worth a warning.
-  const unresolved = (secrets.findings || 0) - (secrets.redacted || 0);
-  if (unresolved > 0) {
+  // A file whose secrets the guard could not remove is left out entirely, so
+  // the warning is about the gap in the export, not about a credential in it.
+  //
+  // This used to be derived as `findings - redacted` and described as secrets
+  // that "remain in the output". Neither half survives: the guard no longer
+  // emits a file it could not clean, so nothing remains; and the subtraction
+  // was never a count of anything, because `findings` counts detections while
+  // `redacted` counts replaced regions — two findings over one credential are
+  // one replacement, and an excluded file contributes findings and no
+  // replacements at all. Every run that dropped a file therefore claimed the
+  // credential had been published.
+  if (secrets.excludedWithSecrets > 0) {
+    const which = nameFiles(secrets.excludedWithSecretsPaths, secrets.excludedWithSecrets);
     warnings.push({
       code: WARNING_CODES.SECRETS_REDACTED,
-      message: `${plural(unresolved, 'possible secret')} could not be redacted and remain in the output`,
-      data: { count: unresolved },
+      message:
+        `${plural(secrets.excludedWithSecrets, 'file')} held a secret that could not be ` +
+        `redacted and ${secrets.excludedWithSecrets === 1 ? 'was' : 'were'} left out` +
+        `${which ? `: ${which}` : ''}`,
+      data: {
+        count: secrets.excludedWithSecrets,
+        paths: secrets.excludedWithSecretsPaths,
+      },
     });
   }
 
@@ -327,7 +342,7 @@ export function buildCompletionModel({
  */
 function qualifier(warnings) {
   const codes = new Set(warnings.map((w) => w.code));
-  if (codes.has(WARNING_CODES.SECRETS_REDACTED)) return 'with secrets still present';
+  if (codes.has(WARNING_CODES.SECRETS_REDACTED)) return 'with unredactable files left out';
   if (codes.has(WARNING_CODES.FILES_OMITTED)) return 'with limits';
   if (codes.has(WARNING_CODES.CONTENT_TRUNCATED)) return 'with truncation';
   return 'with warnings';

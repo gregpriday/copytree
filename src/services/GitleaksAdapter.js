@@ -213,10 +213,16 @@ class GitleaksAdapter {
         // the run degraded. A weaker second opinion is a defensible answer.
         // Silence is not.
         if (findings === null) {
+          // Marked, because the caller has to treat this differently from an
+          // operational failure. Gitleaks has positively said this file
+          // contains a secret; only the *list* is missing. A fallback scan that
+          // comes back clean is a weaker tool disagreeing with a stronger one
+          // that already gave its verdict, and letting the clean answer win
+          // emits the file Gitleaks flagged.
           throw this._fail(
-            'Gitleaks reported findings but its report was empty or unreadable; ' +
-              'the file was re-scanned with the built-in scanner',
+            'Gitleaks reported findings but its report was empty or unreadable',
             error,
+            { detectedWithoutFindings: true },
           );
         }
 
@@ -240,10 +246,13 @@ class GitleaksAdapter {
    *
    * @param {string} message - What went wrong
    * @param {Error} cause - Underlying failure
+   * @param {Object} [flags={}] - Properties to set on the failure
+   * @param {boolean} [flags.detectedWithoutFindings] - Gitleaks detected a secret
+   *   but its findings could not be read. The file is known to contain one.
    * @returns {Error} The recorded failure
    * @private
    */
-  _fail(message, cause) {
+  _fail(message, cause, flags = {}) {
     // The cause is deliberately NOT attached. A Gitleaks error carries its
     // stdout, and stdout is the findings report — which can contain the matched
     // secret. An error object reaches logs, `stats`, and whatever the embedding
@@ -251,6 +260,7 @@ class GitleaksAdapter {
     // along with everything hanging off it.
     this.broken = new Error(message);
     if (cause?.code !== undefined) this.broken.exitCode = cause.code;
+    Object.assign(this.broken, flags);
     return this.broken;
   }
 

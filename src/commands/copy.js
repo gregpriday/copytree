@@ -623,9 +623,16 @@ async function writeSecretsReport(result, request, reporter) {
     return;
   }
 
+  // Atomic and private, like every other artefact that describes credentials.
+  // `writeJson` truncated the destination first, so an interrupted run left a
+  // half-written report that still parsed as far as the truncation; and it
+  // created the file world-readable, which is the wrong default for a document
+  // whose whole subject is where the secrets in this repository are.
   const reportPath = path.resolve(target);
-  await fs.ensureDir(path.dirname(reportPath));
-  await fs.writeJson(reportPath, result.stats.secretsGuard.report, { spaces: 2 });
+  await writeFileAtomic(
+    reportPath,
+    `${JSON.stringify(result.stats.secretsGuard.report, null, 2)}\n`,
+  );
   reporter.note(`Secrets report written to ${reportPath}`);
 }
 

@@ -106,6 +106,7 @@ export type ExclusionReason =
   // anyone auditing what left their machine.
   | 'secretFile'
   | 'secretUnscannable'
+  | 'secretDetected'
   | 'symlinkEscape';
 
 export const EXCLUSION_REASONS: Readonly<Record<string, ExclusionReason>>;
@@ -531,9 +532,32 @@ export interface SecretsGuardSummary {
   excludedSecretFiles: number;
   /** Files dropped for being too large to scan */
   excludedUnscannable: number;
+  /**
+   * Files that held a detected secret and were removed rather than emitted.
+   *
+   * Either `secretsGuard.redactInline` is off, or a detected span could not be
+   * proven redacted. The guard never emits a file it could not clean.
+   */
+  excludedWithSecrets: number;
+  /** Detected secrets that could not be proven redacted, across all files */
+  redactionFailures: number;
+  /**
+   * Present only when the preferred scanner failed and a weaker one finished
+   * the run. Its absence is the assertion that it did not.
+   */
+  degraded?: { from: string; to: string; reason: string };
+  /**
+   * Sample paths behind each count, capped at five. The counts are exact; these
+   * lists are for a status line that can name what it is talking about.
+   */
+  excludedSecretFilePaths: string[];
+  excludedUnscannablePaths: string[];
+  excludedWithSecretsPaths: string[];
+  redactedPaths: string[];
   /** Detail behind the counts. Written by `--secrets-report`. */
   report: {
     scanner: 'gitleaks' | 'builtin' | 'none';
+    degraded?: { from: string; to: string; reason: string };
     redactionMode: 'typed' | 'generic' | 'hash';
     findings: SecretFinding[];
   };

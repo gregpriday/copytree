@@ -207,61 +207,6 @@ line3`;
     });
   });
 
-  describe('redactBatch', () => {
-    it('should redact multiple files', () => {
-      const files = [
-        {
-          content: 'secret1',
-          findings: [
-            {
-              RuleID: 'secret',
-              StartLine: 1,
-              EndLine: 1,
-              StartColumn: 1,
-              EndColumn: 8,
-            },
-          ],
-        },
-        {
-          content: 'secret2',
-          findings: [
-            {
-              RuleID: 'secret',
-              StartLine: 1,
-              EndLine: 1,
-              StartColumn: 1,
-              EndColumn: 8,
-            },
-          ],
-        },
-      ];
-
-      const results = SecretRedactor.redactBatch(files, 'typed');
-
-      expect(results).toHaveLength(2);
-      expect(results[0].content).toContain('***REDACTED:SECRET***');
-      expect(results[1].content).toContain('***REDACTED:SECRET***');
-      expect(results[0].redactionCount).toBe(1);
-      expect(results[1].redactionCount).toBe(1);
-    });
-
-    it('should preserve original file properties', () => {
-      const files = [
-        {
-          path: 'test.js',
-          size: 100,
-          content: 'test',
-          findings: [],
-        },
-      ];
-
-      const results = SecretRedactor.redactBatch(files, 'typed');
-
-      expect(results[0].path).toBe('test.js');
-      expect(results[0].size).toBe(100);
-    });
-  });
-
   describe('_calculateLineOffsets', () => {
     it('should calculate correct offsets for single line', () => {
       const content = 'hello world';

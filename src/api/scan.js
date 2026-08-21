@@ -374,6 +374,10 @@ export async function* scan(basePath, options = {}) {
           options.secretsRedactMode || configInstance.get('secretsGuard.redactionMode', 'typed'),
         failOnSecrets:
           options.failOnSecrets ?? configInstance.get('secretsGuard.failOnSecrets', false),
+        // Scanning spawns a child process per file, exactly as it does on the
+        // CLI. Without the signal a cancelled scan kept starting them, and the
+        // one in flight ran to completion.
+        signal: options.signal,
       }),
     );
   }
