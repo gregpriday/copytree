@@ -196,15 +196,27 @@ describe('feedback contract', () => {
     }
   }, 30000);
 
+  // The unwritable destination is a path *inside an existing file*, not a
+  // directory the current user happens to lack permission on. Permission is a
+  // property of who is running the tests: an absolute path like
+  // `/definitely-not-writable` is refused for an unprivileged POSIX user but
+  // resolves to a creatable drive-root directory for the administrator that
+  // runs a Windows CI job, so the run succeeded and the test failed there. A
+  // file cannot become a directory for anybody, on any platform.
   test('a destination that cannot be written names the file and the operation', async () => {
-    const { code, stderr } = await runCli(
-      [PROJECT, '--stream', '--output', '/definitely-not-writable/out.xml'],
-      speaking,
-    );
+    const blocker = path.join(os.tmpdir(), `copytree-blocker-${process.pid}`);
+    fs.writeFileSync(blocker, 'not a directory');
+    const target = path.join(blocker, 'out.xml');
 
-    expect(code).not.toBe(0);
-    expect(stderr).toContain('Could not write the output file');
-    expect(stderr).toContain('/definitely-not-writable/out.xml');
+    try {
+      const { code, stderr } = await runCli([PROJECT, '--stream', '--output', target], speaking);
+
+      expect(code).not.toBe(0);
+      expect(stderr).toContain('Could not write the output file');
+      expect(stderr).toContain(target);
+    } finally {
+      fs.rmSync(blocker, { force: true });
+    }
   }, 30000);
 
   // Opening the destination during stage assembly truncated an existing file
