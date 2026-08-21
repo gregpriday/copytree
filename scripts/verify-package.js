@@ -67,18 +67,29 @@ function check(ok, label, detail = '') {
 }
 
 /**
- * Run a command, returning its stdout.
+ * Run a command, returning its stdout with line endings normalised.
+ *
+ * The normalisation is not cosmetic. Every caller here reads the output as
+ * lines and compares them to literals, and on Windows the child ends each one
+ * with CRLF — so `package/package.json\r` did not equal `package/package.json`
+ * and the required-entry checks all failed except the last, the one line with
+ * no `\r` after it. Worse, the leaked-`CLAUDE.md` check compares with
+ * `endsWith`, so on Windows it could never match and reported a pass no matter
+ * what the tarball contained.
+ *
  * @param {string} command - Executable
  * @param {string[]} args - Arguments
  * @param {Object} [options={}] - Spawn options
- * @returns {string} Trimmed stdout
+ * @returns {string} Trimmed stdout, LF line endings
  */
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     ...options,
-  }).trim();
+  })
+    .replace(/\r\n/g, '\n')
+    .trim();
 }
 
 /**
@@ -168,7 +179,10 @@ try {
   const tarball = path.join(packDestination, packed.split('\n').pop().trim());
   check(Boolean(tarball), 'npm pack produced a tarball', path.basename(tarball));
 
-  const listing = run('tar', ['-tzf', tarball]).split('\n');
+  const listing = run('tar', ['-tzf', tarball])
+    .split('\n')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
   for (const entry of REQUIRED_ENTRIES) {
     check(listing.includes(entry), `package contains ${entry.replace('package/', '')}`);
   }
