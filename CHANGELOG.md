@@ -2,6 +2,54 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.3] - 2026-08-21
+
+A regression fix. `rc.2` moved to `js-yaml` 5, which loads with `CORE_SCHEMA`
+and has no `!!merge` tag where 4.x's default schema had one — so YAML merge
+keys stopped merging, and any profile or configuration that shared settings
+through an anchor failed to load entirely. Reported by a downstream embedder
+holding its upgrade on it.
+
+### Fixed
+
+- **YAML merge keys work again.** `loadYaml()` now loads with
+  `CORE_SCHEMA.withTags([mergeTag])`, so `<<: *anchor` merges instead of
+  surviving as a literal `"<<"` key. Both the folder-profile validator and the
+  closed configuration schema rejected that key as an unknown setting, so a
+  `.copytree.yml` or `config.yaml` using an anchor was rejected outright with
+  an error naming a key its author never wrote.
+
+  Deliberately not `YAML11_SCHEMA`, which restores merge and YAML 1.1 scalar
+  rules together: `yes`/`no`/`on`/`off` would become booleans, `012` octal,
+  `1e3` a string and a bare date a `Date`. That would change how every existing
+  profile parses in order to fix anchors in the few that use them. The scalar
+  contract is now pinned by tests that fail under either schema swap.
+
+- **`config migrate` verifies its own output.** It validated the values it was
+  about to write, but in memory — and a legacy `~/.copytree/*.js` file is
+  executed, so it can export anything. A `Set` satisfies AJV's idea of an
+  object, survives pruning, and serialises as `!!set`, a tag the loader does
+  not accept. Migration could write a `config.yaml` the next run could not
+  parse, from a command whose whole job is to leave a working configuration.
+  The generated document is now read back and revalidated before it is offered
+  or written.
+
+### Added
+
+- **Reserved `x-` keys**, in profiles and in `config.yaml`. Accepted, read by
+  nothing, and dropped. YAML shares settings through an anchor and an anchor
+  has to be defined on some key — but every other key names a setting and the
+  configuration schema is closed, so there was nowhere to put one. The
+  convention is docker-compose's and GitHub Actions'.
+
+### Documentation
+
+- The profile guide documented `extends:` and `external:`; neither was ever
+  implemented, and a profile using either is rejected with
+  `Unknown profile key` — the same failure this release fixes. Both are
+  replaced with the anchor syntax that works, and `basic-usage.md`'s
+  external-sources recipe with one that runs.
+
 ## [1.0.0-rc.2] - 2026-08-21
 
 The second and, if nothing surfaces, final release candidate for 1.0. An

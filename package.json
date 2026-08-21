@@ -1,6 +1,6 @@
 {
   "name": "copytree",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "description": "A Node.js CLI tool and library that copies directory structures and file contents into structured formats",
   "main": "./src/index.js",
   "types": "./types/index.d.ts",
