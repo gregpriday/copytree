@@ -181,51 +181,40 @@ pipeline had already done, and the third buffered whole files despite its name.
 To control how binaries are handled, use `--binary` or the `binaryPolicy`
 configuration key — see [the CLI reference](../cli/copytree-reference.md).
 
-### Profile Inheritance
+### Sharing Settings Between Blocks
 
-Extend existing profiles:
+YAML anchors and merge keys work, so a setting can be written once and reused:
 
 ```yaml
 name: my-docs
-description: Docs profile based on default
-extends: default
 
-# Additional includes (merged with parent)
-include:
-  - 'examples/**/*'
-  - 'tutorials/**/*'
+x-shared: &shared
+  respectGitignore: true
+  format: markdown
 
-# Additional excludes (merged with parent)
-exclude:
-  - '**/*.draft.md'
-  - 'docs/archive/**'
+options:
+  <<: *shared
+  charLimit: 200000
 ```
 
-### External Sources
+Two things to know:
 
-Include files from other locations:
+- **`x-` keys are yours.** Any top-level key beginning with `x-` is accepted and
+  then ignored, which gives an anchor somewhere to live. Every other top-level
+  key has a meaning, so defining an anchor on one would also be setting it.
+- **The merging block wins.** `<<` supplies defaults; a key written alongside it
+  overrides the anchor.
 
-```yaml
-name: with-external
-description: Include files from external sources
+Scalars follow YAML 1.2 rules: `yes`, `no`, `on` and `off` are strings, not
+booleans, and `012` is twelve. Write `true` and `false` when you mean booleans.
 
-include:
-  - 'src/**/*'
+The same `x-` convention works in `config.yaml` — see
+[the configuration reference](../reference/configuration.md).
 
-external:
-  # Include from GitHub
-  - source: https://github.com/user/shared-docs
-    destination: external/shared
-    rules:
-      - include: '**/*.md'
-
-  # Include from local directory
-  - source: /path/to/shared/library
-    destination: external/lib
-    rules:
-      - include: '**/*.js'
-      - exclude: '**/node_modules/**'
-```
+> There is no `extends:` key, and no `external:` block. Earlier drafts of this
+> guide described both; neither was ever implemented, and a profile using either
+> is rejected with `Unknown profile key`. Anchors are how a profile shares
+> settings, and `--scope` or a second run is how you reach files elsewhere.
 
 ## Rule Processing Order
 

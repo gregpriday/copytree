@@ -80,6 +80,28 @@ copytree config validate
 copytree config show --sources
 ```
 
+### Anchors, and `x-` sections
+
+YAML anchors and merge keys work, and a top-level section whose name begins with
+`x-` is the one exception to the closed schema: it is accepted, read by nothing,
+and dropped. Every other section name means something, so without a reserved
+prefix there would be nowhere to define an anchor.
+
+```yaml
+x-off: &off
+  enabled: false
+
+cache:
+  <<: *off
+  transformations:
+    <<: *off
+```
+
+Scalars follow YAML 1.2 rules, so `yes`, `no`, `on` and `off` are strings, `012`
+is twelve, and a bare date is a string. Write `true` and `false` when you mean
+booleans. Profiles reserve `x-` the same way — see
+[your first profile](../getting-started/first-profile.md).
+
 ## Keys
 
 ### `schemaVersion`
