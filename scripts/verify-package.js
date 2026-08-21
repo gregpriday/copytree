@@ -18,7 +18,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,18 +67,75 @@ function check(ok, label, detail = '') {
 }
 
 /**
- * Run a command, returning its stdout.
+ * Run a command, returning its stdout with line endings normalised.
+ *
+ * The normalisation is not cosmetic. Every caller here reads the output as
+ * lines and compares them to literals, and on Windows the child ends each one
+ * with CRLF — so `package/package.json\r` did not equal `package/package.json`
+ * and the required-entry checks all failed except the last, the one line with
+ * no `\r` after it. Worse, the leaked-`CLAUDE.md` check compares with
+ * `endsWith`, so on Windows it could never match and reported a pass no matter
+ * what the tarball contained.
+ *
  * @param {string} command - Executable
  * @param {string[]} args - Arguments
  * @param {Object} [options={}] - Spawn options
- * @returns {string} Trimmed stdout
+ * @returns {string} Trimmed stdout, LF line endings
  */
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     ...options,
-  }).trim();
+  })
+    .replace(/\r\n/g, '\n')
+    .trim();
+}
+
+/**
+ * The npm CLI as an argument list for `node`, never as a bare `npm`.
+ *
+ * On Windows `npm` is `npm.cmd`, which `execFile` cannot start: without a
+ * shell it does not consult `PATHEXT`, so the lookup fails with `ENOENT`, and
+ * since the batch-file argument-injection fix Node refuses to spawn a `.cmd`
+ * without `shell: true` at all. Turning the shell on is the usual answer and
+ * the wrong one here — it re-joins the arguments on spaces, so any path
+ * through a directory like `C:\\Users\\Ada Lovelace` breaks apart again.
+ *
+ * npm is a JavaScript file, so the portable form is to run it with the Node
+ * that is already running this script. `npm_execpath` is set by npm itself for
+ * every `npm run`; the fallback beside `process.execPath` covers being invoked
+ * directly, as the header invites.
+ *
+ * @param {string[]} args - npm arguments
+ * @returns {string[]} `[cliPath, ...args]`, to be passed to `process.execPath`
+ */
+function npmArgs(args) {
+  const fromEnv = process.env.npm_execpath;
+  if (fromEnv && /\.[cm]?js$/i.test(fromEnv)) return [fromEnv, ...args];
+
+  const beside = path.join(
+    path.dirname(process.execPath),
+    'node_modules',
+    'npm',
+    'bin',
+    'npm-cli.js',
+  );
+  if (existsSync(beside)) return [beside, ...args];
+
+  // POSIX: `npm` is a real executable on `PATH`, and `execFile` finds it.
+  return null;
+}
+
+/**
+ * Run npm, wherever it lives.
+ * @param {string[]} args - npm arguments
+ * @param {Object} [options={}] - Spawn options
+ * @returns {string} Trimmed stdout
+ */
+function npm(args, options = {}) {
+  const viaNode = npmArgs(args);
+  return viaNode ? run(process.execPath, viaNode, options) : run('npm', args, options);
 }
 
 /**
@@ -118,11 +175,14 @@ try {
 
   // ---- Pack ------------------------------------------------------------
   const packDestination = keepAt ?? workspace;
-  const packed = run('npm', ['pack', '--pack-destination', packDestination], { cwd: repoRoot });
+  const packed = npm(['pack', '--pack-destination', packDestination], { cwd: repoRoot });
   const tarball = path.join(packDestination, packed.split('\n').pop().trim());
   check(Boolean(tarball), 'npm pack produced a tarball', path.basename(tarball));
 
-  const listing = run('tar', ['-tzf', tarball]).split('\n');
+  const listing = run('tar', ['-tzf', tarball])
+    .split('\n')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
   for (const entry of REQUIRED_ENTRIES) {
     check(listing.includes(entry), `package contains ${entry.replace('package/', '')}`);
   }
@@ -137,11 +197,18 @@ try {
     `${JSON.stringify({ name: 'copytree-consumer', version: '1.0.0', private: true, type: 'module' }, null, 2)}\n`,
   );
 
-  const install = attempt(
-    'npm',
-    ['install', tarball, '--omit=dev', '--no-audit', '--no-fund', '--loglevel=error'],
-    { cwd: consumer },
-  );
+  const installArgs = [
+    'install',
+    tarball,
+    '--omit=dev',
+    '--no-audit',
+    '--no-fund',
+    '--loglevel=error',
+  ];
+  const viaNode = npmArgs(installArgs);
+  const install = viaNode
+    ? attempt(process.execPath, viaNode, { cwd: consumer })
+    : attempt('npm', installArgs, { cwd: consumer });
   check(install.ok, 'production-only install succeeds', install.ok ? '' : install.output);
 
   if (!install.ok) throw new Error('install failed; skipping the remaining checks');
@@ -223,38 +290,58 @@ try {
   check(tsc.ok, 'strict TypeScript consumer type-checks', tsc.output);
 
   // ---- CLI smoke tests from the installed package ----------------------
-  const cli = path.join(consumer, 'node_modules', '.bin', 'copytree');
+  //
+  // The bin entry is run through `process.execPath`, not through the
+  // `node_modules/.bin` shim. The shim is npm's artifact and its shape is
+  // per-platform — a shell script plus `copytree.cmd` and `copytree.ps1` on
+  // Windows — and the extensionless one there is a bash script that
+  // `execFile` cannot start. That the shim exists is worth asserting; that it
+  // works is npm's contract, not this package's. What this package owes a
+  // consumer is a `bin` entry that runs, and that is what is exercised below.
+  const installed = path.join(consumer, 'node_modules', 'copytree');
+  const binEntry = path.join(
+    installed,
+    JSON.parse(readFileSync(path.join(installed, 'package.json'), 'utf8')).bin.copytree,
+  );
+  const cli = (args, options = {}) => attempt(process.execPath, [binEntry, ...args], options);
+
+  const shim = path.join(consumer, 'node_modules', '.bin', 'copytree');
+  check(
+    existsSync(shim) || existsSync(`${shim}.cmd`),
+    'package installs a copytree command on PATH',
+  );
+
   const declaredVersion = JSON.parse(
     readFileSync(path.join(repoRoot, 'package.json'), 'utf8'),
   ).version;
 
-  const version = attempt(cli, ['--version']);
+  const version = cli(['--version']);
   check(
     version.ok && version.output.includes(declaredVersion),
     'CLI reports the packaged version',
     version.output,
   );
 
-  const help = attempt(cli, ['--help']);
+  const help = cli(['--help']);
   check(
     help.ok && help.output.includes('Commands:'),
     'CLI prints help',
     help.ok ? '' : help.output,
   );
 
-  const plan = attempt(cli, ['plan', '.'], { cwd: consumer });
+  const plan = cli(['plan', '.'], { cwd: consumer });
   check(plan.ok, 'CLI plans a real directory', plan.ok ? '' : plan.output);
 
-  const copyRun = attempt(cli, ['.', '--stdout', '--format', 'json'], { cwd: consumer });
+  const copyRun = cli(['.', '--stdout', '--format', 'json'], { cwd: consumer });
   check(copyRun.ok, 'CLI copies to stdout', copyRun.ok ? '' : copyRun.output);
 
   // An empty selection is a valid outcome, not a failure — including here.
   const emptyDir = path.join(workspace, 'empty');
   mkdirSync(emptyDir);
-  const empty = attempt(cli, [emptyDir, '--stdout'], { cwd: consumer });
+  const empty = cli([emptyDir, '--stdout'], { cwd: consumer });
   check(empty.ok, 'CLI copies an empty folder successfully', empty.ok ? '' : empty.output);
 
-  const doctor = attempt(cli, ['doctor', '--format', 'json'], { cwd: consumer });
+  const doctor = cli(['doctor', '--format', 'json'], { cwd: consumer });
   check(doctor.ok, 'CLI doctor reports healthy', doctor.ok ? '' : doctor.output);
 } catch (error) {
   failures += 1;
