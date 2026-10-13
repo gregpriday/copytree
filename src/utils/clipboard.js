@@ -7,11 +7,11 @@ import { logger } from './logger.js';
 /**
  * How long to wait for the platform's clipboard helper.
  *
- * Short on purpose: a wedged Finder or a headless session must not hang a copy
+ * Short on purpose: a wedged helper or a headless session must not hang a copy
  * that has otherwise finished. But two seconds is a guess about someone else's
  * machine, and it is wrong on a loaded CI runner, a remote desktop session, or
  * a VM with cold page cache — where the helper is killed mid-write and the run
- * silently falls back to copying text.
+ * falls back to copying the path as text.
  *
  * `COPYTREE_CLIPBOARD_TIMEOUT_MS` raises it for those environments.
  *
@@ -21,6 +21,27 @@ function clipboardTimeout() {
   const configured = Number.parseInt(process.env.COPYTREE_CLIPBOARD_TIMEOUT_MS ?? '', 10);
   return Number.isInteger(configured) && configured > 0 ? configured : 2000;
 }
+
+/**
+ * Put a file URL on the general pasteboard from osascript's own process.
+ *
+ * `tell app "Finder" to set the clipboard` is an Apple Event, and macOS lets it
+ * through only when the terminal hosting this process declares Automation
+ * access and the user has approved it. A terminal that does not declare it is
+ * refused with -1743 and no prompt, so the copy degraded to text there. Writing
+ * NSPasteboard through the AppKit bridge sends no Apple Event and needs no
+ * consent; `writeObjects` with an NSURL publishes `public.file-url` and the
+ * legacy `NSFilenamesPboardType`, which is what browsers read for a file paste.
+ * The path arrives as an argument, so it needs no escaping.
+ */
+const MACOS_PASTEBOARD_SCRIPT = `ObjC.import('AppKit');
+function run(argv) {
+  const pasteboard = $.NSPasteboard.generalPasteboard;
+  pasteboard.clearContents;
+  if (!pasteboard.writeObjects($([$.NSURL.fileURLWithPath(argv[0])]))) {
+    throw new Error('the pasteboard did not accept the file URL');
+  }
+}`;
 
 /**
  * Enhanced clipboard utilities with file reference support
@@ -38,9 +59,31 @@ class Clipboard {
   }
 
   /**
+   * Copy the path as text in place of a file reference.
+   *
+   * An agent can still open a pasted path, so this is a degraded success rather
+   * than a failure. It is reported as one, because a browser will not attach a
+   * path and "File reference copied" would send the reader to paste it there.
+   *
+   * @param {string} text - Path or file URI to copy
+   * @param {string} cause - Why no file reference could be copied
+   * @returns {Promise<{asText: true, cause: string}>} Outcome
+   * @private
+   */
+  static async _copyAsText(text, cause) {
+    await this.copyText(text);
+    return { asText: true, cause };
+  }
+
+  /**
    * Copy file reference to clipboard (cross-platform)
+   *
+   * Falls back to the path as text when the platform cannot take a file, and
+   * says so in the result; rejects only when the text copy fails too.
+   *
    * @param {string} filePath - The file path to copy as reference
-   * @returns {Promise<void>}
+   * @returns {Promise<{asText: boolean, cause?: string}>} Whether a file reference
+   *   was copied, or only its path as text and why
    */
   static async copyFileReference(filePath) {
     if (process.platform === 'win32') {
@@ -65,7 +108,7 @@ class Clipboard {
           'Failed to copy file reference using PowerShell, falling back to text:',
           error.message,
         );
-        return this.copyText(filePath);
+        return this._copyAsText(filePath, error.message);
       }
     } else if (process.platform === 'linux') {
       try {
@@ -73,8 +116,7 @@ class Clipboard {
         const method = Clipboard._detectLinuxClipboardMethod(fileUri);
 
         if (!method) {
-          // Neither xclip nor wl-copy available; fall back to plain-text URI
-          return this.copyText(fileUri);
+          return this._copyAsText(fileUri, 'no display server detected');
         }
 
         const result = spawnSync(method.tool, method.args, {
@@ -88,7 +130,10 @@ class Clipboard {
             `Failed to copy file reference using ${method.tool}, falling back to text:`,
             result.error?.message || `exit code ${result.status}`,
           );
-          return this.copyText(fileUri);
+          return this._copyAsText(
+            fileUri,
+            result.error?.message || `${method.tool} exited with code ${result.status}`,
+          );
         }
       } catch (error) {
         logger.debug(
@@ -96,44 +141,44 @@ class Clipboard {
           error.message,
         );
         const fileUri = url.pathToFileURL(filePath).toString();
-        return this.copyText(fileUri);
+        return this._copyAsText(fileUri, error.message);
       }
     } else if (process.platform === 'darwin') {
       try {
-        // Use AppleScript to copy file reference. spawnSync passes the script as a
-        // direct argument (no shell), so single quotes in filePath are safe.
-        const escapedFilePath = filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        const script = `set aFile to POSIX file "${escapedFilePath}"
-tell app "Finder" to set the clipboard to aFile`;
-
-        const result = spawnSync('osascript', ['-e', script], {
-          encoding: 'utf8',
-          stdio: 'pipe',
-          timeout: clipboardTimeout(),
-        });
+        const result = spawnSync(
+          'osascript',
+          // `--` so a relative path starting with `-` is not read as an option.
+          ['-l', 'JavaScript', '-e', MACOS_PASTEBOARD_SCRIPT, '--', filePath],
+          {
+            encoding: 'utf8',
+            stdio: 'pipe',
+            timeout: clipboardTimeout(),
+          },
+        );
 
         // `spawnSync` does not throw when the child exits non-zero, so the
-        // result had to be inspected and was not. A headless session, a denied
-        // automation permission or a Finder that will not answer all left the
-        // clipboard untouched while the run reported "File reference copied" —
-        // the user pastes, gets whatever was there before, and has no reason to
-        // suspect this command. The Linux branch above already checks both.
+        // result had to be inspected and was not. A headless session or a
+        // pasteboard that would not take the URL left no file on the clipboard
+        // while the run reported "File reference copied" — the user pastes,
+        // gets something else, and has no reason to suspect this command.
         if (result?.error || (result && result.status !== 0)) {
+          // The first line only: the reason becomes a note under the headline.
           const reason =
             result.error?.message ||
-            (result.stderr || '').trim() ||
-            `osascript exited with code ${result.status}`;
+            (result.stderr || '').trim().split('\n')[0] ||
+            (result.signal
+              ? `osascript was stopped by ${result.signal}`
+              : `osascript exited with code ${result.status}`);
           throw new Error(reason);
         }
       } catch (error) {
         logger.debug('Failed to copy file reference, falling back to text:', error.message);
-        // Fallback to copying path as text
-        return this.copyText(filePath);
+        return this._copyAsText(filePath, error.message);
       }
     } else {
-      // Fallback for other OSes
-      return this.copyText(filePath);
+      return this._copyAsText(filePath, `${process.platform} has no file-reference mechanism`);
     }
+    return { asText: false };
   }
 
   /**
@@ -151,7 +196,7 @@ tell app "Finder" to set the clipboard to aFile`;
       return {
         supported: true,
         mechanism: 'osascript',
-        detail: 'Finder clipboard via AppleScript',
+        detail: 'NSPasteboard via osascript',
       };
     }
     if (process.platform === 'win32') {

@@ -222,12 +222,23 @@ export function classifyWarnings(result = {}, extra = {}) {
   if (extra.delivery?.fallbackUsed) {
     warnings.push({
       code: WARNING_CODES.CLIPBOARD_FALLBACK,
-      message: `Clipboard unavailable — output saved to ${extra.delivery.path}`,
+      message: fallbackHeadline(extra.delivery),
       data: { path: extra.delivery.path, cause: extra.delivery.cause },
     });
   }
 
   return warnings;
+}
+
+/**
+ * What a clipboard fallback left the reader holding.
+ *
+ * @param {Object} [delivery] - Delivery result with `fallbackUsed`
+ * @returns {string} Headline without a glyph
+ */
+function fallbackHeadline(delivery) {
+  if (delivery?.actual === 'path') return 'Path copied as text, not as a file reference';
+  return `Clipboard unavailable — output saved to ${delivery?.path ?? 'a temporary file'}`;
 }
 
 /**
@@ -314,10 +325,11 @@ export function buildCompletionModel({
     return {
       event: FEEDBACK_EVENTS.RUN_COMPLETE,
       status: 'warning',
-      headline: `Clipboard unavailable — output saved to ${delivery?.path ?? 'a temporary file'}`,
+      headline: fallbackHeadline(delivery),
       metrics: buildMetrics(stats, verbose),
       warnings: warnings.filter((w) => w !== fallback),
-      notes: notices,
+      // The headline says what happened; the cause is what the reader can fix.
+      notes: delivery?.actual === 'path' && delivery.cause ? [delivery.cause, ...notices] : notices,
       details: { path: delivery?.path, destination: delivery?.actual },
       stats,
     };

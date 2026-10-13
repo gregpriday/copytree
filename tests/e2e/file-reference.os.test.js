@@ -83,13 +83,12 @@ describe('OS-specific file reference copy', () => {
       expect(existsSync(logFile)).toBe(true);
 
       const logged = readFileSync(logFile, 'utf8');
-      expect(logged).toContain('-e');
-      expect(logged).toContain('set aFile to POSIX file');
-      expect(logged).toContain('tell app "Finder" to set the clipboard to aFile');
+      expect(logged).toContain('JavaScript');
+      expect(logged).toContain('NSPasteboard');
+      expect(logged).not.toContain('Finder');
 
-      const match = logged.match(/POSIX file "([^"]+\.xml)"/);
-      expect(match).not.toBeNull();
-      const referencedPath = match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      // The path is the script's last argument, one per logged line.
+      const referencedPath = logged.trimEnd().split('\n').at(-1);
       // `<temp>/copytree/<project-slug>/<UTC-timestamp>-<short-hash>.<ext>`
       expect(referencedPath).toMatch(/\/copytree\/simple-project\//);
       expect(path.basename(referencedPath)).toMatch(/^\d{4}-\d{2}-\d{2}T[\d-]+Z-[0-9a-f]{8}\.xml$/);
@@ -166,4 +165,45 @@ describe('OS-specific file reference copy', () => {
     // freshly-written script is genuinely slow under some sandboxes and
     // security tooling, so the headroom is not theoretical.
   }, 60000);
+
+  // A file reference that degrades to the path as text used to report "File
+  // reference copied", so `--strict` passed and the reader pasted a path into a
+  // browser expecting an attachment.
+  (process.platform === 'darwin' ? test : test.skip)(
+    'reports a reference that fell back to text, and fails it under --strict',
+    async () => {
+      tempDir = mkdtempSync(path.join(os.tmpdir(), 'copytree-file-ref-text-'));
+      const binDir = path.join(tempDir, 'bin');
+      const logFile = path.join(tempDir, 'pbcopy.log');
+      mkdirSync(binDir, { recursive: true });
+      writeFileSync(
+        path.join(binDir, 'osascript'),
+        '#!/bin/sh\necho "execution error: the pasteboard is unavailable" >&2\nexit 1\n',
+        { mode: 0o755 },
+      );
+      writeFileSync(path.join(binDir, 'pbcopy'), '#!/bin/sh\ncat > "$COPYTREE_TEST_LOG"\n', {
+        mode: 0o755,
+      });
+
+      const { code, stderr } = await runCli(
+        [PROJECT, '--as-reference', '--format', 'xml', '--strict'],
+        {
+          env: {
+            COPYTREE_TEST_LOG: logFile,
+            PATH: prependPath(binDir, process.env.PATH),
+            TMPDIR: tempDir,
+            TMP: tempDir,
+            TEMP: tempDir,
+            COPYTREE_CLIPBOARD_TIMEOUT_MS: '30000',
+          },
+        },
+      );
+
+      expect(code).toBe(1);
+      expect(stderr).toContain('Delivery fell back to path');
+      expect(stderr).toContain('the pasteboard is unavailable');
+      expectReferencePath(readFileSync(logFile, 'utf8').trim());
+    },
+    60000,
+  );
 });
