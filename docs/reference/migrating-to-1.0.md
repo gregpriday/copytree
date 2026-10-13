@@ -236,6 +236,10 @@ that had to fall back to the built-in patterns. `--strict` is documented as
 "enable every applicable policy-failure check" and did not read that list. It
 does now, and exits 3.
 
+A clipboard that could not take what was asked for is a different case: the
+machine failed rather than a check, so `--strict` exits 1. That includes a file
+reference the platform could only copy as its path in text.
+
 ### `toJSON()` no longer includes the stack
 
 `error.toJSON()` — which is also what `JSON.stringify(error)` calls — returns

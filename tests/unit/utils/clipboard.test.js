@@ -93,9 +93,10 @@ describe('Clipboard', () => {
       });
       const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
 
-      await Clipboard.copyFileReference('C:\\test\\file.xml');
+      const copied = await Clipboard.copyFileReference('C:\\test\\file.xml');
 
       expect(spy).toHaveBeenCalledWith('C:\\test\\file.xml');
+      expect(copied).toEqual({ asText: true, cause: 'PowerShell not found' });
       spy.mockRestore();
     });
   });
@@ -103,7 +104,7 @@ describe('Clipboard', () => {
   describe('copyFileReference — macOS', () => {
     beforeEach(() => setPlatform('darwin'));
 
-    it('uses spawnSync with osascript (no shell layer)', async () => {
+    it('writes the pasteboard through osascript (no shell layer)', async () => {
       spawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
       await Clipboard.copyFileReference('/Users/test/output.xml');
 
@@ -111,9 +112,28 @@ describe('Clipboard', () => {
       expect(execSync).not.toHaveBeenCalled();
       expect(spawnSync).toHaveBeenCalledWith(
         'osascript',
-        ['-e', expect.stringContaining('POSIX file "/Users/test/output.xml"')],
+        [
+          '-l',
+          'JavaScript',
+          '-e',
+          expect.stringContaining('NSPasteboard'),
+          '--',
+          '/Users/test/output.xml',
+        ],
         expect.objectContaining({ stdio: 'pipe' }),
       );
+    });
+
+    // An Apple Event to Finder is refused with -1743, and no prompt, in any
+    // terminal that does not declare Automation access, so the copy degraded to
+    // text there. Writing the pasteboard in-process needs no consent.
+    it('sends no Apple Event to Finder', async () => {
+      spawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+      await Clipboard.copyFileReference('/Users/test/output.xml');
+
+      const script = spawnSync.mock.calls[0][1][3];
+      expect(script).not.toMatch(/Finder|tell app/i);
+      expect(script).toContain('writeObjects');
     });
 
     // `spawnSync` does not throw when the child exits non-zero, so the result
@@ -124,10 +144,44 @@ describe('Clipboard', () => {
       spawnSync.mockReturnValue({ status: 1, stderr: 'execution error: not allowed' });
       const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValue(undefined);
 
-      await Clipboard.copyFileReference('/Users/test/output.xml');
+      const copied = await Clipboard.copyFileReference('/Users/test/output.xml');
 
       expect(spy).toHaveBeenCalledWith('/Users/test/output.xml');
+      expect(copied).toEqual({ asText: true, cause: 'execution error: not allowed' });
       spy.mockRestore();
+    });
+
+    it('keeps a path starting with a dash from being read as an option', async () => {
+      spawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+      await Clipboard.copyFileReference('-exports/context.xml');
+
+      expect(spawnSync.mock.calls[0][1].slice(-2)).toEqual(['--', '-exports/context.xml']);
+    });
+
+    it('gives the first line of stderr as the cause', async () => {
+      spawnSync.mockReturnValue({ status: 1, stderr: 'execution error: refused\n  at run\n' });
+      jest.spyOn(Clipboard, 'copyText').mockResolvedValue(undefined);
+
+      const copied = await Clipboard.copyFileReference('/Users/test/output.xml');
+
+      expect(copied.cause).toBe('execution error: refused');
+    });
+
+    it('names the signal when osascript is stopped without a word', async () => {
+      spawnSync.mockReturnValue({ status: null, signal: 'SIGKILL', stderr: '' });
+      jest.spyOn(Clipboard, 'copyText').mockResolvedValue(undefined);
+
+      const copied = await Clipboard.copyFileReference('/Users/test/output.xml');
+
+      expect(copied.cause).toBe('osascript was stopped by SIGKILL');
+    });
+
+    it('reports a file reference when the pasteboard took it', async () => {
+      spawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+
+      await expect(Clipboard.copyFileReference('/Users/test/output.xml')).resolves.toEqual({
+        asText: false,
+      });
     });
 
     it('falls back to text when osascript cannot be spawned', async () => {
@@ -153,29 +207,19 @@ describe('Clipboard', () => {
       spy.mockRestore();
     });
 
-    it('escapes double quotes for AppleScript', async () => {
-      await Clipboard.copyFileReference('/Users/test/"quoted"/file.xml');
+    it.each([
+      ['double quotes', '/Users/test/"quoted"/file.xml'],
+      ['backslashes', '/Users/test\\path/file.xml'],
+      ['single quotes', "/Users/it's/file.xml"],
+      ['spaces', '/Users/test/My Project/file.xml'],
+    ])('passes a path with %s as an argument, unescaped', async (_label, filePath) => {
+      spawnSync.mockReturnValue({ status: 0, stdout: '', stderr: '' });
+      await Clipboard.copyFileReference(filePath);
 
-      const script = spawnSync.mock.calls[0][1][1];
-      expect(script).toContain('\\"quoted\\"');
-    });
-
-    it('escapes backslashes for AppleScript', async () => {
-      await Clipboard.copyFileReference('/Users/test\\path/file.xml');
-
-      const script = spawnSync.mock.calls[0][1][1];
-      expect(script).toContain('test\\\\path');
-    });
-
-    it('safely handles paths with single quotes (no shell injection)', async () => {
-      // Previously used execSync(`osascript -e '...'`) which was vulnerable to single-quote injection.
-      // Now uses spawnSync — single quotes in the path are passed verbatim to osascript.
-      await Clipboard.copyFileReference("/Users/it's/file.xml");
-
-      expect(spawnSync).toHaveBeenCalledTimes(1);
       expect(execSync).not.toHaveBeenCalled();
-      const script = spawnSync.mock.calls[0][1][1];
-      expect(script).toContain("it's");
+      const args = spawnSync.mock.calls[0][1];
+      expect(args.at(-1)).toBe(filePath);
+      expect(args[3]).not.toContain(filePath);
     });
   });
 
@@ -277,9 +321,10 @@ describe('Clipboard', () => {
       // Neither DISPLAY nor WAYLAND_DISPLAY set
       const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
 
-      await Clipboard.copyFileReference('/home/user/file.txt');
+      const copied = await Clipboard.copyFileReference('/home/user/file.txt');
 
       expect(spy).toHaveBeenCalledWith('file:///home/user/file.txt');
+      expect(copied).toEqual({ asText: true, cause: 'no display server detected' });
       expect(spawnSync).not.toHaveBeenCalled();
       spy.mockRestore();
     });
@@ -290,7 +335,7 @@ describe('Clipboard', () => {
       spawnSync.mockReturnValueOnce({ status: 1, error: null });
       const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
 
-      await Clipboard.copyFileReference('/home/user/file.txt');
+      const copied = await Clipboard.copyFileReference('/home/user/file.txt');
 
       expect(spawnSync).toHaveBeenCalledTimes(1);
       expect(spawnSync).toHaveBeenCalledWith(
@@ -299,6 +344,7 @@ describe('Clipboard', () => {
         expect.objectContaining({ input: 'copy\nfile:///home/user/file.txt' }),
       );
       expect(spy).toHaveBeenCalledWith('file:///home/user/file.txt');
+      expect(copied).toEqual({ asText: true, cause: 'xclip exited with code 1' });
       spy.mockRestore();
     });
 
@@ -307,10 +353,11 @@ describe('Clipboard', () => {
       spawnSync.mockReturnValueOnce({ status: null, error: new Error('ENOENT') });
       const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
 
-      await Clipboard.copyFileReference('/home/user/file.txt');
+      const copied = await Clipboard.copyFileReference('/home/user/file.txt');
 
       expect(spawnSync).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith('file:///home/user/file.txt');
+      expect(copied).toEqual({ asText: true, cause: 'ENOENT' });
       spy.mockRestore();
     });
 
@@ -321,9 +368,10 @@ describe('Clipboard', () => {
       });
       const spy = jest.spyOn(Clipboard, 'copyText').mockResolvedValueOnce();
 
-      await Clipboard.copyFileReference('/home/user/file.txt');
+      const copied = await Clipboard.copyFileReference('/home/user/file.txt');
 
       expect(spy).toHaveBeenCalledWith('file:///home/user/file.txt');
+      expect(copied).toEqual({ asText: true, cause: 'spawn exploded' });
       spy.mockRestore();
     });
 
@@ -332,7 +380,9 @@ describe('Clipboard', () => {
       process.env.XDG_CURRENT_DESKTOP = 'GNOME';
       spawnSync.mockReturnValueOnce({ status: 0, error: null });
 
-      await Clipboard.copyFileReference('/home/user/my documents/file.txt');
+      await expect(
+        Clipboard.copyFileReference('/home/user/my documents/file.txt'),
+      ).resolves.toEqual({ asText: false });
 
       expect(spawnSync).toHaveBeenCalledWith(
         'xclip',
