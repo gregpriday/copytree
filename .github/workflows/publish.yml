@@ -175,12 +175,19 @@ jobs:
           fi
           npm publish "${{ steps.pack.outputs.file }}" --access public --provenance --tag "${{ steps.disttag.outputs.tag }}"
 
+      # npm now accepts a publish before the version is visible ("Your package is
+      # being processed and may take a few minutes to become available").
+      # 1.0.0-rc.4 took nine and a half minutes, and a one-minute wait failed a
+      # release that had published correctly, skipping the GitHub release. The
+      # polls total fifteen minutes; the step timeout bounds npm's own retries
+      # on top of them, so a stalled registry cannot hold the publish group.
       - name: Confirm the registry has the bytes we tested
+        timeout-minutes: 20
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           EXPECTED="${{ steps.pack.outputs.integrity }}"
 
-          for attempt in 1 2 3 4 5 6; do
+          for attempt in $(seq 1 90); do
             PUBLISHED="$(npm view "copytree@$VERSION" dist.integrity 2>/dev/null || true)"
             if [ -n "$PUBLISHED" ]; then
               # Existence is not enough. This is the assertion the whole
@@ -193,7 +200,7 @@ jobs:
               echo "Registry reports $VERSION with matching integrity"
               exit 0
             fi
-            echo "Not visible yet; retrying in 10s ($attempt/6)"
+            echo "Not visible yet; retrying in 10s ($attempt/90)"
             sleep 10
           done
           echo "::error::copytree@$VERSION is not on the registry after publish"
