@@ -1,7 +1,7 @@
 /**
  * One constructor for every Git-ignore matcher in CopyTree.
  *
- * The `ignore` package defaults to case-insensitive matching. `micromatch`,
+ * The `ignore` package defaults to case-insensitive matching. `picomatch`,
  * which evaluates the inclusion globs, defaults to case-sensitive. Left as
  * they came, the two halves of the selection disagreed: `*.log` would exclude
  * `ERROR.LOG` on Linux, while `**\/*.md` would not include `README.MD` on

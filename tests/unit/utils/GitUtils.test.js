@@ -5,9 +5,9 @@ import path from 'path';
 let mockGitInstance;
 
 // Mock simple-git to return our controllable instance
-jest.mock('simple-git', () => {
-  return () => mockGitInstance;
-});
+jest.mock('simple-git', () => ({
+  simpleGit: () => mockGitInstance,
+}));
 
 describe('GitUtils', () => {
   let GitUtils;

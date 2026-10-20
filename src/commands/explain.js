@@ -8,13 +8,12 @@
  */
 
 import path from 'path';
-import micromatch from 'micromatch';
 import { promises as fsp } from 'node:fs';
 import { config as sharedConfig } from '../config/ConfigManager.js';
 import { buildSelectionPlan, loadSelectionProfile, resolveRoot } from '../selection/selection.js';
 import { tracePath } from '../utils/ignoreWalker.js';
 import { isHardExcluded } from '../utils/hardExclusions.js';
-import { toPosix } from '../utils/pathUtils.js';
+import { compileGlobs, toPosix } from '../utils/pathUtils.js';
 import { Feedback, writePayload } from '../cli/io.js';
 import {
   buildExplainModel,
@@ -202,7 +201,7 @@ async function traceEntry({
   });
 
   const profileIncludes = plan.profile.include.length > 0 ? plan.profile.include : ['**/*'];
-  const profileMatched = micromatch.isMatch(relative, profileIncludes);
+  const profileMatched = compileGlobs(profileIncludes)(relative);
   steps.push({
     id: 'profile-include',
     label: 'profile include',
@@ -212,7 +211,7 @@ async function traceEntry({
 
   const cliIncludes = request.selection.includes;
   const cliIncluded =
-    cliIncludes.length === 0 || micromatch.isMatch(relative, cliIncludes, { dot: true });
+    cliIncludes.length === 0 || compileGlobs(cliIncludes, { dot: true })(relative);
   steps.push({
     id: 'cli-include',
     label: 'CLI include',
@@ -260,8 +259,7 @@ async function traceEntry({
   // Includes `.copytreeinclude` and the configured dotfile force-includes, as
   // the run does.
   const forceIncludes = layers.forceIncludes ?? [];
-  const forced =
-    forceIncludes.length > 0 && micromatch.isMatch(relative, forceIncludes, { dot: true });
+  const forced = forceIncludes.length > 0 && compileGlobs(forceIncludes, { dot: true })(relative);
   steps.push({
     id: 'force-include',
     label: 'force include',

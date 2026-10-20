@@ -23,6 +23,8 @@ updates:
           - "@babel/*"
           - "eslint*"
           - "jest*"
+          - "@jest/*"
+          - "babel-jest"
           - "prettier"
         update-types:
           - "minor"
@@ -34,10 +36,25 @@ updates:
           - "@babel/*"
           - "eslint*"
           - "jest*"
+          - "@jest/*"
+          - "babel-jest"
           - "prettier"
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # Jest 30.5's rewritten module system keeps the query string of a
+      # `file://` dynamic import as part of the path, so the cache-busted import
+      # of a legacy `~/.copytree/*.js` config fails with ENOENT under test while
+      # working in Node. Held at 30.4 until a release fixes it.
+      - dependency-name: "jest"
+        versions: [">=30.5.0 <=30.5.2"]
+      - dependency-name: "jest-diff"
+        versions: [">=30.5.0 <=30.5.2"]
+      - dependency-name: "@jest/globals"
+        versions: [">=30.5.0 <=30.5.2"]
+      - dependency-name: "babel-jest"
+        versions: [">=30.5.0 <=30.5.2"]
 
   # Maintain GitHub Actions
   - package-ecosystem: "github-actions"

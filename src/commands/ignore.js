@@ -346,19 +346,20 @@ async function ignoreCheck(request, context) {
  * precisely what Git has already filtered.
  *
  * Bounded, because a rule-redundancy hint is not worth walking `node_modules`.
+ * Symbolic links are left out, as the walkers leave them out unless told to
+ * follow them.
  *
  * @param {string} root - Project root
  * @returns {Promise<string[]>} Root-relative POSIX paths
  */
 async function listRootRelativePaths(root) {
-  const { default: fastGlob } = await import('fast-glob');
-  return fastGlob('**/*', {
+  const { glob } = await import('tinyglobby');
+  return glob('**/*', {
     cwd: root,
     dot: true,
     onlyFiles: false,
-    markDirectories: true,
+    expandDirectories: false,
     followSymbolicLinks: false,
-    suppressErrors: true,
     ignore: ['.git/**', 'node_modules/**'],
     deep: 8,
   });
