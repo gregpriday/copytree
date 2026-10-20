@@ -2,6 +2,73 @@
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] - 2026-10-20
+
+A security release. The production audit is clear again: `simple-git` moves to
+v4, and `micromatch` and `fast-glob` are replaced by `picomatch` and
+`tinyglobby`, because `braces`, which `micromatch` requires, has a high advisory
+and no patched release. Matching is unchanged — `micromatch.matcher()` was
+`picomatch()` under another name. Globbing, which only force-includes and
+`ignore check` do, differs in the places below. Still a prerelease, published
+under `next`.
+
+### Fixed
+
+- **A force-include no longer reads through a link its pattern names.**
+  `--force-include 'keys/*.txt'`, with `keys` a symlink to a directory, returned
+  the files behind the link even under `followSymlinks: false`, and nothing
+  checked where the link led — so a link to `~/.ssh` committed to a repository
+  put its contents in the export. `fast-glob` resolved a pattern's static base
+  through the link, so the setting governed every link except the one the
+  pattern named. A match is now dropped unless its real path is the path it was
+  matched at; the root-containment check still applies when links are followed.
+
+- **A force-include over an unreadable directory is reported, not fatal.**
+  `fast-glob` rejected with `EACCES`, which failed the whole run from a fatal
+  stage. The directory is now recorded once as an `unreadable` exclusion and
+  the run continues, as it does when the walkers meet the same directory.
+
+- **macOS file references no longer need Finder automation.** The reference was
+  written with `tell app "Finder"`, which macOS refuses with `-1743`, and no
+  prompt, in terminals without Apple Events access. It is now written to
+  `NSPasteboard` from `osascript`'s own process through the JXA AppKit bridge,
+  with the path passed after `--` so it needs no escaping and a leading dash is
+  not read as an option.
+
+### Changed
+
+- **A path copied as text says so.** Where the platform could only put the
+  path on the clipboard as text, the run reported "File reference copied". It
+  now says "Path copied as text, not as a file reference", with the reason, on
+  every platform, and `--strict` exits 1. `ignore context` warns the same way.
+
+- **`ignore check` no longer counts a link as present on disk.** A rule
+  matching only a symbolic link is reported as matching no path, rather than as
+  redundant, as the walkers would never select it.
+
+- **A brace range over 1000 values** in a force-include is still refused, now
+  with a `ValidationError` naming the range rather than a `RangeError` from
+  `braces`. Ranges are spelled out as the comma list they stand for before
+  globbing, so `file{01..03}.txt` still finds three files.
+
+### Known gaps
+
+- With `followSymlinks: true`, `tinyglobby` treats a directory link whose
+  target lies inside an already-followed link's target as a cycle, and does
+  not enter it. It matters only when a force-include is the sole route to the
+  file; the walkers do not share the heuristic.
+
+### Infrastructure
+
+- Every dependency updated within range, and the pinned actions with them.
+- Jest is held at 30.4: 30.5's module system keeps a `file://` import's query
+  string as part of the path, which breaks the cache-busted import of a legacy
+  `~/.copytree/*.js` config under test. Dependabot ignores 30.5.0–30.5.2.
+- `jest-diff` is declared, and a mock of a module that does not exist is gone,
+  both flagged by the newer `knip`.
+
+See `docs/technical/behavior-ledger.md` for the full list of behaviour changes.
+
 ## [1.0.0-rc.3] - 2026-08-21
 
 A regression fix. `rc.2` moved to `js-yaml` 5, which loads with `CORE_SCHEMA`

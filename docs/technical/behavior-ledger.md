@@ -9,7 +9,7 @@ The rule this exists to enforce: **do not approve a changed golden file because
 
 ---
 
-## Unreleased (dependency security pass)
+## 1.0.0-rc.4 (dependency security pass)
 
 `simple-git` moved to v4, and `micromatch` and `fast-glob` were replaced by
 `picomatch` and `tinyglobby`, to clear advisories with no patched release on the
