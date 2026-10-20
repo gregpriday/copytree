@@ -143,6 +143,26 @@ describe('completion models', () => {
     expect(model.warnings).toHaveLength(0);
   });
 
+  it('says the path went as text when a reference could not be copied', () => {
+    const delivery = {
+      requested: 'reference',
+      actual: 'path',
+      path: '/tmp/proj.xml',
+      fallbackUsed: true,
+      cause: 'execution error: the pasteboard is unavailable',
+    };
+    const model = buildCompletionModel({
+      delivery,
+      stats,
+      warnings: classifyWarnings({ stats: {} }, { delivery }),
+    });
+
+    expect(model.status).toBe('warning');
+    expect(model.headline).toBe('Path copied as text, not as a file reference');
+    expect(model.notes).toEqual(['execution error: the pasteboard is unavailable']);
+    expect(model.warnings).toHaveLength(0);
+  });
+
   it('reports a preview as neutral, not success', () => {
     const model = buildDryRunModel({ stats });
 

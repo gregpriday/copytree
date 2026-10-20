@@ -649,7 +649,19 @@ async function deliverOutput(result, request, root, reporter) {
   if (destination.type === 'reference') {
     const tempFile = await writeReferenceFile(output, root, request.content.format);
     try {
-      await (await clipboard()).copyFileReference(tempFile);
+      const copied = await (await clipboard()).copyFileReference(tempFile);
+      if (copied?.asText) {
+        // The path is on the clipboard, which an agent can still open, but a
+        // browser will not attach it, so this is not the reference asked for.
+        return {
+          requested: 'reference',
+          actual: 'path',
+          status: 'warning',
+          path: tempFile,
+          fallbackUsed: true,
+          cause: copied.cause,
+        };
+      }
       return {
         requested: 'reference',
         actual: 'reference',

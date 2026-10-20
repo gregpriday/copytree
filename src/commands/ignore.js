@@ -239,8 +239,15 @@ async function ignoreContext(request, context) {
     const file = await writeReferenceFile(text, root, format === 'json' ? 'json' : 'markdown');
     const { default: clipboard } = await import('../utils/clipboard.js');
     try {
-      await clipboard.copyFileReference(file);
-      feedback.write(`Ignore context written to ${file} and copied as a file reference`);
+      const copied = await clipboard.copyFileReference(file);
+      if (copied?.asText) {
+        feedback.write(
+          `Ignore context written to ${file}; its path was copied as text (${copied.cause})`,
+          { level: 'warn' },
+        );
+      } else {
+        feedback.write(`Ignore context written to ${file} and copied as a file reference`);
+      }
     } catch (error) {
       feedback.write(
         `Ignore context written to ${file} (clipboard unavailable: ${error.message})`,

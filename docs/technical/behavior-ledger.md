@@ -513,6 +513,10 @@ kilobytes of inline context.
 - `-r` / `--as-reference` is accepted and does nothing, since it now selects the
   default.
 - `-o`, `--display`, and `--stream` are unaffected and still take precedence.
+- Where the platform cannot put a file on the clipboard, the path is copied as
+  text and the run says "Path copied as text, not as a file reference", with the
+  reason; `--strict` makes that exit 1. On macOS the reference is written to the
+  pasteboard directly, so it needs no Automation permission for Finder.
 
 **Folder-profile discovery is no longer tied to `-r`.**
 Auto-discovery of a `.copytree.yml` used to happen only when `-r` was passed.
