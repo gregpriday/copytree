@@ -16,17 +16,18 @@
 
 import Stage from '../Stage.js';
 import { walkWithIgnore } from '../../utils/ignoreWalker.js';
-import micromatch from 'micromatch';
-import fastGlob from 'fast-glob';
+import { glob } from 'tinyglobby';
 import { createMatcher } from '../../utils/ignoreMatcher.js';
 import path from 'path';
+import * as nodeFs from 'node:fs';
 import { promises as fsp } from 'node:fs';
 import { getLimiterFor } from '../../utils/taskLimiter.js';
-import { toPosix } from '../../utils/pathUtils.js';
+import { compileGlobs, toPosix } from '../../utils/pathUtils.js';
 import { collectGitIgnoreSources } from '../../utils/gitignoreSources.js';
 import { ExclusionReport, EXCLUSION_REASONS } from '../../utils/exclusionReport.js';
 import { resolveScope } from '../../utils/scopeResolver.js';
 import { HARD_EXCLUDED_DIRECTORIES, isHardExcluded } from '../../utils/hardExclusions.js';
+import { ValidationError } from '../../utils/errors.js';
 
 /**
  * Directories excluded by default because including them buries the signal,
@@ -553,11 +554,11 @@ class FileDiscoveryStage extends Stage {
   /**
    * Compiled matchers, built on first use and reused for every path.
    *
-   * `micromatch.isMatch(path, patterns)` compiles the pattern list into regular
+   * Matching straight from the pattern list compiles it into regular
    * expressions on each call, and both of these were called once per discovered
    * file — so a run over a thousand files parsed the same ten force-include
-   * globs a thousand times. `micromatch.matcher()` returns the compiled matcher
-   * so the parse happens once.
+   * globs a thousand times. `compileGlobs()` returns the compiled matcher so
+   * the parse happens once.
    *
    * Lazy rather than constructed up front: a stage built for `--only-tree` or a
    * dry run may never reach the walk, and compiling globs it will not use is the
@@ -568,7 +569,7 @@ class FileDiscoveryStage extends Stage {
    */
   matchesForceInclude(relativePath) {
     if (!this._forceIncludeMatcher) {
-      this._forceIncludeMatcher = micromatch.matcher(this.forceInclude, { dot: true });
+      this._forceIncludeMatcher = compileGlobs(this.forceInclude, { dot: true });
     }
     return this._forceIncludeMatcher(relativePath);
   }
@@ -581,7 +582,7 @@ class FileDiscoveryStage extends Stage {
    */
   matchesIncludePatterns(relativePath) {
     if (!this._includeMatcher) {
-      this._includeMatcher = micromatch.matcher(this.patterns);
+      this._includeMatcher = compileGlobs(this.patterns);
     }
     return this._includeMatcher(relativePath);
   }
@@ -594,7 +595,7 @@ class FileDiscoveryStage extends Stage {
    */
   matchesCliIncludes(relativePath) {
     if (!this._cliIncludeMatcher) {
-      this._cliIncludeMatcher = micromatch.matcher(this.includes, { dot: true });
+      this._cliIncludeMatcher = compileGlobs(this.includes, { dot: true });
     }
     return this._cliIncludeMatcher(relativePath);
   }
@@ -634,30 +635,81 @@ class FileDiscoveryStage extends Stage {
 
     this.log(`Force-including ${this.forceInclude.length} pattern(s)`, 'debug');
 
-    // Use task limiter for fast-glob to prevent oversubscription
     const globLimiter = getLimiterFor('glob', 100);
-    const globConcurrency = Math.min(
-      globLimiter.activeCount + 50, // Allow more for glob since it's usually quick
-      100,
-    );
-
     const followSymlinks = this.options.followSymlinks === true;
 
-    const entries = await fastGlob(this.forceInclude, {
+    const patterns = this.forceInclude.map(spellOutBraceRanges);
+
+    // tinyglobby skips a directory it cannot read without saying so. The
+    // walkers report one, and so does this — once, however many routes led
+    // the glob into it.
+    const unreadable = new Map();
+    const fs = {
+      ...nodeFs,
+      readdir: (dir, options, callback) =>
+        nodeFs.readdir(dir, options, (error, entries) => {
+          if (error && error.code !== 'ENOENT') unreadable.set(dir, error.code);
+          callback(error, entries);
+        }),
+    };
+
+    const matches = await glob(patterns, {
       cwd: this.basePath,
-      absolute: false,
       dot: true, // ensure hidden files/dirs are discovered
-      onlyFiles: true,
-      stats: true,
-      ignore: [], // bypass all ignore patterns
-      concurrency: globConcurrency,
-      // fast-glob follows symlinks by default, which made `always` the one path
+      // A pattern naming a directory matches the directory, not everything in
+      // it; force-includes have always meant exactly what they say.
+      expandDirectories: false,
+      // Globbing follows symlinks by default, which made `always` the one path
       // into the tree that ignored the traversal setting entirely: a force
       // include would follow links even with `followSymlinks: false`, and even
       // when following was on it skipped the root-containment check both
-      // walkers apply.
+      // walkers apply. Not following also drops the links themselves, though
+      // not a directory link the glob starts from (see below).
       followSymbolicLinks: followSymlinks,
+      fs,
     });
+
+    for (const [dir, code] of unreadable) {
+      report?.add({
+        path: toPosix(path.relative(this.basePath, dir)),
+        size: 0,
+        reason: EXCLUSION_REASONS.UNREADABLE,
+        rule: code,
+        isDirectory: true,
+      });
+    }
+
+    // The glob returns names only. A file that vanished or became unreadable
+    // between the two calls is reported, as the walkers report one.
+    //
+    // When links are not followed, a match must also be where its path says it
+    // is. The glob crawls from a pattern's static base, so `link/*.txt` reads
+    // through a directory link even with following off — and nothing else
+    // checks containment in that mode, so a link to `~/.ssh` would be read.
+    const statFile = followSymlinks ? fsp.stat : fsp.lstat;
+    const realBasePath = followSymlinks ? null : await fsp.realpath(this.basePath);
+    const entries = await Promise.all(
+      matches.map((match) =>
+        globLimiter(async () => {
+          const absolutePath = path.join(this.basePath, match);
+          try {
+            if (realBasePath !== null) {
+              const real = await fsp.realpath(absolutePath);
+              if (real !== path.join(realBasePath, match)) return null;
+            }
+            return { path: match, stats: await statFile(absolutePath) };
+          } catch (error) {
+            report?.add({
+              path: toPosix(match),
+              size: 0,
+              reason: EXCLUSION_REASONS.UNREADABLE,
+              rule: error.code,
+            });
+            return null;
+          }
+        }),
+      ),
+    );
 
     const scopePrefixes = scopePaths
       ? scopePaths.map((abs) => toPosix(path.relative(this.basePath, abs)))
@@ -665,8 +717,9 @@ class FileDiscoveryStage extends Stage {
 
     const forced = [];
     for (const entry of entries) {
-      const entryPath = toPosix(entry.path || entry);
-      const size = entry.stats?.size || 0;
+      if (!entry) continue;
+      const entryPath = toPosix(entry.path);
+      const size = entry.stats.size;
 
       // Force inclusion overrides *exclusions* — ignore files, profile and CLI
       // excludes, the hidden-file default, the size gate. It does not override
@@ -736,7 +789,7 @@ class FileDiscoveryStage extends Stage {
         path: entryPath,
         absolutePath,
         size,
-        modified: entry.stats?.mtime || null,
+        modified: entry.stats.mtime,
         stats: entry.stats,
         // Marked here, at the decision, rather than re-derived by a later stage
         // with a different matcher against a pattern list that never included
@@ -890,6 +943,96 @@ function dedupe(values) {
 function isWithin(candidate, prefix) {
   if (prefix === '' || prefix === '.') return true;
   return candidate === prefix || candidate.startsWith(`${prefix}/`);
+}
+
+/** A brace range, `{1..9}`, `{01..10..2}` or `{a..e}`, read from a `{`. */
+const BRACE_RANGE = /\{(-?\d+|[a-zA-Z])\.\.(-?\d+|[a-zA-Z])(?:\.\.(-?\d+))?\}/y;
+
+/** The largest range spelled out, as `braces` capped it for fast-glob. */
+const BRACE_RANGE_LIMIT = 1000;
+
+/**
+ * Rewrite each brace range in a glob as the comma list it stands for, so
+ * `file{01..03}.txt` becomes `file{01,02,03}.txt`.
+ *
+ * fast-glob expanded ranges itself. tinyglobby leaves braces to picomatch,
+ * which matches a comma list but not a range, so the same pattern found
+ * nothing. Only the range is rewritten: escapes, character classes and every
+ * other brace reach picomatch as written, where a full shell-style expansion
+ * would have unescaped them.
+ *
+ * @param {string} pattern - Glob pattern
+ * @returns {string} The pattern with its ranges spelled out
+ * @throws {ValidationError} When a range has more than {@link BRACE_RANGE_LIMIT} values
+ */
+function spellOutBraceRanges(pattern) {
+  let out = '';
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const char = pattern[i];
+    if (char === '\\') {
+      out += pattern.slice(i, i + 2);
+      i++;
+      continue;
+    }
+    if (char === '[') inClass = true;
+    else if (char === ']') inClass = false;
+    else if (char === '{' && !inClass) {
+      BRACE_RANGE.lastIndex = i;
+      const range = BRACE_RANGE.exec(pattern);
+      const values = range && rangeValues(range);
+      if (values) {
+        out += values.length === 1 ? values[0] : `{${values.join(',')}}`;
+        i += range[0].length - 1;
+        continue;
+      }
+    }
+    out += char;
+  }
+  return out;
+}
+
+/**
+ * The values of one brace range, or null when its ends do not form one.
+ *
+ * Numbers are zero-padded to the wider end when either end is padded, as the
+ * shell pads them. Letters must share a case: `{a..Z}` would run through
+ * `[`, `\` and `]`, which mean something else in a glob.
+ *
+ * @param {RegExpExecArray} range - A {@link BRACE_RANGE} match
+ * @returns {string[]|null} The values, in order
+ */
+function rangeValues([group, from, to, step]) {
+  const numeric = /\d/.test(from);
+  if (numeric !== /\d/.test(to)) return null;
+  if (!numeric && (from === from.toLowerCase()) !== (to === to.toLowerCase())) return null;
+
+  const start = numeric ? Number(from) : from.charCodeAt(0);
+  const end = numeric ? Number(to) : to.charCodeAt(0);
+  const stride = Math.abs(Number(step ?? 1)) || 1;
+  const count = Math.floor(Math.abs(end - start) / stride) + 1;
+  if (count > BRACE_RANGE_LIMIT) {
+    throw new ValidationError(
+      `Brace range ${group} has ${count} values; the limit is ${BRACE_RANGE_LIMIT}`,
+      'forceInclude',
+      group,
+    );
+  }
+
+  const padded = numeric && [from, to].some((edge) => /^-?0\d/.test(edge));
+  const width = padded ? Math.max(from.replace('-', '').length, to.replace('-', '').length) : 0;
+  const direction = end >= start ? 1 : -1;
+  const values = [];
+  for (let n = 0; n < count; n++) {
+    const value = start + n * stride * direction;
+    if (!numeric) {
+      values.push(String.fromCharCode(value));
+    } else {
+      const digits = String(Math.abs(value)).padStart(width, '0');
+      values.push(value < 0 ? `-${digits}` : digits);
+    }
+  }
+  return values;
 }
 
 /**

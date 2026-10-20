@@ -37,7 +37,7 @@ class TaskLimiter {
    * @param {number} [options.totalBudget=20] - Total concurrent operations across all domains
    * @param {Object} [options.budgets] - Per-domain budgets
    * @param {number} [options.budgets.discovery] - File discovery concurrency
-   * @param {number} [options.budgets.glob] - fast-glob concurrency
+   * @param {number} [options.budgets.glob] - Force-include stat concurrency
    * @param {number} [options.budgets.transform] - Transformation concurrency
    */
   initialize(options = {}) {

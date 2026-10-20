@@ -178,7 +178,7 @@ describe('symlink sandbox', () => {
 
   // `always` overrides ignore rules and the size gate. It does not override the
   // root boundary, which is a security limit rather than a convenience filter.
-  // Force include reaches the filesystem through fast-glob, which follows
+  // Force include reaches the filesystem through a glob, and globbing follows
   // symlinks by default, so it was the one path into the tree that ignored the
   // traversal setting entirely.
   describe('force include', () => {
