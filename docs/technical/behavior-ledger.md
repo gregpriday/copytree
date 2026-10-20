@@ -9,6 +9,52 @@ The rule this exists to enforce: **do not approve a changed golden file because
 
 ---
 
+## Unreleased (dependency security pass)
+
+`simple-git` moved to v4, and `micromatch` and `fast-glob` were replaced by
+`picomatch` and `tinyglobby`, to clear advisories with no patched release on the
+old line (`braces`, which `micromatch` requires, has none at all). Matching is
+unchanged: `micromatch.matcher()` was `picomatch()` under another name. Globbing
+— which only force-includes and `ignore check` do — differs in the places below.
+Brace ranges are not among them: a range in a force-include is spelled out as
+the comma list it stands for before globbing, so `file{01..03}.txt` still finds
+three files, and a range over 1000 values is still refused, now with a
+`ValidationError` naming the range rather than a `RangeError` from `braces`.
+
+### A force-include no longer reads through a link its pattern names (security)
+
+`--always 'keys/*.txt'`, with `keys` a symlink to a directory, returned the files
+behind the link even under `followSymlinks: false`, and nothing checked where the
+link led, so a link to `~/.ssh` committed to a repository put its contents in the
+export. `fast-glob` walked from a pattern's static base and resolved that base
+through the link, so the setting governed every link except the one the pattern
+named. A match is now dropped unless its real path is the path it was matched
+at, so links are left out entirely when not followed, as the walkers leave them
+out. The root-containment check still applies when they are followed.
+
+### A force-include over an unreadable directory is reported, not fatal
+
+`fast-glob` rejected with `EACCES` when a force-include had to enter a directory
+it could not read, which failed the whole run from a fatal stage. The directory
+is now recorded once as an `unreadable` exclusion and the run continues, as it
+does when the walkers meet the same directory.
+
+### Known gap: a link inside a followed link, pointing further into it
+
+With `followSymlinks: true`, `tinyglobby`'s walker (`fdir`) treats a directory
+link whose target lies inside an already-followed link's target as a cycle, and
+does not enter it: `link -> real` plus `real/alias -> real/sub` loses
+`link/alias/...`. It matters only when a force-include is the sole route to the
+file, because the walkers do not share the heuristic. `fast-glob` entered it.
+
+### `ignore check` no longer counts a link as present on disk
+
+The listing that tells a mistyped rule from a redundant one included symbolic
+links, though not what they point at. It now leaves them out, as the walkers do,
+so a rule matching only a link is reported as matching no path rather than as
+redundant. Either way the fix is to drop the rule: a run that does not follow
+links never selects one.
+
 ## 0.17.0 (dependency and process-boundary pass)
 
 The first performance pass removed duplicated work. This one removes

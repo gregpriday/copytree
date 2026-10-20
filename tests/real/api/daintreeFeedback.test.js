@@ -251,8 +251,8 @@ describe('scope can reach config-excluded directories', () => {
 
     /**
      * Every override combination that could plausibly reach git metadata.
-     * `always` is the interesting one: force-includes run through `fast-glob`
-     * with `ignore: []`, so they bypass the ignore layers by design.
+     * `always` is the interesting one: force-includes run through a glob
+     * with no ignore rules, so they bypass the ignore layers by design.
      */
     it.each([
       ['both scope overrides', { scope: ['.git'] }],

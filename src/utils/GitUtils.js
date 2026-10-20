@@ -1,4 +1,4 @@
-import simpleGit from 'simple-git';
+import { simpleGit } from 'simple-git';
 import { GitError } from './errors.js';
 import { logger } from './logger.js';
 import { createCache } from './helpers.js';
