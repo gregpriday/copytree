@@ -98,7 +98,7 @@
     "commander": "^15.0.0",
     "ignore": "^7.0.13",
     "js-yaml": "^5.5.0",
-    "minimatch": "^10.2.6",
+    "minimatch": "^11.0.3",
     "p-limit": "^7.3.3",
     "picomatch": "^4.0.7",
     "simple-git": "^4.0.2",
